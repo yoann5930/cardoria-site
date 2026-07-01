@@ -1,7 +1,10 @@
+import { Router } from "express";
 import { analyzeCardPremium } from "../lib/ai/analyze.js";
 import { getAnalysis } from "../lib/ai/training.js";
 import { readJson, writeJson } from "../lib/storage.js";
 import { recordWitnotEstimation, resolveTrafficSource } from "../lib/attribution/witnot.js";
+
+const router = Router();
 
 export async function handleEstimation(req, res) {
   try {
@@ -66,3 +69,8 @@ export async function handleEstimation(req, res) {
 export function getEstimations() {
   return readJson("estimations", []);
 }
+
+router.get("/", (req, res) => res.json({ ok: true, message: "Route estimation active." }));
+router.post("/", handleEstimation);
+
+export default router;

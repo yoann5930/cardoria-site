@@ -35,7 +35,6 @@ import ultimateRoutes from "./routes/ultimate.js";
 import ultimateAdminRoutes from "./routes/ultimate-admin.js";
 import bigdataAnalyticsRoutes from "./routes/bigdata-analytics.js";
 import bigdataAdminRoutes from "./routes/bigdata-admin.js";
-import { handleEstimation } from "./routes/estimation.js";
 import { logAudit } from "./lib/audit.js";
 import { applySecurityMiddleware, errorHandler } from "./lib/security/index.js";
 import { apiRateLimit, aiRateLimit, authRateLimit } from "./lib/security/rateLimit.js";
@@ -87,8 +86,10 @@ app.use("/api/marketplace", apiRateLimit, marketplaceV1Routes);
 app.use("/api/payments", apiRateLimit, paymentsRoutes);
 app.use("/api/seo", apiRateLimit, seoRoutes);
 
-app.get("/api/estimation-carte", (req, res) => res.json({ ok: true, message: "Route estimation active." }));
-app.post("/api/estimation-carte", aiRateLimit, handleEstimation);
+app.use("/api/estimation-carte", (req, res, next) => {
+  if (req.method === "POST") return aiRateLimit(req, res, next);
+  next();
+}, estimationRoutes);
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/engine", engineAdminRoutes);
