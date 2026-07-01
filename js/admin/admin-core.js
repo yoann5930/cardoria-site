@@ -77,7 +77,7 @@
     document.body.innerHTML =
       '<div class="admin-layout">' +
       '<aside class="admin-sidebar">' +
-      '<div class="admin-brand"><img src="assets/logo/cardoria-premium.png" alt="Cardoria" onerror="this.src=\'logo-cardoria.jpg\'"><span>CARDORIA</span></div>' +
+      '<div class="admin-brand"><img src="/assets/logo/cardoria-premium.png" alt="Cardoria" onerror="this.onerror=null;this.src=\'/logo-cardoria.jpg\'"><span>CARDORIA</span></div>' +
       '<nav class="admin-nav">' + navHtml + "</nav>" +
       '<button type="button" class="btn btn-secondary" style="width:100%;margin-top:24px" id="adminLogoutBtn">Déconnexion</button>' +
       "</aside>" +

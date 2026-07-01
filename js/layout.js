@@ -1,17 +1,22 @@
 (function () {
   "use strict";
 
-  function rootPath() {
+  var A = window.CARDORIA_ASSETS || {
+    logo: "/assets/logo/cardoria-premium.png",
+    logoFallback: "/logo-cardoria.jpg"
+  };
+
+  function pageBase() {
     return location.pathname.indexOf("/pages/") !== -1 ? "../../" : "";
   }
 
   function renderHeader() {
-    var base = rootPath();
+    var base = pageBase();
     var slot = document.getElementById("site-header");
     if (!slot) return;
     slot.innerHTML =
       '<header class="header"><div class="container nav">' +
-      '<a class="brand" href="' + base + 'index.html"><img src="' + base + 'assets/logo/cardoria-premium.png" alt="Cardoria — cartes TCG premium" width="58" height="42" loading="eager" decoding="async" onerror="this.src=\'' + base + 'logo-cardoria.jpg\'"><span>CARDORIA</span></a>' +
+      '<a class="brand" href="' + base + 'index.html"><img src="' + A.logo + '" alt="Cardoria — cartes TCG premium" width="58" height="42" loading="eager" decoding="async" onerror="this.onerror=null;this.src=\'' + A.logoFallback + '\'"><span>CARDORIA</span></a>' +
       '<button class="burger" type="button" aria-label="Ouvrir le menu" onclick="toggleMenu()">Menu</button>' +
       '<nav class="menu" id="menu" aria-label="Navigation principale">' +
       '<a href="' + base + 'index.html">Accueil</a>' +
@@ -27,7 +32,7 @@
   }
 
   function renderFooter() {
-    var base = rootPath();
+    var base = pageBase();
     var slot = document.getElementById("site-footer");
     if (!slot) return;
     var lic = window.CARDORIA_SEO && CARDORIA_SEO.licenses ? CARDORIA_SEO.licenses : {};
@@ -40,7 +45,7 @@
       '<footer class="footer-premium">' +
       '<div class="container footer-grid">' +
       '<div class="footer-brand">' +
-      '<img src="' + base + 'assets/logo/cardoria-premium.png" alt="Cardoria logo" width="90" height="65" loading="lazy" decoding="async" onerror="this.src=\'' + base + 'logo-cardoria.jpg\'">' +
+      '<img src="' + A.logo + '" alt="Cardoria logo" width="90" height="65" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=\'' + A.logoFallback + '\'">' +
       "<p>Plateforme premium française : estimation IA, marketplace, rachat et expertise cartes TCG.</p>" +
       '<p class="footer-email"><a href="mailto:Cardoria59330@gmail.com">Cardoria59330@gmail.com</a></p>' +
       "</div>" +
@@ -77,7 +82,7 @@
     renderHeader();
     renderFooter();
     if (location.pathname.indexOf("admin") === -1) {
-      var base = rootPath();
+      var base = pageBase();
       var attr = document.createElement("script");
       attr.src = base + "js/attribution.js";
       attr.defer = true;
