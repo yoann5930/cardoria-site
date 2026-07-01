@@ -2,12 +2,14 @@
  * Historique des prix — 7 / 30 / 90 / 365 jours.
  */
 import { getDb } from "../engine/database.js";
+import { ensureAiPriceHistoryTable } from "./migrate.js";
 
 const PERIODS = { "7": 7, "30": 30, "90": 90, "365": 365, "1y": 365, "1an": 365 };
 
 export function recordPriceSnapshot(cardId, prices, source = "cardoria_aggregate") {
   if (!cardId || !prices) return;
   const db = getDb();
+  ensureAiPriceHistoryTable(db);
   db.prepare(`
     INSERT INTO ai_price_history (card_id, recorded_at, price_low, price_avg, price_high, price_recommended, source)
     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -23,9 +25,11 @@ export function recordPriceSnapshot(cardId, prices, source = "cardoria_aggregate
 }
 
 export function getPriceHistory(cardId, period = "30") {
+  const db = getDb();
+  ensureAiPriceHistoryTable(db);
   const days = PERIODS[String(period)] || 30;
   const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-  const rows = getDb().prepare(`
+  const rows = db.prepare(`
     SELECT recorded_at AS date, price_low AS low, price_avg AS avg, price_high AS high, price_recommended AS recommended
     FROM ai_price_history WHERE card_id = ? AND recorded_at >= ?
     ORDER BY recorded_at ASC
@@ -36,6 +40,7 @@ export function getPriceHistory(cardId, period = "30") {
 
 export function seedPriceHistoryIfEmpty(cardId, basePrice) {
   const db = getDb();
+  ensureAiPriceHistoryTable(db);
   const count = db.prepare("SELECT COUNT(*) AS c FROM ai_price_history WHERE card_id = ?").get(cardId)?.c ?? 0;
   if (count > 0) return;
 

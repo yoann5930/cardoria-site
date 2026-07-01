@@ -3,6 +3,7 @@
  */
 import { getDb } from "../engine/database.js";
 import { getCardById } from "../engine/cards.js";
+import { ensureAiPriceHistoryTable } from "../ai/migrate.js";
 
 const PERIODS = {
   "7": 7,
@@ -55,6 +56,7 @@ export function getUltimateHistory(cardId, periodKey = "30", { refresh = false }
 
 function buildHistoryPoints(cardId, periodKey) {
   const db = getDb();
+  ensureAiPriceHistoryTable(db);
   const days = PERIODS[periodKey];
   const since = days
     ? new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)

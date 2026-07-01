@@ -2,9 +2,11 @@
  * Détection des tendances marché — cartes en hausse ou en baisse.
  */
 import { getDb } from "../engine/database.js";
+import { ensureAiPriceHistoryTable } from "./migrate.js";
 
 export function computeTrendForCard(cardId, cardName = "", license = "") {
   const db = getDb();
+  ensureAiPriceHistoryTable(db);
   const rows = db.prepare(`
     SELECT price_recommended, recorded_at FROM ai_price_history
     WHERE card_id = ? ORDER BY recorded_at DESC LIMIT 60
@@ -56,7 +58,9 @@ export function getTrends({ direction, limit = 20 } = {}) {
 }
 
 export function refreshAllTrends(limit = 100) {
-  const cards = getDb().prepare(`
+  const db = getDb();
+  ensureAiPriceHistoryTable(db);
+  const cards = db.prepare(`
     SELECT DISTINCT card_id FROM ai_price_history LIMIT ?
   `).all(limit);
   let updated = 0;

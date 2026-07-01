@@ -59,6 +59,7 @@ app.use("/api/health", healthRoutes);
 app.use("/api/system", systemRoutes);
 
 migrateAuth();
+initAi();
 seedEngineIfEmpty();
 initMarketplace();
 initMarketData();
@@ -66,7 +67,6 @@ initScanner();
 initAiEnterprise();
 initUltimate();
 initBigData();
-initAi();
 initSeo();
 scheduleAutoBackup();
 initLaunch();

@@ -3,8 +3,25 @@
  */
 import { getDb } from "../engine/database.js";
 
+export function ensureAiPriceHistoryTable(db = getDb()) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_price_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id TEXT NOT NULL,
+      recorded_at TEXT NOT NULL,
+      price_low REAL NOT NULL,
+      price_avg REAL NOT NULL,
+      price_high REAL NOT NULL,
+      price_recommended REAL NOT NULL,
+      source TEXT DEFAULT 'cardoria_aggregate'
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_price_history_card ON ai_price_history(card_id, recorded_at);
+  `);
+}
+
 export function migrateAi() {
   const db = getDb();
+  ensureAiPriceHistoryTable(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS ai_analyses (
       id TEXT PRIMARY KEY,
