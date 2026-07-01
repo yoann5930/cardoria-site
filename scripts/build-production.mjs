@@ -31,8 +31,24 @@ function copyMin(src, dest, minFn) {
   console.log("→", path.relative(ROOT, dest));
 }
 
+function copyTree(srcDir, destDir) {
+  if (!fs.existsSync(srcDir)) return;
+  fs.mkdirSync(destDir, { recursive: true });
+  for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const src = path.join(srcDir, entry.name);
+    const dest = path.join(destDir, entry.name);
+    if (entry.isDirectory()) copyTree(src, dest);
+    else fs.copyFileSync(src, dest);
+  }
+}
+
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
+
+copyTree(path.join(ROOT, "assets"), path.join(OUT, "assets"));
+if (fs.existsSync(path.join(ROOT, "logo-cardoria.jpg"))) {
+  fs.copyFileSync(path.join(ROOT, "logo-cardoria.jpg"), path.join(OUT, "logo-cardoria.jpg"));
+}
 
 ["style.css", "css/marketplace.css", "css/engine.css", "css/launch-perf.css"].forEach((f) => {
   const src = path.join(ROOT, f);
