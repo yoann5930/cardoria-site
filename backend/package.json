@@ -1,0 +1,19 @@
+{
+  "name": "cardoria-v5-backend",
+  "version": "5.0.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "audit": "node ../scripts/audit-launch.mjs",
+    "sitemap": "node ../scripts/generate-launch-sitemap.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "nodemailer": "^6.9.15",
+    "openai": "^4.67.0"
+  }
+}

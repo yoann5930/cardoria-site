@@ -1,0 +1,65 @@
+[
+  {
+    "id": "PKM-001",
+    "name": "Pikachu Promo",
+    "category": "pokemon",
+    "condition": "Excellent",
+    "price": 19.9,
+    "stock": 3,
+    "emoji": "⚡"
+  },
+  {
+    "id": "PKM-002",
+    "name": "Dracaufeu Holo",
+    "category": "pokemon",
+    "condition": "Good",
+    "price": 89.9,
+    "stock": 1,
+    "emoji": "🔥"
+  },
+  {
+    "id": "OP-001",
+    "name": "Luffy Rare",
+    "category": "onepiece",
+    "condition": "Near Mint",
+    "price": 24.9,
+    "stock": 2,
+    "emoji": "🏴‍☠️"
+  },
+  {
+    "id": "YGO-001",
+    "name": "Dragon Blanc aux Yeux Bleus",
+    "category": "yugioh",
+    "condition": "Played",
+    "price": 14.9,
+    "stock": 1,
+    "emoji": "🐉"
+  },
+  {
+    "id": "ACC-001",
+    "name": "Sleeves premium x100",
+    "category": "accessoires",
+    "condition": "Neuf",
+    "price": 6.9,
+    "stock": 20,
+    "emoji": "🛡️"
+  },
+  {
+    "id": "ACC-002",
+    "name": "Top loaders x25",
+    "category": "accessoires",
+    "condition": "Neuf",
+    "price": 5.9,
+    "stock": 15,
+    "emoji": "📦"
+  },
+  {
+    "id": "ACC-003",
+    "name": "Classeur 9 poches",
+    "category": "accessoires",
+    "condition": "Neuf",
+    "price": 14.9,
+    "stock": 8,
+    "emoji": "📚"
+  }
+]

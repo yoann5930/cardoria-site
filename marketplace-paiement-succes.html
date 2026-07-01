@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paiement confirmé — Cardoria Marketplace</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/marketplace.css">
+</head>
+<body>
+<main class="container mk-page" style="text-align:center;padding:60px 20px">
+<h1 style="color:#ffe18a">Paiement confirmé</h1>
+<p id="msg">Merci pour votre achat sur Cardoria Marketplace.</p>
+<p><a href="mes-commandes.html">Voir mes commandes</a> · <a href="marketplace.html">Continuer mes achats</a></p>
+</main>
+<script src="js/marketplace-client.js"></script>
+<script>
+(function () {
+  var M = window.CardoriaMarketplace;
+  var params = new URLSearchParams(location.search);
+  var order = params.get("order");
+  var checkoutId = params.get("checkout_id");
+  var msg = document.getElementById("msg");
+  if (order) msg.textContent = "Commande " + order + " — paiement SumUp en cours de validation.";
+  if (checkoutId) {
+    fetch(M.BACKEND + "/api/payments/sumup/confirm/" + encodeURIComponent(checkoutId))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.ok && d.status === "paid") msg.textContent = "Paiement confirmé. Vous recevrez un email de confirmation.";
+      });
+  }
+})();
+</script>
+</body>
+</html>

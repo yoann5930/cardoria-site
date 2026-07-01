@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: cardoria-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SITE_URL
+        value: https://cardoria.fr
+      - key: CORS_ORIGINS
+        value: https://cardoria.fr,https://www.cardoria.fr,https://cardoria.vercel.app
+    disk:
+      name: cardoria-data
+      mountPath: /opt/render/project/src/backend/data
+      sizeGB: 1

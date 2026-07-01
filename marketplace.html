@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marketplace TCG — Cardoria</title>
+<meta name="description" content="Achetez et vendez des cartes Pokémon, Yu-Gi-Oh!, One Piece et TCG sur la marketplace Cardoria. Paiement sécurisé SumUp.">
+<meta name="robots" content="index,follow">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/marketplace.css">
+<link rel="stylesheet" href="css/perf.css">
+<script src="js/seo-config.js"></script>
+<script src="js/seo.js"></script>
+<link rel="icon" href="assets/logo/cardoria-premium.png">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="container mk-page">
+<section class="mk-hero"><span class="badge">MARKETPLACE</span><h1>Acheter & vendre des cartes TCG</h1><p>Entre particuliers et professionnels — paiement SumUp sécurisé, expédition Mondial Relay, Colissimo et Chronopost.</p></section>
+<div class="mk-toolbar">
+<input class="mk-search" id="mkSearch" placeholder="Recherche ultra-rapide — nom, extension, vendeur…" autocomplete="off">
+<select id="mkLicense"><option value="">Toutes licences</option><option value="pokemon">Pokémon</option><option value="yugioh">Yu-Gi-Oh!</option><option value="onepiece">One Piece</option><option value="lorcana">Lorcana</option><option value="magic">Magic</option></select>
+<select id="mkSort"><option value="recent">Plus récentes</option><option value="price_asc">Prix ↑</option><option value="price">Prix ↓</option><option value="popular">Populaires</option></select>
+<button type="button" id="mkNeg">Négociable</button>
+<span class="mk-ms" id="mkMs"></span>
+</div>
+<div class="mk-grid" id="mkGrid"><div class="engine-loading">Chargement…</div></div>
+<div class="mk-pagination" id="mkPages"></div>
+<p style="margin-top:24px;text-align:center"><a href="comparateur.html" style="color:#ffe18a">Comparateur de prix</a> · <a href="souhaits.html" style="color:#ffe18a">Liste de souhaits & alertes</a> · <a href="pages/licences/" style="color:#ffe18a">Licences TCG</a></p>
+</main>
+<div id="site-footer"></div>
+<script src="js/layout.js" defer></script>
+<script src="js/analytics.js" defer></script>
+<script src="js/cookie-consent.js" defer></script>
+<script src="script.js?v=9" defer></script>
+<script src="js/marketplace-client.js"></script>
+<script src="js/marketplace-browse.js"></script>
+</body>
+</html>

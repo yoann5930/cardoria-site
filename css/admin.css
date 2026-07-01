@@ -1,0 +1,42 @@
+/* Cardoria Enterprise Back-Office */
+.admin-app{margin:0;background:#06080d;color:#fff8e8;min-height:100vh}
+.admin-layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.admin-sidebar{background:linear-gradient(180deg,#0a0c12,#07080c);border-right:1px solid rgba(212,175,55,.25);padding:24px 16px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.admin-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px;padding:0 8px}
+.admin-brand img{width:48px;border-radius:8px}
+.admin-brand span{font-weight:900;letter-spacing:.08em;color:#ffe18a;font-size:14px}
+.admin-nav{display:flex;flex-direction:column;gap:4px}
+.admin-nav a{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;font-size:14px;font-weight:700;color:#baaf97;transition:background .2s,color .2s}
+.admin-nav a:hover,.admin-nav a.active{background:rgba(212,175,55,.12);color:#ffe18a}
+.admin-nav-section{margin:18px 0 8px;padding:0 14px;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:rgba(212,175,55,.5)}
+.admin-main{padding:28px 32px 48px;overflow-x:hidden}
+.admin-topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:28px;flex-wrap:wrap}
+.admin-topbar h1{margin:0 0 6px;font-size:clamp(24px,3vw,34px);color:#ffe18a}
+.admin-topbar p{margin:0;color:#baaf97;font-size:14px}
+.admin-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:28px}
+.admin-kpi{padding:22px 20px;background:linear-gradient(145deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(212,175,55,.25);border-radius:18px}
+.admin-kpi label{display:block;font-size:12px;color:#baaf97;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+.admin-kpi strong{display:block;font-size:clamp(22px,3vw,32px);color:#ffe18a;font-weight:900}
+.admin-kpi small{display:block;margin-top:6px;font-size:12px;color:#baaf97}
+.admin-panel{padding:22px;background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(212,175,55,.22);border-radius:18px;margin-bottom:22px}
+.admin-panel h2{margin:0 0 16px;font-size:18px;color:#ffe18a}
+.admin-filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.admin-filters input,.admin-filters select{padding:11px 14px;border:1px solid rgba(212,175,55,.25);background:rgba(255,255,255,.05);color:#fff8e8;border-radius:12px;font-size:14px;min-width:160px}
+.admin-table-wrap{overflow:auto;border:1px solid rgba(212,175,55,.2);border-radius:14px}
+.admin-table{width:100%;border-collapse:collapse;min-width:720px}
+.admin-table th,.admin-table td{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;font-size:14px}
+.admin-table th{color:#ffe18a;background:rgba(212,175,55,.08);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.admin-table tr:hover td{background:rgba(212,175,55,.04)}
+.admin-badge{display:inline-flex;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;text-transform:uppercase}
+.admin-badge--ok{background:rgba(76,175,125,.15);color:#8fd4a8}
+.admin-badge--warn{background:rgba(212,175,55,.15);color:#ffe18a}
+.admin-badge--danger{background:rgba(255,107,107,.15);color:#ff8a8a}
+.admin-badge--gold{background:rgba(212,175,55,.22);color:#ffe18a;border:1px solid rgba(212,175,55,.35)}
+.admin-periods{display:flex;gap:8px;flex-wrap:wrap}
+.admin-periods button{padding:9px 14px;border:1px solid rgba(212,175,55,.25);background:transparent;color:#baaf97;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px}
+.admin-periods button.active,.admin-periods button:hover{background:rgba(212,175,55,.15);color:#ffe18a;border-color:rgba(212,175,55,.45)}
+.admin-chart{width:100%;max-width:100%;height:auto;border-radius:14px;background:rgba(255,255,255,.02);border:1px solid rgba(212,175,55,.15);margin-bottom:18px}
+.admin-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.admin-role-admin{color:#ffe18a}.admin-role-employee{color:#8fd4a8}.admin-role-client{color:#baaf97}
+@media(max-width:1024px){.admin-layout{grid-template-columns:1fr}.admin-sidebar{position:relative;height:auto}.admin-kpi-grid{grid-template-columns:repeat(2,1fr)}.admin-grid-2{grid-template-columns:1fr}}
+@media(max-width:640px){.admin-main{padding:18px 16px 32px}.admin-kpi-grid{grid-template-columns:1fr}}

@@ -1,0 +1,147 @@
+/* Cardoria Scanner Intelligent — mobile premium noir/or */
+:root {
+  --scan-bg: #060608;
+  --scan-panel: #101018;
+  --scan-gold: #d4af37;
+  --scan-gold-light: #ffe18a;
+  --scan-muted: #9a9078;
+  --scan-border: rgba(212, 175, 55, 0.22);
+}
+
+.scanner-app {
+  min-height: 100vh;
+  background: radial-gradient(ellipse at top, #14121a 0%, var(--scan-bg) 55%);
+  color: #f5f0e6;
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+}
+
+.scanner-header {
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--scan-border);
+  background: rgba(0, 0, 0, 0.35);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(8px);
+}
+
+.scanner-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--scan-gold-light);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.scanner-brand img { width: 42px; height: auto; }
+
+.scanner-main { padding: 18px 16px 100px; max-width: 520px; margin: 0 auto; }
+
+.scanner-hero { text-align: center; margin-bottom: 20px; }
+.scanner-hero .badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--scan-border);
+  color: var(--scan-gold-light);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.scanner-hero h1 { font-size: 1.55rem; margin: 12px 0 8px; color: var(--scan-gold-light); }
+.scanner-hero p { color: var(--scan-muted); font-size: 14px; line-height: 1.5; margin: 0; }
+
+.scanner-preview {
+  aspect-ratio: 3/4;
+  border-radius: 18px;
+  border: 1px dashed var(--scan-border);
+  background: linear-gradient(145deg, rgba(212,175,55,.08), rgba(0,0,0,.4));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 14px;
+  position: relative;
+}
+
+.scanner-preview img { width: 100%; height: 100%; object-fit: contain; }
+.scanner-preview-placeholder { color: var(--scan-muted); font-size: 14px; text-align: center; padding: 20px; }
+
+.scanner-thumbs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.scanner-thumb {
+  width: 64px; height: 64px; border-radius: 10px; overflow: hidden;
+  border: 2px solid transparent; cursor: pointer; background: var(--scan-panel);
+}
+.scanner-thumb.active { border-color: var(--scan-gold); }
+.scanner-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.scanner-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+
+.scan-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 12px; border-radius: 14px; border: 1px solid var(--scan-border);
+  background: var(--scan-panel); color: var(--scan-gold-light);
+  font-weight: 700; font-size: 14px; cursor: pointer;
+}
+.scan-btn-primary {
+  grid-column: 1 / -1;
+  background: linear-gradient(145deg, #c9a227, #8a6f18);
+  color: #120f08; border: none;
+}
+.scan-btn:active { transform: scale(0.98); }
+
+.scanner-form label { display: block; font-size: 11px; color: var(--scan-muted); margin: 10px 0 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+.scanner-form input {
+  width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--scan-border); background: rgba(255,255,255,.04); color: #fff;
+}
+
+.scanner-result {
+  margin-top: 20px; padding: 16px; border-radius: 16px;
+  border: 1px solid var(--scan-border);
+  background: rgba(16, 16, 24, 0.9);
+}
+
+.scanner-result h3 { color: var(--scan-gold-light); margin: 0 0 10px; font-size: 1rem; }
+.scanner-card-name { font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0 0 6px; }
+.scanner-meta { font-size: 13px; color: var(--scan-muted); line-height: 1.6; }
+.scanner-price {
+  margin-top: 14px; padding: 14px; border-radius: 12px;
+  background: linear-gradient(145deg, rgba(212,175,55,.18), rgba(212,175,55,.05));
+  text-align: center;
+}
+.scanner-price label { display: block; font-size: 10px; color: var(--scan-muted); text-transform: uppercase; }
+.scanner-price strong { font-size: 1.6rem; color: var(--scan-gold-light); }
+
+.scanner-cta { display: grid; gap: 10px; margin-top: 16px; }
+.scanner-cta .scan-btn-primary { grid-column: auto; }
+.scanner-cta .scan-btn-secondary { background: transparent; color: var(--scan-gold-light); }
+
+.scanner-loading {
+  text-align: center; padding: 24px; color: var(--scan-gold-light);
+}
+.scanner-loading .pulse {
+  width: 48px; height: 48px; margin: 0 auto 12px; border-radius: 50%;
+  border: 3px solid rgba(212,175,55,.2); border-top-color: var(--scan-gold);
+  animation: scanSpin .8s linear infinite;
+}
+@keyframes scanSpin { to { transform: rotate(360deg); } }
+
+.scanner-defects { margin-top: 10px; font-size: 12px; color: #baaf97; }
+.scanner-defects li { margin: 4px 0; }
+
+.scanner-fallback {
+  padding: 10px 12px; border-radius: 10px; background: rgba(255,180,80,.1);
+  color: #ffd699; font-size: 13px; margin-bottom: 12px;
+}
+
+input[type="file"].scan-file-input { display: none; }
+
+@media (min-width: 768px) {
+  .scanner-main { max-width: 560px; padding-top: 28px; }
+}

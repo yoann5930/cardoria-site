@@ -1,0 +1,59 @@
+/* Cardoria Marketplace — style premium noir/or */
+.mk-page{padding:28px 0 48px}
+.mk-hero{margin-bottom:28px}
+.mk-hero h1{margin:0 0 8px;color:#ffe18a;font-size:clamp(26px,4vw,38px)}
+.mk-hero p{color:#baaf97;margin:0;font-size:15px}
+.mk-toolbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;align-items:center}
+.mk-search{flex:1;min-width:220px;padding:14px 18px;border:1px solid rgba(212,175,55,.3);background:rgba(255,255,255,.05);color:#fff8e8;border-radius:14px;font-size:15px}
+.mk-search:focus{outline:none;border-color:rgba(212,175,55,.6);box-shadow:0 0 0 3px rgba(212,175,55,.12)}
+.mk-filters{display:flex;gap:8px;flex-wrap:wrap}
+.mk-filters select,.mk-filters button{padding:11px 14px;border:1px solid rgba(212,175,55,.25);background:rgba(255,255,255,.04);color:#baaf97;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer}
+.mk-filters button.active,.mk-filters button:hover{background:rgba(212,175,55,.15);color:#ffe18a}
+.mk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px}
+.mk-card{background:linear-gradient(145deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(212,175,55,.22);border-radius:18px;overflow:hidden;text-decoration:none;color:inherit;transition:transform .2s,border-color .2s;display:flex;flex-direction:column}
+.mk-card:hover{transform:translateY(-4px);border-color:rgba(212,175,55,.45)}
+.mk-card-img{height:200px;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.mk-card-img img{max-width:100%;max-height:100%;object-fit:contain}
+.mk-card-body{padding:16px;flex:1;display:flex;flex-direction:column}
+.mk-card-body h3{margin:0 0 6px;font-size:16px;color:#ffe18a;line-height:1.3}
+.mk-card-meta{font-size:13px;color:#baaf97;margin-bottom:10px}
+.mk-card-price{margin-top:auto;font-size:22px;font-weight:900;color:#ffe18a}
+.mk-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:10px;font-weight:900;text-transform:uppercase}
+.mk-badge-verified{background:rgba(76,175,125,.15);color:#8fd4a8}
+.mk-badge-neg{background:rgba(212,175,55,.12);color:#ffe18a}
+.mk-badge-pro{background:rgba(100,149,237,.15);color:#9ec5ff}
+.mk-seller-row{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:#baaf97}
+.mk-detail{display:grid;grid-template-columns:minmax(300px,480px) 1fr;gap:28px;align-items:start}
+.mk-gallery{background:rgba(255,255,255,.04);border:1px solid rgba(212,175,55,.2);border-radius:18px;padding:16px}
+.mk-gallery-main{height:360px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;border-radius:12px;background:rgba(0,0,0,.2)}
+.mk-gallery-main img{max-height:100%;max-width:100%;object-fit:contain}
+.mk-thumbs{display:flex;gap:8px;flex-wrap:wrap}
+.mk-thumbs img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid transparent;cursor:pointer}
+.mk-thumbs img.active{border-color:#ffe18a}
+.mk-buy-box{padding:22px;background:linear-gradient(145deg,rgba(212,175,55,.1),rgba(212,175,55,.03));border:1px solid rgba(212,175,55,.3);border-radius:18px;margin-top:18px}
+.mk-price-big{font-size:36px;font-weight:900;color:#ffe18a;margin:8px 0}
+.mk-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.mk-btn{padding:12px 20px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;border:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.mk-btn-primary{background:linear-gradient(135deg,#d4af37,#ffe18a);color:#111}
+.mk-btn-secondary{background:transparent;border:1px solid rgba(212,175,55,.35);color:#ffe18a}
+.mk-seller-card{padding:20px;border:1px solid rgba(212,175,55,.2);border-radius:16px;margin-top:20px}
+.mk-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+.mk-stat{text-align:center;padding:12px;background:rgba(255,255,255,.04);border-radius:12px}
+.mk-stat strong{display:block;font-size:20px;color:#ffe18a}
+.mk-stat span{font-size:11px;color:#baaf97;text-transform:uppercase}
+.mk-compare-table{width:100%;border-collapse:collapse;margin-top:16px}
+.mk-compare-table th,.mk-compare-table td{padding:12px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}
+.mk-compare-table th{color:#ffe18a;font-size:12px;text-transform:uppercase}
+.mk-compare-best{color:#8fd4a8;font-weight:800}
+.mk-pagination{display:flex;gap:8px;justify-content:center;margin-top:28px;flex-wrap:wrap}
+.mk-pagination button{padding:9px 14px;border:1px solid rgba(212,175,55,.25);background:transparent;color:#baaf97;border-radius:10px;cursor:pointer;font-weight:700}
+.mk-pagination button.active{background:rgba(212,175,55,.15);color:#ffe18a}
+.mk-ms{font-size:12px;color:#baaf97;margin-left:auto}
+.mk-form-grid{display:grid;gap:12px;max-width:640px}
+.mk-form-grid input,.mk-form-grid select,.mk-form-grid textarea{padding:12px 14px;border:1px solid rgba(212,175,55,.25);background:rgba(255,255,255,.05);color:#fff8e8;border-radius:12px;font-size:14px}
+.mk-order-card{padding:18px;border:1px solid rgba(212,175,55,.2);border-radius:14px;margin-bottom:14px}
+.mk-status{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;text-transform:uppercase}
+.mk-status-paid{background:rgba(76,175,125,.15);color:#8fd4a8}
+.mk-status-pending{background:rgba(212,175,55,.15);color:#ffe18a}
+.mk-status-shipped{background:rgba(100,149,237,.15);color:#9ec5ff}
+@media(max-width:900px){.mk-detail{grid-template-columns:1fr}.mk-stats{grid-template-columns:1fr 1fr}}

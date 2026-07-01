@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Licences TCG — Cardoria</title>
+<link rel="preload" href="../../style.css" as="style">
+<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="../../css/seo-pages.css">
+<link rel="stylesheet" href="../../css/perf.css">
+<link rel="icon" href="../../assets/logo/cardoria-premium.png">
+<script src="../../js/seo-config.js"></script>
+<script>window.CARDORIA_SEO_PAGE={type:"collection",path:"/pages/licences/",breadcrumbs:[{name:"Accueil",url:"/index.html"},{name:"Licences TCG",url:"/pages/licences/"}]};</script>
+<script src="../../js/seo.js"></script>
+</head>
+<body>
+<div id="site-header"></div>
+<main class="container seo-page">
+<span class="badge">LICENCES TCG</span>
+<h1>Toutes les licences cartes à collectionner</h1>
+<p class="seo-lead">Pages SEO optimisées par licence : estimation, catalogue, marketplace et tendances marché Cardoria.</p>
+<div class="seo-catalog" id="licenceGrid"></div>
+</main>
+<div id="site-footer"></div>
+<script src="../../js/layout.js" defer></script>
+<script src="../../js/analytics.js" defer></script>
+<script src="../../js/cookie-consent.js" defer></script>
+<script>
+(function(){
+  var lic=window.CARDORIA_SEO&&CARDORIA_SEO.licenses||{};
+  var g=document.getElementById("licenceGrid");
+  if(!g)return;
+  g.innerHTML=Object.keys(lic).map(function(k){
+    var l=lic[k];
+    return '<a href="'+k+'/"><span class="icon">'+l.icon+'</span><strong>'+l.name+'</strong></a>';
+  }).join("");
+})();
+</script>
+</body>
+</html>

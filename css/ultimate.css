@@ -1,0 +1,28 @@
+.ultimate-hero { padding: 48px 0 32px; }
+.ultimate-sub { color: #baaf97; margin-bottom: 20px; }
+.ultimate-search { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+.ultimate-search input { flex: 1; min-width: 220px; padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(212,175,55,.35); background: #111; color: #f5f0e6; }
+.ultimate-understood { color: #baaf97; font-size: 14px; margin-bottom: 12px; }
+.ultimate-results { display: grid; gap: 10px; }
+.ultimate-card { display: block; padding: 14px 16px; border: 1px solid rgba(212,175,55,.25); border-radius: 10px; text-decoration: none; color: inherit; background: rgba(0,0,0,.35); }
+.ultimate-card strong { display: block; color: #ffe18a; }
+.ultimate-card span { font-size: 13px; color: #baaf97; }
+.ultimate-card em { display: block; margin-top: 6px; color: #d4af37; }
+.ultimate-meta { color: #baaf97; margin-bottom: 16px; }
+.ultimate-section { margin: 28px 0; padding: 18px; border: 1px solid rgba(212,175,55,.2); border-radius: 12px; background: rgba(0,0,0,.25); }
+.ultimate-section h2 { color: #ffe18a; font-size: 18px; margin: 0 0 14px; }
+.ultimate-prices { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.ultimate-prices label { display: block; font-size: 11px; color: #baaf97; text-transform: uppercase; }
+.ultimate-prices strong { color: #ffe18a; font-size: 16px; }
+.ultimate-advice { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+.ult-action strong { color: #ffe18a; font-size: 18px; }
+.ult-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.ult-tag { font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(212,175,55,.4); color: #d4af37; }
+.ultimate-periods { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.ultimate-periods button { padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(212,175,55,.3); background: transparent; color: #baaf97; cursor: pointer; }
+.ultimate-periods button.active { background: rgba(212,175,55,.2); color: #ffe18a; }
+.ultimate-forecast { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.ultimate-forecast div { padding: 10px; border-radius: 8px; background: rgba(212,175,55,.08); }
+.ultimate-forecast em { display: block; font-size: 11px; color: #baaf97; font-style: normal; }
+.ultimate-alert { padding: 14px; border-radius: 10px; margin-bottom: 16px; border: 1px solid rgba(212,175,55,.5); background: rgba(212,175,55,.1); }
+.ult-alert--high { border-color: #c44; background: rgba(200,68,68,.12); }

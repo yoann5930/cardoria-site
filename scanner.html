@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060608">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Scanner Intelligent Cardoria</title>
+<meta name="description" content="Scannez vos cartes TCG avec l'IA Cardoria — reconnaissance instantanée et estimation.">
+<meta name="robots" content="index,follow">
+<link rel="stylesheet" href="css/scanner.css">
+<link rel="icon" href="assets/logo/cardoria-premium.png">
+<script src="js/seo-config.js"></script>
+</head>
+<body class="scanner-app">
+<header class="scanner-header">
+  <a class="scanner-brand" href="index.html">
+    <img src="assets/logo/cardoria-premium.png" alt="Cardoria" onerror="this.src='logo-cardoria.jpg'">
+    <span>SCANNER</span>
+  </a>
+  <a href="estimation.html" style="color:#baaf97;font-size:13px;text-decoration:none">Estimation →</a>
+</header>
+
+<main class="scanner-main">
+  <section class="scanner-hero">
+    <span class="badge">Scanner IA</span>
+    <h1>Scannez votre carte</h1>
+    <p>Recto, verso ou plusieurs cartes sur une photo — reconnaissance automatique Cardoria.</p>
+  </section>
+
+  <div class="scanner-preview" id="scanPreview">
+    <div class="scanner-preview-placeholder" id="scanPlaceholder">Aucune photo — prenez ou importez une image</div>
+    <img id="scanPreviewImg" alt="Aperçu scan" style="display:none">
+  </div>
+
+  <div class="scanner-thumbs" id="scanThumbs"></div>
+
+  <div class="scanner-actions">
+    <button type="button" class="scan-btn" id="btnCapture">📷 Prendre une photo</button>
+    <button type="button" class="scan-btn" id="btnImport">🖼 Importer</button>
+    <button type="button" class="scan-btn" id="btnRecto">Recto</button>
+    <button type="button" class="scan-btn" id="btnVerso">Verso</button>
+    <button type="button" class="scan-btn scan-btn-primary" id="btnAnalyze">Analyser avec Cardoria</button>
+  </div>
+
+  <div class="scanner-form">
+    <label for="scanName">Votre nom (optionnel)</label>
+    <input id="scanName" type="text" placeholder="Prénom" autocomplete="name">
+    <label for="scanEmail">Email (pour offre de rachat)</label>
+    <input id="scanEmail" type="email" placeholder="votre@email.fr" autocomplete="email">
+  </div>
+
+  <div id="scanResult"></div>
+</main>
+
+<input type="file" id="fileCapture" class="scan-file-input" accept="image/*" capture="environment">
+<input type="file" id="fileImport" class="scan-file-input" accept="image/*" multiple>
+<input type="file" id="fileRecto" class="scan-file-input" accept="image/*" capture="environment">
+<input type="file" id="fileVerso" class="scan-file-input" accept="image/*" capture="environment">
+
+<script src="js/attribution.js"></script>
+<script src="js/scanner.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recherche IA — Cardoria</title>
+<meta name="description" content="Recherche de cartes TCG en langage naturel — Cardoria Ultimate.">
+<meta name="robots" content="index,follow">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/ultimate.css">
+<script src="js/seo-config.js"></script>
+<link rel="icon" href="assets/logo/cardoria-premium.png">
+</head>
+<body>
+<header class="header"><div class="container nav"><a class="brand" href="index.html"><img src="assets/logo/cardoria-premium.png" onerror="this.src='logo-cardoria.jpg'" alt="Cardoria"><span>CARDORIA</span></a><button class="burger" type="button" onclick="toggleMenu()">Menu</button><nav class="menu" id="menu"><a href="boutique.html">Boutique</a><a href="estimation.html">Estimation</a><a href="recherche-ia.html" class="active">Recherche IA</a><a href="contact.html">Contact</a></nav></div></header>
+<main class="container ultimate-hero">
+<h1>Recherche IA Cardoria</h1>
+<p class="ultimate-sub">Décrivez la carte en langage naturel — l'IA comprend licence, rareté, grade PSA…</p>
+<form id="searchForm" class="ultimate-search">
+<input type="search" id="searchInput" placeholder="Ex : Carte Pokémon Dracaufeu PSA 10" autocomplete="off">
+<button type="submit" class="btn btn-primary">Rechercher</button>
+</form>
+<div id="understood" class="ultimate-understood"></div>
+<div id="results" class="ultimate-results"></div>
+</main>
+<footer class="footer"><img src="assets/logo/cardoria-premium.png" onerror="this.src='logo-cardoria.jpg'" alt="Cardoria"><p class="small">Cardoria Ultimate Enterprise</p></footer>
+<script src="script.js?v=7"></script>
+<script src="js/recherche-ia.js"></script>
+</body>
+</html>

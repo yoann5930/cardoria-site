@@ -1,0 +1,39 @@
+{
+  "$schema": "https://cardoria.fr/schemas/launch-seo.json",
+  "organization": {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Cardoria",
+    "url": "https://cardoria.fr",
+    "logo": "https://cardoria.fr/assets/logo/cardoria-premium.png",
+    "email": "Cardoria59330@gmail.com",
+    "sameAs": []
+  },
+  "website": {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Cardoria",
+    "url": "https://cardoria.fr",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://cardoria.fr/marketplace.html?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  },
+  "breadcrumb": {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": []
+  },
+  "product": {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": "",
+    "offers": { "@type": "Offer", "priceCurrency": "EUR" }
+  },
+  "faq": {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": []
+  }
+}
