@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-backend.onrender.com";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
   var base = location.pathname.indexOf("/pages/") !== -1 ? "../../" : "";
   var isArticle = location.pathname.indexOf("article.html") !== -1;
 

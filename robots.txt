@@ -27,5 +27,5 @@ Disallow: /document-commande.html
 
 Sitemap: https://cardoria.vercel.app/sitemap-index.xml
 Sitemap: https://cardoria.vercel.app/sitemap.xml
-Sitemap: https://cardoria-backend.onrender.com/api/seo/sitemap.xml
-Sitemap: https://cardoria-backend.onrender.com/api/marketplace/v1/sitemap.xml
+Sitemap: https://cardoria-site-2.onrender.com/api/seo/sitemap.xml
+Sitemap: https://cardoria-site-2.onrender.com/api/marketplace/v1/sitemap.xml

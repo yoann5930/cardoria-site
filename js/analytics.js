@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-backend.onrender.com";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
   var loaded = { ga4: false, clarity: false };
 
   function hasConsent() {

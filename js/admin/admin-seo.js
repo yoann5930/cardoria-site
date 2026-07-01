@@ -34,7 +34,7 @@
     '<div class="admin-panel"><p id="seoStats">Chargement…</p>' +
     '<div class="admin-filters"><button class="btn btn-primary" type="button" id="seoRegen">Régénérer pages SEO</button>' +
     '<a class="btn btn-secondary" href="sitemap.xml" target="_blank">Sitemap statique</a>' +
-    '<a class="btn btn-secondary" href="https://cardoria-backend.onrender.com/api/seo/sitemap.xml" target="_blank">Sitemap dynamique API</a></div></div>' +
+    '<a class="btn btn-secondary" href="https://cardoria-site-2.onrender.com/api/seo/sitemap.xml" target="_blank">Sitemap dynamique API</a></div></div>' +
     '<div class="admin-panel"><h2>Google Analytics 4 & Clarity</h2>' +
     '<div class="admin-filters" style="flex-direction:column;align-items:stretch;gap:10px">' +
     '<input id="ga4Id" placeholder="G-XXXXXXXXXX">' +

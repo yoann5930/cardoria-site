@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap><loc>https://cardoria.vercel.app/sitemap.xml</loc><lastmod>2026-07-01</lastmod></sitemap>
-  <sitemap><loc>https://cardoria-backend.onrender.com/api/seo/sitemap.xml</loc><lastmod>2026-07-01</lastmod></sitemap>
-  <sitemap><loc>https://cardoria-backend.onrender.com/api/marketplace/v1/sitemap.xml</loc><lastmod>2026-07-01</lastmod></sitemap>
+  <sitemap><loc>https://cardoria-site-2.onrender.com/api/seo/sitemap.xml</loc><lastmod>2026-07-01</lastmod></sitemap>
+  <sitemap><loc>https://cardoria-site-2.onrender.com/api/marketplace/v1/sitemap.xml</loc><lastmod>2026-07-01</lastmod></sitemap>
 </sitemapindex>

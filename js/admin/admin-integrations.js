@@ -15,7 +15,7 @@
     '<p id="gscStatus" style="font-size:14px">Remplacez le contenu par votre code de vérification Google.</p></div>' +
     '<div class="admin-panel"><h2>Sitemap & Robots</h2>' +
     '<ul><li><a href="sitemap.xml" target="_blank">sitemap.xml</a> — statique (script generate-sitemap)</li>' +
-    '<li><a href="https://cardoria-backend.onrender.com/api/seo/sitemap.xml" target="_blank">Sitemap dynamique API</a></li>' +
+    '<li><a href="https://cardoria-site-2.onrender.com/api/seo/sitemap.xml" target="_blank">Sitemap dynamique API</a></li>' +
     '<li><a href="robots.txt" target="_blank">robots.txt</a></li></ul></div>');
 
   A.adminFetch("/api/admin/integrations").then(function (d) {

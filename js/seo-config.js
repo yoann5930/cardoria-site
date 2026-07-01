@@ -3,7 +3,7 @@
  */
 window.CARDORIA_SEO = {
   siteUrl: "https://cardoria.vercel.app",
-  backendUrl: "https://cardoria-backend.onrender.com",
+  backendUrl: "https://cardoria-site-2.onrender.com",
   siteName: "Cardoria",
   locale: "fr_FR",
   lang: "fr",
@@ -80,3 +80,6 @@ window.CARDORIA_SEO = {
   ],
   breadcrumbs: {}
 };
+
+/** URL API backend Render — utilisée par tous les modules client */
+window.CARDORIA_BACKEND = window.CARDORIA_SEO.backendUrl;

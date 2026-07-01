@@ -1,7 +1,7 @@
 
 (function(){
 "use strict";
-const BACKEND_URL="https://cardoria-backend.onrender.com";
+const BACKEND_URL="https://cardoria-site-2.onrender.com";
 const ADMIN_CODE_LOCAL="CARDORIA59330";
 let allProducts=[], allOrders=[], cart=[], productFilter="all", orderFilter="all";
 function qs(id){return document.getElementById(id)}

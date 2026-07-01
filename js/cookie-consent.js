@@ -3,7 +3,7 @@
 
   var KEY = "cardoria_cookie_consent";
   var PREFS_KEY = "cardoria_cookie_prefs";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-backend.onrender.com";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
 
   function hasConsent() {
     try { return localStorage.getItem(KEY) === "accepted"; } catch (e) { return false; }

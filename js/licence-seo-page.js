@@ -6,7 +6,7 @@
 
   var slug = root.dataset.slug || new URLSearchParams(location.search).get("slug") || "pokemon";
   var base = location.pathname.indexOf("/pages/") !== -1 ? "../../" : "";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-backend.onrender.com";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
   var licCfg = (window.CARDORIA_SEO && CARDORIA_SEO.licenses && CARDORIA_SEO.licenses[slug]) || { name: slug };
 
   window.CARDORIA_SEO_PAGE = {

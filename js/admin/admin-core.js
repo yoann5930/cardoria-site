@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-backend.onrender.com";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
   var ADMIN_CODE_KEY = "cardoria_admin_code";
   var SESSION_KEY = "cardoria_session_token";
   var CSRF_KEY = "cardoria_csrf_token";

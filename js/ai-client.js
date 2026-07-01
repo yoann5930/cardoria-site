@@ -4,7 +4,7 @@
 (function (global) {
   "use strict";
 
-  var BACKEND = (global.CARDORIA_SEO && global.CARDORIA_SEO.backendUrl) || global.CARDORIA_BACKEND || "https://cardoria-backend.onrender.com";
+  var BACKEND = (global.CARDORIA_SEO && global.CARDORIA_SEO.backendUrl) || global.CARDORIA_BACKEND || "https://cardoria-site-2.onrender.com";
 
   function euro(n) {
     if (n == null || n === "") return "—";

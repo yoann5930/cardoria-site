@@ -4,7 +4,7 @@
 (function (global) {
   "use strict";
 
-  var BACKEND = global.CARDORIA_BACKEND || "https://cardoria-backend.onrender.com";
+  var BACKEND = global.CARDORIA_BACKEND || "https://cardoria-site-2.onrender.com";
   var USER_KEY = "cardoria_mk_user";
   var SELLER_KEY = "cardoria_mk_seller";
 
