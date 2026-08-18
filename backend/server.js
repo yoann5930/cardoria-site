@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import estimationRoutes from "./routes/estimation.js";
@@ -168,6 +169,19 @@ app.post("/api/admin/login", authRateLimit, (req, res) => {
   }
   logAudit({ type: "auth", action: "login_success", user: "admin", detail: "Legacy code" });
   res.json({ ok: true, token: expected, legacy: true });
+});
+
+app.get("/script.js", (req, res, next) => {
+  try {
+    const scriptPath = path.join(PUBLIC_ROOT, "script.js");
+    let source = fs.readFileSync(scriptPath, "utf8");
+    source = source
+      .replace('const BACKEND_URL="https://cardoria-site-2.onrender.com";', 'const BACKEND_URL=window.location.origin;')
+      .replace('const ADMIN_CODE_LOCAL="CARDORIA59330";', 'const ADMIN_CODE_LOCAL="";');
+    res.type("application/javascript; charset=utf-8").send(source);
+  } catch (error) {
+    next(error);
+  }
 });
 
 function sendPublicFile(req, res, next) {
