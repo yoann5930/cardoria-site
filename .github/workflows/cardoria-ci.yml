@@ -1,0 +1,91 @@
+name: Cardoria CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "admin-login.html"
+      - "js/admin/**"
+      - "render.yaml"
+      - ".github/workflows/cardoria-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "admin-login.html"
+      - "js/admin/**"
+      - "render.yaml"
+      - ".github/workflows/cardoria-ci.yml"
+
+jobs:
+  backend-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: 10000
+      ADMIN_EMAIL: Cardoria59330@gmail.com
+      ADMIN_INITIAL_PASSWORD: Cardoria-CI-Temporary-Password-2026!
+      LEGACY_ADMIN_CODE: "false"
+      CORS_ORIGINS: http://127.0.0.1:8080
+      ALERT_EMAIL: "false"
+      CSRF_ENABLED: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.0"
+          cache: npm
+          cache-dependency-path: backend/package.json
+
+      - name: Install backend dependencies
+        run: npm install --omit=dev
+
+      - name: Syntax checks
+        run: |
+          node --check server.js
+          node --check routes/auth.js
+          node --check lib/auth.js
+          node --check lib/auth/migrate.js
+          node --check ../js/admin/admin-login-secure.js
+
+      - name: Start backend
+        run: |
+          npm start > /tmp/cardoria-backend.log 2>&1 &
+          echo $! > /tmp/cardoria-backend.pid
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:10000/api/health/ > /tmp/cardoria-health.json; then
+              cat /tmp/cardoria-health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/cardoria-backend.log || true
+          exit 1
+
+      - name: Verify auth endpoint rejects invalid credentials
+        run: |
+          code=$(curl -sS -o /tmp/cardoria-auth.json -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"Cardoria59330@gmail.com","password":"wrong-password","totpCode":""}' \
+            http://127.0.0.1:10000/api/auth/login)
+          cat /tmp/cardoria-auth.json
+          test "$code" = "401"
+
+      - name: Backend log on failure
+        if: failure()
+        run: cat /tmp/cardoria-backend.log || true
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-backend.pid ]; then kill $(cat /tmp/cardoria-backend.pid) || true; fi
