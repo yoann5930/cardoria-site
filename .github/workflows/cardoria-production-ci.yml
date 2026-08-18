@@ -1,0 +1,65 @@
+name: Cardoria Production CI
+
+on:
+  push:
+    branches:
+      - main
+      - fix/cardoria-production-stability-v2
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  production-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.0'
+      - name: Install backend
+        run: npm install --omit=dev
+      - name: Syntax checks
+        run: |
+          node --check server.js
+          node --check ../script.js
+          node --check ../js/admin/admin-login-secure.js
+      - name: Reject client admin secret
+        working-directory: .
+        run: |
+          if grep -R --exclude-dir=.git --exclude-dir=node_modules -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' .; then
+            echo 'Client-side admin secret detected'
+            exit 1
+          fi
+      - name: Start backend
+        env:
+          NODE_ENV: test
+          PORT: '10000'
+          LEGACY_ADMIN_CODE: 'false'
+          ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+          ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+          ALERT_EMAIL: 'false'
+        run: |
+          node server.js > /tmp/cardoria-backend.log 2>&1 &
+          echo $! > /tmp/cardoria-backend.pid
+      - name: Health and public login checks
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:10000/api/health/ > /tmp/cardoria-health.json; then
+              break
+            fi
+            sleep 1
+          done
+          cat /tmp/cardoria-health.json
+          curl --fail --silent http://127.0.0.1:10000/admin-login.html > /tmp/cardoria-login.html
+          grep -q 'Admin Cardoria' /tmp/cardoria-login.html
+          curl --fail --silent http://127.0.0.1:10000/api > /tmp/cardoria-api.json
+          cat /tmp/cardoria-api.json
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-backend.pid ]; then kill $(cat /tmp/cardoria-backend.pid) || true; fi
+          cat /tmp/cardoria-backend.log || true
