@@ -3,6 +3,8 @@ name: Deploy Cardoria Recovery Pages
 on:
   push:
     branches: ["fix/cardoria-pages-recovery"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -71,6 +73,7 @@ jobs:
           path: _site
 
   deploy:
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
