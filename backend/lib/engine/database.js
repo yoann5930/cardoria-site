@@ -95,6 +95,7 @@ function migrate(database) {
     CREATE INDEX IF NOT EXISTS idx_sales_card ON sales_history(card_id, sold_at);
   `);
 
+  let ftsAvailable = true;
   try {
     database.exec(`
       CREATE VIRTUAL TABLE IF NOT EXISTS cards_fts USING fts5(
@@ -104,18 +105,22 @@ function migrate(database) {
       );
     `);
   } catch {
-    /* FTS5 indisponible — recherche LIKE utilisée en fallback */
+    ftsAvailable = false;
   }
 
-  const ftsCount = database.prepare("SELECT COUNT(*) AS c FROM cards_fts").get()?.c ?? 0;
-  const cardCount = database.prepare("SELECT COUNT(*) AS c FROM cards").get()?.c ?? 0;
-  if (cardCount > 0 && ftsCount === 0) {
+  if (ftsAvailable) {
     try {
-      database.exec(`
-        INSERT INTO cards_fts(rowid, name, extension, number, rarity, license_slug)
-        SELECT rowid, name, extension, number, rarity, license_slug FROM cards;
-      `);
-    } catch { /* ignore */ }
+      const ftsCount = database.prepare("SELECT COUNT(*) AS c FROM cards_fts").get()?.c ?? 0;
+      const cardCount = database.prepare("SELECT COUNT(*) AS c FROM cards").get()?.c ?? 0;
+      if (cardCount > 0 && ftsCount === 0) {
+        database.exec(`
+          INSERT INTO cards_fts(rowid, name, extension, number, rarity, license_slug)
+          SELECT rowid, name, extension, number, rarity, license_slug FROM cards;
+        `);
+      }
+    } catch {
+      // FTS5 reste optionnel : la recherche LIKE prendra le relais.
+    }
   }
 }
 
