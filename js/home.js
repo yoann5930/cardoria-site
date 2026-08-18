@@ -1,6 +1,11 @@
 (function () {
   "use strict";
 
+  window.toggleMenu = function () {
+    var menu = document.getElementById("menu");
+    if (menu) menu.classList.toggle("open");
+  };
+
   function initFaq() {
     document.querySelectorAll(".home-faq-question").forEach(function (button) {
       button.addEventListener("click", function () {
