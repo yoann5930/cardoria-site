@@ -2,9 +2,8 @@ services:
   - type: web
     name: cardoria-site-2
     runtime: node
-    rootDir: backend
-    buildCommand: npm install --omit=dev
-    startCommand: npm start
+    buildCommand: cd backend && npm install --omit=dev
+    startCommand: cd backend && npm start
     healthCheckPath: /api/health/
     maxShutdownDelaySeconds: 30
     envVars:
@@ -15,9 +14,9 @@ services:
       - key: LEGACY_ADMIN_CODE
         value: "false"
       - key: SITE_URL
-        value: https://cardoria.fr
+        value: https://cardoria-site-2.onrender.com
       - key: CORS_ORIGINS
-        value: https://cardoria.fr,https://www.cardoria.fr,https://cardoria.vercel.app
+        value: https://cardoria-site-2.onrender.com,https://cardoria.fr,https://www.cardoria.fr
     disk:
       name: cardoria-data
       mountPath: /opt/render/project/src/backend/data
