@@ -1,0 +1,15 @@
+:root{
+  --home-bg:#06070a;
+  --home-panel:#0d1016;
+  --home-panel-2:#11151d;
+  --home-gold:#d8b648;
+  --home-gold-soft:#f5dc8a;
+  --home-text:#f8f4ea;
+  --home-muted:#aaa394;
+  --home-line:rgba(216,182,72,.22);
+  --home-shadow:0 28px 90px rgba(0,0,0,.42);
+}
+
+.home-v7{overflow:hidden;background:var(--home-bg);color:var(--home-text)}
+.home-v7 .container{width:min(1220px,92vw)}
+.home-v7 .home-section{padding:96px 0;position
