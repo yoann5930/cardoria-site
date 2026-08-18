@@ -1,5 +1,8 @@
 import express from "express";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import estimationRoutes from "./routes/estimation.js";
 import adminRoutes from "./routes/admin.js";
 import analyticsRoutes from "./routes/analytics.js";
@@ -46,6 +49,25 @@ import systemRoutes from "./routes/system.js";
 
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PUBLIC_ROOT = path.resolve(__dirname, "..");
+const BLOCKED_PUBLIC_ROOTS = new Set([
+  "backend",
+  ".git",
+  ".github",
+  "node_modules",
+  "database",
+  "scripts",
+  "logs",
+  "backups"
+]);
+const PUBLIC_EXTENSIONS = new Set([
+  ".html", ".css", ".js", ".json", ".xml", ".txt",
+  ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico",
+  ".woff", ".woff2", ".ttf", ".map"
+]);
+
 const app = express();
 const startup = { ok: true, degraded: [], startedAt: new Date().toISOString() };
 
@@ -71,7 +93,9 @@ applySecurityMiddleware(app);
 app.use("/api/marketplace/webhooks", webhookRouter);
 app.use(express.json({ limit: process.env.BODY_LIMIT || "15mb" }));
 
-app.get("/", (req, res) => res.send("Backend Cardoria V5 Enterprise opérationnel."));
+app.get("/api", (req, res) => {
+  res.json({ ok: true, service: "Cardoria API", version: "6.0.0" });
+});
 app.get("/api/health/startup", (req, res) => {
   res.status(startup.ok ? 200 : 503).json({
     ok: startup.ok,
@@ -136,8 +160,8 @@ app.post("/api/admin/login", authRateLimit, (req, res) => {
   if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
 
   const expected = process.env.ADMIN_CODE;
-  if (!expected) {
-    return res.status(503).json({ ok: false, error: "ADMIN_CODE non configuré — utiliser /api/auth/login." });
+  if (!expected || process.env.LEGACY_ADMIN_CODE === "false") {
+    return res.status(503).json({ ok: false, error: "Connexion legacy désactivée — utiliser /api/auth/login." });
   }
   if (v.data.code !== expected) {
     logAudit({ type: "auth", action: "login_failed", user: "unknown", detail: "Code incorrect" });
@@ -147,11 +171,60 @@ app.post("/api/admin/login", authRateLimit, (req, res) => {
   res.json({ ok: true, token: expected, legacy: true });
 });
 
+app.get("/script.js", (req, res, next) => {
+  try {
+    const scriptPath = path.join(PUBLIC_ROOT, "script.js");
+    let source = fs.readFileSync(scriptPath, "utf8");
+    source = source
+      .replace('const BACKEND_URL="https://cardoria-site-2.onrender.com";', 'const BACKEND_URL=window.location.origin;')
+      .replace('const ADMIN_CODE_LOCAL="CARDORIA59330";', 'const ADMIN_CODE_LOCAL="";');
+    res.type("application/javascript; charset=utf-8").send(source);
+  } catch (error) {
+    next(error);
+  }
+});
+
+function sendPublicFile(req, res, next) {
+  let requestPath;
+  try {
+    requestPath = decodeURIComponent(req.path || "/");
+  } catch {
+    return res.status(400).send("Requête invalide.");
+  }
+
+  if (requestPath.startsWith("/api/")) return next();
+  if (requestPath === "/") {
+    return res.sendFile(path.join(PUBLIC_ROOT, "index.html"));
+  }
+
+  const relativePath = requestPath.replace(/^\/+/, "");
+  if (!relativePath || relativePath.includes("..")) return next();
+
+  const firstSegment = relativePath.split("/")[0];
+  if (BLOCKED_PUBLIC_ROOTS.has(firstSegment)) return res.status(404).send("Not found");
+
+  const extension = path.extname(relativePath).toLowerCase();
+  if (!PUBLIC_EXTENSIONS.has(extension)) return next();
+
+  const absolutePath = path.resolve(PUBLIC_ROOT, relativePath);
+  if (absolutePath !== PUBLIC_ROOT && !absolutePath.startsWith(PUBLIC_ROOT + path.sep)) {
+    return res.status(403).send("Forbidden");
+  }
+
+  return res.sendFile(absolutePath, (error) => {
+    if (!error) return;
+    if (error.status === 404) return next();
+    return next(error);
+  });
+}
+
+app.get("*", sendPublicFile);
 app.use(errorHandler);
 
 const port = process.env.PORT || 10000;
 const server = app.listen(port, "0.0.0.0", () => {
-  console.log(`Cardoria backend V5.0.1 ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`);
+  console.log(`Cardoria V6 single-host ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`);
+  console.log(`[startup] public root: ${PUBLIC_ROOT}`);
 });
 
 function shutdown(signal) {
