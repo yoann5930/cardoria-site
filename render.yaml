@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: cardoria-backend
+    name: cardoria-site-2
     runtime: node
     rootDir: backend
     buildCommand: npm install --omit=dev
