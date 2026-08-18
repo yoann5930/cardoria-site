@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const BACKEND = window.CARDORIA_BACKEND || "https://cardoria-site-2.onrender.com";
+  const BACKEND = window.CARDORIA_BACKEND || window.location.origin;
 
   function qs(id) {
     return document.getElementById(id);
