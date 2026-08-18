@@ -1,0 +1,85 @@
+name: Deploy Cardoria Recovery Pages
+
+on:
+  push:
+    branches: ["fix/cardoria-pages-recovery"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: cardoria-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare static recovery site
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          rsync -a ./ _site/ \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude '_site' \
+            --exclude 'backend' \
+            --exclude 'database' \
+            --exclude 'render.yaml'
+          touch _site/.nojekyll
+
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('_site')
+          exts = {'.html', '.js', '.css', '.json', '.xml'}
+          replacements = [
+              ('href="/','href="/cardoria-site/'),
+              ("href='/", "href='/cardoria-site/"),
+              ('src="/','src="/cardoria-site/'),
+              ("src='/", "src='/cardoria-site/"),
+              ('url(/','url(/cardoria-site/'),
+              ('url("/','url("/cardoria-site/'),
+              ("url('/", "url('/cardoria-site/"),
+          ]
+          for p in root.rglob('*'):
+              if not p.is_file() or p.suffix.lower() not in exts:
+                  continue
+              try:
+                  text = p.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              for old, new in replacements:
+                  text = text.replace(old, new)
+              p.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
