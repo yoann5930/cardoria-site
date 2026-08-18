@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import estimationRoutes from "./routes/estimation.js";
 import adminRoutes from "./routes/admin.js";
+import developmentRoutes from "./routes/development.js";
 import analyticsRoutes from "./routes/analytics.js";
 import engineRoutes from "./routes/engine.js";
 import engineAdminRoutes from "./routes/engine-admin.js";
@@ -143,6 +144,7 @@ app.use("/api/estimation-carte", (req, res, next) => {
 }, estimationRoutes);
 
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin/development", developmentRoutes);
 app.use("/api/admin/engine", engineAdminRoutes);
 app.use("/api/admin/marketplace", marketplaceAdminRoutes);
 app.use("/api/admin/payments", paymentsAdminRoutes);
