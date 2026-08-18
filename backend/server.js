@@ -47,29 +47,57 @@ import systemRoutes from "./routes/system.js";
 dotenv.config();
 
 const app = express();
-applySecurityMiddleware(app);
+const startup = { ok: true, degraded: [], startedAt: new Date().toISOString() };
 
+function safeInit(name, fn) {
+  try {
+    fn();
+    console.log(`[startup] ${name}: ok`);
+  } catch (error) {
+    startup.ok = false;
+    startup.degraded.push({ name, error: error?.message || String(error) });
+    console.error(`[startup] ${name}: degraded`, error);
+  }
+}
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[process] unhandledRejection", reason);
+});
+process.on("uncaughtException", (error) => {
+  console.error("[process] uncaughtException", error);
+});
+
+applySecurityMiddleware(app);
 app.use("/api/marketplace/webhooks", webhookRouter);
 app.use(express.json({ limit: process.env.BODY_LIMIT || "15mb" }));
 
 app.get("/", (req, res) => res.send("Backend Cardoria V5 Enterprise opérationnel."));
+app.get("/api/health/startup", (req, res) => {
+  res.status(startup.ok ? 200 : 503).json({
+    ok: startup.ok,
+    status: startup.ok ? "healthy" : "degraded",
+    startedAt: startup.startedAt,
+    degraded: startup.degraded.map((item) => item.name)
+  });
+});
+
 app.use(maintenanceMiddleware);
 app.use(connectionJournalMiddleware());
 app.use("/api/health", healthRoutes);
 app.use("/api/system", systemRoutes);
 
-migrateAuth();
-initAi();
-seedEngineIfEmpty();
-initMarketplace();
-initMarketData();
-initScanner();
-initAiEnterprise();
-initUltimate();
-initBigData();
-initSeo();
-scheduleAutoBackup();
-initLaunch();
+safeInit("auth-migration", migrateAuth);
+safeInit("ai", initAi);
+safeInit("engine-seed", seedEngineIfEmpty);
+safeInit("marketplace", initMarketplace);
+safeInit("market-data", initMarketData);
+safeInit("scanner", initScanner);
+safeInit("ai-enterprise", initAiEnterprise);
+safeInit("ultimate", initUltimate);
+safeInit("bigdata", initBigData);
+safeInit("seo", initSeo);
+safeInit("backup-scheduler", scheduleAutoBackup);
+safeInit("launch", initLaunch);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/gdpr", gdprRoutes);
@@ -79,7 +107,6 @@ app.use("/api/scanner", aiRateLimit, scannerRoutes);
 app.use("/api/ai-enterprise", aiRateLimit, aiEnterpriseRoutes);
 app.use("/api/ultimate", aiRateLimit, ultimateRoutes);
 app.use("/api/bigdata", apiRateLimit, bigdataAnalyticsRoutes);
-
 app.use("/api/engine", apiRateLimit, engineRoutes);
 app.use("/api/marketplace", apiRateLimit, marketplaceRoutes);
 app.use("/api/marketplace", apiRateLimit, marketplaceV1Routes);
@@ -103,7 +130,7 @@ app.use("/api/admin/ai-enterprise", aiEnterpriseAdminRoutes);
 app.use("/api/admin/ultimate", ultimateAdminRoutes);
 app.use("/api/admin/bigdata", bigdataAdminRoutes);
 
-/** Legacy login — conservé pour compatibilité admin actuel */
+/** Legacy login conservé uniquement côté serveur pour transition. */
 app.post("/api/admin/login", authRateLimit, (req, res) => {
   const v = validateBody(SCHEMAS.legacyAdminLogin, req.body || {});
   if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
@@ -123,4 +150,14 @@ app.post("/api/admin/login", authRateLimit, (req, res) => {
 app.use(errorHandler);
 
 const port = process.env.PORT || 10000;
-app.listen(port, () => console.log("Cardoria backend V1.0 Ready for Launch — port " + port));
+const server = app.listen(port, "0.0.0.0", () => {
+  console.log(`Cardoria backend V5.0.1 ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`);
+});
+
+function shutdown(signal) {
+  console.log(`[process] ${signal} received, closing HTTP server`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
