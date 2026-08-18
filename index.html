@@ -3,250 +3,207 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cardoria — Estimation &amp; rachat de cartes TCG premium</title>
-  <meta name="description" content="Cardoria, plateforme premium française : estimation, expertise, rachat et vente de cartes Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, Dragon Ball et Disney.">
+  <title>Cardoria — Cartes TCG, estimation, rachat & marketplace</title>
+  <meta name="description" content="Cardoria réunit estimation de cartes TCG, rachat, boutique, marketplace, scanner et outils d'analyse pour collectionneurs et vendeurs.">
   <meta name="robots" content="index,follow">
-  <meta name="theme-color" content="#080a0f">
-  <link rel="canonical" href="https://cardoria.vercel.app/">
+  <meta name="theme-color" content="#06070a">
+  <link rel="canonical" href="https://cardoria-site-2.onrender.com/">
   <link rel="preload" href="/style.css" as="style">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/css/perf.css">
+  <link rel="stylesheet" href="/css/home-v7.css">
   <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
   <script src="/js/asset-paths.js"></script>
   <script src="/js/seo-config.js"></script>
   <script src="/js/seo.js"></script>
 </head>
-<body>
+<body class="home-v7">
   <div id="site-header"></div>
 
-  <main class="hero">
-    <div class="hero-inner container">
-      <div class="hero-logo-wrap">
-        <img class="hero-logo" src="/assets/logo/cardoria-premium.png" alt="Cardoria" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
+  <main>
+    <section class="home-hero" aria-labelledby="home-title">
+      <div class="container home-hero-grid">
+        <div class="home-hero-copy">
+          <span class="home-kicker">Cardoria • Univers TCG premium</span>
+          <h1 id="home-title">Vos cartes méritent <span>une vraie expertise.</span></h1>
+          <p class="home-hero-lead">Estimez, achetez, vendez et suivez vos cartes à collectionner depuis un même écosystème pensé pour les collectionneurs, les vendeurs et les passionnés.</p>
+          <div class="home-hero-actions">
+            <a class="home-btn home-btn--primary" href="/pages/estimation/">Estimer une carte</a>
+            <a class="home-btn home-btn--secondary" href="/pages/boutique/">Découvrir la boutique</a>
+            <a class="home-btn home-btn--secondary" href="/marketplace.html">Explorer la marketplace</a>
+          </div>
+          <div class="home-hero-trust" aria-label="Points forts Cardoria">
+            <span>Analyse multi-critères</span>
+            <span>Paiement SumUp</span>
+            <span>Plusieurs licences TCG</span>
+          </div>
+        </div>
+
+        <div class="home-visual" aria-hidden="true">
+          <div class="home-visual-glow"></div>
+          <div class="home-logo-card">
+            <img src="/assets/logo/cardoria-premium.png" alt="" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
+            <strong>Collect • Analyse • Trade</strong>
+            <p>Un seul espace pour comprendre, gérer et valoriser votre collection.</p>
+            <span class="home-float home-float--1">Estimation TCG</span>
+            <span class="home-float home-float--2">Marketplace sécurisée</span>
+          </div>
+        </div>
       </div>
-      <span class="badge">Plateforme Premium</span>
-      <h1>Le royaume des cartes à collectionner</h1>
-      <p class="hero-lead">Expertise • Achat • Vente • Référencement de cartes Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic et bien d'autres.</p>
-      <div class="hero-actions">
-        <a class="btn btn-primary btn-lg" href="pages/estimation/">Faire estimer une carte</a>
+    </section>
+
+    <section class="home-section home-section--soft" aria-labelledby="services-title">
+      <div class="container">
+        <header class="home-section-head home-reveal">
+          <span class="home-kicker">Tout Cardoria au même endroit</span>
+          <h2 class="home-section-title" id="services-title">De la première estimation à la vente.</h2>
+          <p class="home-section-subtitle">Cardoria centralise les outils essentiels pour mieux connaître vos cartes, développer votre collection et gérer vos transactions TCG.</p>
+        </header>
+
+        <div class="home-service-grid">
+          <a class="home-service home-reveal" href="/pages/estimation/">
+            <span class="home-service-icon" aria-hidden="true">◇</span>
+            <h3>Estimation</h3>
+            <p>Envoyez les informations et photos de votre carte pour lancer une analyse Cardoria structurée.</p>
+            <span class="home-service-link">Lancer une estimation →</span>
+          </a>
+          <a class="home-service home-reveal" href="/rachat-cartes.html">
+            <span class="home-service-icon" aria-hidden="true">↗</span>
+            <h3>Rachat</h3>
+            <p>Présentez une carte ou une collection et préparez une demande de rachat auprès de Cardoria.</p>
+            <span class="home-service-link">Proposer mes cartes →</span>
+          </a>
+          <a class="home-service home-reveal" href="/pages/boutique/">
+            <span class="home-service-icon" aria-hidden="true">▣</span>
+            <h3>Boutique</h3>
+            <p>Accédez au catalogue Cardoria et aux produits disponibles depuis la boutique officielle.</p>
+            <span class="home-service-link">Voir la boutique →</span>
+          </a>
+          <a class="home-service home-reveal" href="/marketplace.html">
+            <span class="home-service-icon" aria-hidden="true">⇄</span>
+            <h3>Marketplace</h3>
+            <p>Consultez les annonces et les fonctions de mise en relation prévues dans l'écosystème Cardoria.</p>
+            <span class="home-service-link">Ouvrir la marketplace →</span>
+          </a>
+          <a class="home-service home-reveal" href="/scanner.html">
+            <span class="home-service-icon" aria-hidden="true">⌁</span>
+            <h3>Scanner</h3>
+            <p>Utilisez les outils Cardoria de reconnaissance et d'analyse pour identifier plus rapidement vos cartes.</p>
+            <span class="home-service-link">Accéder au scanner →</span>
+          </a>
+          <a class="home-service home-reveal" href="/tendances.html">
+            <span class="home-service-icon" aria-hidden="true">⌁</span>
+            <h3>Tendances</h3>
+            <p>Retrouvez les fonctions de suivi de marché et les indicateurs disponibles dans le moteur Cardoria.</p>
+            <span class="home-service-link">Voir les tendances →</span>
+          </a>
+        </div>
       </div>
-      <div class="hero-highlights">
-        <article class="hero-highlight">
-          <h3>Rachat express</h3>
-          <p>Recevez une offre rapidement.</p>
-        </article>
-        <article class="hero-highlight">
-          <h3>Toutes licences</h3>
-          <p>Pokémon • Yu-Gi-Oh! • One Piece • Lorcana • Magic</p>
-        </article>
+    </section>
+
+    <section class="home-section" aria-labelledby="path-title">
+      <div class="container home-path">
+        <div class="home-path-intro home-reveal">
+          <span class="home-kicker">Parcours simple</span>
+          <h2 id="path-title">Une carte. Quatre étapes. Une décision éclairée.</h2>
+          <p>Cardoria organise le parcours pour éviter les écrans inutiles : identifier la carte, analyser les informations disponibles, choisir l'action adaptée puis retrouver le suivi dans l'écosystème.</p>
+          <div class="home-hero-actions">
+            <a class="home-btn home-btn--primary" href="/pages/estimation/">Commencer maintenant</a>
+          </div>
+        </div>
+        <div class="home-path-list">
+          <article class="home-path-step home-reveal"><span class="home-path-num">01</span><div><h3>Identifier</h3><p>Nom, licence, extension, état et photos : Cardoria rassemble les éléments nécessaires à l'analyse.</p></div></article>
+          <article class="home-path-step home-reveal"><span class="home-path-num">02</span><div><h3>Analyser</h3><p>Le moteur Cardoria structure les informations disponibles et les données de marché intégrées au projet.</p></div></article>
+          <article class="home-path-step home-reveal"><span class="home-path-num">03</span><div><h3>Choisir</h3><p>Conserver, vendre, acheter, suivre ou demander un rachat selon votre objectif.</p></div></article>
+          <article class="home-path-step home-reveal"><span class="home-path-num">04</span><div><h3>Suivre</h3><p>Retrouvez ensuite les outils, commandes, annonces ou historiques disponibles dans Cardoria.</p></div></article>
+        </div>
       </div>
-    </div>
+    </section>
+
+    <section class="home-section home-section--soft" aria-labelledby="licenses-title">
+      <div class="container">
+        <header class="home-section-head home-reveal">
+          <span class="home-kicker">Univers collection</span>
+          <h2 class="home-section-title" id="licenses-title">Les grandes licences TCG réunies.</h2>
+          <p class="home-section-subtitle">Cardoria est conçu pour gérer plusieurs univers sans enfermer le collectionneur dans une seule licence.</p>
+        </header>
+        <div class="home-license-grid">
+          <a class="home-license home-reveal" href="/licence.html?slug=pokemon"><span class="home-license-icon">⚡</span><span><strong>Pokémon</strong><small>Cartes & collections</small></span></a>
+          <a class="home-license home-reveal" href="/licence.html?slug=yugioh"><span class="home-license-icon">◈</span><span><strong>Yu-Gi-Oh!</strong><small>Cartes & collections</small></span></a>
+          <a class="home-license home-reveal" href="/licence.html?slug=onepiece"><span class="home-license-icon">☠</span><span><strong>One Piece</strong><small>Cartes & collections</small></span></a>
+          <a class="home-license home-reveal" href="/licence.html?slug=lorcana"><span class="home-license-icon">✦</span><span><strong>Lorcana</strong><small>Cartes & collections</small></span></a>
+          <a class="home-license home-reveal" href="/licence.html?slug=magic"><span class="home-license-icon">✧</span><span><strong>Magic</strong><small>Cartes & collections</small></span></a>
+          <a class="home-license home-reveal" href="/licence.html?slug=dragonball"><span class="home-license-icon">●</span><span><strong>Dragon Ball</strong><small>Cartes & collections</small></span></a>
+          <a class="home-license home-reveal" href="/pages/licences/"><span class="home-license-icon">＋</span><span><strong>Autres licences</strong><small>Voir le catalogue</small></span></a>
+          <a class="home-license home-reveal" href="/comparateur.html"><span class="home-license-icon">≋</span><span><strong>Comparateur</strong><small>Comparer les données</small></span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-section" aria-labelledby="intelligence-title">
+      <div class="container">
+        <div class="home-intelligence home-reveal">
+          <div>
+            <span class="home-kicker">Moteur Cardoria</span>
+            <h2 id="intelligence-title">Une plateforme construite autour de la donnée carte.</h2>
+            <p>Le projet Cardoria réunit déjà un moteur cartes, des fonctions d'estimation, un suivi marketplace, des paiements SumUp et des outils d'administration. La refonte rend cet ensemble plus lisible et plus cohérent pour le visiteur.</p>
+            <div class="home-hero-actions">
+              <a class="home-btn home-btn--secondary" href="/recherche-ia.html">Recherche Cardoria</a>
+              <a class="home-btn home-btn--secondary" href="/comparateur.html">Comparateur</a>
+            </div>
+          </div>
+          <div class="home-intelligence-list">
+            <div class="home-intelligence-item"><strong>Identification</strong><span>Recherche et référencement des cartes dans le moteur Cardoria.</span></div>
+            <div class="home-intelligence-item"><strong>État & analyse</strong><span>Prise en compte des informations décrivant la carte et son état.</span></div>
+            <div class="home-intelligence-item"><strong>Marché</strong><span>Outils internes prévus pour agréger et exploiter les données disponibles.</span></div>
+            <div class="home-intelligence-item"><strong>Suivi</strong><span>Administration, paiements, annonces et commandes regroupés côté Cardoria.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-section home-section--soft" aria-labelledby="confidence-title">
+      <div class="container">
+        <header class="home-section-head home-reveal">
+          <span class="home-kicker">Confiance</span>
+          <h2 class="home-section-title" id="confidence-title">Une vitrine plus claire, sans promesses inventées.</h2>
+          <p class="home-section-subtitle">La nouvelle page d'accueil présente uniquement les fonctions et parcours réellement présents dans le projet Cardoria.</p>
+        </header>
+        <div class="home-proof-grid">
+          <article class="home-proof home-reveal"><strong>Architecture mono-serveur</strong><p>Le site et les API Cardoria sont regroupés sur le même service Render pour limiter les ruptures d'hébergement.</p></article>
+          <article class="home-proof home-reveal"><strong>Paiement SumUp</strong><p>Le backend Cardoria contient les routes et le registre de paiements nécessaires aux flux boutique et marketplace.</p></article>
+          <article class="home-proof home-reveal"><strong>Administration protégée</strong><p>L'administration utilise une authentification serveur et des sessions plutôt qu'un simple accès visuel côté navigateur.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-section" aria-labelledby="faq-title">
+      <div class="container">
+        <header class="home-section-head home-reveal">
+          <span class="home-kicker">Questions fréquentes</span>
+          <h2 class="home-section-title" id="faq-title">Avant de commencer.</h2>
+        </header>
+        <div class="home-faq">
+          <article class="home-faq-item home-reveal"><h3><button class="home-faq-question" type="button" aria-expanded="false">Que puis-je faire avec Cardoria ?</button></h3><div class="home-faq-answer"><p>Cardoria regroupe notamment estimation, rachat, boutique, marketplace, scanner, recherche de cartes, comparateur et suivi administratif.</p></div></article>
+          <article class="home-faq-item home-reveal"><h3><button class="home-faq-question" type="button" aria-expanded="false">Quelles licences sont prises en charge ?</button></h3><div class="home-faq-answer"><p>Le projet intègre plusieurs licences TCG, notamment Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic et Dragon Ball, avec une architecture prévue pour évoluer.</p></div></article>
+          <article class="home-faq-item home-reveal"><h3><button class="home-faq-question" type="button" aria-expanded="false">Comment faire estimer une carte ?</button></h3><div class="home-faq-answer"><p>Ouvrez la page Estimation, renseignez les informations demandées et ajoutez les photos nécessaires pour lancer l'analyse disponible dans Cardoria.</p></div></article>
+          <article class="home-faq-item home-reveal"><h3><button class="home-faq-question" type="button" aria-expanded="false">Les paiements sont-ils intégrés au projet ?</button></h3><div class="home-faq-answer"><p>Oui. Le backend Cardoria possède des flux SumUp pour les paiements boutique et marketplace. La disponibilité réelle d'un paiement dépend de la configuration active du service.</p></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-final">
+      <div class="container">
+        <div class="home-final-box home-reveal">
+          <div><h2>Commencez par votre carte.</h2><p>Une estimation, une recherche ou une visite de la boutique suffit pour entrer dans l'écosystème Cardoria.</p></div>
+          <div class="home-final-actions">
+            <a class="home-btn home-btn--primary" href="/pages/estimation/">Estimer une carte</a>
+            <a class="home-btn home-btn--secondary" href="/pages/boutique/">Voir la boutique</a>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
-
-  <section class="features reveal" aria-labelledby="features-title">
-    <div class="container">
-      <header class="features-head">
-        <span class="badge">Excellence Cardoria</span>
-        <h2 id="features-title">Pourquoi choisir Cardoria ?</h2>
-        <p class="features-subtitle">La plateforme française dédiée aux cartes à collectionner — expertise, confiance et service premium.</p>
-      </header>
-      <div class="features-grid">
-        <article class="feature-card">
-          <div class="feature-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3l2.2 4.5 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L4.8 8.2l5-.7L12 3z"/><circle cx="12" cy="12" r="9"/></svg>
-          </div>
-          <h3>Expertise professionnelle</h3>
-          <p>Estimation fiable de vos cartes.</p>
-        </article>
-        <article class="feature-card">
-          <div class="feature-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
-          </div>
-          <h3>Rachat Express</h3>
-          <p>Recevez une offre rapidement.</p>
-        </article>
-        <article class="feature-card">
-          <div class="feature-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3l7 4v5c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V7l7-4z"/><path d="M9 12l2 2 4-4"/></svg>
-          </div>
-          <h3>Authentification</h3>
-          <p>Vérification de l'état, de la rareté et des éditions.</p>
-        </article>
-        <article class="feature-card">
-          <div class="feature-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4M7 13h10"/></svg>
-          </div>
-          <h3>Toutes licences</h3>
-          <p>Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic.</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section class="estimation-process reveal" aria-labelledby="process-title">
-    <div class="container">
-      <header class="section-head">
-        <span class="badge">Simple &amp; rapide</span>
-        <h2 id="process-title">Comment fonctionne l'estimation</h2>
-        <p class="section-subtitle">Un processus transparent en quatre étapes, pensé pour les collectionneurs exigeants.</p>
-      </header>
-      <ol class="process-steps">
-        <li class="process-step reveal reveal-delay-1">
-          <span class="process-num">1</span>
-          <div class="process-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>
-          <h3>Envoyez vos photos</h3>
-          <p>Recto, verso et coins de votre carte via le formulaire sécurisé Cardoria.</p>
-        </li>
-        <li class="process-step reveal reveal-delay-2">
-          <span class="process-num">2</span>
-          <div class="process-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
-          <h3>Expertise professionnelle</h3>
-          <p>Analyse de l'état, de la rareté, de l'édition et du marché actuel.</p>
-        </li>
-        <li class="process-step reveal reveal-delay-3">
-          <span class="process-num">3</span>
-          <div class="process-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3l2.2 4.5 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L4.8 8.2l5-.7L12 3z"/></svg></div>
-          <h3>Recevez votre estimation</h3>
-          <p>Réponse sous 24 à 48 h avec une fourchette de valeur claire et documentée.</p>
-        </li>
-        <li class="process-step reveal reveal-delay-4">
-          <span class="process-num">4</span>
-          <div class="process-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v18M5 10l7-7 7 7"/></svg></div>
-          <h3>Rachat ou vente</h3>
-          <p>Acceptez une offre de rachat express ou vendez via la boutique Cardoria.</p>
-        </li>
-      </ol>
-      <div class="section-cta">
-        <a class="btn btn-primary btn-lg" href="pages/estimation/">Commencer mon estimation</a>
-      </div>
-    </div>
-  </section>
-
-  <section class="licenses reveal" aria-labelledby="licenses-title">
-    <div class="container">
-      <header class="section-head">
-        <span class="badge">Univers TCG</span>
-        <h2 id="licenses-title">Les licences disponibles</h2>
-        <p class="section-subtitle">Estimation, rachat, vente et référencement sur Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, Dragon Ball, Disney, Sports et bien d'autres.</p>
-      </header>
-      <div class="licenses-grid">
-        <a class="license-card" href="pages/boutique/" title="Cartes Pokémon"><span class="license-icon" aria-hidden="true">⚡</span><span class="license-name">Pokémon</span></a>
-        <a class="license-card" href="pages/boutique/" title="Cartes Yu-Gi-Oh!"><span class="license-icon" aria-hidden="true">🐉</span><span class="license-name">Yu-Gi-Oh!</span></a>
-        <a class="license-card" href="pages/boutique/" title="Cartes One Piece"><span class="license-icon" aria-hidden="true">🏴‍☠️</span><span class="license-name">One Piece</span></a>
-        <a class="license-card" href="pages/boutique/" title="Cartes Lorcana"><span class="license-icon" aria-hidden="true">✨</span><span class="license-name">Lorcana</span></a>
-        <a class="license-card" href="pages/boutique/" title="Cartes Magic"><span class="license-icon" aria-hidden="true">🔮</span><span class="license-name">Magic</span></a>
-        <a class="license-card" href="pages/boutique/" title="Cartes Dragon Ball"><span class="license-icon" aria-hidden="true">🥋</span><span class="license-name">Dragon Ball</span></a>
-        <a class="license-card" href="pages/boutique/" title="Cartes Disney"><span class="license-icon" aria-hidden="true">🏰</span><span class="license-name">Disney</span></a>
-        <a class="license-card" href="pages/boutique/" title="Cartes Sports"><span class="license-icon" aria-hidden="true">⚽</span><span class="license-name">Sports</span></a>
-      </div>
-    </div>
-  </section>
-
-  <section class="estimated-cards reveal" aria-labelledby="estimated-title">
-    <div class="container">
-      <header class="section-head">
-        <span class="badge">Expertise récente</span>
-        <h2 id="estimated-title">Dernières cartes estimées</h2>
-        <p class="section-subtitle">Exemples d'estimations réalisées par nos experts sur les principales licences TCG.</p>
-      </header>
-      <div class="cards-grid" id="estimatedCards"></div>
-      <div class="section-cta">
-        <a class="btn btn-secondary" href="pages/estimation/">Estimer ma carte</a>
-      </div>
-    </div>
-  </section>
-
-  <section class="sold-cards reveal" aria-labelledby="sold-title">
-    <div class="container">
-      <header class="section-head">
-        <span class="badge">Boutique active</span>
-        <h2 id="sold-title">Cartes récemment vendues</h2>
-        <p class="section-subtitle">Transactions récentes sur la boutique Cardoria — cartes expertisées et expédiées rapidement.</p>
-      </header>
-      <div class="cards-grid" id="soldCards"></div>
-      <div class="section-cta">
-        <a class="btn btn-secondary" href="pages/boutique/">Découvrir la boutique</a>
-      </div>
-    </div>
-  </section>
-
-  <section class="reviews reveal" aria-labelledby="reviews-title">
-    <div class="container">
-      <header class="section-head">
-        <span class="badge">Confiance</span>
-        <h2 id="reviews-title">Avis clients</h2>
-        <p class="section-subtitle">Ce que disent les collectionneurs qui nous confient leurs cartes.</p>
-      </header>
-      <div class="reviews-grid">
-        <blockquote class="review-card" itemscope itemtype="https://schema.org/Review">
-          <div class="review-stars" aria-label="5 étoiles sur 5" itemprop="reviewRating" itemscope itemtype="https://schema.org/Rating">
-            <meta itemprop="ratingValue" content="5"><meta itemprop="bestRating" content="5">★★★★★
-          </div>
-          <p itemprop="reviewBody">« Estimation rapide et transparente sur ma collection Pokémon. L'offre de rachat était claire et le paiement reçu en quelques jours. »</p>
-          <footer itemprop="author" itemscope itemtype="https://schema.org/Person">
-            <strong itemprop="name">Thomas M.</strong>
-            <span>Collectionneur Pokémon — Lille</span>
-          </footer>
-        </blockquote>
-        <blockquote class="review-card" itemscope itemtype="https://schema.org/Review">
-          <div class="review-stars" aria-label="5 étoiles sur 5" itemprop="reviewRating" itemscope itemtype="https://schema.org/Rating">
-            <meta itemprop="ratingValue" content="5"><meta itemprop="bestRating" content="5">★★★★★
-          </div>
-          <p itemprop="reviewBody">« J'ai vendu un lot Yu-Gi-Oh! et One Piece. L'équipe Cardoria a vérifié chaque carte avec soin. Service premium, je recommande. »</p>
-          <footer itemprop="author" itemscope itemtype="https://schema.org/Person">
-            <strong itemprop="name">Sophie R.</strong>
-            <span>Vendeuse TCG — Paris</span>
-          </footer>
-        </blockquote>
-        <blockquote class="review-card" itemscope itemtype="https://schema.org/Review">
-          <div class="review-stars" aria-label="5 étoiles sur 5" itemprop="reviewRating" itemscope itemtype="https://schema.org/Rating">
-            <meta itemprop="ratingValue" content="5"><meta itemprop="bestRating" content="5">★★★★★
-          </div>
-          <p itemprop="reviewBody">« Boutique sérieuse, cartes bien décrites et livraison soignée. Cardoria est devenu ma référence pour compléter ma collection Lorcana. »</p>
-          <footer itemprop="author" itemscope itemtype="https://schema.org/Person">
-            <strong itemprop="name">Karim B.</strong>
-            <span>Collectionneur Lorcana — Bruxelles</span>
-          </footer>
-        </blockquote>
-      </div>
-    </div>
-  </section>
-
-  <section class="faq reveal" aria-labelledby="faq-title">
-    <div class="container">
-      <header class="section-head">
-        <span class="badge">Questions fréquentes</span>
-        <h2 id="faq-title">FAQ — Estimation &amp; rachat de cartes TCG</h2>
-        <p class="section-subtitle">Toutes les réponses sur l'estimation, le rachat et les licences acceptées par Cardoria.</p>
-      </header>
-      <div class="faq-list">
-        <article class="faq-item">
-          <h3><button class="faq-question" type="button" aria-expanded="false">Comment faire estimer une carte Pokémon ou TCG ?</button></h3>
-          <div class="faq-answer"><p>Envoyez des photos nettes (recto, verso, coins) via notre <a href="pages/estimation/">formulaire d'estimation</a>. L'équipe Cardoria analyse l'état, la rareté et le marché, puis vous transmet une estimation fiable sous 48 h.</p></div>
-        </article>
-        <article class="faq-item">
-          <h3><button class="faq-question" type="button" aria-expanded="false">Quelles licences de cartes acceptez-vous ?</button></h3>
-          <div class="faq-answer"><p>Cardoria expertises Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, Dragon Ball, Disney et cartes Sports. Toutes les extensions et éditions sont acceptées.</p></div>
-        </article>
-        <article class="faq-item">
-          <h3><button class="faq-question" type="button" aria-expanded="false">Combien de temps pour recevoir une estimation ?</button></h3>
-          <div class="faq-answer"><p>La plupart des demandes reçoivent une première estimation sous 24 à 48 h ouvrées. Les collections volumineuses peuvent nécessiter un délai supplémentaire, communiqué à l'avance.</p></div>
-        </article>
-        <article class="faq-item">
-          <h3><button class="faq-question" type="button" aria-expanded="false">Proposez-vous le rachat de cartes à collectionner ?</button></h3>
-          <div class="faq-answer"><p>Oui. Après estimation, Cardoria peut vous faire une offre de <a href="rachat-cartes.html">rachat express</a>. Vous êtes libre d'accepter ou de refuser, sans engagement.</p></div>
-        </article>
-        <article class="faq-item">
-          <h3><button class="faq-question" type="button" aria-expanded="false">Comment vendre ma collection de cartes TCG ?</button></h3>
-          <div class="faq-answer"><p>Contactez Cardoria via le formulaire d'estimation ou la page rachat. Listez vos cartes ou envoyez des photos de lot : nous vous proposons une offre globale transparente.</p></div>
-        </article>
-        <article class="faq-item">
-          <h3><button class="faq-question" type="button" aria-expanded="false">Les estimations Cardoria sont-elles fiables ?</button></h3>
-          <div class="faq-answer"><p>Chaque carte est analysée par des experts du marché TCG français et international. L'estimation tient compte de l'état, de la rareté, de l'édition et des tendances actuelles.</p></div>
-        </article>
-      </div>
-    </div>
-  </section>
 
   <div id="site-footer"></div>
 
@@ -255,6 +212,6 @@
   <script src="/js/analytics.js" defer></script>
   <script src="/js/cookie-consent.js" defer></script>
   <script src="/js/home.js" defer></script>
-  <script src="/script.js?v=6" defer></script>
+  <script src="/script.js?v=7" defer></script>
 </body>
 </html>
