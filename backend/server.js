@@ -43,6 +43,7 @@ import { scheduleAutoBackup } from "./lib/backup/full.js";
 import { validateBody, SCHEMAS } from "./lib/security/validate.js";
 import { initLaunch, connectionJournalMiddleware, maintenanceMiddleware } from "./lib/launch/index.js";
 import systemRoutes from "./routes/system.js";
+import { mountCardoriaMcp } from "./mcp/index.js";
 
 dotenv.config();
 
@@ -57,6 +58,10 @@ app.use(maintenanceMiddleware);
 app.use(connectionJournalMiddleware());
 app.use("/api/health", healthRoutes);
 app.use("/api/system", systemRoutes);
+
+// Passerelle MCP Cardoria: endpoint /mcp protégé + health public minimal.
+// Aucun secret n'est exposé; CARDORIA_MCP_TOKEN_SECRET reste uniquement côté serveur.
+mountCardoriaMcp(app);
 
 migrateAuth();
 initAi();
