@@ -1,13 +1,19 @@
 services:
   - type: web
     name: cardoria-backend
-    env: node
+    runtime: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm install --omit=dev
     startCommand: npm start
+    healthCheckPath: /api/health/
+    maxShutdownDelaySeconds: 30
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: LEGACY_ADMIN_CODE
+        value: "false"
       - key: SITE_URL
         value: https://cardoria.fr
       - key: CORS_ORIGINS
