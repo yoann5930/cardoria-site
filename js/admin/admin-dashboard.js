@@ -48,6 +48,10 @@
   }
 
   A.renderShell("dashboard", "Tableau de bord", "Vue d'ensemble Cardoria Enterprise",
+    '<div class="admin-panel" style="margin-bottom:20px;border:1px solid rgba(212,175,55,.4)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">' +
+    '<div><h2 style="margin:0 0 6px;color:#ffe18a">Développement du site</h2><p style="margin:0;color:#baaf97">Validation page par page. On commence par Accueil et on ne passe à la suivante qu’à 100 %.</p></div>' +
+    '<a class="btn" href="admin-developpement.html">Ouvrir le tableau de développement</a></div></div>' +
     '<div class="admin-periods" id="dashPeriods">' +
     '<button data-period="day" class="active">Jour</button><button data-period="week">Semaine</button>' +
     '<button data-period="month">Mois</button><button data-period="year">Année</button></div>' +
