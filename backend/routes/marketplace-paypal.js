@@ -2,6 +2,7 @@
  * Routes PayPal Marketplace Cardoria — vendeurs particuliers/pro et checkout C2C.
  */
 import { Router } from "express";
+import pg from "pg";
 import { getSeller, getSellerByEmail, registerSeller } from "../lib/marketplace/sellers.js";
 import { getCart, createOrdersFromCart } from "../lib/marketplace/v1/cart.js";
 import { updateOrderStatus } from "../lib/marketplace/orders.js";
@@ -14,6 +15,7 @@ import {
   captureMarketplacePayPalOrder
 } from "../lib/marketplace/paypal.js";
 
+const { Pool } = pg;
 const router = Router();
 
 function assertSellerIdentity(seller, email) {
@@ -26,8 +28,89 @@ function assertSellerIdentity(seller, email) {
   return seller;
 }
 
+function classifyPostgresError(error) {
+  const code = String(error?.code || error?.cause?.code || "");
+  const map = {
+    "28P01": "authentication_failed",
+    "28000": "authorization_failed",
+    "3D000": "database_not_found",
+    "42501": "permission_denied",
+    "42P01": "schema_missing",
+    "42703": "schema_mismatch",
+    ENOTFOUND: "dns_failed",
+    EAI_AGAIN: "dns_temporary_failure",
+    ECONNREFUSED: "connection_refused",
+    ETIMEDOUT: "connection_timeout",
+    ECONNRESET: "connection_reset"
+  };
+  return { code: code || "unknown", type: map[code] || "postgres_connection_failed" };
+}
+
 router.get("/v1/persistence/status", (req, res) => {
   res.json({ ok: true, persistence: getMarketplacePersistenceStatus() });
+});
+
+router.get("/v1/persistence/probe", async (req, res) => {
+  const raw = String(process.env.MARKETPLACE_DATABASE_URL || "").trim();
+  if (!raw) {
+    return res.json({
+      ok: false,
+      configured: false,
+      target: "none",
+      placeholderPassword: false,
+      error: { code: "missing_url", type: "not_configured" }
+    });
+  }
+
+  let target = "unknown";
+  let placeholderPassword = false;
+  try {
+    const parsed = new URL(raw);
+    target = parsed.hostname.includes("pooler.supabase.com") ? "supabase_pooler" : "postgres";
+    const password = decodeURIComponent(parsed.password || "");
+    placeholderPassword = /your[-_ ]?password|\[.*password.*\]/i.test(password);
+  } catch {
+    return res.json({
+      ok: false,
+      configured: true,
+      target: "invalid_url",
+      placeholderPassword: false,
+      error: { code: "invalid_url", type: "invalid_connection_string" }
+    });
+  }
+
+  if (placeholderPassword) {
+    return res.json({
+      ok: false,
+      configured: true,
+      target,
+      placeholderPassword: true,
+      error: { code: "placeholder_password", type: "authentication_failed" }
+    });
+  }
+
+  const pool = new Pool({ connectionString: raw, max: 1, connectionTimeoutMillis: 8_000 });
+  try {
+    const result = await pool.query("SELECT current_database() AS db, 1 AS ok");
+    return res.json({
+      ok: Number(result.rows[0]?.ok) === 1,
+      configured: true,
+      target,
+      placeholderPassword: false,
+      databaseReachable: true
+    });
+  } catch (error) {
+    return res.json({
+      ok: false,
+      configured: true,
+      target,
+      placeholderPassword: false,
+      databaseReachable: false,
+      error: classifyPostgresError(error)
+    });
+  } finally {
+    try { await pool.end(); } catch { /* ignore */ }
+  }
 });
 
 router.get("/v1/paypal/config", (req, res) => {
