@@ -7,14 +7,19 @@ on:
       - "backend/**"
       - "script.js"
       - "admin-login.html"
+      - "admin-email-login.html"
+      - "admin.html"
       - "js/admin/**"
       - "render.yaml"
       - ".github/workflows/cardoria-ci.yml"
   pull_request:
+    branches: [main]
     paths:
       - "backend/**"
       - "script.js"
       - "admin-login.html"
+      - "admin-email-login.html"
+      - "admin.html"
       - "js/admin/**"
       - "render.yaml"
       - ".github/workflows/cardoria-ci.yml"
@@ -32,6 +37,7 @@ jobs:
       ADMIN_EMAIL: Cardoria59330@gmail.com
       ADMIN_INITIAL_PASSWORD: Cardoria-CI-Temporary-Password-2026!
       LEGACY_ADMIN_CODE: "false"
+      ADMIN_AUTH_DISABLED: "false"
       CORS_ORIGINS: http://127.0.0.1:10000
       ALERT_EMAIL: "false"
       CSRF_ENABLED: "false"
@@ -53,14 +59,20 @@ jobs:
           node --check routes/auth.js
           node --check lib/auth.js
           node --check lib/auth/migrate.js
+          node --check lib/auth/magicLink.js
           node --check ../script.js
           node --check ../js/admin/admin-login-secure.js
+          node --check ../js/admin/admin-email-login.js
 
       - name: Reject client-side admin bypass
         working-directory: .
         run: |
           if grep -R --exclude-dir=.git --exclude-dir=node_modules -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' .; then
             echo "Client-side admin bypass detected"
+            exit 1
+          fi
+          if grep -R --exclude-dir=.git --exclude-dir=node_modules -n 'ADMIN_AUTH_DISABLED.*true' backend render.yaml; then
+            echo "Direct admin bypass must never be enabled"
             exit 1
           fi
 
@@ -85,14 +97,23 @@ jobs:
         run: |
           curl -fsS http://127.0.0.1:10000/admin-login.html > /tmp/cardoria-admin-login.html
           grep -q "Admin Cardoria" /tmp/cardoria-admin-login.html
+          grep -q "adminEmailLoginForm" /tmp/cardoria-admin-login.html
 
-      - name: Verify auth endpoint rejects invalid credentials
+      - name: Verify magic-link endpoint is public and neutral
         run: |
           code=$(curl -sS -o /tmp/cardoria-auth.json -w "%{http_code}" \
             -H "Content-Type: application/json" \
-            -d '{"email":"Cardoria59330@gmail.com","password":"wrong-password","totpCode":""}' \
-            http://127.0.0.1:10000/api/auth/login)
+            -d '{"email":"unknown-ci-user@cardoria.invalid"}' \
+            http://127.0.0.1:10000/api/auth/email/request)
           cat /tmp/cardoria-auth.json
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/cardoria-auth.json
+
+      - name: Verify protected admin endpoint rejects anonymous access
+        run: |
+          code=$(curl -sS -o /tmp/cardoria-protected.json -w "%{http_code}" \
+            http://127.0.0.1:10000/api/health/full)
+          cat /tmp/cardoria-protected.json
           test "$code" = "401"
 
       - name: Backend log on failure
