@@ -30,10 +30,11 @@ export function getPayPalMarketplaceConfig() {
   const clientId = String(process.env.PAYPAL_CLIENT_ID || "").trim();
   const secret = String(process.env.PAYPAL_CLIENT_SECRET || "").trim();
   const partnerMerchantId = String(process.env.PAYPAL_PARTNER_MERCHANT_ID || "").trim();
+  const attributionId = String(process.env.PAYPAL_PARTNER_ATTRIBUTION_ID || "").trim();
   return {
     provider: "paypal",
     environment: environment(),
-    configured: !!(clientId && secret && partnerMerchantId),
+    configured: !!(clientId && secret && partnerMerchantId && attributionId),
     commissionPercent: commissionPercent(),
     delayedDisbursement: delayedDisbursementEnabled()
   };
@@ -45,6 +46,22 @@ function assertConfigured() {
     throw new Error("PayPal Marketplace non configuré côté serveur.");
   }
   return cfg;
+}
+
+function base64Url(value) {
+  return Buffer.from(typeof value === "string" ? value : JSON.stringify(value))
+    .toString("base64")
+    .replace(/=+$/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+}
+
+function authAssertion(merchantId) {
+  const payerId = String(merchantId || "").trim();
+  if (!payerId) return "";
+  const header = base64Url({ alg: "none" });
+  const payload = base64Url({ iss: String(process.env.PAYPAL_CLIENT_ID || "").trim(), payer_id: payerId });
+  return `${header}.${payload}.`;
 }
 
 async function getAccessToken() {
@@ -65,15 +82,15 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-async function paypalRequest(path, { method = "GET", body, requestId } = {}) {
+async function paypalRequest(path, { method = "GET", body, requestId, authMerchantId = "" } = {}) {
   const token = await getAccessToken();
   const headers = {
     Authorization: `Bearer ${token}`,
     Accept: "application/json",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "PayPal-Partner-Attribution-Id": String(process.env.PAYPAL_PARTNER_ATTRIBUTION_ID || "").trim()
   };
-  const bnCode = String(process.env.PAYPAL_PARTNER_ATTRIBUTION_ID || "").trim();
-  if (bnCode) headers["PayPal-Partner-Attribution-Id"] = bnCode;
+  if (authMerchantId) headers["PayPal-Auth-Assertion"] = authAssertion(authMerchantId);
   if (requestId) headers["PayPal-Request-Id"] = requestId;
 
   const response = await fetch(`${apiBase()}${path}`, {
@@ -130,7 +147,8 @@ export async function createSellerOnboarding({ sellerId, returnUrl }) {
   const result = await paypalRequest("/v2/customer/partner-referrals", {
     method: "POST",
     body: payload,
-    requestId: `onboard-${seller.id}-${Date.now()}`
+    requestId: `onboard-${seller.id}-${Date.now()}`,
+    authMerchantId: process.env.PAYPAL_PARTNER_MERCHANT_ID
   });
   const url = getActionUrl(result);
   if (!url) throw new Error("Lien d'activation vendeur PayPal introuvable.");
@@ -155,14 +173,19 @@ export async function syncSellerPayPalStatus(sellerId, paypalMerchantId = "") {
   const seller = getSeller(sellerId);
   if (!seller) throw new Error("Vendeur introuvable.");
 
-  const partnerMerchantId = encodeURIComponent(process.env.PAYPAL_PARTNER_MERCHANT_ID);
+  const partnerMerchantIdRaw = String(process.env.PAYPAL_PARTNER_MERCHANT_ID || "").trim();
+  const partnerMerchantId = encodeURIComponent(partnerMerchantIdRaw);
   const knownMerchantId = String(paypalMerchantId || seller.paypalMerchantId || "").trim();
   let payload;
 
   if (knownMerchantId) {
-    payload = await paypalRequest(`/v1/customer/partners/${partnerMerchantId}/merchant-integrations/${encodeURIComponent(knownMerchantId)}`);
+    payload = await paypalRequest(`/v1/customer/partners/${partnerMerchantId}/merchant-integrations/${encodeURIComponent(knownMerchantId)}`, {
+      authMerchantId: partnerMerchantIdRaw
+    });
   } else {
-    payload = await paypalRequest(`/v1/customer/partners/${partnerMerchantId}/merchant-integrations?tracking_id=${encodeURIComponent(seller.id)}`);
+    payload = await paypalRequest(`/v1/customer/partners/${partnerMerchantId}/merchant-integrations?tracking_id=${encodeURIComponent(seller.id)}`, {
+      authMerchantId: partnerMerchantIdRaw
+    });
   }
 
   const integration = normalizeMerchantIntegration(payload);
@@ -171,9 +194,10 @@ export async function syncSellerPayPalStatus(sellerId, paypalMerchantId = "") {
     return getSeller(seller.id);
   }
 
+  const oauthThirdParty = integration.oauth_third_party || integration.oauthThirdParty || integration.oauth_integrations || [];
   const permissionsGranted = Boolean(
     integration.permissions_granted ||
-    integration.oauth_integrations?.length ||
+    (Array.isArray(oauthThirdParty) && oauthThirdParty.length) ||
     integration.products?.some?.((product) => product.vetting_status === "SUBSCRIBED")
   );
   const emailConfirmed = Boolean(integration.primary_email_confirmed);
