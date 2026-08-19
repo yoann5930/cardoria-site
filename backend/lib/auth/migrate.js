@@ -82,15 +82,17 @@ function seedDefaultAdmin(db) {
   const count = db.prepare("SELECT COUNT(*) AS c FROM auth_users").get()?.c ?? 0;
   if (count > 0) return;
 
-  const email = process.env.ADMIN_EMAIL || "Cardoria59330@gmail.com";
-  const password = process.env.ADMIN_INITIAL_PASSWORD;
-  if (!password) return;
+  const email = String(process.env.ADMIN_EMAIL || "Cardoria59330@gmail.com").trim().toLowerCase();
+  if (!email) return;
 
+  // Le back-office utilise le lien magique. Si aucun mot de passe initial n'est fourni,
+  // on stocke un secret aléatoire impossible à deviner plutôt que de désactiver l'auth.
+  const password = process.env.ADMIN_INITIAL_PASSWORD || crypto.randomBytes(48).toString("base64url");
   const now = new Date().toISOString();
   db.prepare(`
     INSERT INTO auth_users (id, email, password_hash, role, name, created_at, updated_at)
     VALUES (?, ?, ?, 'super_admin', 'Admin Cardoria', ?, ?)
-  `).run("usr_admin_1", email.toLowerCase(), hashPassword(password), now, now);
+  `).run("usr_admin_1", email, hashPassword(password), now, now);
 }
 
 export function hashToken(token) {
