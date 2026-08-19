@@ -87,32 +87,6 @@
     window.setTimeout(finish, 5000);
   }
 
-  window.toggleMenu = function () {
-    var menu = document.getElementById("menu");
-    if (menu) menu.classList.toggle("open");
-  };
-
-  function initFaq() {
-    document.querySelectorAll(".home-faq-question").forEach(function (button) {
-      button.addEventListener("click", function () {
-        var item = button.closest(".home-faq-item");
-        if (!item) return;
-        var isOpen = item.classList.contains("is-open");
-
-        document.querySelectorAll(".home-faq-item.is-open").forEach(function (openItem) {
-          openItem.classList.remove("is-open");
-          var openButton = openItem.querySelector(".home-faq-question");
-          if (openButton) openButton.setAttribute("aria-expanded", "false");
-        });
-
-        if (!isOpen) {
-          item.classList.add("is-open");
-          button.setAttribute("aria-expanded", "true");
-        }
-      });
-    });
-  }
-
   function initReveal() {
     var elements = document.querySelectorAll(".home-reveal");
     if (!elements.length) return;
@@ -138,10 +112,51 @@
     elements.forEach(function (element) { observer.observe(element); });
   }
 
+  function initMenu() {
+    var button = document.getElementById("homeMenuBtn");
+    var menu = document.getElementById("homeMenu");
+    if (!button || !menu) return;
+
+    button.addEventListener("click", function () {
+      var open = menu.classList.toggle("is-open");
+      button.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+
+    menu.querySelectorAll("a").forEach(function (link) {
+      link.addEventListener("click", function () {
+        menu.classList.remove("is-open");
+        button.setAttribute("aria-expanded", "false");
+      });
+    });
+  }
+
+  function initSearch() {
+    var form = document.getElementById("homeCardSearch");
+    var input = document.getElementById("homeCardQuery");
+    if (!form || !input) return;
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var query = input.value.trim();
+      if (!query) {
+        input.focus();
+        return;
+      }
+      location.href = "/recherche-ia.html?q=" + encodeURIComponent(query);
+    });
+  }
+
+  function initYear() {
+    var year = document.getElementById("homeYear");
+    if (year) year.textContent = String(new Date().getFullYear());
+  }
+
   initLoader();
 
   document.addEventListener("DOMContentLoaded", function () {
-    initFaq();
     initReveal();
+    initMenu();
+    initSearch();
+    initYear();
   });
 })();
