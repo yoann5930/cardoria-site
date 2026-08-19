@@ -21,6 +21,10 @@
     });
   }
 
+  function isDemoMode() {
+    return !!(config && config.demoMode);
+  }
+
   function commissionText() {
     if (!config || !config.commissionConfigured) return "La commission Cardoria sera affichée avant l'activation des transactions.";
     return "Commission Cardoria : " + Number(config.commissionPercent).toLocaleString("fr-FR") + " % par transaction.";
@@ -174,7 +178,7 @@
   function render() {
     var seller = M.getSeller();
     if (!seller) return renderRegistration();
-    if (!seller.paypalReady) return renderPayPalActivation(seller);
+    if (!seller.paypalReady && !isDemoMode()) return renderPayPalActivation(seller);
     renderListingForm(seller);
   }
 
@@ -183,7 +187,7 @@
       config = d;
       var seller = M.getSeller();
       var params = new URLSearchParams(location.search);
-      if (seller && params.get("paypal") === "return") return syncSellerStatus(seller);
+      if (seller && params.get("paypal") === "return" && !isDemoMode()) return syncSellerStatus(seller);
       render();
     }).catch(function (e) {
       root.innerHTML = '<div class="panel"><h1>Marketplace temporairement indisponible</h1><p>' + esc(e.message) + '</p></div>';
