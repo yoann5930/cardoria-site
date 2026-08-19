@@ -1,5 +1,5 @@
 /**
- * Panier marketplace — validation prix serveur, checkout SumUp.
+ * Panier marketplace — validation prix serveur et création de commandes par vendeur.
  */
 import { getDb } from "../../engine/database.js";
 import { getListing } from "../listings.js";
@@ -81,8 +81,8 @@ export function clearCart(userId) {
   return { userId, items: [], subtotal: 0, itemCount: 0 };
 }
 
-/** Crée une commande par vendeur (checkout panier). */
-export function createOrdersFromCart(userId, { buyerEmail, buyerName, buyerId, shippingCarrier, shippingCost, shippingAddress }) {
+/** Crée une commande par vendeur (checkout panier). Le panier peut être conservé jusqu'à création du paiement. */
+export function createOrdersFromCart(userId, { buyerEmail, buyerName, buyerId, shippingCarrier, shippingCost, shippingAddress, clearAfterCreate = true }) {
   const cart = getCart(userId);
   if (!cart.items.length) throw new Error("Panier vide");
 
@@ -99,7 +99,7 @@ export function createOrdersFromCart(userId, { buyerEmail, buyerName, buyerId, s
   sellerIds.forEach((sellerId) => {
     const lines = bySeller[sellerId];
     const primary = lines[0];
-    validateServerSidePrice(primary.listingId, primary.unitPrice, primary.qty);
+    lines.forEach((line) => validateServerSidePrice(line.listingId, line.unitPrice, line.qty));
 
     const order = createOrder({
       listingId: primary.listingId,
@@ -113,21 +113,17 @@ export function createOrdersFromCart(userId, { buyerEmail, buyerName, buyerId, s
     });
 
     const itemsJson = JSON.stringify(lines.map((l) => ({
-      listingId: l.listingId, title: l.title, qty: l.qty, unitPrice: l.unitPrice
+      listingId: l.listingId, title: l.title, qty: l.qty, unitPrice: l.unitPrice, lineTotal: l.lineTotal
     })));
 
-    getDb().prepare("UPDATE mk_orders SET items_json = ? WHERE id = ?").run(itemsJson, order.id);
-
-    if (lines.length > 1) {
-      const extraTotal = lines.slice(1).reduce((s, l) => s + l.lineTotal, 0);
-      const newTotal = Math.round((order.total + extraTotal) * 100) / 100;
-      getDb().prepare("UPDATE mk_orders SET total = ? WHERE id = ?").run(newTotal, order.id);
-      order.total = newTotal;
-    }
+    const productsTotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const newTotal = Math.round((productsTotal + shipPerOrder) * 100) / 100;
+    getDb().prepare("UPDATE mk_orders SET items_json = ?, total = ? WHERE id = ?")
+      .run(itemsJson, newTotal, order.id);
 
     orders.push(getOrder(order.id));
   });
 
-  clearCart(userId);
+  if (clearAfterCreate) clearCart(userId);
   return orders;
 }
