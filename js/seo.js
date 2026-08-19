@@ -1,6 +1,17 @@
 (function () {
   "use strict";
 
+  // Les menus natifs peuvent être ouverts sur fond blanc par le navigateur/OS.
+  // On garde les champs fermés dans le thème Cardoria, mais on force les options
+  // natives blanches à utiliser une police noire lisible sur toutes les pages
+  // publiques qui chargent le script SEO commun.
+  if (!document.getElementById("cardoria-native-select-fix")) {
+    var selectStyle = document.createElement("style");
+    selectStyle.id = "cardoria-native-select-fix";
+    selectStyle.textContent = "select option,select optgroup{background:#fff!important;color:#111!important;}";
+    document.head.appendChild(selectStyle);
+  }
+
   var cfg = window.CARDORIA_SEO;
   if (!cfg) return;
 
