@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Boutique Cardoria — Cartes TCG & Collectibles</title>
-  <meta name="description" content="Découvrez les gammes disponibles dans la boutique Cardoria.">
+  <title>Boutique Cardoria — Gammes TCG & Collectibles</title>
+  <meta name="description" content="Découvrez les gammes de la boutique Cardoria. Pokémon est disponible, les autres univers arrivent progressivement.">
   <meta name="robots" content="index,follow">
   <meta name="theme-color" content="#030303">
   <link rel="canonical" href="https://cardoria-site-2.onrender.com/boutique.html">
   <link rel="preload" href="/style.css" as="style">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/css/boutique-v1.css?v=1">
-  <link rel="stylesheet" href="/css/boutique-v2.css?v=3">
+  <link rel="stylesheet" href="/css/boutique-v2.css?v=4">
   <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
   <script src="/js/seo-config.js"></script>
   <script src="/js/seo.js"></script>
@@ -43,7 +43,7 @@
       <div class="shop-shell shop-hero-content">
         <p class="shop-kicker">Sélection Cardoria</p>
         <h1>La <span>Boutique</span></h1>
-        <p>Choisissez une gamme pour découvrir les produits disponibles.</p>
+        <p>Choisissez un univers. Les gammes Cardoria sont ouvertes progressivement, sans mélanger directement toutes les cartes sur la page principale.</p>
       </div>
     </section>
 
@@ -52,23 +52,102 @@
         <div class="shop-catalog-head">
           <div>
             <p class="shop-kicker">Gammes</p>
-            <h2>Univers disponibles</h2>
+            <h2>Choisissez votre univers</h2>
           </div>
-          <p class="shop-catalog-note">Les nouvelles gammes seront ajoutées ici au fur et à mesure.</p>
+          <p class="shop-catalog-note">Pokémon est disponible. Les autres gammes seront activées une par une.</p>
         </div>
 
-        <div class="shop-range-grid">
-          <a class="shop-range-card shop-range-pokemon" href="/boutique.html?gamme=pokemon" aria-label="Ouvrir la gamme Pokémon">
+        <div class="shop-range-grid" aria-label="Gammes de la boutique Cardoria">
+          <a class="shop-range-card shop-range-pokemon is-available" href="/boutique.html?gamme=pokemon" aria-label="Ouvrir la gamme Pokémon">
+            <div class="shop-range-status is-open">Disponible</div>
             <div class="shop-range-visual">
               <img src="https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg" alt="Logo Pokémon" loading="eager" decoding="async">
             </div>
             <div class="shop-range-copy">
-              <p class="shop-kicker">Gamme disponible</p>
+              <p class="shop-kicker">Gamme active</p>
               <h3>Pokémon</h3>
-              <p>Cartes et produits Pokémon disponibles chez Cardoria.</p>
+              <p>Entrez dans l’univers Pokémon pour consulter uniquement les produits Pokémon disponibles.</p>
               <span>Découvrir la gamme →</span>
             </div>
           </a>
+
+          <article class="shop-range-card is-coming" aria-disabled="true">
+            <div class="shop-range-status">Bientôt disponible</div>
+            <div class="shop-range-visual">
+              <img src="https://commons.wikimedia.org/wiki/Special:Redirect/file/Yu-Gi-Oh%21.png" alt="Logo Yu-Gi-Oh!" loading="lazy" decoding="async">
+            </div>
+            <div class="shop-range-copy">
+              <p class="shop-kicker">Prochainement</p>
+              <h3>Yu-Gi-Oh!</h3>
+              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
+              <span>Aucune action disponible</span>
+            </div>
+          </article>
+
+          <article class="shop-range-card is-coming" aria-disabled="true">
+            <div class="shop-range-status">Bientôt disponible</div>
+            <div class="shop-range-visual">
+              <img src="https://commons.wikimedia.org/wiki/Special:Redirect/file/One_piece_logo.svg" alt="Logo One Piece" loading="lazy" decoding="async">
+            </div>
+            <div class="shop-range-copy">
+              <p class="shop-kicker">Prochainement</p>
+              <h3>One Piece</h3>
+              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
+              <span>Aucune action disponible</span>
+            </div>
+          </article>
+
+          <article class="shop-range-card is-coming" aria-disabled="true">
+            <div class="shop-range-status">Bientôt disponible</div>
+            <div class="shop-range-visual">
+              <div class="shop-range-wordmark" aria-label="Disney Lorcana">Disney <strong>Lorcana</strong></div>
+            </div>
+            <div class="shop-range-copy">
+              <p class="shop-kicker">Prochainement</p>
+              <h3>Lorcana</h3>
+              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
+              <span>Aucune action disponible</span>
+            </div>
+          </article>
+
+          <article class="shop-range-card is-coming" aria-disabled="true">
+            <div class="shop-range-status">Bientôt disponible</div>
+            <div class="shop-range-visual">
+              <img src="https://commons.wikimedia.org/wiki/Special:Redirect/file/Magic_the_Gathering_2017.svg" alt="Logo Magic: The Gathering" loading="lazy" decoding="async">
+            </div>
+            <div class="shop-range-copy">
+              <p class="shop-kicker">Prochainement</p>
+              <h3>Magic</h3>
+              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
+              <span>Aucune action disponible</span>
+            </div>
+          </article>
+
+          <article class="shop-range-card is-coming" aria-disabled="true">
+            <div class="shop-range-status">Bientôt disponible</div>
+            <div class="shop-range-visual">
+              <img src="https://commons.wikimedia.org/wiki/Special:Redirect/file/Dragonball_Anime-Serie_Original-Logo.svg" alt="Logo Dragon Ball" loading="lazy" decoding="async">
+            </div>
+            <div class="shop-range-copy">
+              <p class="shop-kicker">Prochainement</p>
+              <h3>Dragon Ball</h3>
+              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
+              <span>Aucune action disponible</span>
+            </div>
+          </article>
+
+          <article class="shop-range-card is-coming" aria-disabled="true">
+            <div class="shop-range-status">Bientôt disponible</div>
+            <div class="shop-range-visual">
+              <div class="shop-range-wordmark shop-range-wordmark-sports" aria-label="Sports">SPORTS</div>
+            </div>
+            <div class="shop-range-copy">
+              <p class="shop-kicker">Prochainement</p>
+              <h3>Sports</h3>
+              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
+              <span>Aucune action disponible</span>
+            </div>
+          </article>
         </div>
       </div>
     </section>
@@ -126,9 +205,9 @@
 
     <section class="shop-reassurance">
       <div class="shop-shell shop-reassurance-grid">
-        <article><strong>Gammes évolutives</strong><p>Chaque nouvel univers sera ajouté progressivement dans cette page.</p></article>
-        <article><strong>Stock Cardoria</strong><p>Les produits restent liés à l’inventaire existant, sans modification du stock.</p></article>
-        <article><strong>Paiement sécurisé</strong><p>Le parcours de paiement SumUp actuel est conservé.</p></article>
+        <article><strong>Gammes évolutives</strong><p>Chaque nouvel univers sera activé progressivement depuis cette page.</p></article>
+        <article><strong>Stock Cardoria</strong><p>Les produits restent liés à l’inventaire existant, sans suppression ni modification du stock.</p></article>
+        <article><strong>Paiement sécurisé</strong><p>Le parcours de paiement SumUp existant est conservé dans les gammes actives.</p></article>
       </div>
     </section>
   </main>
@@ -151,6 +230,6 @@
   </footer>
 
   <script src="/js/attribution.js"></script>
-  <script src="/js/boutique.js?v=1"></script>
+  <script src="/js/boutique.js?v=2"></script>
 </body>
 </html>
