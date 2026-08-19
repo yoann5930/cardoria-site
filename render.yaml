@@ -21,6 +21,8 @@ services:
         value: https://cardoria-site-2.onrender.com
       - key: CORS_ORIGINS
         value: https://cardoria-site-2.onrender.com,https://cardoria.fr,https://www.cardoria.fr
+      - key: MARKETPLACE_COMMISSION_PERCENT
+        value: "5"
     disk:
       name: cardoria-data
       mountPath: /opt/render/project/src/backend/data
