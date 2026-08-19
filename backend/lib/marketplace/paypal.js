@@ -5,6 +5,7 @@
 import { getDb } from "../engine/database.js";
 import { getSeller, updateSellerPayPal } from "./sellers.js";
 import { getOrder, updateOrderStatus } from "./orders.js";
+import { consumePaidCartItems } from "./v1/cart.js";
 
 const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
@@ -42,9 +43,7 @@ export function getPayPalMarketplaceConfig() {
 
 function assertConfigured() {
   const cfg = getPayPalMarketplaceConfig();
-  if (!cfg.configured) {
-    throw new Error("PayPal Marketplace non configuré côté serveur.");
-  }
+  if (!cfg.configured) throw new Error("PayPal Marketplace non configuré côté serveur.");
   return cfg;
 }
 
@@ -64,16 +63,11 @@ async function getAccessToken() {
   const credentials = Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`).toString("base64");
   const response = await fetch(`${apiBase()}/v1/oauth2/token`, {
     method: "POST",
-    headers: {
-      Authorization: `Basic ${credentials}`,
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
+    headers: { Authorization: `Basic ${credentials}`, "Content-Type": "application/x-www-form-urlencoded" },
     body: "grant_type=client_credentials"
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.access_token) {
-    throw new Error(data.error_description || data.error || "Authentification PayPal impossible.");
-  }
+  if (!response.ok || !data.access_token) throw new Error(data.error_description || data.error || "Authentification PayPal impossible.");
   return data.access_token;
 }
 
@@ -132,10 +126,7 @@ export async function createSellerOnboarding({ sellerId, returnUrl }) {
       }
     }],
     products: ["EXPRESS_CHECKOUT"],
-    partner_config_override: {
-      return_url: returnUrl,
-      return_url_description: "Retour vers Cardoria Marketplace"
-    },
+    partner_config_override: { return_url: returnUrl, return_url_description: "Retour vers Cardoria Marketplace" },
     legal_consents: [{ type: "SHARE_DATA_CONSENT", granted: true }]
   };
 
@@ -147,11 +138,7 @@ export async function createSellerOnboarding({ sellerId, returnUrl }) {
   const url = getActionUrl(result);
   if (!url) throw new Error("Lien d'activation vendeur PayPal introuvable.");
 
-  updateSellerPayPal(seller.id, {
-    onboardingStatus: "pending",
-    trackingId: seller.id
-  });
-
+  updateSellerPayPal(seller.id, { onboardingStatus: "pending", trackingId: seller.id });
   return { url, seller: getSeller(seller.id) };
 }
 
@@ -168,34 +155,46 @@ function hasThirdPartyPermissions(integration) {
   return oauthIntegrations.some((entry) => Array.isArray(entry?.oauth_third_party) && entry.oauth_third_party.length > 0);
 }
 
+async function getMerchantIntegration(partnerMerchantId, merchantId) {
+  return paypalRequest(`/v1/customer/partners/${encodeURIComponent(partnerMerchantId)}/merchant-integrations/${encodeURIComponent(merchantId)}`);
+}
+
 export async function syncSellerPayPalStatus(sellerId, paypalMerchantId = "") {
   assertConfigured();
   const seller = getSeller(sellerId);
   if (!seller) throw new Error("Vendeur introuvable.");
 
-  const partnerMerchantId = encodeURIComponent(String(process.env.PAYPAL_PARTNER_MERCHANT_ID || "").trim());
-  const knownMerchantId = String(paypalMerchantId || seller.paypalMerchantId || "").trim();
-  let payload;
+  const partnerMerchantId = String(process.env.PAYPAL_PARTNER_MERCHANT_ID || "").trim();
+  let merchantId = String(paypalMerchantId || seller.paypalMerchantId || "").trim();
+  let integration = null;
 
-  if (knownMerchantId) {
-    payload = await paypalRequest(`/v1/customer/partners/${partnerMerchantId}/merchant-integrations/${encodeURIComponent(knownMerchantId)}`);
+  if (merchantId) {
+    integration = await getMerchantIntegration(partnerMerchantId, merchantId);
   } else {
-    payload = await paypalRequest(`/v1/customer/partners/${partnerMerchantId}/merchant-integrations?tracking_id=${encodeURIComponent(seller.id)}`);
+    const lookup = await paypalRequest(`/v1/customer/partners/${encodeURIComponent(partnerMerchantId)}/merchant-integrations?tracking_id=${encodeURIComponent(seller.id)}`);
+    const lookupIntegration = normalizeMerchantIntegration(lookup);
+    merchantId = String(lookupIntegration?.merchant_id || "").trim();
+    if (merchantId) {
+      // Le lookup par tracking_id peut être partiel : demander immédiatement la fiche complète.
+      integration = await getMerchantIntegration(partnerMerchantId, merchantId);
+    } else {
+      integration = lookupIntegration;
+    }
   }
 
-  const integration = normalizeMerchantIntegration(payload);
   if (!integration) {
     updateSellerPayPal(seller.id, { onboardingStatus: "pending" });
     return getSeller(seller.id);
   }
 
+  merchantId = String(integration.merchant_id || merchantId).trim();
   const permissionsGranted = hasThirdPartyPermissions(integration);
   const emailConfirmed = Boolean(integration.primary_email_confirmed);
   const paymentsReceivable = Boolean(integration.payments_receivable);
-  const ready = permissionsGranted && emailConfirmed && paymentsReceivable;
+  const ready = Boolean(merchantId && permissionsGranted && emailConfirmed && paymentsReceivable);
 
   return updateSellerPayPal(seller.id, {
-    merchantId: integration.merchant_id || knownMerchantId,
+    merchantId,
     onboardingStatus: ready ? "ready" : "pending",
     paymentsReceivable,
     emailConfirmed,
@@ -206,9 +205,7 @@ export async function syncSellerPayPalStatus(sellerId, paypalMerchantId = "") {
 
 function platformFeeFor(order) {
   const pct = commissionPercent();
-  if (pct == null) {
-    throw new Error("Commission Marketplace non configurée. Définir MARKETPLACE_COMMISSION_PERCENT.");
-  }
+  if (pct == null) throw new Error("Commission Marketplace non configurée. Définir MARKETPLACE_COMMISSION_PERCENT.");
   const includeShipping = String(process.env.MARKETPLACE_COMMISSION_INCLUDE_SHIPPING || "false").toLowerCase() === "true";
   const base = includeShipping ? Number(order.total) : Math.max(0, Number(order.total) - Number(order.shippingCost || 0));
   return round2(base * pct / 100);
@@ -240,15 +237,10 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
       custom_id: order.id,
       description: `Cardoria Marketplace - ${String(order.listingTitle || "Achat de carte").slice(0, 110)}`,
       payee: { merchant_id: seller.paypalMerchantId },
-      amount: {
-        currency_code: "EUR",
-        value: Number(order.total).toFixed(2)
-      },
+      amount: { currency_code: "EUR", value: Number(order.total).toFixed(2) },
       payment_instruction: {
         disbursement_mode: cfg.delayedDisbursement ? "DELAYED" : "INSTANT",
-        platform_fees: [{
-          amount: { currency_code: "EUR", value: fee.toFixed(2) }
-        }]
+        platform_fees: [{ amount: { currency_code: "EUR", value: fee.toFixed(2) } }]
       }
     };
   });
@@ -256,15 +248,7 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
   const payload = {
     intent: "CAPTURE",
     purchase_units: purchaseUnits,
-    payment_source: {
-      paypal: {
-        experience_context: {
-          return_url: successUrl,
-          cancel_url: cancelUrl,
-          user_action: "PAY_NOW"
-        }
-      }
-    }
+    payment_source: { paypal: { experience_context: { return_url: successUrl, cancel_url: cancelUrl, user_action: "PAY_NOW" } } }
   };
 
   const uniqueSellerMerchantIds = [...new Set(sellers.map((seller) => seller.paypalMerchantId).filter(Boolean))];
@@ -287,14 +271,7 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
     `).run(result.id, fee.platformFee, fee.sellerNet, new Date().toISOString(), fee.orderId);
   });
 
-  return {
-    provider: "paypal",
-    id: result.id,
-    status: result.status,
-    url,
-    commissionPercent: cfg.commissionPercent,
-    fees
-  };
+  return { provider: "paypal", id: result.id, status: result.status, url, commissionPercent: cfg.commissionPercent, fees };
 }
 
 function captureSellerMerchantId(paypalOrderId) {
@@ -327,15 +304,15 @@ export async function captureMarketplacePayPalOrder(paypalOrderId) {
     const captureStatus = capture?.status || "";
     const captureId = capture?.id || "";
 
-    db.prepare(`
-      UPDATE mk_orders SET paypal_capture_id = ?, payment_provider = 'paypal', updated_at = ? WHERE id = ?
-    `).run(captureId, new Date().toISOString(), internalOrderId);
+    db.prepare("UPDATE mk_orders SET paypal_capture_id = ?, payment_provider = 'paypal', updated_at = ? WHERE id = ?")
+      .run(captureId, new Date().toISOString(), internalOrderId);
 
     if (captureStatus === "COMPLETED") {
-      updateOrderStatus(internalOrderId, "paid", {
-        paymentStatus: "paid",
-        paymentMethod: "paypal"
-      });
+      const wasAlreadyPaid = ["paid", "preparing", "shipped", "delivered"].includes(order.status);
+      const updated = updateOrderStatus(internalOrderId, "paid", { paymentStatus: "paid", paymentMethod: "paypal" });
+      if (!wasAlreadyPaid && updated?.buyerId) {
+        consumePaidCartItems(updated.buyerId, updated.items?.length ? updated.items : [{ listingId: updated.listingId, qty: updated.qty }]);
+      }
     }
 
     captures.push({ orderId: internalOrderId, captureId, status: captureStatus });
