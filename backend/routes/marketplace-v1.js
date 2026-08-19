@@ -3,7 +3,7 @@
  */
 import { Router } from "express";
 import {
-  getCart, addToCart, updateCartQty, removeFromCart, clearCart, createOrdersFromCart
+  getCart, addToCart, updateCartQty, removeFromCart, clearCart
 } from "../lib/marketplace/v1/cart.js";
 import {
   createListingV1, updateListingV1, getListingV1, getListingV1BySlug,
@@ -13,14 +13,12 @@ import {
   assertSellerSession, assertSellerOwnsListing, assertBuyerOwnsOrder, MarketplaceAuthError
 } from "../lib/marketplace/v1/security.js";
 import { getOrdersBySeller } from "../lib/marketplace/orders.js";
-import { createCheckoutSession, isSumUpConfigured } from "../lib/marketplace/payments.js";
 import { getOrder, getOrdersByBuyer } from "../lib/marketplace/orders.js";
-import { createInvoiceForOrder, getInvoiceHtmlByOrder, exportAccountingCsv } from "../lib/marketplace/v1/invoices.js";
-import { createDispute, listDisputes, resolveDispute } from "../lib/marketplace/v1/disputes.js";
+import { createInvoiceForOrder, getInvoiceHtmlByOrder } from "../lib/marketplace/v1/invoices.js";
+import { createDispute } from "../lib/marketplace/v1/disputes.js";
 import { getMarketplaceStats } from "../lib/marketplace/v1/index.js";
 import { registerSeller, getSeller } from "../lib/marketplace/sellers.js";
 import { updateOrderStatus } from "../lib/marketplace/orders.js";
-import { generateShippingLabel } from "../lib/marketplace/shipping.js";
 import paypalMarketplaceRoutes from "./marketplace-paypal.js";
 
 const router = Router();
@@ -39,7 +37,7 @@ router.get("/v1/sitemap/listings", (req, res) => {
 });
 
 router.get("/v1/sitemap.xml", (req, res) => {
-  const base = (process.env.MARKETPLACE_FRONTEND_URL || process.env.FRONTEND_URL || "https://cardoria.vercel.app").replace(/\/$/, "");
+  const base = (process.env.MARKETPLACE_FRONTEND_URL || process.env.FRONTEND_URL || "https://cardoria-site-2.onrender.com").replace(/\/$/, "");
   const entries = getListingsSitemapEntries(Number(req.query.limit) || 5000);
   const urls = entries.map((e) =>
     "  <url><loc>" + base + e.url + "</loc>" +
@@ -182,27 +180,16 @@ router.delete("/v1/cart/:userId", (req, res) => {
   res.json({ ok: true, cart: clearCart(req.params.userId) });
 });
 
-/** Route SumUp historique conservée temporairement, mais le frontend Marketplace utilise PayPal. */
-router.post("/v1/cart/checkout", async (req, res) => {
-  try {
-    const body = req.body || {};
-    const orders = createOrdersFromCart(body.userId, body);
-    if (!isSumUpConfigured()) {
-      return res.json({ ok: true, orders, paymentRequired: false, message: "SumUp non configuré" });
-    }
-    const sessions = [];
-    for (const order of orders) {
-      const session = await createCheckoutSession(
-        order,
-        body.successUrl || process.env.MARKETPLACE_SUCCESS_URL || "https://cardoria.vercel.app/marketplace-paiement-succes.html",
-        body.cancelUrl || process.env.MARKETPLACE_CANCEL_URL || "https://cardoria.vercel.app/marketplace-paiement-echec.html"
-      );
-      sessions.push({ orderId: order.id, ...session });
-    }
-    res.json({ ok: true, orders, checkout: sessions.length === 1 ? sessions[0] : sessions });
-  } catch (e) {
-    res.status(400).json({ ok: false, error: e.message });
-  }
+/**
+ * Ancien checkout Marketplace SumUp désactivé.
+ * SumUp reste réservé à la Boutique Cardoria ; la Marketplace C2C passe par PayPal.
+ */
+router.post("/v1/cart/checkout", (req, res) => {
+  res.status(410).json({
+    ok: false,
+    error: "Ce checkout Marketplace est désactivé. Utilisez le paiement PayPal Marketplace.",
+    replacement: "/api/marketplace/v1/paypal/checkout"
+  });
 });
 
 router.get("/v1/orders/secure/:id", (req, res) => {
