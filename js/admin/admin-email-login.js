@@ -4,6 +4,7 @@
   const status = document.getElementById("magicLoginStatus");
   const error = document.getElementById("magicLoginError");
   const token = new URLSearchParams(window.location.search).get("token") || "";
+  const BACKEND = window.CARDORIA_BACKEND || (window.CARDORIA_SEO && window.CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
 
   if (!token) {
     if (status) status.textContent = "";
@@ -12,7 +13,7 @@
   }
 
   try {
-    const response = await fetch(`${window.location.origin}/api/auth/email/confirm`, {
+    const response = await fetch(`${BACKEND}/api/auth/email/confirm`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token })
@@ -36,9 +37,9 @@
     if (data.csrfToken) sessionStorage.setItem("cardoria_csrf_token", data.csrfToken);
     if (data.user?.email) sessionStorage.setItem("cardoria_admin_email", data.user.email);
 
-    history.replaceState({}, "", "/admin-email-login.html");
+    history.replaceState({}, "", window.location.pathname);
     if (status) status.textContent = "Connexion validée. Redirection...";
-    window.location.replace("/admin.html");
+    window.location.replace("admin.html");
   } catch (e) {
     if (status) status.textContent = "";
     if (error) error.textContent = `Connexion impossible : ${e.message}`;
