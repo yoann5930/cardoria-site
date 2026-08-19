@@ -24,6 +24,10 @@ import paypalMarketplaceRoutes from "./marketplace-paypal.js";
 const router = Router();
 router.use(paypalMarketplaceRoutes);
 
+function isMarketplaceDemoMode() {
+  return String(process.env.MARKETPLACE_DEMO_MODE || "").toLowerCase() === "true";
+}
+
 function authError(res, e) {
   return res.status(e.code || 403).json({ ok: false, error: e.message });
 }
@@ -77,11 +81,11 @@ router.post("/v1/listings", (req, res) => {
     }
     if (!seller) throw new MarketplaceAuthError("Vendeur requis", 400);
     assertSellerSession({ sellerId: seller.id, sellerEmail: body.sellerEmail || seller.email });
-    if (body.status !== "draft" && !seller.paypalReady) {
+    if (body.status !== "draft" && !seller.paypalReady && !isMarketplaceDemoMode()) {
       throw new MarketplaceAuthError("Activez d'abord votre compte vendeur PayPal avant de publier une annonce.", 409);
     }
     const listing = createListingV1({ ...body, sellerId: seller.id });
-    res.json({ ok: true, listing, seller });
+    res.json({ ok: true, listing, seller, demoMode: isMarketplaceDemoMode() });
   } catch (e) {
     if (e instanceof MarketplaceAuthError) return authError(res, e);
     res.status(400).json({ ok: false, error: e.message });
@@ -92,11 +96,11 @@ router.put("/v1/listings/:id", (req, res) => {
   try {
     const seller = assertSellerSession(req.body);
     assertSellerOwnsListing(req.body.sellerId, req.params.id);
-    if (req.body.status === "active" && !seller.paypalReady) {
+    if (req.body.status === "active" && !seller.paypalReady && !isMarketplaceDemoMode()) {
       throw new MarketplaceAuthError("Activez d'abord votre compte vendeur PayPal avant de publier l'annonce.", 409);
     }
     const listing = updateListingV1(req.params.id, req.body.sellerId, req.body);
-    res.json({ ok: true, listing });
+    res.json({ ok: true, listing, demoMode: isMarketplaceDemoMode() });
   } catch (e) {
     if (e instanceof MarketplaceAuthError) return authError(res, e);
     res.status(400).json({ ok: false, error: e.message });
