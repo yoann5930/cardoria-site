@@ -48,20 +48,15 @@ function assertConfigured() {
   return cfg;
 }
 
-function base64Url(value) {
-  return Buffer.from(typeof value === "string" ? value : JSON.stringify(value))
-    .toString("base64")
-    .replace(/=+$/g, "")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_");
+function encodeObjectToBase64(value) {
+  return Buffer.from(JSON.stringify(value)).toString("base64");
 }
 
-function authAssertion(merchantId) {
-  const payerId = String(merchantId || "").trim();
+function authAssertion(sellerMerchantId) {
+  const payerId = String(sellerMerchantId || "").trim();
   if (!payerId) return "";
-  const header = base64Url({ alg: "none" });
-  const payload = base64Url({ iss: String(process.env.PAYPAL_CLIENT_ID || "").trim(), payer_id: payerId });
-  return `${header}.${payload}.`;
+  const clientId = String(process.env.PAYPAL_CLIENT_ID || "").trim();
+  return `${encodeObjectToBase64({ alg: "none" })}.${encodeObjectToBase64({ iss: clientId, payer_id: payerId })}.`;
 }
 
 async function getAccessToken() {
@@ -82,7 +77,7 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-async function paypalRequest(path, { method = "GET", body, requestId, authMerchantId = "" } = {}) {
+async function paypalRequest(path, { method = "GET", body, requestId, sellerMerchantId = "" } = {}) {
   const token = await getAccessToken();
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -90,7 +85,7 @@ async function paypalRequest(path, { method = "GET", body, requestId, authMercha
     "Content-Type": "application/json",
     "PayPal-Partner-Attribution-Id": String(process.env.PAYPAL_PARTNER_ATTRIBUTION_ID || "").trim()
   };
-  if (authMerchantId) headers["PayPal-Auth-Assertion"] = authAssertion(authMerchantId);
+  if (sellerMerchantId) headers["PayPal-Auth-Assertion"] = authAssertion(sellerMerchantId);
   if (requestId) headers["PayPal-Request-Id"] = requestId;
 
   const response = await fetch(`${apiBase()}${path}`, {
@@ -147,8 +142,7 @@ export async function createSellerOnboarding({ sellerId, returnUrl }) {
   const result = await paypalRequest("/v2/customer/partner-referrals", {
     method: "POST",
     body: payload,
-    requestId: `onboard-${seller.id}-${Date.now()}`,
-    authMerchantId: process.env.PAYPAL_PARTNER_MERCHANT_ID
+    requestId: `onboard-${seller.id}-${Date.now()}`
   });
   const url = getActionUrl(result);
   if (!url) throw new Error("Lien d'activation vendeur PayPal introuvable.");
@@ -168,24 +162,25 @@ function normalizeMerchantIntegration(payload) {
   return integrations[0] || null;
 }
 
+function hasThirdPartyPermissions(integration) {
+  if (integration?.permissions_granted === true) return true;
+  const oauthIntegrations = Array.isArray(integration?.oauth_integrations) ? integration.oauth_integrations : [];
+  return oauthIntegrations.some((entry) => Array.isArray(entry?.oauth_third_party) && entry.oauth_third_party.length > 0);
+}
+
 export async function syncSellerPayPalStatus(sellerId, paypalMerchantId = "") {
   assertConfigured();
   const seller = getSeller(sellerId);
   if (!seller) throw new Error("Vendeur introuvable.");
 
-  const partnerMerchantIdRaw = String(process.env.PAYPAL_PARTNER_MERCHANT_ID || "").trim();
-  const partnerMerchantId = encodeURIComponent(partnerMerchantIdRaw);
+  const partnerMerchantId = encodeURIComponent(String(process.env.PAYPAL_PARTNER_MERCHANT_ID || "").trim());
   const knownMerchantId = String(paypalMerchantId || seller.paypalMerchantId || "").trim();
   let payload;
 
   if (knownMerchantId) {
-    payload = await paypalRequest(`/v1/customer/partners/${partnerMerchantId}/merchant-integrations/${encodeURIComponent(knownMerchantId)}`, {
-      authMerchantId: partnerMerchantIdRaw
-    });
+    payload = await paypalRequest(`/v1/customer/partners/${partnerMerchantId}/merchant-integrations/${encodeURIComponent(knownMerchantId)}`);
   } else {
-    payload = await paypalRequest(`/v1/customer/partners/${partnerMerchantId}/merchant-integrations?tracking_id=${encodeURIComponent(seller.id)}`, {
-      authMerchantId: partnerMerchantIdRaw
-    });
+    payload = await paypalRequest(`/v1/customer/partners/${partnerMerchantId}/merchant-integrations?tracking_id=${encodeURIComponent(seller.id)}`);
   }
 
   const integration = normalizeMerchantIntegration(payload);
@@ -194,12 +189,7 @@ export async function syncSellerPayPalStatus(sellerId, paypalMerchantId = "") {
     return getSeller(seller.id);
   }
 
-  const oauthThirdParty = integration.oauth_third_party || integration.oauthThirdParty || integration.oauth_integrations || [];
-  const permissionsGranted = Boolean(
-    integration.permissions_granted ||
-    (Array.isArray(oauthThirdParty) && oauthThirdParty.length) ||
-    integration.products?.some?.((product) => product.vetting_status === "SUBSCRIBED")
-  );
+  const permissionsGranted = hasThirdPartyPermissions(integration);
   const emailConfirmed = Boolean(integration.primary_email_confirmed);
   const paymentsReceivable = Boolean(integration.payments_receivable);
   const ready = permissionsGranted && emailConfirmed && paymentsReceivable;
@@ -239,8 +229,10 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
   if (orders.length > 10) throw new Error("Le panier contient trop de vendeurs pour un paiement PayPal unique.");
 
   const fees = [];
+  const sellers = [];
   const purchaseUnits = orders.map((order) => {
     const seller = ensureSellerCanReceive(order);
+    sellers.push(seller);
     const fee = platformFeeFor(order);
     fees.push({ orderId: order.id, platformFee: fee, sellerNet: round2(Number(order.total) - fee) });
     return {
@@ -275,10 +267,12 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
     }
   };
 
+  const uniqueSellerMerchantIds = [...new Set(sellers.map((seller) => seller.paypalMerchantId).filter(Boolean))];
   const result = await paypalRequest("/v2/checkout/orders", {
     method: "POST",
     body: payload,
-    requestId: `cardoria-${orders.map((o) => o.id).join("-")}`.slice(0, 100)
+    requestId: `cardoria-${orders.map((o) => o.id).join("-")}`.slice(0, 100),
+    sellerMerchantId: uniqueSellerMerchantIds.length === 1 ? uniqueSellerMerchantIds[0] : ""
   });
   const url = getActionUrl(result);
   if (!url) throw new Error("Lien de paiement PayPal introuvable.");
@@ -303,12 +297,21 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
   };
 }
 
+function captureSellerMerchantId(paypalOrderId) {
+  const rows = getDb().prepare("SELECT DISTINCT seller_id FROM mk_orders WHERE paypal_order_id = ?").all(paypalOrderId);
+  if (rows.length !== 1) return "";
+  const seller = getSeller(rows[0].seller_id);
+  return seller?.paypalMerchantId || "";
+}
+
 export async function captureMarketplacePayPalOrder(paypalOrderId) {
   if (!paypalOrderId) throw new Error("Identifiant de paiement PayPal requis.");
+  const sellerMerchantId = captureSellerMerchantId(paypalOrderId);
   const result = await paypalRequest(`/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
     method: "POST",
     body: {},
-    requestId: `capture-${paypalOrderId}`
+    requestId: `capture-${paypalOrderId}`,
+    sellerMerchantId
   });
 
   const db = getDb();
