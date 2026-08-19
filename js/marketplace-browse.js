@@ -80,7 +80,7 @@
         '<div class="mk-card-img">' + photo + '</div>' +
         '<div class="mk-card-body">' +
           '<h3>' + escapeHtml(listing.title) + '</h3>' +
-          '<p class="mk-card-meta">' + escapeHtml(listing.condition) + ' • Stock : ' + Number(listing.stock || 0) + '</p>' +
+          '<p class="mk-card-meta">' + escapeHtml(listing.condition) + '</p>' +
           '<div class="mk-card-price">' + M.euro(listing.price) + '</div>' +
           '<div class="mk-card-badges">' + negotiable + '</div>' +
           '<div class="mk-seller-row">' + M.sellerBadge(listing.seller) + '<span>' + sellerName + '</span></div>' +
