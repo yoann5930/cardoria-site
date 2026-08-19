@@ -3,7 +3,7 @@
  */
 import { Router } from "express";
 import { getSeller, getSellerByEmail, registerSeller } from "../lib/marketplace/sellers.js";
-import { getCart, createOrdersFromCart, clearCart } from "../lib/marketplace/v1/cart.js";
+import { getCart, createOrdersFromCart } from "../lib/marketplace/v1/cart.js";
 import { updateOrderStatus } from "../lib/marketplace/orders.js";
 import {
   getPayPalMarketplaceConfig,
@@ -121,7 +121,7 @@ router.post("/v1/paypal/checkout", async (req, res) => {
     const successUrl = `${successBase}${separator}provider=paypal`;
 
     const payment = await createMarketplacePayPalOrder(orders, { successUrl, cancelUrl });
-    clearCart(body.userId);
+    // Le panier reste intact tant que PayPal n'a pas confirmé la capture.
     res.json({ ok: true, provider: "paypal", orders, checkout: payment });
   } catch (error) {
     for (const order of orders) {
