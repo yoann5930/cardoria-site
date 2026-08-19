@@ -1,3 +1,4 @@
+# Stability validation trigger
 name: Cardoria CI
 
 on:
