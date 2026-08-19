@@ -1,1 +1,128 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Boutique Cardoria</title><meta name="description" content="Acheter cartes TCG et accessoires Cardoria."><meta name="robots" content="index,follow"><link rel="canonical" href="https://cardoria.vercel.app/"><meta property="og:title" content="Boutique Cardoria"><meta property="og:description" content="Acheter cartes TCG et accessoires Cardoria."><meta property="og:image" content="https://cardoria.vercel.app/assets/logo/cardoria-premium.png"><link rel="preload" href="/style.css" as="style"><link rel="stylesheet" href="/style.css"><script src="/js/seo-config.js"></script><script src="/js/seo.js"></script><link rel="icon" href="/assets/logo/cardoria-premium.png"></head><body><header class="header"><div class="container nav"><a class="brand" href="index.html"><img src="/assets/logo/cardoria-premium.png" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'" alt="Cardoria"><span>CARDORIA</span></a><button class="burger" type="button" onclick="toggleMenu()">Menu</button><nav class="menu" id="menu"><a href="boutique.html">Boutique</a><a href="accessoires.html">Accessoires</a><a href="estimation.html">Estimation</a><a href="rachat-cartes.html">Rachat</a><a href="referencement.html">Référencement</a><a href="contact.html">Contact</a><a href="admin-login.html">Admin</a></nav></div></header><main class="container"><section class="section"><span class="badge">BOUTIQUE</span><h1>Boutique Cardoria</h1><p>Cartes TCG et accessoires premium.</p><input id="search" oninput="renderProducts()" placeholder="Rechercher un produit"><div class="actions"><button type="button" onclick="setFilter('all')">Tout</button><button type="button" onclick="setFilter('pokemon')">Pokémon</button><button type="button" onclick="setFilter('onepiece')">One Piece</button><button type="button" onclick="setFilter('yugioh')">Yu-Gi-Oh!</button><button type="button" onclick="setFilter('accessoires')">Accessoires</button></div><div class="products" id="products"></div><aside class="panel"><h2>Panier</h2><ul id="cart"></ul><p>Total : <b id="cartTotal">0,00 €</b></p><input id="shopName" placeholder="Votre nom"><input id="shopEmail" placeholder="Votre email" type="email"><button class="primary" type="button" onclick="checkoutBoutique()">Payer par carte — SumUp</button><p id="shopPayMsg" class="small" style="margin-top:10px;color:#baaf97"></p></aside></section></main><footer class="footer"><img src="/assets/logo/cardoria-premium.png" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'" alt="Cardoria"><p>Email : <b>Cardoria59330@gmail.com</b></p><p class="small">Cardoria - Trading cards • Collectibles • Premium</p></footer><script src="/js/attribution.js"></script><script src="/script.js?v=6"></script></body></html>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Boutique Cardoria — Cartes TCG & Collectibles</title>
+  <meta name="description" content="Découvrez la boutique Cardoria : cartes TCG, accessoires et produits de collection.">
+  <meta name="robots" content="index,follow">
+  <meta name="theme-color" content="#030303">
+  <link rel="canonical" href="https://cardoria-site-2.onrender.com/boutique.html">
+  <link rel="preload" href="/style.css" as="style">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/css/boutique-v1.css?v=1">
+  <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
+  <script src="/js/seo-config.js"></script>
+  <script src="/js/seo.js"></script>
+</head>
+<body class="shop-v1">
+  <header class="shop-header">
+    <div class="shop-topline">Le Royaume des Collectionneurs</div>
+    <div class="shop-shell shop-nav">
+      <a class="shop-brand" href="/" aria-label="Cardoria — Accueil">
+        <img src="/assets/logo/cardoria-premium.png" alt="Logo Cardoria" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
+        <span><strong>CARDORIA</strong><small>Trading Cards • Collectibles</small></span>
+      </a>
+      <button class="shop-menu-btn" type="button" onclick="toggleMenu()" aria-label="Ouvrir le menu">Menu</button>
+      <nav class="shop-menu" id="menu" aria-label="Navigation principale">
+        <a href="/">Accueil</a>
+        <a class="is-active" href="/boutique.html">Boutique</a>
+        <a href="/marketplace.html">Marketplace</a>
+        <a href="/estimation.html">Estimation</a>
+        <a href="/rachat-cartes.html">Rachat</a>
+        <a href="/pages/licences/">Licences</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+      <a class="shop-nav-action" href="/estimation.html">Estimer une carte</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="shop-hero">
+      <div class="shop-shell shop-hero-content">
+        <p class="shop-kicker">Sélection Cardoria</p>
+        <h1>La <span>Boutique</span></h1>
+        <p>Retrouvez les cartes, accessoires et produits de collection disponibles chez Cardoria.</p>
+      </div>
+    </section>
+
+    <section class="shop-search-wrap" aria-label="Recherche et filtres boutique">
+      <div class="shop-shell shop-search-card">
+        <label class="shop-search-field" for="search">
+          <span>⌕</span>
+          <input id="search" type="search" oninput="renderProducts()" placeholder="Rechercher une carte ou un produit..." autocomplete="off">
+        </label>
+        <div class="shop-filter-bar" aria-label="Filtres produits">
+          <button type="button" onclick="setFilter('all')">Tout</button>
+          <button type="button" onclick="setFilter('pokemon')">Pokémon</button>
+          <button type="button" onclick="setFilter('onepiece')">One Piece</button>
+          <button type="button" onclick="setFilter('yugioh')">Yu-Gi-Oh!</button>
+          <button type="button" onclick="setFilter('accessoires')">Accessoires</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="shop-main">
+      <div class="shop-shell shop-layout">
+        <div class="shop-catalog">
+          <div class="shop-catalog-head">
+            <div>
+              <p class="shop-kicker">Catalogue</p>
+              <h2>Produits disponibles</h2>
+            </div>
+            <p class="shop-catalog-note">Disponibilité synchronisée avec le stock Cardoria.</p>
+          </div>
+          <div class="products" id="products" aria-live="polite"></div>
+        </div>
+
+        <aside class="shop-cart" aria-label="Panier Cardoria">
+          <div class="shop-cart-head">
+            <h2>Votre panier</h2>
+            <span>▣</span>
+          </div>
+          <ul id="cart"></ul>
+          <div class="shop-cart-total">
+            <span>Total</span>
+            <strong id="cartTotal">0,00 €</strong>
+          </div>
+          <div class="shop-customer">
+            <input id="shopName" placeholder="Votre nom" autocomplete="name">
+            <input id="shopEmail" placeholder="Votre email" type="email" autocomplete="email">
+          </div>
+          <button class="shop-pay" type="button" onclick="checkoutBoutique()">Payer par carte — SumUp</button>
+          <p class="shop-pay-note">Votre panier et le paiement utilisent le système Cardoria existant.</p>
+          <p id="shopPayMsg"></p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="shop-reassurance">
+      <div class="shop-shell shop-reassurance-grid">
+        <article><strong>Stock Cardoria</strong><p>Les produits affichés restent liés au stock existant de la boutique.</p></article>
+        <article><strong>Paiement sécurisé</strong><p>Le parcours de paiement actuel est conservé sans modification de la logique métier.</p></article>
+        <article><strong>Univers collectionneur</strong><p>Une boutique plus claire, pensée pour retrouver rapidement les produits Cardoria.</p></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="shop-footer">
+    <div class="shop-shell shop-footer-grid">
+      <div class="shop-footer-brand">
+        <img src="/assets/logo/cardoria-premium.png" alt="Cardoria" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
+        <strong>CARDORIA</strong>
+        <p>Le Royaume des Collectionneurs.</p>
+      </div>
+      <div><h3>Boutique</h3><a href="/boutique.html">Produits</a><a href="/accessoires.html">Accessoires</a><a href="/marketplace.html">Marketplace</a></div>
+      <div><h3>Services</h3><a href="/estimation.html">Estimation</a><a href="/rachat-cartes.html">Rachat</a><a href="/scanner.html">Scanner</a></div>
+      <div><h3>Cardoria</h3><a href="/">Accueil</a><a href="/contact.html">Contact</a><a href="/admin-login.html">Admin</a></div>
+    </div>
+    <div class="shop-shell shop-footer-bottom">
+      <span>© Cardoria</span>
+      <span>Trading Cards • Collectibles • Premium</span>
+    </div>
+  </footer>
+
+  <script src="/js/attribution.js"></script>
+  <script src="/script.js?v=6"></script>
+</body>
+</html>
