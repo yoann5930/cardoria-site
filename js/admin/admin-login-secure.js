@@ -1,30 +1,33 @@
 (function () {
   "use strict";
 
-  const BACKEND = window.CARDORIA_BACKEND || window.location.origin;
+  const BACKEND = window.location.origin;
 
   function qs(id) {
     return document.getElementById(id);
   }
 
-  window.adminLogin = async function adminLoginSecure() {
+  async function requestAdminEmailLink(event) {
+    event?.preventDefault();
     const err = qs("loginError");
+    const success = qs("loginSuccess");
     if (err) err.textContent = "";
+    if (success) success.textContent = "";
 
     const email = qs("adminEmail")?.value?.trim();
-    const password = qs("adminPassword")?.value || "";
-    const totpCode = qs("adminTotp")?.value?.trim() || "";
-
-    if (!email || !password) {
-      if (err) err.textContent = "Indiquez votre email et votre mot de passe.";
+    if (!email) {
+      if (err) err.textContent = "Indiquez votre adresse e-mail.";
       return;
     }
 
+    const button = qs("adminEmailLoginForm")?.querySelector("button[type='submit']");
+    if (button) button.disabled = true;
+
     try {
-      const response = await fetch(`${BACKEND}/api/auth/login`, {
+      const response = await fetch(`${BACKEND}/api/auth/email/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, totpCode })
+        body: JSON.stringify({ email })
       });
 
       let data = {};
@@ -34,25 +37,20 @@
         throw new Error("Réponse serveur illisible.");
       }
 
-      if (data.requires2fa && !totpCode) {
-        const row = qs("adminTotpRow");
-        if (row) row.style.display = "block";
-        if (err) err.textContent = "Code 2FA requis.";
-        return;
-      }
-
-      if (!response.ok || !data.ok || !data.token) {
+      if (!response.ok || !data.ok) {
         if (err) err.textContent = data.error || "Connexion impossible.";
         return;
       }
 
-      sessionStorage.setItem("cardoria_admin_connected", "yes");
-      sessionStorage.setItem("cardoria_session_token", data.token);
-      if (data.csrfToken) sessionStorage.setItem("cardoria_csrf_token", data.csrfToken);
-      if (data.user?.email) sessionStorage.setItem("cardoria_admin_email", data.user.email);
-      location.href = "admin.html";
+      if (success) success.textContent = data.message || "Lien de connexion envoyé. Consultez votre boîte e-mail.";
     } catch (error) {
       if (err) err.textContent = `Serveur Cardoria indisponible : ${error.message}`;
+    } finally {
+      if (button) button.disabled = false;
     }
-  };
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    qs("adminEmailLoginForm")?.addEventListener("submit", requestAdminEmailLink);
+  });
 })();
