@@ -18,6 +18,20 @@ services:
         value: https://cardoria-site-2.onrender.com
       - key: CORS_ORIGINS
         value: https://cardoria-site-2.onrender.com,https://cardoria.fr,https://www.cardoria.fr,https://cardoria.vercel.app,https://cardoria-site-2tve.vercel.app
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        value: Cardoria59330@gmail.com
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        value: Cardoria <Cardoria59330@gmail.com>
+      - key: MAIL_TO
+        value: Cardoria59330@gmail.com
     disk:
       name: cardoria-data
       mountPath: /opt/render/project/src/backend/data
