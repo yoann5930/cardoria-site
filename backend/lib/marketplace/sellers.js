@@ -1,5 +1,5 @@
 /**
- * Profils vendeurs — évaluations, badge vérifié, statistiques.
+ * Profils vendeurs — évaluations, badge vérifié, statistiques, statut PayPal Marketplace.
  */
 import { getDb } from "../engine/database.js";
 import { makeMarketId } from "./migrate.js";
@@ -25,6 +25,33 @@ export function registerSeller({ email, displayName, sellerType, bio }) {
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(id, email, displayName || email.split("@")[0], sellerType || "individual", bio || "", now);
   return getSeller(id);
+}
+
+export function updateSellerPayPal(sellerId, patch = {}) {
+  const seller = getSeller(sellerId);
+  if (!seller) return null;
+  const db = getDb();
+  db.prepare(`
+    UPDATE mk_sellers SET
+      paypal_merchant_id = COALESCE(?, paypal_merchant_id),
+      paypal_tracking_id = COALESCE(?, paypal_tracking_id),
+      paypal_onboarding_status = COALESCE(?, paypal_onboarding_status),
+      paypal_payments_receivable = COALESCE(?, paypal_payments_receivable),
+      paypal_email_confirmed = COALESCE(?, paypal_email_confirmed),
+      paypal_permissions_granted = COALESCE(?, paypal_permissions_granted),
+      paypal_connected_at = COALESCE(?, paypal_connected_at)
+    WHERE id = ?
+  `).run(
+    patch.merchantId ?? null,
+    patch.trackingId ?? null,
+    patch.onboardingStatus ?? null,
+    patch.paymentsReceivable != null ? (patch.paymentsReceivable ? 1 : 0) : null,
+    patch.emailConfirmed != null ? (patch.emailConfirmed ? 1 : 0) : null,
+    patch.permissionsGranted != null ? (patch.permissionsGranted ? 1 : 0) : null,
+    patch.connectedAt ?? null,
+    sellerId
+  );
+  return getSeller(sellerId);
 }
 
 export function updateSellerStats(sellerId) {
@@ -76,6 +103,18 @@ function toSeller(row) {
     ratingCount: row.rating_count,
     salesCount: row.sales_count,
     satisfactionRate: row.satisfaction_rate,
+    paypalMerchantId: row.paypal_merchant_id || "",
+    paypalTrackingId: row.paypal_tracking_id || "",
+    paypalOnboardingStatus: row.paypal_onboarding_status || "",
+    paypalPaymentsReceivable: !!row.paypal_payments_receivable,
+    paypalEmailConfirmed: !!row.paypal_email_confirmed,
+    paypalPermissionsGranted: !!row.paypal_permissions_granted,
+    paypalConnectedAt: row.paypal_connected_at || "",
+    paypalReady: !!(
+      row.paypal_merchant_id &&
+      row.paypal_onboarding_status === "ready" &&
+      row.paypal_payments_receivable
+    ),
     createdAt: row.created_at
   };
 }
