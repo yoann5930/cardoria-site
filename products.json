@@ -6,7 +6,7 @@
     "condition": "Excellent",
     "price": 19.9,
     "stock": 3,
-    "emoji": "⚡"
+    "emoji": "<img class=\"pokemon-brand-logo\" src=\"https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg\" alt=\"Logo Pokémon\" loading=\"lazy\" decoding=\"async\">"
   },
   {
     "id": "PKM-002",
@@ -15,7 +15,7 @@
     "condition": "Good",
     "price": 89.9,
     "stock": 1,
-    "emoji": "🔥"
+    "emoji": "<img class=\"pokemon-brand-logo\" src=\"https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg\" alt=\"Logo Pokémon\" loading=\"lazy\" decoding=\"async\">"
   },
   {
     "id": "OP-001",
