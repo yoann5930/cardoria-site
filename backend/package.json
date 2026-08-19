@@ -9,9 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "audit": "node ../scripts/audit-launch.mjs",
-    "sitemap": "node ../scripts/generate-launch-sitemap.mjs",
-    "marketplace:postgres:init": "node scripts/marketplace-postgres-init.mjs",
-    "marketplace:postgres:migrate": "node scripts/marketplace-sqlite-to-postgres.mjs"
+    "sitemap": "node ../scripts/generate-launch-sitemap.mjs"
   },
   "dependencies": {
     "better-sqlite3": "11.7.0",
