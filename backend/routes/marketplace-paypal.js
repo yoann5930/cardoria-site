@@ -5,6 +5,7 @@ import { Router } from "express";
 import { getSeller, getSellerByEmail, registerSeller } from "../lib/marketplace/sellers.js";
 import { getCart, createOrdersFromCart } from "../lib/marketplace/v1/cart.js";
 import { updateOrderStatus } from "../lib/marketplace/orders.js";
+import { getMarketplacePersistenceStatus } from "../lib/marketplace/persistence.js";
 import {
   getPayPalMarketplaceConfig,
   createSellerOnboarding,
@@ -24,6 +25,10 @@ function assertSellerIdentity(seller, email) {
   }
   return seller;
 }
+
+router.get("/v1/persistence/status", (req, res) => {
+  res.json({ ok: true, persistence: getMarketplacePersistenceStatus() });
+});
 
 router.get("/v1/paypal/config", (req, res) => {
   const cfg = getPayPalMarketplaceConfig();
