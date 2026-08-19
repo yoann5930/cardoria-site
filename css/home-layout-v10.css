@@ -1,11 +1,11 @@
 /* Cardoria accueil V10 — disposition demandee : menu, fond noir, logo entier, texte dessous */
 .home-v8 .home-hero--logo {
   position: relative;
-  min-height: calc(100vh - 102px);
+  min-height: calc(115vh - 102px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 62px 0 92px;
+  padding: 72px 0 150px;
   background: #000;
   overflow: hidden;
 }
@@ -13,9 +13,11 @@
 .home-v8 .home-hero--logo::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: -8%;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 37%, rgba(215,178,74,.08), transparent 38%);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(242,215,122,.22) 0%, rgba(215,178,74,.14) 18%, rgba(140,111,35,.08) 32%, transparent 54%);
+  filter: blur(10px);
 }
 
 .home-v8 .home-hero-logo-layout {
@@ -44,12 +46,14 @@
   height: auto;
   object-fit: contain;
   object-position: center;
-  filter: drop-shadow(0 20px 55px rgba(215,178,74,.13));
+  filter:
+    drop-shadow(0 0 24px rgba(242,215,122,.22))
+    drop-shadow(0 24px 70px rgba(215,178,74,.24));
 }
 
 .home-v8 .home-hero-text-under {
   width: min(780px, 92vw);
-  margin-top: 18px;
+  margin-top: 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -84,8 +88,8 @@
 
 @media (max-width: 980px) {
   .home-v8 .home-hero--logo {
-    min-height: auto;
-    padding: 52px 0 86px;
+    min-height: calc(108vh - 94px);
+    padding: 58px 0 118px;
   }
 
   .home-v8 .home-hero-logo-full {
@@ -96,7 +100,8 @@
 
 @media (max-width: 640px) {
   .home-v8 .home-hero--logo {
-    padding: 38px 0 76px;
+    min-height: calc(104vh - 94px);
+    padding: 44px 0 96px;
   }
 
   .home-v8 .home-hero-logo-full {
@@ -105,7 +110,7 @@
   }
 
   .home-v8 .home-hero-text-under {
-    margin-top: 12px;
+    margin-top: 16px;
   }
 
   .home-v8 .home-hero-text-under h1 {
