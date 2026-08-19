@@ -5,6 +5,7 @@ import { getDb } from "../../engine/database.js";
 
 export function migrateMarketplaceV1() {
   const db = getDb();
+  migrateSellerColumns(db);
   migrateListingColumns(db);
   migrateOrderColumns(db);
 
@@ -47,34 +48,48 @@ export function migrateMarketplaceV1() {
     CREATE INDEX IF NOT EXISTS idx_mk_cart_user ON mk_cart_items(user_id);
     CREATE INDEX IF NOT EXISTS idx_mk_disputes_order ON mk_disputes(order_id, status);
     CREATE INDEX IF NOT EXISTS idx_mk_invoices_order ON mk_invoices(order_id);
+    CREATE INDEX IF NOT EXISTS idx_mk_sellers_paypal ON mk_sellers(paypal_merchant_id, paypal_onboarding_status);
+    CREATE INDEX IF NOT EXISTS idx_mk_orders_paypal ON mk_orders(paypal_order_id, paypal_capture_id);
   `);
+}
+
+function addColumnIfMissing(db, table, cols, name, type) {
+  if (!cols.includes(name)) {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`); } catch { /* ignore */ }
+  }
+}
+
+function migrateSellerColumns(db) {
+  const cols = db.prepare("PRAGMA table_info(mk_sellers)").all().map((c) => c.name);
+  addColumnIfMissing(db, "mk_sellers", cols, "paypal_merchant_id", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_sellers", cols, "paypal_tracking_id", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_sellers", cols, "paypal_onboarding_status", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_sellers", cols, "paypal_payments_receivable", "INTEGER DEFAULT 0");
+  addColumnIfMissing(db, "mk_sellers", cols, "paypal_email_confirmed", "INTEGER DEFAULT 0");
+  addColumnIfMissing(db, "mk_sellers", cols, "paypal_permissions_granted", "INTEGER DEFAULT 0");
+  addColumnIfMissing(db, "mk_sellers", cols, "paypal_connected_at", "TEXT DEFAULT ''");
 }
 
 function migrateListingColumns(db) {
   const cols = db.prepare("PRAGMA table_info(mk_listings)").all().map((c) => c.name);
-  const add = (name, type) => {
-    if (!cols.includes(name)) {
-      try { db.exec(`ALTER TABLE mk_listings ADD COLUMN ${name} ${type}`); } catch { /* ignore */ }
-    }
-  };
-  add("extension", "TEXT DEFAULT ''");
-  add("card_number", "TEXT DEFAULT ''");
-  add("language", "TEXT DEFAULT ''");
-  add("slug", "TEXT DEFAULT ''");
-  add("seo_title", "TEXT DEFAULT ''");
-  add("seo_description", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_listings", cols, "extension", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_listings", cols, "card_number", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_listings", cols, "language", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_listings", cols, "slug", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_listings", cols, "seo_title", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_listings", cols, "seo_description", "TEXT DEFAULT ''");
 }
 
 function migrateOrderColumns(db) {
   const cols = db.prepare("PRAGMA table_info(mk_orders)").all().map((c) => c.name);
-  const add = (name, type) => {
-    if (!cols.includes(name)) {
-      try { db.exec(`ALTER TABLE mk_orders ADD COLUMN ${name} ${type}`); } catch { /* ignore */ }
-    }
-  };
-  add("items_json", "TEXT DEFAULT '[]'");
-  add("invoice_number", "TEXT DEFAULT ''");
-  add("vat_rate", "REAL DEFAULT 20");
-  add("vat_amount", "REAL DEFAULT 0");
-  add("dispute_status", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_orders", cols, "items_json", "TEXT DEFAULT '[]'");
+  addColumnIfMissing(db, "mk_orders", cols, "invoice_number", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_orders", cols, "vat_rate", "REAL DEFAULT 20");
+  addColumnIfMissing(db, "mk_orders", cols, "vat_amount", "REAL DEFAULT 0");
+  addColumnIfMissing(db, "mk_orders", cols, "dispute_status", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_orders", cols, "payment_provider", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_orders", cols, "paypal_order_id", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_orders", cols, "paypal_capture_id", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_orders", cols, "platform_fee", "REAL DEFAULT 0");
+  addColumnIfMissing(db, "mk_orders", cols, "seller_amount_after_platform_fee", "REAL DEFAULT 0");
 }
