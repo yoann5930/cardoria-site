@@ -1,3 +1,4 @@
+# Final stability validation trigger
 name: Cardoria CI
 
 on:
