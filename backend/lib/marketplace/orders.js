@@ -1,5 +1,5 @@
 /**
- * Commandes marketplace — statuts, facture, paiement SumUp.
+ * Commandes marketplace — statuts, facture et paiement entre clients.
  */
 import { getDb } from "../engine/database.js";
 import { makeMarketId } from "./migrate.js";
@@ -60,9 +60,25 @@ export function updateOrderSumUpRefs(id, checkoutId, paymentStatus) {
   return getOrder(id);
 }
 
+function orderLines(order) {
+  if (Array.isArray(order.items) && order.items.length) return order.items;
+  return [{ listingId: order.listingId, qty: order.qty }];
+}
+
+function applyPaidSideEffectsOnce(order, previousStatus) {
+  const alreadyPaid = ["paid", "preparing", "shipped", "delivered"].includes(previousStatus);
+  if (alreadyPaid) return;
+  for (const line of orderLines(order)) {
+    decrementStock(line.listingId, Number(line.qty) || 1);
+  }
+  updateSellerStats(order.sellerId);
+  try { ingestMarketplaceOrder(order); } catch (e) { console.warn("[Market] ingest order:", e.message); }
+}
+
 export function updateOrderStatus(id, status, extra = {}) {
   if (!STATUS_FLOW.includes(status)) throw new Error("Statut invalide");
   const prev = getOrder(id);
+  if (!prev) throw new Error("Commande introuvable");
   const db = getDb();
   const now = new Date().toISOString();
   db.prepare(`
@@ -90,17 +106,12 @@ export function updateOrderStatus(id, status, extra = {}) {
     id
   );
 
-  if (status === "paid") {
-    const order = getOrder(id);
-    if (order) {
-      decrementStock(order.listingId, order.qty);
-      updateSellerStats(order.sellerId);
-      try { ingestMarketplaceOrder(order); } catch (e) { console.warn("[Market] ingest order:", e.message); }
-    }
-  }
   const updated = getOrder(id);
+  if (status === "paid" && updated) {
+    applyPaidSideEffectsOnce(updated, prev.status);
+  }
   if (_notifyHook && updated) _notifyHook(updated, status, prev?.status).catch?.(() => {});
-  return updated;
+  return getOrder(id);
 }
 
 export function markOrderPaymentStatus(id, paymentStatus, extra = {}) {
@@ -145,8 +156,12 @@ export function getInvoiceHtml(orderId) {
   return generateInvoiceHtml(order);
 }
 
+function parseItems(raw) {
+  try { return JSON.parse(raw || "[]"); } catch { return []; }
+}
+
 function toOrder(row) {
-  const paymentRef = row.sumup_checkout_id || row.stripe_session_id || "";
+  const paymentRef = row.paypal_order_id || row.sumup_checkout_id || row.stripe_session_id || "";
   return {
     id: row.id,
     buyerEmail: row.buyer_email,
@@ -155,6 +170,7 @@ function toOrder(row) {
     sellerId: row.seller_id,
     listingId: row.listing_id,
     listingTitle: row.listing_title,
+    items: parseItems(row.items_json),
     qty: row.qty,
     unitPrice: row.unit_price,
     shippingCost: row.shipping_cost,
@@ -163,6 +179,11 @@ function toOrder(row) {
     status: row.status,
     paymentStatus: row.payment_status || (row.status === "paid" ? "paid" : "pending"),
     paymentMethod: row.payment_method,
+    paymentProvider: row.payment_provider || "",
+    platformFee: Number(row.platform_fee || 0),
+    sellerAmountAfterPlatformFee: Number(row.seller_amount_after_platform_fee || 0),
+    paypalOrderId: row.paypal_order_id || "",
+    paypalCaptureId: row.paypal_capture_id || "",
     sumupCheckoutId: row.sumup_checkout_id || "",
     sumupTransactionId: row.sumup_transaction_id || "",
     paymentReference: paymentRef,
