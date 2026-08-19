@@ -263,6 +263,14 @@ body.shop-v1 .product-img{
   font-size:48px;
 }
 
+body.shop-v1 .product-img .pokemon-brand-logo{
+  display:block;
+  width:min(72%,210px);
+  max-height:104px;
+  object-fit:contain;
+  filter:drop-shadow(0 10px 18px rgba(0,0,0,.35));
+}
+
 body.shop-v1 .product h3{
   margin:0 0 8px;
   font-size:19px;
@@ -477,5 +485,10 @@ body.shop-v1 #cart li{
   body.shop-v1 .product,
   .shop-cart{
     border-radius:7px;
+  }
+
+  body.shop-v1 .product-img .pokemon-brand-logo{
+    width:min(68%,190px);
+    max-height:92px;
   }
 }
