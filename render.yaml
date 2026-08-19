@@ -23,6 +23,8 @@ services:
         value: https://cardoria-site-2.onrender.com
       - key: CORS_ORIGINS
         value: https://cardoria-site-2.onrender.com,https://cardoria.fr,https://www.cardoria.fr
+      - key: MARKETPLACE_DEMO_MODE
+        value: "true"
       - key: MARKETPLACE_COMMISSION_PERCENT
         value: "5"
       - key: MARKETPLACE_COMMISSION_INCLUDE_SHIPPING

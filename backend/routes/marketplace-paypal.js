@@ -18,6 +18,10 @@ import {
 const { Pool } = pg;
 const router = Router();
 
+function isMarketplaceDemoMode() {
+  return String(process.env.MARKETPLACE_DEMO_MODE || "").toLowerCase() === "true";
+}
+
 function assertSellerIdentity(seller, email) {
   if (!seller) throw new Error("Vendeur introuvable.");
   if (!email || seller.email.toLowerCase() !== String(email).toLowerCase()) {
@@ -122,7 +126,8 @@ router.get("/v1/paypal/config", (req, res) => {
     configured: cfg.configured,
     commissionConfigured: cfg.commissionPercent != null,
     commissionPercent: cfg.commissionPercent,
-    delayedDisbursement: cfg.delayedDisbursement
+    delayedDisbursement: cfg.delayedDisbursement,
+    demoMode: isMarketplaceDemoMode()
   });
 });
 
