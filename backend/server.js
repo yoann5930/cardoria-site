@@ -16,6 +16,12 @@ import paymentsRoutes from "./routes/payments.js";
 import paymentsAdminRoutes from "./routes/payments-admin.js";
 import { seedEngineIfEmpty } from "./lib/engine/seed.js";
 import { initMarketplace } from "./lib/marketplace/index.js";
+import {
+  initMarketplacePersistence,
+  marketplacePersistenceMiddleware,
+  flushMarketplacePersistence,
+  closeMarketplacePersistence
+} from "./lib/marketplace/persistence.js";
 import { initAi } from "./lib/ai/index.js";
 import { initSeo } from "./lib/seo/index.js";
 import { initMarketData } from "./lib/market/index.js";
@@ -91,7 +97,7 @@ process.on("uncaughtException", (error) => {
 });
 
 applySecurityMiddleware(app);
-app.use("/api/marketplace/webhooks", webhookRouter);
+app.use("/api/marketplace/webhooks", marketplacePersistenceMiddleware, webhookRouter);
 app.use(express.json({ limit: process.env.BODY_LIMIT || "15mb" }));
 
 app.get("/api", (req, res) => {
@@ -115,6 +121,13 @@ safeInit("auth-migration", migrateAuth);
 safeInit("ai", initAi);
 safeInit("engine-seed", seedEngineIfEmpty);
 safeInit("marketplace", initMarketplace);
+const marketplacePersistence = await initMarketplacePersistence();
+if (!marketplacePersistence.ok) {
+  startup.ok = false;
+  startup.degraded.push({ name: "marketplace-persistence", error: marketplacePersistence.error || "initialization_failed" });
+} else if (marketplacePersistence.configured) {
+  console.log(`[startup] marketplace-persistence: ok (${marketplacePersistence.restored ? "restored" : "initialized"})`);
+}
 safeInit("market-data", initMarketData);
 safeInit("scanner", initScanner);
 safeInit("ai-enterprise", initAiEnterprise);
@@ -133,6 +146,7 @@ app.use("/api/ai-enterprise", aiRateLimit, aiEnterpriseRoutes);
 app.use("/api/ultimate", aiRateLimit, ultimateRoutes);
 app.use("/api/bigdata", apiRateLimit, bigdataAnalyticsRoutes);
 app.use("/api/engine", apiRateLimit, engineRoutes);
+app.use("/api/marketplace", marketplacePersistenceMiddleware);
 app.use("/api/marketplace", apiRateLimit, marketplaceRoutes);
 app.use("/api/marketplace", apiRateLimit, marketplaceV1Routes);
 app.use("/api/payments", apiRateLimit, paymentsRoutes);
@@ -146,7 +160,7 @@ app.use("/api/estimation-carte", (req, res, next) => {
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/development", developmentRoutes);
 app.use("/api/admin/engine", engineAdminRoutes);
-app.use("/api/admin/marketplace", marketplaceAdminRoutes);
+app.use("/api/admin/marketplace", marketplacePersistenceMiddleware, marketplaceAdminRoutes);
 app.use("/api/admin/payments", paymentsAdminRoutes);
 app.use("/api/admin/seo", seoAdminRoutes);
 app.use("/api/admin/ai", aiAdminRoutes);
@@ -235,8 +249,15 @@ const server = app.listen(port, "0.0.0.0", () => {
 
 function shutdown(signal) {
   console.log(`[process] ${signal} received, closing HTTP server`);
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(1), 10000).unref();
+  const forceExit = setTimeout(() => process.exit(1), 10000);
+  forceExit.unref();
+  server.close(async () => {
+    const persisted = await flushMarketplacePersistence(`shutdown-${signal.toLowerCase()}`);
+    if (!persisted.ok) console.error("[marketplace-persistence] shutdown flush failed");
+    try { await closeMarketplacePersistence(); } catch { /* ignore */ }
+    clearTimeout(forceExit);
+    process.exit(persisted.ok ? 0 : 1);
+  });
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
