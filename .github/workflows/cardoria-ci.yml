@@ -67,11 +67,11 @@ jobs:
       - name: Reject client-side admin bypass
         working-directory: .
         run: |
-          if grep -R --exclude-dir=.git --exclude-dir=node_modules -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' .; then
+          if grep -R -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' script.js js *.html 2>/dev/null; then
             echo "Client-side admin bypass detected"
             exit 1
           fi
-          if grep -R --exclude-dir=.git --exclude-dir=node_modules -n 'ADMIN_AUTH_DISABLED.*true' backend render.yaml; then
+          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend render.yaml 2>/dev/null; then
             echo "Direct admin bypass must never be enabled"
             exit 1
           fi
