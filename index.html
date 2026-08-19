@@ -6,12 +6,13 @@
   <title>Cardoria — Le Royaume des Collectionneurs</title>
   <meta name="description" content="Cardoria, l'univers premium des cartes à collectionner : estimation, boutique, rachat, marketplace, scanner et suivi du marché TCG.">
   <meta name="robots" content="index,follow">
-  <meta name="theme-color" content="#050505">
+  <meta name="theme-color" content="#000000">
   <link rel="canonical" href="https://cardoria-site-2.onrender.com/">
   <link rel="preload" href="/style.css" as="style">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/css/perf.css">
   <link rel="stylesheet" href="/css/home-v7.css?v=9">
+  <link rel="stylesheet" href="/css/home-layout-v10.css?v=1">
   <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
   <script src="/js/asset-paths.js"></script>
   <script src="/js/seo-config.js"></script>
@@ -42,20 +43,14 @@
   </header>
 
   <main>
-    <section class="home-hero home-hero--centered" aria-labelledby="homeTitle">
-      <div class="home-shell home-hero-centered">
-        <div class="home-hero-emblem home-reveal" aria-hidden="true">
-          <span class="home-emblem-ring home-emblem-ring--one"></span>
-          <span class="home-emblem-ring home-emblem-ring--two"></span>
-          <div class="home-emblem-core">
-            <img src="/assets/logo/cardoria-premium.png" alt="" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
-          </div>
+    <section class="home-hero home-hero--logo" aria-labelledby="homeTitle">
+      <div class="home-hero-logo-layout">
+        <div class="home-hero-logo-wrap home-reveal">
+          <img class="home-hero-logo-full" src="/assets/logo/cardoria-premium.png" alt="Cardoria" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
         </div>
-
-        <div class="home-hero-copy home-hero-copy--center home-reveal">
-          <p class="home-eyebrow">Collection • Expertise • Marché</p>
-          <h1 id="homeTitle">Le Royaume des <span>Collectionneurs.</span></h1>
-          <p class="home-lead">Découvrez, estimez, achetez et vendez vos cartes dans un univers Cardoria plus simple, plus clair et entièrement pensé pour la collection.</p>
+        <div class="home-hero-text-under home-reveal">
+          <h1 id="homeTitle">Le Royaume des Collectionneurs</h1>
+          <p>Découvrez, estimez, achetez et vendez vos cartes dans un univers Cardoria simple, premium et entièrement pensé pour la collection.</p>
           <div class="home-actions home-actions--center">
             <a class="home-btn home-btn--gold" href="/pages/estimation/">Estimer ma carte</a>
             <a class="home-btn home-btn--dark" href="/pages/boutique/">Découvrir la boutique</a>
@@ -70,108 +65,33 @@
 
     <section class="home-search-zone home-search-zone--first" aria-labelledby="searchTitle">
       <div class="home-shell home-search-panel home-search-panel--wide home-reveal">
-        <div class="home-search-copy">
-          <p class="home-eyebrow">Recherche Cardoria</p>
-          <h2 id="searchTitle">Vous avez déjà une carte en tête ?</h2>
-          <p>Recherchez-la directement par son nom.</p>
-        </div>
-        <form class="home-search" id="homeCardSearch">
-          <label class="sr-only" for="homeCardQuery">Nom de la carte</label>
-          <input id="homeCardQuery" name="q" type="search" placeholder="Ex. Pikachu, Dracaufeu, Luffy..." autocomplete="off">
-          <button type="submit">Rechercher</button>
-        </form>
+        <div class="home-search-copy"><p class="home-eyebrow">Recherche Cardoria</p><h2 id="searchTitle">Vous avez déjà une carte en tête ?</h2><p>Recherchez-la directement par son nom.</p></div>
+        <form class="home-search" id="homeCardSearch"><label class="sr-only" for="homeCardQuery">Nom de la carte</label><input id="homeCardQuery" name="q" type="search" placeholder="Ex. Pikachu, Dracaufeu, Luffy..." autocomplete="off"><button type="submit">Rechercher</button></form>
       </div>
     </section>
 
     <section class="home-quick" id="actions" aria-labelledby="quickTitle">
       <div class="home-shell">
-        <div class="home-section-head home-section-head--center home-reveal">
-          <p class="home-eyebrow">Tout commence ici</p>
-          <h2 id="quickTitle">Choisissez votre espace.</h2>
-          <p>Quatre accès principaux, sans détour.</p>
-        </div>
-
+        <div class="home-section-head home-section-head--center home-reveal"><p class="home-eyebrow">Tout commence ici</p><h2 id="quickTitle">Choisissez votre espace.</h2><p>Quatre accès principaux, sans détour.</p></div>
         <div class="home-action-layout">
-          <a class="home-action-block home-action-block--large home-reveal" href="/pages/estimation/">
-            <div class="home-action-number">01</div>
-            <div class="home-action-content"><span class="home-action-icon">◇</span><h3>Estimation</h3><p>Identifiez votre carte et démarrez son estimation.</p></div>
-            <span class="home-action-arrow">→</span>
-          </a>
-
+          <a class="home-action-block home-action-block--large home-reveal" href="/pages/estimation/"><div class="home-action-number">01</div><div class="home-action-content"><span class="home-action-icon">◇</span><h3>Estimation</h3><p>Identifiez votre carte et démarrez son estimation.</p></div><span class="home-action-arrow">→</span></a>
           <div class="home-action-pair">
-            <a class="home-action-block home-reveal" href="/pages/boutique/">
-              <div class="home-action-number">02</div>
-              <div class="home-action-content"><span class="home-action-icon">▣</span><h3>Boutique</h3><p>Découvrez les produits disponibles chez Cardoria.</p></div>
-              <span class="home-action-arrow">→</span>
-            </a>
-            <a class="home-action-block home-reveal" href="/rachat-cartes.html">
-              <div class="home-action-number">03</div>
-              <div class="home-action-content"><span class="home-action-icon">↗</span><h3>Rachat</h3><p>Proposez une carte ou une collection à Cardoria.</p></div>
-              <span class="home-action-arrow">→</span>
-            </a>
+            <a class="home-action-block home-reveal" href="/pages/boutique/"><div class="home-action-number">02</div><div class="home-action-content"><span class="home-action-icon">▣</span><h3>Boutique</h3><p>Découvrez les produits disponibles chez Cardoria.</p></div><span class="home-action-arrow">→</span></a>
+            <a class="home-action-block home-reveal" href="/rachat-cartes.html"><div class="home-action-number">03</div><div class="home-action-content"><span class="home-action-icon">↗</span><h3>Rachat</h3><p>Proposez une carte ou une collection à Cardoria.</p></div><span class="home-action-arrow">→</span></a>
           </div>
-
-          <a class="home-action-block home-action-block--wide home-reveal" href="/marketplace.html">
-            <div class="home-action-number">04</div>
-            <div class="home-action-content"><span class="home-action-icon">⇄</span><h3>Marketplace</h3><p>Explorez l'espace dédié aux échanges entre collectionneurs.</p></div>
-            <span class="home-action-arrow">→</span>
-          </a>
+          <a class="home-action-block home-action-block--wide home-reveal" href="/marketplace.html"><div class="home-action-number">04</div><div class="home-action-content"><span class="home-action-icon">⇄</span><h3>Marketplace</h3><p>Explorez l'espace dédié aux échanges entre collectionneurs.</p></div><span class="home-action-arrow">→</span></a>
         </div>
       </div>
     </section>
 
-    <section class="home-licenses" aria-labelledby="licensesTitle">
-      <div class="home-shell">
-        <div class="home-section-head home-section-head--center home-reveal">
-          <p class="home-eyebrow">Univers TCG</p>
-          <h2 id="licensesTitle">Retrouvez vos licences.</h2>
-          <p>Accédez rapidement aux univers qui composent votre collection.</p>
-        </div>
-        <div class="home-license-grid home-license-grid--balanced">
-          <a class="home-license home-reveal" href="/licence.html?slug=pokemon"><span>⚡</span><strong>Pokémon</strong><small>Explorer</small></a>
-          <a class="home-license home-reveal" href="/licence.html?slug=yugioh"><span>◈</span><strong>Yu-Gi-Oh!</strong><small>Explorer</small></a>
-          <a class="home-license home-reveal" href="/licence.html?slug=onepiece"><span>☠</span><strong>One Piece</strong><small>Explorer</small></a>
-          <a class="home-license home-reveal" href="/licence.html?slug=lorcana"><span>✦</span><strong>Lorcana</strong><small>Explorer</small></a>
-          <a class="home-license home-reveal" href="/licence.html?slug=magic"><span>✧</span><strong>Magic</strong><small>Explorer</small></a>
-          <a class="home-license home-reveal" href="/licence.html?slug=dragonball"><span>●</span><strong>Dragon Ball</strong><small>Explorer</small></a>
-        </div>
-        <div class="home-center-link home-reveal"><a href="/pages/licences/">Voir toutes les licences →</a></div>
-      </div>
-    </section>
+    <section class="home-licenses" aria-labelledby="licensesTitle"><div class="home-shell"><div class="home-section-head home-section-head--center home-reveal"><p class="home-eyebrow">Univers TCG</p><h2 id="licensesTitle">Retrouvez vos licences.</h2><p>Accédez rapidement aux univers qui composent votre collection.</p></div><div class="home-license-grid home-license-grid--balanced"><a class="home-license home-reveal" href="/licence.html?slug=pokemon"><span>⚡</span><strong>Pokémon</strong><small>Explorer</small></a><a class="home-license home-reveal" href="/licence.html?slug=yugioh"><span>◈</span><strong>Yu-Gi-Oh!</strong><small>Explorer</small></a><a class="home-license home-reveal" href="/licence.html?slug=onepiece"><span>☠</span><strong>One Piece</strong><small>Explorer</small></a><a class="home-license home-reveal" href="/licence.html?slug=lorcana"><span>✦</span><strong>Lorcana</strong><small>Explorer</small></a><a class="home-license home-reveal" href="/licence.html?slug=magic"><span>✧</span><strong>Magic</strong><small>Explorer</small></a><a class="home-license home-reveal" href="/licence.html?slug=dragonball"><span>●</span><strong>Dragon Ball</strong><small>Explorer</small></a></div><div class="home-center-link home-reveal"><a href="/pages/licences/">Voir toutes les licences →</a></div></div></section>
 
-    <section class="home-tools" aria-labelledby="toolsTitle">
-      <div class="home-shell">
-        <div class="home-section-head home-section-head--center home-reveal">
-          <p class="home-eyebrow">Outils collectionneur</p>
-          <h2 id="toolsTitle">Trois outils. Un même univers.</h2>
-        </div>
-        <div class="home-tools-grid">
-          <a class="home-tool home-reveal" href="/scanner.html"><span class="home-tool-number">01</span><div><strong>Scanner Cardoria</strong><p>Accédez aux outils d'identification de cartes.</p></div><b>→</b></a>
-          <a class="home-tool home-reveal" href="/comparateur.html"><span class="home-tool-number">02</span><div><strong>Comparateur</strong><p>Comparez les informations disponibles sur vos cartes.</p></div><b>→</b></a>
-          <a class="home-tool home-reveal" href="/tendances.html"><span class="home-tool-number">03</span><div><strong>Tendances</strong><p>Consultez les indicateurs disponibles sur le marché TCG.</p></div><b>→</b></a>
-        </div>
-      </div>
-    </section>
+    <section class="home-tools" aria-labelledby="toolsTitle"><div class="home-shell"><div class="home-section-head home-section-head--center home-reveal"><p class="home-eyebrow">Outils collectionneur</p><h2 id="toolsTitle">Trois outils. Un même univers.</h2></div><div class="home-tools-grid"><a class="home-tool home-reveal" href="/scanner.html"><span class="home-tool-number">01</span><div><strong>Scanner Cardoria</strong><p>Accédez aux outils d'identification de cartes.</p></div><b>→</b></a><a class="home-tool home-reveal" href="/comparateur.html"><span class="home-tool-number">02</span><div><strong>Comparateur</strong><p>Comparez les informations disponibles sur vos cartes.</p></div><b>→</b></a><a class="home-tool home-reveal" href="/tendances.html"><span class="home-tool-number">03</span><div><strong>Tendances</strong><p>Consultez les indicateurs disponibles sur le marché TCG.</p></div><b>→</b></a></div></div></section>
 
-    <section class="home-banner">
-      <div class="home-shell home-banner-box home-banner-box--center home-reveal">
-        <p class="home-eyebrow">Cardoria</p>
-        <h2>Une collection commence toujours par une carte.</h2>
-        <p>Choisissez votre première action et entrez dans l'univers Cardoria.</p>
-        <div class="home-actions home-actions--center"><a class="home-btn home-btn--gold" href="/pages/estimation/">Estimer une carte</a><a class="home-btn home-btn--dark" href="/pages/boutique/">Voir la boutique</a></div>
-      </div>
-    </section>
+    <section class="home-banner"><div class="home-shell home-banner-box home-banner-box--center home-reveal"><p class="home-eyebrow">Cardoria</p><h2>Une collection commence toujours par une carte.</h2><p>Choisissez votre première action et entrez dans l'univers Cardoria.</p><div class="home-actions home-actions--center"><a class="home-btn home-btn--gold" href="/pages/estimation/">Estimer une carte</a><a class="home-btn home-btn--dark" href="/pages/boutique/">Voir la boutique</a></div></div></section>
   </main>
 
-  <footer class="home-footer">
-    <div class="home-shell home-footer-grid">
-      <div class="home-footer-brand"><img src="/assets/logo/cardoria-premium.png" alt="Cardoria" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'"><strong>CARDORIA</strong><p>Le Royaume des Collectionneurs.</p></div>
-      <div><h3>Cardoria</h3><a href="/pages/boutique/">Boutique</a><a href="/marketplace.html">Marketplace</a><a href="/pages/estimation/">Estimation</a><a href="/rachat-cartes.html">Rachat</a></div>
-      <div><h3>Découvrir</h3><a href="/pages/licences/">Licences</a><a href="/scanner.html">Scanner</a><a href="/comparateur.html">Comparateur</a><a href="/tendances.html">Tendances</a></div>
-      <div><h3>Informations</h3><a href="/pages/contact/">Contact</a><a href="/pages/faq/">FAQ</a><a href="/pages/mentions-legales/">Mentions légales</a><a href="/pages/confidentialite/">Confidentialité</a></div>
-    </div>
-    <div class="home-shell home-footer-bottom"><span>© <span id="homeYear"></span> Cardoria</span><span>Trading Cards • Collectibles • Premium</span></div>
-  </footer>
+  <footer class="home-footer"><div class="home-shell home-footer-grid"><div class="home-footer-brand"><img src="/assets/logo/cardoria-premium.png" alt="Cardoria" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'"><strong>CARDORIA</strong><p>Le Royaume des Collectionneurs.</p></div><div><h3>Cardoria</h3><a href="/pages/boutique/">Boutique</a><a href="/marketplace.html">Marketplace</a><a href="/pages/estimation/">Estimation</a><a href="/rachat-cartes.html">Rachat</a></div><div><h3>Découvrir</h3><a href="/pages/licences/">Licences</a><a href="/scanner.html">Scanner</a><a href="/comparateur.html">Comparateur</a><a href="/tendances.html">Tendances</a></div><div><h3>Informations</h3><a href="/pages/contact/">Contact</a><a href="/pages/faq/">FAQ</a><a href="/pages/mentions-legales/">Mentions légales</a><a href="/pages/confidentialite/">Confidentialité</a></div></div><div class="home-shell home-footer-bottom"><span>© <span id="homeYear"></span> Cardoria</span><span>Trading Cards • Collectibles • Premium</span></div></footer>
 
   <script src="/js/attribution.js"></script>
   <script src="/js/analytics.js" defer></script>
