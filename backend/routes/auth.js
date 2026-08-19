@@ -1,11 +1,12 @@
 /**
- * Authentification publique — login, 2FA, reset password.
+ * Authentification publique — connexion par e-mail, sessions et 2FA optionnelle.
  */
 import { Router } from "express";
-import { authenticateUser, getUserById, setTotpSecret, getTotpSecret, ADMIN_ROLES } from "../lib/auth/users.js";
+import { getUserById, setTotpSecret, getTotpSecret, ADMIN_ROLES } from "../lib/auth/users.js";
 import { createSession, revokeSession, validateSession } from "../lib/auth/session.js";
 import { generateTotpSecret, verifyTotp, getTotpUri } from "../lib/auth/totp.js";
 import { requestPasswordReset, confirmPasswordReset } from "../lib/auth/passwordReset.js";
+import { requestMagicLogin, consumeMagicLogin } from "../lib/auth/magicLink.js";
 import { validateBody, SCHEMAS } from "../lib/security/validate.js";
 import { authRateLimit } from "../lib/security/rateLimit.js";
 import { generateCsrfToken } from "../lib/security/csrf.js";
@@ -13,36 +14,23 @@ import { logAudit } from "../lib/audit.js";
 
 const router = Router();
 
-router.post("/login", authRateLimit, (req, res) => {
-  const v = validateBody({
-    email: SCHEMAS.login.email,
-    password: SCHEMAS.login.password,
-    totpCode: { type: "string", maxLength: 8, allowNewlines: false }
-  }, req.body);
-
+router.post("/email/request", authRateLimit, async (req, res) => {
+  const v = validateBody(SCHEMAS.passwordResetRequest, req.body);
   if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
-
   try {
-    const user = authenticateUser(v.data.email, v.data.password);
-    if (!user) {
-      logAudit({ type: "auth", action: "login_failed", user: v.data.email, detail: "Identifiants invalides" });
-      return res.status(401).json({ ok: false, error: "Email ou mot de passe incorrect." });
-    }
+    const result = await requestMagicLogin(v.data.email);
+    res.json(result);
+  } catch (e) {
+    res.status(e.status || 500).json({ ok: false, error: e.message });
+  }
+});
 
-    if (!ADMIN_ROLES.includes(user.role)) {
-      return res.status(403).json({ ok: false, error: "Accès réservé au back-office." });
-    }
-
-    const totp = getTotpSecret(user.id);
-    if (totp?.enabled) {
-      if (!v.data.totpCode || !verifyTotp(totp.secret, v.data.totpCode)) {
-        return res.status(401).json({ ok: false, error: "Code 2FA requis ou invalide.", requires2fa: true });
-      }
-    }
-
+router.post("/email/confirm", authRateLimit, (req, res) => {
+  const token = String(req.body?.token || "");
+  try {
+    const user = consumeMagicLogin(token);
     const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"] });
-    logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });
-
+    logAudit({ type: "auth", action: "email_login_success", user: user.email, detail: user.role });
     res.json({
       ok: true,
       token: session.token,
@@ -51,7 +39,7 @@ router.post("/login", authRateLimit, (req, res) => {
       csrfToken: generateCsrfToken(user.id)
     });
   } catch (e) {
-    return res.status(e.status || 500).json({ ok: false, error: e.message });
+    res.status(e.status || 500).json({ ok: false, error: e.message });
   }
 });
 
@@ -109,21 +97,6 @@ router.post("/2fa/enable", (req, res) => {
   }
   setTotpSecret(user.id, totp.secret, true);
   res.json({ ok: true, enabled: true });
-});
-
-/** Compatibilité legacy code admin */
-router.post("/legacy", authRateLimit, (req, res) => {
-  const v = validateBody(SCHEMAS.legacyAdminLogin, req.body);
-  if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
-
-  const expected = process.env.ADMIN_CODE;
-  if (!expected || v.data.code !== expected) {
-    logAudit({ type: "auth", action: "legacy_login_failed", user: "unknown", detail: "" });
-    return res.status(401).json({ ok: false, error: "Code incorrect." });
-  }
-
-  logAudit({ type: "auth", action: "legacy_login_success", user: "admin", detail: "" });
-  res.json({ ok: true, token: expected, legacy: true });
 });
 
 export default router;
