@@ -173,6 +173,10 @@ app.post("/api/admin/login", authRateLimit, (req, res) => {
   res.json({ ok: true, token: expected, legacy: true });
 });
 
+app.get(["/boutique", "/boutique/", "/pages/boutique", "/pages/boutique/"], (req, res) => {
+  res.redirect(308, "/boutique.html");
+});
+
 app.get("/script.js", (req, res, next) => {
   try {
     const scriptPath = path.join(PUBLIC_ROOT, "script.js");
