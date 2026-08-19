@@ -21,8 +21,10 @@ import { getMarketplaceStats } from "../lib/marketplace/v1/index.js";
 import { registerSeller, getSeller } from "../lib/marketplace/sellers.js";
 import { updateOrderStatus } from "../lib/marketplace/orders.js";
 import { generateShippingLabel } from "../lib/marketplace/shipping.js";
+import paypalMarketplaceRoutes from "./marketplace-paypal.js";
 
 const router = Router();
+router.use(paypalMarketplaceRoutes);
 
 function authError(res, e) {
   return res.status(e.code || 403).json({ ok: false, error: e.message });
@@ -71,10 +73,14 @@ router.get("/v1/listings/:id", (req, res) => {
 router.post("/v1/listings", (req, res) => {
   try {
     const body = req.body || {};
-    assertSellerSession(body);
-    let seller = getSeller(body.sellerId);
+    let seller = body.sellerId ? getSeller(body.sellerId) : null;
     if (!seller && body.sellerEmail) {
       seller = registerSeller({ email: body.sellerEmail, displayName: body.sellerName, sellerType: body.sellerType });
+    }
+    if (!seller) throw new MarketplaceAuthError("Vendeur requis", 400);
+    assertSellerSession({ sellerId: seller.id, sellerEmail: body.sellerEmail || seller.email });
+    if (body.status !== "draft" && !seller.paypalReady) {
+      throw new MarketplaceAuthError("Activez d'abord votre compte vendeur PayPal avant de publier une annonce.", 409);
     }
     const listing = createListingV1({ ...body, sellerId: seller.id });
     res.json({ ok: true, listing, seller });
@@ -86,8 +92,11 @@ router.post("/v1/listings", (req, res) => {
 
 router.put("/v1/listings/:id", (req, res) => {
   try {
-    assertSellerSession(req.body);
+    const seller = assertSellerSession(req.body);
     assertSellerOwnsListing(req.body.sellerId, req.params.id);
+    if (req.body.status === "active" && !seller.paypalReady) {
+      throw new MarketplaceAuthError("Activez d'abord votre compte vendeur PayPal avant de publier l'annonce.", 409);
+    }
     const listing = updateListingV1(req.params.id, req.body.sellerId, req.body);
     res.json({ ok: true, listing });
   } catch (e) {
@@ -173,6 +182,7 @@ router.delete("/v1/cart/:userId", (req, res) => {
   res.json({ ok: true, cart: clearCart(req.params.userId) });
 });
 
+/** Route SumUp historique conservée temporairement, mais le frontend Marketplace utilise PayPal. */
 router.post("/v1/cart/checkout", async (req, res) => {
   try {
     const body = req.body || {};
