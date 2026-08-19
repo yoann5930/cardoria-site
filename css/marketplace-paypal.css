@@ -40,10 +40,13 @@
 .mk-paypal-note,
 .mk-payment-provider small{
   display:block;
+  margin:8px 0 0;
   color:#847b6c;
-  font-size:11px;
-  line-height:1.6;
+  font-size:12px;
+  line-height:1.4;
 }
+
+.mk-paypal-ready .mk-paypal-note{margin-top:6px}
 
 .mk-form-message{
   margin-top:16px;
