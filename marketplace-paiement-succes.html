@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Paiement confirmé — Cardoria Marketplace</title>
 <link rel="stylesheet" href="/style.css">
-<link rel="stylesheet" href="/css/marketplace.css">
+<link rel="stylesheet" href="/css/marketplace.css?v=3">
+<link rel="icon" href="/assets/logo/cardoria-premium.png">
 </head>
 <body>
 <main class="container mk-page" style="text-align:center;padding:60px 20px">
-<h1 style="color:#ffe18a">Paiement confirmé</h1>
-<p id="msg">Merci pour votre achat sur Cardoria Marketplace.</p>
+<span class="mk-eyebrow">MARKETPLACE CARDORIA</span>
+<h1 style="color:#ffe18a">Confirmation du paiement</h1>
+<p id="msg">Validation de votre paiement PayPal en cours…</p>
+<div id="paymentDetails" class="mk-payment-result"></div>
 <p><a href="mes-commandes.html">Voir mes commandes</a> · <a href="marketplace.html">Continuer mes achats</a></p>
 </main>
 <script src="/js/marketplace-client.js"></script>
@@ -18,17 +21,43 @@
 (function () {
   var M = window.CardoriaMarketplace;
   var params = new URLSearchParams(location.search);
-  var order = params.get("order");
-  var checkoutId = params.get("checkout_id");
+  var provider = params.get("provider") || "";
+  var paypalOrderId = params.get("token") || localStorage.getItem("cardoria_marketplace_paypal_order") || "";
   var msg = document.getElementById("msg");
-  if (order) msg.textContent = "Commande " + order + " — paiement SumUp en cours de validation.";
-  if (checkoutId) {
-    fetch(M.BACKEND + "/api/payments/sumup/confirm/" + encodeURIComponent(checkoutId))
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (d.ok && d.status === "paid") msg.textContent = "Paiement confirmé. Vous recevrez un email de confirmation.";
-      });
+  var details = document.getElementById("paymentDetails");
+
+  function fail(message) {
+    msg.textContent = "Le paiement n’a pas pu être confirmé automatiquement.";
+    details.textContent = message || "Réessayez depuis votre panier ou consultez vos commandes.";
+    details.className = "mk-payment-result is-error";
   }
+
+  if ((provider === "paypal" || paypalOrderId) && paypalOrderId) {
+    fetch(M.BACKEND + "/api/marketplace/v1/paypal/orders/" + encodeURIComponent(paypalOrderId) + "/capture", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok || !d.ok) throw new Error(d.error || "Confirmation PayPal impossible.");
+        return d;
+      });
+    }).then(function (d) {
+      localStorage.removeItem("cardoria_marketplace_paypal_order");
+      if (d.paid) {
+        msg.textContent = "Paiement PayPal confirmé.";
+        details.textContent = d.total > 1
+          ? d.total + " transactions vendeurs ont été confirmées."
+          : "Votre transaction Marketplace est confirmée.";
+        details.className = "mk-payment-result is-success";
+      } else {
+        fail("PayPal n’a pas encore confirmé toutes les transactions vendeurs.");
+      }
+    }).catch(function (e) { fail(e.message); });
+    return;
+  }
+
+  fail("Identifiant de paiement PayPal manquant.");
 })();
 </script>
 </body>
