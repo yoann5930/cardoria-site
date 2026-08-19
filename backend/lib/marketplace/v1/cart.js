@@ -81,7 +81,38 @@ export function clearCart(userId) {
   return { userId, items: [], subtotal: 0, itemCount: 0 };
 }
 
-/** Crée une commande par vendeur (checkout panier). Le panier peut être conservé jusqu'à création du paiement. */
+/**
+ * Retire du panier uniquement les quantités réellement payées.
+ * Cette fonction est idempotente côté paiement grâce à l'appel conditionné lors
+ * du premier passage de la commande au statut paid.
+ */
+export function consumePaidCartItems(userId, items = []) {
+  if (!userId || !Array.isArray(items) || !items.length) return getCart(userId || "");
+  const db = getDb();
+  const consume = db.transaction((lines) => {
+    for (const line of lines) {
+      const listingId = String(line?.listingId || "").trim();
+      const paidQty = Math.max(0, Number(line?.qty) || 0);
+      if (!listingId || paidQty <= 0) continue;
+
+      const existing = db.prepare("SELECT qty FROM mk_cart_items WHERE user_id = ? AND listing_id = ?")
+        .get(userId, listingId);
+      if (!existing) continue;
+
+      if (Number(existing.qty) <= paidQty) {
+        db.prepare("DELETE FROM mk_cart_items WHERE user_id = ? AND listing_id = ?").run(userId, listingId);
+      } else {
+        db.prepare("UPDATE mk_cart_items SET qty = qty - ? WHERE user_id = ? AND listing_id = ?")
+          .run(paidQty, userId, listingId);
+      }
+    }
+  });
+
+  consume(items);
+  return getCart(userId);
+}
+
+/** Crée une commande par vendeur (checkout panier). Le panier peut être conservé jusqu'à confirmation du paiement. */
 export function createOrdersFromCart(userId, { buyerEmail, buyerName, buyerId, shippingCarrier, shippingCost, shippingAddress, clearAfterCreate = true }) {
   const cart = getCart(userId);
   if (!cart.items.length) throw new Error("Panier vide");
