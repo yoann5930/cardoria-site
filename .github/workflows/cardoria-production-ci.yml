@@ -15,6 +15,15 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      LEGACY_ADMIN_CODE: 'false'
+      ADMIN_AUTH_DISABLED: 'false'
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,23 +34,25 @@ jobs:
       - name: Syntax checks
         run: |
           node --check server.js
+          node --check routes/auth.js
+          node --check lib/auth.js
+          node --check lib/auth/migrate.js
+          node --check lib/auth/magicLink.js
           node --check ../script.js
           node --check ../js/admin/admin-login-secure.js
-      - name: Reject client admin secret
+          node --check ../js/admin/admin-email-login.js
+      - name: Reject client admin bypass
         working-directory: .
         run: |
-          if grep -R --exclude-dir=.git --exclude-dir=node_modules -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' .; then
+          if grep -R -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' script.js js *.html 2>/dev/null; then
             echo 'Client-side admin secret detected'
             exit 1
           fi
+          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend render.yaml 2>/dev/null; then
+            echo 'Direct admin bypass enabled'
+            exit 1
+          fi
       - name: Start backend
-        env:
-          NODE_ENV: test
-          PORT: '10000'
-          LEGACY_ADMIN_CODE: 'false'
-          ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
-          ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
-          ALERT_EMAIL: 'false'
         run: |
           node server.js > /tmp/cardoria-backend.log 2>&1 &
           echo $! > /tmp/cardoria-backend.pid
@@ -56,8 +67,14 @@ jobs:
           cat /tmp/cardoria-health.json
           curl --fail --silent http://127.0.0.1:10000/admin-login.html > /tmp/cardoria-login.html
           grep -q 'Admin Cardoria' /tmp/cardoria-login.html
+          grep -q 'adminEmailLoginForm' /tmp/cardoria-login.html
           curl --fail --silent http://127.0.0.1:10000/api > /tmp/cardoria-api.json
           cat /tmp/cardoria-api.json
+      - name: Protected route must require authentication
+        run: |
+          code=$(curl -sS -o /tmp/cardoria-protected.json -w "%{http_code}" http://127.0.0.1:10000/api/health/full)
+          cat /tmp/cardoria-protected.json
+          test "$code" = "401"
       - name: Stop backend
         if: always()
         run: |
