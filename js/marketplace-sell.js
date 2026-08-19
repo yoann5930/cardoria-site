@@ -3,6 +3,7 @@
   var M = window.CardoriaMarketplace;
   var root = document.getElementById("sellPage");
   var config = null;
+  var Bridge = window.CardoriaMarketplaceEstimateBridge;
 
   function api(path, opts) {
     opts = opts || {};
@@ -28,6 +29,22 @@
   function commissionText() {
     if (!config || !config.commissionConfigured) return "La commission Cardoria sera affichée avant l'activation des transactions.";
     return "Commission Cardoria : " + Number(config.commissionPercent).toLocaleString("fr-FR") + " % par transaction.";
+  }
+
+  function gameLabel(value) {
+    return {
+      pokemon: "Pokémon",
+      yugioh: "Yu-Gi-Oh!",
+      onepiece: "One Piece",
+      lorcana: "Lorcana",
+      magic: "Magic",
+      dragonball: "Dragon Ball",
+      sports: "Autre"
+    }[value] || "Autre";
+  }
+
+  function estimationCondition(value) {
+    return { NM: "nm", EX: "ex", GD: "gd", LP: "played", MP: "played" }[value] || "nm";
   }
 
   function renderRegistration() {
@@ -88,12 +105,87 @@
     };
   }
 
+  function currentDraft() {
+    var license = document.getElementById("sLicense")?.value || "pokemon";
+    var condition = document.getElementById("sCond")?.value || "NM";
+    return {
+      title: document.getElementById("sTitle")?.value || "",
+      license: license,
+      extension: document.getElementById("sExt")?.value || "",
+      number: document.getElementById("sNum")?.value || "",
+      language: document.getElementById("sLang")?.value || "",
+      condition: condition,
+      price: document.getElementById("sPrice")?.value || "",
+      negotiable: !!document.getElementById("sNeg")?.checked,
+      description: document.getElementById("sDesc")?.value || "",
+      gameLabel: gameLabel(license),
+      estimationCondition: estimationCondition(condition)
+    };
+  }
+
+  function restoreDraft() {
+    if (!Bridge) return;
+    var draft = Bridge.getDraft();
+    var ids = {
+      sTitle: "title",
+      sLicense: "license",
+      sExt: "extension",
+      sNum: "number",
+      sLang: "language",
+      sCond: "condition",
+      sPrice: "price",
+      sDesc: "description"
+    };
+    Object.keys(ids).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && draft[ids[id]] != null && draft[ids[id]] !== "") el.value = draft[ids[id]];
+    });
+    var neg = document.getElementById("sNeg");
+    if (neg && typeof draft.negotiable === "boolean") neg.checked = draft.negotiable;
+    renderPhotoPreview(Bridge.getPhotos());
+  }
+
+  function renderPhotoPreview(photos) {
+    var box = document.getElementById("sPhotoPreview");
+    if (!box) return;
+    var list = Array.isArray(photos) ? photos : [];
+    if (!list.length) {
+      box.innerHTML = '<span style="color:#847b6c;font-size:12px">Aucune photo sélectionnée.</span>';
+      return;
+    }
+    box.innerHTML = list.map(function (src, index) {
+      return '<img src="' + src + '" alt="Photo carte ' + (index + 1) + '" style="width:82px;height:112px;object-fit:cover;border-radius:10px;border:1px solid rgba(212,175,55,.28);background:#070707">';
+    }).join("");
+  }
+
+  function saveSelectedPhotos() {
+    if (!Bridge) return Promise.resolve([]);
+    var input = document.getElementById("sPhotoFiles");
+    var files = input ? input.files : null;
+    if (!files || !files.length) return Promise.resolve(Bridge.getPhotos());
+    return Bridge.saveFiles(files).then(function (photos) {
+      renderPhotoPreview(photos);
+      return photos;
+    });
+  }
+
+  function goToEstimation() {
+    if (!Bridge) return showResult("Le transfert vers l’estimation est indisponible.", true);
+    Bridge.saveDraft(currentDraft());
+    showResult("Préparation des photos pour l’estimation…", false);
+    saveSelectedPhotos().then(function () {
+      location.href = "/estimation.html?source=marketplace";
+    }).catch(function (e) {
+      showResult(e.message, true);
+    });
+  }
+
   function renderListingForm(seller) {
     root.innerHTML =
       '<section class="mk-seller-onboarding mk-paypal-ready">' +
       '<span class="mk-eyebrow">VENDEUR ACTIF</span>' +
       '<div class="mk-paypal-status"><strong>PayPal Marketplace</strong><span>Prêt à recevoir des ventes</span></div>' +
-      '<p>' + esc(commissionText()) + '</p></section>' +
+      '<p class="mk-paypal-note">' + esc(commissionText()) + '</p></section>' +
       "<h1>Publier une annonce</h1><p style='color:#baaf97'>Votre carte sera proposée aux autres clients Cardoria.</p>" +
       '<div class="mk-form-grid">' +
       '<input id="sTitle" placeholder="Titre de l\'annonce">' +
@@ -103,51 +195,68 @@
       '<input id="sLang" placeholder="Langue (FR, EN, JP…)">' +
       '<select id="sCond"><option>NM</option><option>EX</option><option>GD</option><option>LP</option><option>MP</option></select>' +
       '<input id="sPrice" type="number" min="0.01" step="0.01" placeholder="Prix €">' +
-      '<input id="sStock" type="number" min="1" value="1" placeholder="Quantité">' +
-      '<label><input type="checkbox" id="sNeg"> Prix négociable</label>' +
+      '<label style="display:flex;align-items:center;gap:9px;color:#d7c8aa;font-size:13px"><input type="checkbox" id="sNeg" style="width:auto"> Prix négociable</label>' +
       '<textarea id="sDesc" rows="4" placeholder="Description, défauts, envoi…"></textarea>' +
-      '<input id="sPhoto" placeholder="URL photo principale">' +
-      '<input id="sPhotosExtra" placeholder="URLs photos suppl. (virgules)">' +
-      '<button class="mk-btn mk-btn-primary" type="button" id="publishBtn">Publier l\'annonce</button></div>' +
+      '<label style="color:#d7c8aa;font-size:13px">Photos de la carte (jusqu’à 6)<input id="sPhotoFiles" type="file" accept="image/*" multiple style="margin-top:7px"></label>' +
+      '<div id="sPhotoPreview" style="display:flex;gap:9px;flex-wrap:wrap;min-height:32px"></div>' +
+      '<div class="mk-actions" style="margin-top:4px">' +
+      '<button class="mk-btn mk-btn-secondary" type="button" id="estimateBtn">Estimer la carte</button>' +
+      '<button class="mk-btn mk-btn-primary" type="button" id="publishBtn">Publier l\'annonce</button>' +
+      '</div></div>' +
       '<div id="sellResult" style="margin-top:16px"></div>';
+
+    restoreDraft();
+
+    document.getElementById("sPhotoFiles").addEventListener("change", function () {
+      showResult("Préparation des photos…", false);
+      saveSelectedPhotos().then(function (photos) {
+        showResult(photos.length + " photo" + (photos.length > 1 ? "s" : "") + " prête" + (photos.length > 1 ? "s" : "") + ".", false);
+      }).catch(function (e) { showResult(e.message, true); });
+    });
+
+    document.getElementById("estimateBtn").onclick = goToEstimation;
 
     document.getElementById("publishBtn").onclick = function () {
       var price = Number(document.getElementById("sPrice").value);
       if (!document.getElementById("sTitle").value.trim()) return showResult("Titre de l’annonce requis.", true);
       if (!(price > 0)) return showResult("Prix valide requis.", true);
 
-      var body = {
-        sellerId: seller.id,
-        sellerEmail: seller.email,
-        sellerName: seller.displayName,
-        sellerType: seller.sellerType,
-        title: document.getElementById("sTitle").value,
-        license: document.getElementById("sLicense").value,
-        extension: document.getElementById("sExt").value,
-        number: document.getElementById("sNum").value,
-        language: document.getElementById("sLang").value,
-        status: "active",
-        condition: document.getElementById("sCond").value,
-        price: price,
-        stock: Number(document.getElementById("sStock").value) || 1,
-        negotiable: document.getElementById("sNeg").checked,
-        description: document.getElementById("sDesc").value,
-        photos: [document.getElementById("sPhoto").value]
-          .concat((document.getElementById("sPhotosExtra").value || "").split(",").map(function (u) { return u.trim(); }))
-          .filter(Boolean)
-      };
+      if (Bridge) Bridge.saveDraft(currentDraft());
+      saveSelectedPhotos().then(function (photos) {
+        var body = {
+          sellerId: seller.id,
+          sellerEmail: seller.email,
+          sellerName: seller.displayName,
+          sellerType: seller.sellerType,
+          title: document.getElementById("sTitle").value,
+          license: document.getElementById("sLicense").value,
+          extension: document.getElementById("sExt").value,
+          number: document.getElementById("sNum").value,
+          language: document.getElementById("sLang").value,
+          status: "active",
+          condition: document.getElementById("sCond").value,
+          price: price,
+          negotiable: document.getElementById("sNeg").checked,
+          description: document.getElementById("sDesc").value,
+          photos: photos
+        };
 
-      fetch(M.BACKEND + "/api/marketplace/v1/listings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      }).then(function (r) {
-        return r.json().then(function (d) {
-          if (!r.ok || !d.ok) throw new Error(d.error || "Publication impossible.");
-          return d;
+        return fetch(M.BACKEND + "/api/marketplace/v1/listings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        }).then(function (r) {
+          return r.json().then(function (d) {
+            if (!r.ok || !d.ok) throw new Error(d.error || "Publication impossible.");
+            return d;
+          });
         });
       }).then(function (d) {
         M.setSeller(d.seller || seller);
+        if (Bridge) {
+          Bridge.saveDraft({});
+          Bridge.savePhotos([]);
+        }
         var url = d.listing.publicUrl || M.listingUrl(d.listing.id);
         document.getElementById("sellResult").innerHTML = 'Annonce publiée ! <a href="' + url + '">Voir l\'annonce</a> · <a href="mes-annonces.html">Mes annonces</a>';
       }).catch(function (e) { showResult(e.message, true); });
