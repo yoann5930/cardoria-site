@@ -32,14 +32,28 @@ body.shop-v1{
 .shop-catalog-note{color:#7f796e;font-size:10px;font-weight:300;letter-spacing:.03em}
 
 .shop-range-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
-.shop-range-card{display:block;overflow:hidden;border:1px solid rgba(201,165,68,.18);border-radius:12px;background:#080808;transition:transform .25s ease,border-color .25s ease,background .25s ease}
-.shop-range-card:hover{transform:translateY(-4px);border-color:rgba(201,165,68,.42);background:#0a0a0a}
+.shop-range-card{position:relative;display:block;overflow:hidden;border:1px solid rgba(201,165,68,.18);border-radius:12px;background:#080808;transition:transform .25s ease,border-color .25s ease,background .25s ease,opacity .25s ease}
+.shop-range-card.is-available:hover{transform:translateY(-4px);border-color:rgba(201,165,68,.42);background:#0a0a0a}
+.shop-range-status{position:absolute;top:14px;right:14px;z-index:2;padding:7px 10px;border:1px solid rgba(255,255,255,.08);border-radius:999px;background:rgba(0,0,0,.58);color:#8f8b84;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;backdrop-filter:blur(8px)}
+.shop-range-status.is-open{border-color:rgba(201,165,68,.38);color:var(--shop-gold-light)}
 .shop-range-visual{min-height:280px;display:grid;place-items:center;padding:40px;background:radial-gradient(circle at 50% 45%,rgba(201,165,68,.09),transparent 50%),#050505;border-bottom:1px solid rgba(255,255,255,.045)}
-.shop-range-visual img{display:block;width:min(78%,330px);height:auto;filter:drop-shadow(0 12px 30px rgba(0,0,0,.45))}
+.shop-range-visual img{display:block;width:min(78%,330px);max-height:150px;height:auto;object-fit:contain;filter:drop-shadow(0 12px 30px rgba(0,0,0,.45))}
 .shop-range-copy{padding:24px}
 .shop-range-copy h3{margin:10px 0 9px;font-family:Georgia,"Times New Roman",serif;font-size:30px;font-weight:400}
 .shop-range-copy p:not(.shop-kicker){margin:0;color:#8e887d;font-size:12px;line-height:1.65}
 .shop-range-copy span{display:inline-block;margin-top:20px;color:var(--shop-gold-light);font-size:11px;font-weight:600;letter-spacing:.055em;text-transform:uppercase}
+
+.shop-range-card.is-coming{cursor:not-allowed;border-color:rgba(255,255,255,.055);background:#060606;opacity:.72;filter:grayscale(1)}
+.shop-range-card.is-coming:hover{transform:none;border-color:rgba(255,255,255,.055);background:#060606}
+.shop-range-card.is-coming .shop-range-visual{background:radial-gradient(circle at 50% 45%,rgba(255,255,255,.025),transparent 52%),#040404}
+.shop-range-card.is-coming .shop-range-visual img{opacity:.44;filter:grayscale(1) contrast(.8) brightness(.7)}
+.shop-range-card.is-coming .shop-range-copy h3{color:#8f8b84}
+.shop-range-card.is-coming .shop-range-copy p{color:#65625d}
+.shop-range-card.is-coming .shop-range-copy span{color:#65625d}
+.shop-range-card.is-coming .shop-kicker{color:#6b6862}
+.shop-range-wordmark{color:#8a8781;font-family:Georgia,"Times New Roman",serif;font-size:30px;letter-spacing:.06em;text-align:center;line-height:1.05}
+.shop-range-wordmark strong{display:block;margin-top:4px;font-size:42px;font-weight:500;letter-spacing:.02em}
+.shop-range-wordmark-sports{font-family:Inter,Arial,sans-serif;font-size:34px;font-weight:800;letter-spacing:.18em}
 
 .shop-range-toolbar{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid rgba(201,165,68,.13)}
 .shop-back-link{color:#a69d8d;font-size:11px;letter-spacing:.035em}
