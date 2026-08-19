@@ -19,10 +19,26 @@ services:
         value: "false"
       - key: SITE_URL
         value: https://cardoria-site-2.onrender.com
+      - key: FRONTEND_URL
+        value: https://cardoria-site-2.onrender.com
       - key: CORS_ORIGINS
         value: https://cardoria-site-2.onrender.com,https://cardoria.fr,https://www.cardoria.fr
       - key: MARKETPLACE_COMMISSION_PERCENT
         value: "5"
+      - key: MARKETPLACE_COMMISSION_INCLUDE_SHIPPING
+        value: "false"
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_DISBURSEMENT_MODE
+        value: INSTANT
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_PARTNER_MERCHANT_ID
+        sync: false
+      - key: PAYPAL_PARTNER_ATTRIBUTION_ID
+        sync: false
     disk:
       name: cardoria-data
       mountPath: /opt/render/project/src/backend/data
