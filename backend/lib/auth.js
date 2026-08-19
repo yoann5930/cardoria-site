@@ -1,11 +1,23 @@
 /**
- * Authentification Cardoria — sessions + compatibilité legacy ADMIN_CODE.
+ * Authentification Cardoria — sessions + mode temporaire d'acces admin direct.
  */
 import { validateSession } from "./auth/session.js";
 import { roleCan, ADMIN_ROLES } from "./auth/users.js";
 import { logAudit } from "./audit.js";
 
 export { roleCan, ADMIN_ROLES } from "./auth/users.js";
+
+const TEMP_ADMIN = {
+  id: "temporary-direct-admin",
+  email: "",
+  role: "super_admin",
+  name: "Admin Cardoria",
+  temporaryDirectAccess: true
+};
+
+function directAdminEnabled() {
+  return process.env.ADMIN_AUTH_DISABLED === "true";
+}
 
 function extractToken(req) {
   const auth = req.headers.authorization || "";
@@ -24,6 +36,11 @@ export function requireAuth(options = {}) {
   const { roles = ADMIN_ROLES, action = "read" } = options;
 
   return (req, res, next) => {
+    if (directAdminEnabled()) {
+      req.authUser = TEMP_ADMIN;
+      return next();
+    }
+
     const token = extractToken(req);
     const user = validateSession(token);
 
@@ -48,12 +65,17 @@ export function requireAuth(options = {}) {
   };
 }
 
-/** Compatibilité routes admin existantes */
+/** Compatibilite routes admin existantes */
 export function requireAdmin(req, res, next) {
   return requireAuth({ roles: ADMIN_ROLES, action: "read" })(req, res, next);
 }
 
 export function optionalAuth(req, res, next) {
+  if (directAdminEnabled()) {
+    req.authUser = TEMP_ADMIN;
+    return next();
+  }
+
   const token = extractToken(req);
   const user = validateSession(token);
   if (user) req.authUser = user;
