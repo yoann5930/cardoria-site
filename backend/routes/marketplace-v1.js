@@ -19,14 +19,11 @@ import { createDispute } from "../lib/marketplace/v1/disputes.js";
 import { getMarketplaceStats } from "../lib/marketplace/v1/index.js";
 import { registerSeller, getSeller } from "../lib/marketplace/sellers.js";
 import { updateOrderStatus } from "../lib/marketplace/orders.js";
+import { isMarketplaceDemoMode } from "../lib/marketplace/demo-mode.js";
 import paypalMarketplaceRoutes from "./marketplace-paypal.js";
 
 const router = Router();
 router.use(paypalMarketplaceRoutes);
-
-function isMarketplaceDemoMode() {
-  return String(process.env.MARKETPLACE_DEMO_MODE || "").toLowerCase() === "true";
-}
 
 function authError(res, e) {
   return res.status(e.code || 403).json({ ok: false, error: e.message });

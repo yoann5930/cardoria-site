@@ -7,6 +7,7 @@ import { getSeller, getSellerByEmail, registerSeller } from "../lib/marketplace/
 import { getCart, createOrdersFromCart } from "../lib/marketplace/v1/cart.js";
 import { updateOrderStatus } from "../lib/marketplace/orders.js";
 import { getMarketplacePersistenceStatus } from "../lib/marketplace/persistence.js";
+import { isMarketplaceDemoMode } from "../lib/marketplace/demo-mode.js";
 import {
   getPayPalMarketplaceConfig,
   createSellerOnboarding,
@@ -17,10 +18,6 @@ import {
 
 const { Pool } = pg;
 const router = Router();
-
-function isMarketplaceDemoMode() {
-  return String(process.env.MARKETPLACE_DEMO_MODE || "").toLowerCase() === "true";
-}
 
 function assertSellerIdentity(seller, email) {
   if (!seller) throw new Error("Vendeur introuvable.");
