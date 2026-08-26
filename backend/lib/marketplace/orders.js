@@ -26,7 +26,7 @@ export function createOrder({ listingId, items = null, buyerEmail, buyerName, bu
       if (!listing || listing.status !== "active") throw Object.assign(new Error(`Annonce indisponible: ${lineId}`), { status: 409 });
       if (sellerId && listing.sellerId !== sellerId) throw Object.assign(new Error("Une commande ne peut contenir qu'un seul vendeur."), { status: 400 });
       sellerId = listing.sellerId;
-      const reserved = db.prepare("UPDATE mk_listings SET stock = stock - ?, updated_at = ? WHERE id = ? AND status = 'active' AND stock >= ?").run(safeQty, now, lineId, safeQty);
+      const reserved = db.prepare("UPDATE mk_listings SET stock=stock-?,updated_at=? WHERE id=? AND status='active' AND stock>=?").run(safeQty, now, lineId, safeQty);
       if (reserved.changes !== 1) throw Object.assign(new Error(`Stock insuffisant pour ${listing.title}`), { status: 409 });
       const unitPrice = Math.round(Number(listing.price || 0) * 100) / 100;
       prepared.push({ listingId: lineId, title: listing.title, qty: safeQty, unitPrice, lineTotal: Math.round(unitPrice * safeQty * 100) / 100 });
@@ -35,7 +35,7 @@ export function createOrder({ listingId, items = null, buyerEmail, buyerName, bu
     const ship = Math.max(0, Number(shippingCost) || 0);
     const productsTotal = prepared.reduce((sum, line) => sum + line.lineTotal, 0);
     const total = Math.round((productsTotal + ship) * 100) / 100;
-    db.prepare(`INSERT INTO mk_orders (id,buyer_email,buyer_name,buyer_id,seller_id,listing_id,listing_title,items_json,qty,unit_price,shipping_cost,shipping_carrier,total,status,payment_status,shipping_address,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending','pending',?,?,?)`).run(id, String(buyerEmail || "").toLowerCase(), buyerName || "", buyerId || "", sellerId, primary.listingId, primary.title, JSON.stringify(prepared), primary.qty, primary.unitPrice, ship, shippingCarrier || "", total, shippingAddress || "", now, now);
+    db.prepare(`INSERT INTO mk_orders (id,buyer_email,buyer_name,buyer_id,seller_id,listing_id,listing_title,items_json,qty,unit_price,shipping_cost,shipping_carrier,total,status,payment_status,shipping_address,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','pending',?,?,?)`).run(id, String(buyerEmail || "").toLowerCase(), buyerName || "", String(buyerId || ""), sellerId, primary.listingId, primary.title, JSON.stringify(prepared), primary.qty, primary.unitPrice, ship, shippingCarrier || "", total, shippingAddress || "", now, now);
   });
   transaction();
   const order = getOrder(id);
@@ -43,17 +43,17 @@ export function createOrder({ listingId, items = null, buyerEmail, buyerName, bu
   return order;
 }
 
-export function getOrder(id) { const row = getDb().prepare("SELECT * FROM mk_orders WHERE id = ?").get(id); return row ? toOrder(row) : null; }
+export function getOrder(id) { const row = getDb().prepare("SELECT * FROM mk_orders WHERE id=?").get(id); return row ? toOrder(row) : null; }
 export function updateOrderSumUpRefs(id, checkoutId, paymentStatus) {
   const db = getDb(); const now = new Date().toISOString();
-  if (checkoutId) db.prepare("UPDATE mk_orders SET sumup_checkout_id=?, payment_status=COALESCE(?,payment_status), updated_at=? WHERE id=?").run(checkoutId, paymentStatus ?? null, now, id);
-  else if (paymentStatus) db.prepare("UPDATE mk_orders SET payment_status=?, updated_at=? WHERE id=?").run(paymentStatus, now, id);
+  if (checkoutId) db.prepare("UPDATE mk_orders SET sumup_checkout_id=?,payment_status=COALESCE(?,payment_status),updated_at=? WHERE id=?").run(checkoutId, paymentStatus ?? null, now, id);
+  else if (paymentStatus) db.prepare("UPDATE mk_orders SET payment_status=?,updated_at=? WHERE id=?").run(paymentStatus, now, id);
   return getOrder(id);
 }
 function orderLines(order) { return Array.isArray(order.items) && order.items.length ? order.items : [{ listingId: order.listingId, qty: order.qty }]; }
 function releaseReservedStock(order) {
   const db = getDb(); const now = new Date().toISOString();
-  for (const line of orderLines(order)) db.prepare("UPDATE mk_listings SET stock = stock + ?, updated_at = ? WHERE id = ?").run(Math.max(1, Number(line.qty) || 1), now, line.listingId);
+  for (const line of orderLines(order)) db.prepare("UPDATE mk_listings SET stock=stock+?,updated_at=? WHERE id=?").run(Math.max(1, Number(line.qty) || 1), now, line.listingId);
 }
 function applyPaidSideEffectsOnce(order, previousStatus) {
   if (["paid", "preparing", "shipped", "delivered"].includes(previousStatus)) return;
@@ -66,7 +66,7 @@ export function updateOrderStatus(id, status, extra = {}) {
   const db = getDb(); const now = new Date().toISOString();
   const tx = db.transaction(() => {
     if (status === "cancelled" && prev.status === "pending") releaseReservedStock(prev);
-    db.prepare(`UPDATE mk_orders SET status=?, shipping_tracking=COALESCE(?,shipping_tracking), shipping_label_url=COALESCE(?,shipping_label_url), sumup_checkout_id=COALESCE(?,sumup_checkout_id), sumup_transaction_id=COALESCE(?,sumup_transaction_id), stripe_session_id=COALESCE(?,stripe_session_id), stripe_payment_intent=COALESCE(?,stripe_payment_intent), payment_status=COALESCE(?,payment_status), payment_method=COALESCE(?,payment_method), updated_at=? WHERE id=?`).run(status, extra.tracking ?? null, extra.labelUrl ?? null, extra.sumupCheckoutId ?? extra.stripeSessionId ?? null, extra.sumupTransactionId ?? extra.paymentIntent ?? null, extra.stripeSessionId ?? null, extra.paymentIntent ?? null, extra.paymentStatus ?? null, extra.paymentMethod ?? null, now, id);
+    db.prepare(`UPDATE mk_orders SET status=?,shipping_tracking=COALESCE(?,shipping_tracking),shipping_label_url=COALESCE(?,shipping_label_url),sumup_checkout_id=COALESCE(?,sumup_checkout_id),sumup_transaction_id=COALESCE(?,sumup_transaction_id),stripe_session_id=COALESCE(?,stripe_session_id),stripe_payment_intent=COALESCE(?,stripe_payment_intent),payment_status=COALESCE(?,payment_status),payment_method=COALESCE(?,payment_method),updated_at=? WHERE id=?`).run(status, extra.tracking ?? null, extra.labelUrl ?? null, extra.sumupCheckoutId ?? extra.stripeSessionId ?? null, extra.sumupTransactionId ?? extra.paymentIntent ?? null, extra.stripeSessionId ?? null, extra.paymentIntent ?? null, extra.paymentStatus ?? null, extra.paymentMethod ?? null, now, id);
   });
   tx();
   const updated = getOrder(id);
@@ -74,6 +74,17 @@ export function updateOrderStatus(id, status, extra = {}) {
   if (_notifyHook && updated) _notifyHook(updated, status, prev.status).catch?.(() => {});
   return updated;
 }
+
+export function expireStalePendingOrders(maxAgeMs = 30 * 60 * 1000) {
+  const cutoff = new Date(Date.now() - Math.max(5 * 60 * 1000, Number(maxAgeMs) || 0)).toISOString();
+  const rows = getDb().prepare("SELECT id FROM mk_orders WHERE status='pending' AND payment_status='pending' AND created_at<? LIMIT 200").all(cutoff);
+  let expired = 0;
+  for (const row of rows) {
+    try { updateOrderStatus(row.id, "cancelled", { paymentStatus: "failed", paymentMethod: "expired" }); expired += 1; } catch {}
+  }
+  return expired;
+}
+
 export function markOrderPaymentStatus(id, paymentStatus, extra = {}) {
   if (!PAYMENT_STATUSES.includes(paymentStatus)) throw new Error("Statut paiement invalide");
   const patch = { ...extra, paymentStatus };
@@ -83,8 +94,11 @@ export function markOrderPaymentStatus(id, paymentStatus, extra = {}) {
   return updateOrderStatus(id, getOrder(id)?.status || "pending", patch);
 }
 export function markOrderPaid(id, { sumupCheckoutId, sumupTransactionId, stripeSessionId, paymentIntent, paymentMethod } = {}) { return updateOrderStatus(id, "paid", { sumupCheckoutId: sumupCheckoutId || stripeSessionId, sumupTransactionId: sumupTransactionId || paymentIntent, stripeSessionId, paymentIntent, paymentMethod: paymentMethod || "sumup_card", paymentStatus: "paid" }); }
-export function getOrdersByBuyer(email, buyerId) { return getDb().prepare("SELECT * FROM mk_orders WHERE buyer_email = ? OR buyer_id = ? ORDER BY created_at DESC LIMIT 100").all(email, buyerId || "").map(toOrder); }
-export function getOrdersBySeller(sellerId) { return getDb().prepare("SELECT * FROM mk_orders WHERE seller_id = ? ORDER BY created_at DESC LIMIT 100").all(sellerId).map(toOrder); }
+export function getOrdersByBuyer(_email, buyerId) {
+  if (!buyerId) return [];
+  return getDb().prepare("SELECT * FROM mk_orders WHERE buyer_id=? ORDER BY created_at DESC LIMIT 100").all(String(buyerId)).map(toOrder);
+}
+export function getOrdersBySeller(sellerId) { return getDb().prepare("SELECT * FROM mk_orders WHERE seller_id=? ORDER BY created_at DESC LIMIT 100").all(sellerId).map(toOrder); }
 export function getAllOrders(limit = 200) { return getDb().prepare("SELECT * FROM mk_orders ORDER BY created_at DESC LIMIT ?").all(limit).map(toOrder); }
 export function getInvoiceHtml(orderId) { const order = getOrder(orderId); return order ? generateInvoiceHtml(order) : null; }
 function parseItems(raw) { try { return JSON.parse(raw || "[]"); } catch { return []; } }
