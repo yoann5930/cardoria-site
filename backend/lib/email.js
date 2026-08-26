@@ -7,9 +7,17 @@ function envTrim(name) {
   return String(process.env[name] || "").trim();
 }
 
-/** SMTP Gmail utilisable : hôte + compte + mot de passe d'application. Ne lit jamais le secret pour le journaliser. */
+export function isBrevoConfigured() {
+  return Boolean(envTrim("BREVO_API_KEY") && envTrim("BREVO_SENDER_EMAIL"));
+}
+
+/** SMTP utilisable sur les hebergements qui autorisent les ports sortants 465/587. */
 export function isSmtpConfigured() {
   return Boolean(envTrim("SMTP_HOST") && envTrim("SMTP_USER") && envTrim("SMTP_PASS"));
+}
+
+export function isEmailConfigured() {
+  return isBrevoConfigured() || isSmtpConfigured();
 }
 
 export function smtpMissingReason() {
@@ -34,27 +42,95 @@ function createSmtpTransport() {
   });
 }
 
-export async function sendEmail({ subject, text, html, attachments, to }) {
-  if (!isSmtpConfigured()) {
-    console.warn("SMTP non configuré — e-mail non envoyé :", subject, `(${smtpMissingReason()})`);
-    return false;
+function normalizeRecipients(to) {
+  const values = Array.isArray(to) ? to : [to || ALERT_EMAIL];
+  return values
+    .map((value) => typeof value === "string" ? value.trim() : String(value?.email || "").trim())
+    .filter(Boolean)
+    .map((email) => ({ email }));
+}
+
+function normalizeBrevoAttachments(attachments) {
+  return (attachments || []).map((attachment) => {
+    if (!attachment?.filename || attachment?.content == null) return null;
+    const content = Buffer.isBuffer(attachment.content)
+      ? attachment.content.toString("base64")
+      : Buffer.from(String(attachment.content)).toString("base64");
+    return { name: attachment.filename, content };
+  }).filter(Boolean);
+}
+
+async function sendWithBrevo({ subject, text, html, attachments, to }) {
+  const senderEmail = envTrim("BREVO_SENDER_EMAIL");
+  const senderName = envTrim("BREVO_SENDER_NAME") || "Cardoria";
+  const recipients = normalizeRecipients(to);
+  if (!recipients.length) throw new Error("Aucun destinataire e-mail valide");
+
+  const body = {
+    sender: { email: senderEmail, name: senderName },
+    to: recipients,
+    subject: String(subject || "Cardoria")
+  };
+  if (html) body.htmlContent = String(html);
+  else body.textContent = String(text || "");
+
+  const normalizedAttachments = normalizeBrevoAttachments(attachments);
+  if (normalizedAttachments.length) body.attachment = normalizedAttachments;
+
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "api-key": envTrim("BREVO_API_KEY")
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000)
+  });
+
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload?.message) detail += ` - ${String(payload.message).slice(0, 240)}`;
+    } catch {}
+    throw new Error(detail);
   }
+  return true;
+}
+
+async function sendWithSmtp({ subject, text, html, attachments, to }) {
+  const transporter = createSmtpTransport();
+  await transporter.sendMail({
+    from: envTrim("MAIL_FROM") || envTrim("SMTP_USER"),
+    to: to || ALERT_EMAIL,
+    subject,
+    text,
+    html,
+    attachments
+  });
+  return true;
+}
+
+export async function sendEmail({ subject, text, html, attachments, to }) {
   try {
-    const transporter = createSmtpTransport();
-    await transporter.sendMail({
-      from: envTrim("MAIL_FROM") || envTrim("SMTP_USER"),
-      to: to || ALERT_EMAIL,
-      subject,
-      text,
-      html,
-      attachments
-    });
-    return true;
+    if (isBrevoConfigured()) {
+      return await sendWithBrevo({ subject, text, html, attachments, to });
+    }
+
+    if (isSmtpConfigured()) {
+      return await sendWithSmtp({ subject, text, html, attachments, to });
+    }
+
+    console.warn("E-mail non configuré — envoi ignoré :", subject, "(BREVO_API_KEY/BREVO_SENDER_EMAIL ou SMTP requis)");
+    return false;
   } catch (error) {
-    const pass = envTrim("SMTP_PASS");
-    let detail = String(error?.code || error?.message || "erreur SMTP");
-    if (pass) detail = detail.split(pass).join("[redacted]");
-    console.warn("SMTP envoi impossible — e-mail non envoyé :", subject, detail);
+    const smtpPass = envTrim("SMTP_PASS");
+    const brevoKey = envTrim("BREVO_API_KEY");
+    let detail = String(error?.code || error?.message || "erreur e-mail");
+    if (smtpPass) detail = detail.split(smtpPass).join("[redacted]");
+    if (brevoKey) detail = detail.split(brevoKey).join("[redacted]");
+    console.warn("Envoi e-mail impossible :", subject, detail);
     return false;
   }
 }
