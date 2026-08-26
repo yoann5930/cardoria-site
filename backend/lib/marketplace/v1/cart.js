@@ -3,7 +3,7 @@
  */
 import { getDb } from "../../engine/database.js";
 import { getListing } from "../listings.js";
-import { createOrder } from "../orders.js";
+import { createOrder, updateOrderStatus } from "../orders.js";
 import { validateServerSidePrice } from "./security.js";
 
 export function getCart(userId) {
@@ -110,10 +110,7 @@ export function createOrdersFromCart(userId, { buyerEmail, buyerName, buyerId, s
       orders.push(order);
     });
   } catch (error) {
-    // Chaque commande est atomique. Si un vendeur suivant echoue, annuler les
-    // reservations deja creees pour les vendeurs precedents.
-    const { updateOrderStatus } = globalThis.__cardoriaOrderModule || {};
-    if (typeof updateOrderStatus === "function") createdIds.forEach((id) => { try { updateOrderStatus(id, "cancelled", { paymentStatus: "failed" }); } catch {} });
+    createdIds.forEach((id) => { try { updateOrderStatus(id, "cancelled", { paymentStatus: "failed", paymentMethod: "paypal" }); } catch {} });
     throw error;
   }
   if (clearAfterCreate) clearCart(userId);
