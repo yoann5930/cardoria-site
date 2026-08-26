@@ -102,6 +102,26 @@ jobs:
             echo 'Hardcoded admin credential detected in admin frontend'
             exit 1
           fi
+          if git grep -I -nE 'SMTP_PASS[[:space:]]*=[[:space:]]*[^[:space:]#]+' -- . ':!.github/workflows' ':!backend/node_modules' ':!**/node_modules/**'; then
+            echo 'Hardcoded SMTP_PASS detected'
+            exit 1
+          fi
+          if git grep -I -nE 'SMTP_PASS[[:space:]]*:[[:space:]]*["'\''][^"'\'']+' -- . ':!.github/workflows' ':!backend/node_modules' ':!**/node_modules/**'; then
+            echo 'Hardcoded SMTP_PASS detected'
+            exit 1
+          fi
+          if grep -A2 -- '- key: SMTP_PASS' render.yaml | grep -q 'value:'; then
+            echo 'SMTP_PASS must not have a plaintext value in render.yaml'
+            exit 1
+          fi
+          if ! grep -A2 -- '- key: SMTP_PASS' render.yaml | grep -q 'sync: false'; then
+            echo 'SMTP_PASS must be a Render secret (sync: false)'
+            exit 1
+          fi
+          if ! grep -q 'requireTLS: !secure && port === 587' backend/lib/email.js; then
+            echo 'Gmail STARTTLS on port 587 is missing'
+            exit 1
+          fi
       - name: Start backend
         run: |
           node server.js > /tmp/cardoria-backend.log 2>&1 &

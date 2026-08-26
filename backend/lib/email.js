@@ -51,7 +51,10 @@ export async function sendEmail({ subject, text, html, attachments, to }) {
     });
     return true;
   } catch (error) {
-    console.warn("SMTP envoi impossible — e-mail non envoyé :", subject, error?.code || error?.message || "erreur SMTP");
+    const pass = envTrim("SMTP_PASS");
+    let detail = String(error?.code || error?.message || "erreur SMTP");
+    if (pass) detail = detail.split(pass).join("[redacted]");
+    console.warn("SMTP envoi impossible — e-mail non envoyé :", subject, detail);
     return false;
   }
 }
