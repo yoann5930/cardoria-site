@@ -61,6 +61,7 @@ jobs:
           node --check lib/auth.js
           node --check lib/auth/migrate.js
           node --check lib/auth/magicLink.js
+          node --check lib/email.js
           node --check ../script.js
           node --check ../js/admin/admin-login-secure.js
           node --check ../js/admin/admin-email-login.js
@@ -109,6 +110,16 @@ jobs:
           cat /tmp/cardoria-auth.json
           test "$code" = "200"
           grep -q '"ok":true' /tmp/cardoria-auth.json
+
+      - name: Verify SMTP missing is detected for authorized admin
+        run: |
+          code=$(curl -sS -o /tmp/cardoria-smtp.json -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"Cardoria59330@gmail.com"}' \
+            http://127.0.0.1:10000/api/auth/email/request)
+          cat /tmp/cardoria-smtp.json
+          test "$code" = "503"
+          grep -q "n'est pas configure" /tmp/cardoria-smtp.json
 
       - name: Verify protected admin endpoint rejects anonymous access
         run: |

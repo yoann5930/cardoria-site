@@ -36,21 +36,26 @@ export async function requestMagicLogin(email) {
   const siteUrl = String(process.env.SITE_URL || "https://cardoria-site-2.onrender.com").replace(/\/$/, "");
   const link = `${siteUrl}/admin-email-login.html?token=${encodeURIComponent(token)}`;
 
-  const sent = await sendEmail({
-    to: user.email,
-    subject: "Cardoria - Connexion administrateur",
-    text: [
-      "Bonjour,",
-      "",
-      "Voici votre lien de connexion securise au back-office Cardoria :",
-      link,
-      "",
-      `Ce lien est valable ${MAGIC_LINK_MINUTES} minutes et ne peut etre utilise qu'une fois.`,
-      "Si vous n'etes pas a l'origine de cette demande, ignorez cet e-mail.",
-      "",
-      "Cardoria"
-    ].join("\n")
-  });
+  let sent = false;
+  try {
+    sent = await sendEmail({
+      to: user.email,
+      subject: "Cardoria - Connexion administrateur",
+      text: [
+        "Bonjour,",
+        "",
+        "Voici votre lien de connexion securise au back-office Cardoria :",
+        link,
+        "",
+        `Ce lien est valable ${MAGIC_LINK_MINUTES} minutes et ne peut etre utilise qu'une fois.`,
+        "Si vous n'etes pas a l'origine de cette demande, ignorez cet e-mail.",
+        "",
+        "Cardoria"
+      ].join("\n")
+    });
+  } catch {
+    sent = false;
+  }
 
   if (!sent) {
     db.prepare("DELETE FROM auth_magic_tokens WHERE token_hash = ?").run(tokenHash);

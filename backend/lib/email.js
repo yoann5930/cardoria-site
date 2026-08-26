@@ -3,26 +3,57 @@ import nodemailer from "nodemailer";
 export const ALERT_EMAIL = process.env.MAIL_TO || "Cardoria59330@gmail.com";
 export const CONFIDENCE_THRESHOLD = Number(process.env.CONFIDENCE_THRESHOLD || 95);
 
+function envTrim(name) {
+  return String(process.env[name] || "").trim();
+}
+
+/** SMTP Gmail utilisable : hôte + compte + mot de passe d'application. Ne lit jamais le secret pour le journaliser. */
+export function isSmtpConfigured() {
+  return Boolean(envTrim("SMTP_HOST") && envTrim("SMTP_USER") && envTrim("SMTP_PASS"));
+}
+
+export function smtpMissingReason() {
+  if (!envTrim("SMTP_HOST")) return "SMTP_HOST manquant";
+  if (!envTrim("SMTP_USER")) return "SMTP_USER manquant";
+  if (!envTrim("SMTP_PASS")) return "SMTP_PASS manquant";
+  return "";
+}
+
+function createSmtpTransport() {
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = String(process.env.SMTP_SECURE || "").toLowerCase() === "true" || port === 465;
+  return nodemailer.createTransport({
+    host: envTrim("SMTP_HOST"),
+    port,
+    secure,
+    requireTLS: !secure && port === 587,
+    auth: {
+      user: envTrim("SMTP_USER"),
+      pass: envTrim("SMTP_PASS")
+    }
+  });
+}
+
 export async function sendEmail({ subject, text, html, attachments, to }) {
-  if (!process.env.SMTP_HOST) {
-    console.warn("SMTP non configuré — e-mail non envoyé :", subject);
+  if (!isSmtpConfigured()) {
+    console.warn("SMTP non configuré — e-mail non envoyé :", subject, `(${smtpMissingReason()})`);
     return false;
   }
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined
-  });
-  await transporter.sendMail({
-    from: process.env.MAIL_FROM || process.env.SMTP_USER,
-    to: to || ALERT_EMAIL,
-    subject,
-    text,
-    html,
-    attachments
-  });
-  return true;
+  try {
+    const transporter = createSmtpTransport();
+    await transporter.sendMail({
+      from: envTrim("MAIL_FROM") || envTrim("SMTP_USER"),
+      to: to || ALERT_EMAIL,
+      subject,
+      text,
+      html,
+      attachments
+    });
+    return true;
+  } catch (error) {
+    console.warn("SMTP envoi impossible — e-mail non envoyé :", subject, error?.code || error?.message || "erreur SMTP");
+    return false;
+  }
 }
 
 export function buildAttachments(imagesBase64) {

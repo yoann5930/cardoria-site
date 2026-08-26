@@ -53,3 +53,17 @@ services:
         sync: false
       - key: SUMUP_WEBHOOK_SECRET
         sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        value: cardoria59330@gmail.com
+      - key: MAIL_FROM
+        value: cardoria59330@gmail.com
+      - key: MAIL_TO
+        value: cardoria59330@gmail.com
+      - key: SMTP_PASS
+        sync: false

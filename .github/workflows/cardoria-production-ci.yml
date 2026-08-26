@@ -60,6 +60,7 @@ jobs:
           node --check lib/marketplace/v1/cart.js
           node --check lib/payments/sumup.js
           node --check lib/security/index.js
+          node --check lib/email.js
           node --check ../script.js
           node --check ../js/marketplace-client.js
           node --check ../js/marketplace-cart-page.js

@@ -9,6 +9,7 @@ import { cacheStats } from "../cache.js";
 import { getErrorStats } from "./errors.js";
 import { listBackups } from "../backup/full.js";
 import { isSumUpConfigured } from "../payments/sumup.js";
+import { isSmtpConfigured } from "../email.js";
 
 const DB_PATH = path.join(DATA_DIR, "cardoria-engine.db");
 
@@ -51,7 +52,7 @@ export function getHealthReport() {
       database: checkDb(),
       disk: checkDisk(),
       openai: { ok: !!process.env.OPENAI_API_KEY, configured: !!process.env.OPENAI_API_KEY },
-      smtp: { ok: !!process.env.SMTP_HOST, configured: !!process.env.SMTP_HOST },
+      smtp: { ok: isSmtpConfigured(), configured: isSmtpConfigured() },
       sumup: { ok: isSumUpConfigured(), configured: isSumUpConfigured() },
       postgres: {
         ok: !!process.env.DATABASE_URL,
