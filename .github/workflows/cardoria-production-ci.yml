@@ -32,6 +32,8 @@ jobs:
           node-version: '22.22.0'
       - name: Install backend
         run: npm install --omit=dev
+      - name: Dependency security audit
+        run: npm audit --omit=dev --audit-level=low
       - name: Syntax checks
         run: |
           node --check server.js
