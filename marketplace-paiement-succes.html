@@ -26,38 +26,29 @@
   var paypalOrderId = params.get("token") || localStorage.getItem("cardoria_marketplace_paypal_order") || "";
   var msg = document.getElementById("msg");
   var details = document.getElementById("paymentDetails");
-
   function fail(message) {
     msg.textContent = "Le paiement n’a pas pu être confirmé automatiquement.";
-    details.textContent = message || "Réessayez depuis votre panier ou consultez vos commandes.";
+    details.textContent = message || "Consultez vos commandes. Le webhook PayPal peut encore confirmer le paiement côté serveur.";
     details.className = "mk-payment-result is-error";
   }
-
   if ((provider === "paypal" || paypalOrderId) && paypalOrderId) {
+    if (!M.getToken()) { fail("Votre session Cardoria a expiré. Reconnectez-vous dans Mes commandes ; le serveur PayPal continue la synchronisation."); return; }
     fetch(M.BACKEND + "/api/marketplace/v1/paypal/orders/" + encodeURIComponent(paypalOrderId) + "/capture", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: M.authHeaders(),
       body: "{}"
     }).then(function (r) {
-      return r.json().then(function (d) {
-        if (!r.ok || !d.ok) throw new Error(d.error || "Confirmation PayPal impossible.");
-        return d;
-      });
+      return r.json().then(function (d) { if (!r.ok || !d.ok) throw new Error(d.error || "Confirmation PayPal impossible."); return d; });
     }).then(function (d) {
       localStorage.removeItem("cardoria_marketplace_paypal_order");
       if (d.paid) {
         msg.textContent = "Paiement PayPal confirmé.";
-        details.textContent = d.total > 1
-          ? d.total + " transactions vendeurs ont été confirmées."
-          : "Votre transaction Marketplace est confirmée.";
+        details.textContent = d.total > 1 ? d.total + " transactions vendeurs ont été confirmées." : "Votre transaction Marketplace est confirmée.";
         details.className = "mk-payment-result is-success";
-      } else {
-        fail("PayPal n’a pas encore confirmé toutes les transactions vendeurs.");
-      }
+      } else fail("PayPal n’a pas encore confirmé toutes les transactions vendeurs.");
     }).catch(function (e) { fail(e.message); });
     return;
   }
-
   fail("Identifiant de paiement PayPal manquant.");
 })();
 </script>
