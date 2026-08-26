@@ -1,7 +1,7 @@
 /** Admin Marketplace Cardoria + webhook SumUp Boutique. */
 import { Router } from "express";
 import express from "express";
-import { requireAdmin } from "../lib/auth.js";
+import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logAudit } from "../lib/audit.js";
 import { getAllOrders, updateOrderStatus } from "../lib/marketplace/orders.js";
 import { searchListings } from "../lib/marketplace/listings.js";
@@ -35,10 +35,14 @@ function assertManualStatus(status) {
   return next;
 }
 
+const WRITE_ADMIN = requireAuth({ roles: ["super_admin", "admin", "employee"], action: "write" });
+const FINANCE_ADMIN = requireAuth({ roles: ["super_admin", "admin"], action: "finance" });
+const EXPORT_ADMIN = requireAuth({ roles: ["super_admin", "admin", "employee"], action: "export" });
 const router = Router();
 router.use(requireAdmin);
+
 router.get("/orders", (req, res) => res.json({ ok: true, orders: getAllOrders() }));
-router.put("/orders/:id/status", (req, res) => {
+router.put("/orders/:id/status", WRITE_ADMIN, (req, res) => {
   try {
     const status = assertManualStatus(req.body.status);
     const order = updateOrderStatus(req.params.id, status, req.body);
@@ -46,21 +50,25 @@ router.put("/orders/:id/status", (req, res) => {
     res.json({ ok: true, order });
   } catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message }); }
 });
-router.post("/orders/:id/shipping-label", async (req, res) => {
+router.post("/orders/:id/shipping-label", WRITE_ADMIN, async (req, res) => {
   try { res.json({ ok: true, ...(await generateShippingLabel(req.params.id, req.body.carrier)) }); }
   catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message }); }
 });
 router.get("/listings", (req, res) => res.json({ ok: true, listings: listAllListingsAdmin(req.query) }));
 router.get("/listings/search", (req, res) => res.json({ ok: true, ...searchListings({ ...req.query, activeOnly: false }) }));
 router.get("/sellers", (req, res) => res.json({ ok: true, sellers: listSellers() }));
-router.put("/sellers/:id/verified", (req, res) => { const seller = setSellerVerified(req.params.id, req.body.verified); logAudit({ type: "marketplace", action: "seller_verified", user: req.authUser?.email || "admin", detail: req.params.id }); res.json({ ok: true, seller }); });
-router.post("/alerts/process", async (req, res) => res.json({ ok: true, ...(await processPriceAlerts()) }));
+router.put("/sellers/:id/verified", WRITE_ADMIN, (req, res) => {
+  const seller = setSellerVerified(req.params.id, req.body.verified);
+  logAudit({ type: "marketplace", action: "seller_verified", user: req.authUser?.email || "admin", detail: req.params.id });
+  res.json({ ok: true, seller });
+});
+router.post("/alerts/process", WRITE_ADMIN, async (req, res) => res.json({ ok: true, ...(await processPriceAlerts()) }));
 router.get("/config", (req, res) => {
   const paypal = getPayPalMarketplaceConfig();
   res.json({ ok: true, boutique: { provider: "sumup", configured: isSumUpConfigured() }, marketplace: { provider: "paypal", configured: paypal.configured, webhookConfigured: paypalWebhookConfigured(), environment: paypal.environment, commissionPercent: paypal.commissionPercent, delayedDisbursement: paypal.delayedDisbursement }, carriers: ["mondial_relay", "colissimo", "chronopost"], carrierLabelsReady: false, stats: getMarketplaceStats() });
 });
 router.get("/stats", (req, res) => res.json({ ok: true, stats: getMarketplaceStats() }));
-router.put("/orders/:id/tracking", (req, res) => {
+router.put("/orders/:id/tracking", WRITE_ADMIN, (req, res) => {
   try {
     const status = assertManualStatus(req.body.status || "shipped");
     const order = updateOrderStatus(req.params.id, status, { tracking: String(req.body.tracking || "").slice(0, 120), labelUrl: String(req.body.labelUrl || "").slice(0, 1000) });
@@ -68,7 +76,7 @@ router.put("/orders/:id/tracking", (req, res) => {
     res.json({ ok: true, order });
   } catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message }); }
 });
-router.post("/orders/:id/refund", async (req, res) => {
+router.post("/orders/:id/refund", FINANCE_ADMIN, async (req, res) => {
   try {
     const result = await refundPayPalOrder(req.params.id, req.body?.amount);
     logAudit({ type: "payment", action: "paypal_refund", user: req.authUser?.email || "admin", detail: `${req.params.id} — ${result.amount || "full"}` });
@@ -81,6 +89,15 @@ router.get("/orders/:id/invoice", (req, res) => {
   res.type("text/html; charset=utf-8").send(html);
 });
 router.get("/disputes", (req, res) => res.json({ ok: true, disputes: listDisputes(req.query) }));
-router.put("/disputes/:id", (req, res) => { const dispute = resolveDispute(req.params.id, req.body || {}); logAudit({ type: "marketplace", action: "dispute_resolve", user: req.authUser?.email || "admin", detail: req.params.id }); res.json({ ok: true, dispute }); });
-router.get("/export/accounting.csv", (req, res) => { const csv = exportAccountingCsv({ from: req.query.from, to: req.query.to }); res.setHeader("Content-Type", "text/csv; charset=utf-8"); res.setHeader("Content-Disposition", "attachment; filename=cardoria-marketplace-compta.csv"); res.send("\uFEFF" + csv); });
+router.put("/disputes/:id", WRITE_ADMIN, (req, res) => {
+  const dispute = resolveDispute(req.params.id, req.body || {});
+  logAudit({ type: "marketplace", action: "dispute_resolve", user: req.authUser?.email || "admin", detail: req.params.id });
+  res.json({ ok: true, dispute });
+});
+router.get("/export/accounting.csv", EXPORT_ADMIN, (req, res) => {
+  const csv = exportAccountingCsv({ from: req.query.from, to: req.query.to });
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", "attachment; filename=cardoria-marketplace-compta.csv");
+  res.send("\uFEFF" + csv);
+});
 export default router;
