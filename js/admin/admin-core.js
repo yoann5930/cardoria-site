@@ -12,6 +12,7 @@
     { href: "admin-statistiques.html", label: "Statistiques site", page: "stats" },
     { section: "Opérations" },
     { href: "admin-comptabilite.html", label: "Comptabilité", page: "accounting" },
+    { href: "admin-achats.html", label: "Achats", page: "purchases" },
     { href: "admin-paiements.html", label: "Paiements SumUp", page: "payments" },
     { href: "admin-commandes.html", label: "Commandes", page: "orders" },
     { href: "admin-stock.html", label: "Stock", page: "stock" },

@@ -21,7 +21,10 @@
 .admin-panel{padding:22px;background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(212,175,55,.22);border-radius:18px;margin-bottom:22px}
 .admin-panel h2{margin:0 0 16px;font-size:18px;color:#ffe18a}
 .admin-filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
-.admin-filters input,.admin-filters select{padding:11px 14px;border:1px solid rgba(212,175,55,.25);background:rgba(255,255,255,.05);color:#fff8e8;border-radius:12px;font-size:14px;min-width:160px}
+.admin-filters input,.admin-filters select{padding:11px 14px;border:1px solid rgba(212,175,55,.25);background:rgba(255,255,255,.05);border-radius:12px;font-size:14px;min-width:160px}
+.admin-filters input{color:#fff8e8}
+.admin-app select{color:#111!important;background:#fff!important}
+.admin-app select option{color:#111!important;background:#fff!important}
 .admin-table-wrap{overflow:auto;border:1px solid rgba(212,175,55,.2);border-radius:14px}
 .admin-table{width:100%;border-collapse:collapse;min-width:720px}
 .admin-table th,.admin-table td{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;font-size:14px}
@@ -38,5 +41,11 @@
 .admin-chart{width:100%;max-width:100%;height:auto;border-radius:14px;background:rgba(255,255,255,.02);border:1px solid rgba(212,175,55,.15);margin-bottom:18px}
 .admin-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .admin-role-admin{color:#ffe18a}.admin-role-employee{color:#8fd4a8}.admin-role-client{color:#baaf97}
+.admin-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px}
+.admin-form-grid label{display:flex;flex-direction:column;gap:7px;color:#baaf97;font-size:13px;font-weight:700}
+.admin-form-grid input,.admin-form-grid textarea,.admin-form-grid select{width:100%;padding:11px 13px;border-radius:11px;border:1px solid rgba(212,175,55,.28);font:inherit}
+.admin-form-grid input,.admin-form-grid textarea{background:rgba(255,255,255,.06);color:#fff8e8}
+.admin-form-grid textarea{resize:vertical}
+.admin-form-wide{grid-column:1/-1}
 @media(max-width:1024px){.admin-layout{grid-template-columns:1fr}.admin-sidebar{position:relative;height:auto}.admin-kpi-grid{grid-template-columns:repeat(2,1fr)}.admin-grid-2{grid-template-columns:1fr}}
-@media(max-width:640px){.admin-main{padding:18px 16px 32px}.admin-kpi-grid{grid-template-columns:1fr}}
+@media(max-width:640px){.admin-main{padding:18px 16px 32px}.admin-kpi-grid{grid-template-columns:1fr}.admin-form-grid{grid-template-columns:1fr}.admin-form-wide{grid-column:auto}}
