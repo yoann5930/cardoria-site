@@ -1,6 +1,6 @@
 /** Routes PayPal Marketplace Cardoria. */
 import { Router } from "express";
-import { getSeller, getSellerByEmail, registerSeller } from "../lib/marketplace/sellers.js";
+import { getSeller, getSellerByAuthUserId, registerSeller } from "../lib/marketplace/sellers.js";
 import { getCart, createOrdersFromCart } from "../lib/marketplace/v1/cart.js";
 import { updateOrderStatus } from "../lib/marketplace/orders.js";
 import { getMarketplacePersistenceStatus } from "../lib/marketplace/persistence.js";
@@ -20,18 +20,15 @@ router.get("/v1/paypal/config", (req, res) => {
   const cfg = getPayPalMarketplaceConfig();
   res.json({ ok: true, provider: cfg.provider, environment: cfg.environment, configured: cfg.configured, webhookConfigured: paypalWebhookConfigured(), commissionConfigured: cfg.commissionPercent != null, commissionPercent: cfg.commissionPercent, delayedDisbursement: cfg.delayedDisbursement, demoMode: isMarketplaceDemoMode() });
 });
-
-// PayPal signe lui-meme ce webhook. Aucune identite fournie par le navigateur n'est acceptee.
 router.post("/v1/paypal/webhook", async (req, res) => {
   try { res.json({ ok: true, ...(await handlePayPalWebhook(req.headers, req.body || {})) }); }
   catch (error) { fail(res, error); }
 });
-
 router.post("/v1/paypal/sellers/register", (req, res) => {
   try {
     const user = getMarketplaceUser(req);
-    let seller = getSellerByEmail(user.email);
-    if (!seller) seller = registerSeller({ email: user.email, displayName: String(req.body?.displayName || user.name || user.email.split("@")[0]).trim().slice(0, 120), sellerType: req.body?.sellerType === "professional" ? "professional" : "individual" });
+    let seller = getSellerByAuthUserId(user.id);
+    if (!seller) seller = registerSeller({ email: user.email, authUserId: user.id, displayName: String(req.body?.displayName || user.name || user.email.split("@")[0]).trim().slice(0, 120), sellerType: req.body?.sellerType === "professional" ? "professional" : "individual" });
     res.json({ ok: true, seller });
   } catch (error) { fail(res, error); }
 });
@@ -46,7 +43,6 @@ router.get("/v1/paypal/sellers/:id/status", async (req, res) => {
   try { const seller = assertSellerSession(req, req.params.id); res.json({ ok: true, seller: await syncSellerPayPalStatus(seller.id, req.query.merchantId || "") }); }
   catch (error) { fail(res, error); }
 });
-
 router.post("/v1/paypal/checkout", async (req, res) => {
   let orders = [];
   try {
@@ -74,8 +70,6 @@ router.post("/v1/paypal/checkout", async (req, res) => {
     fail(res, error);
   }
 });
-
-// Le retour navigateur reste un filet de securite; le webhook serveur est la voie principale.
 router.post("/v1/paypal/orders/:paypalOrderId/capture", async (req, res) => {
   try {
     getMarketplaceUser(req);
