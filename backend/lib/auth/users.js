@@ -60,7 +60,7 @@ export function getTotpSecret(userId) {
 }
 
 export function listUsers() {
-  return getDb().prepare("SELECT id, email, role, name, active, created_at, last_login_at FROM auth_users ORDER BY created_at DESC")
+  return getDb().prepare("SELECT id, email, role, name, active, totp_enabled, created_at, last_login_at FROM auth_users ORDER BY created_at DESC")
     .all()
     .map((r) => ({
       id: r.id,
@@ -68,15 +68,40 @@ export function listUsers() {
       role: r.role,
       name: r.name,
       active: !!r.active,
+      status: r.active ? "active" : "inactive",
+      totpEnabled: !!r.totp_enabled,
       createdAt: r.created_at,
       lastLoginAt: r.last_login_at
     }));
 }
 
+export function updateUserAdmin(userId, patch = {}, actorRole = "admin") {
+  const db = getDb();
+  const current = getUserById(userId);
+  if (!current) throw Object.assign(new Error("Utilisateur introuvable"), { status: 404 });
+
+  const nextRole = patch.role == null ? current.role : String(patch.role);
+  if (!ROLES.includes(nextRole)) throw Object.assign(new Error("Rôle invalide"), { status: 400 });
+  if ((current.role === "super_admin" || nextRole === "super_admin") && actorRole !== "super_admin") {
+    throw Object.assign(new Error("Seul un super administrateur peut modifier ce rôle."), { status: 403 });
+  }
+
+  const nextActive = patch.active == null ? current.active : !!patch.active;
+  if (current.role === "super_admin" && (!nextActive || nextRole !== "super_admin")) {
+    const activeSuperAdmins = db.prepare("SELECT COUNT(*) AS n FROM auth_users WHERE role='super_admin' AND active=1").get()?.n || 0;
+    if (activeSuperAdmins <= 1) throw Object.assign(new Error("Impossible de désactiver ou rétrograder le dernier super administrateur."), { status: 409 });
+  }
+
+  const name = patch.name == null ? current.name : String(patch.name || "").trim().slice(0, 120);
+  db.prepare("UPDATE auth_users SET name=?, role=?, active=?, updated_at=? WHERE id=?")
+    .run(name, nextRole, nextActive ? 1 : 0, new Date().toISOString(), userId);
+  return getUserById(userId);
+}
+
 export function roleCan(role, action) {
   const matrix = {
-    super_admin: ["read", "write", "delete", "export", "backup", "restore", "users", "security", "health"],
-    admin: ["read", "write", "delete", "export", "backup", "users", "health"],
+    super_admin: ["read", "write", "delete", "export", "backup", "restore", "users", "security", "health", "finance"],
+    admin: ["read", "write", "delete", "export", "backup", "users", "health", "finance"],
     employee: ["read", "write", "export"],
     client: ["read"]
   };
