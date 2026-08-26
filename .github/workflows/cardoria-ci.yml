@@ -2,7 +2,9 @@ name: Cardoria CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - fix/free-email-brevo-api
     paths:
       - "backend/**"
       - "script.js"
@@ -62,6 +64,7 @@ jobs:
           node --check lib/auth/migrate.js
           node --check lib/auth/magicLink.js
           node --check lib/email.js
+          node --check lib/monitoring/health.js
           node --check ../script.js
           node --check ../js/admin/admin-login-secure.js
           node --check ../js/admin/admin-email-login.js
@@ -97,6 +100,49 @@ jobs:
             echo "Gmail STARTTLS on port 587 is missing"
             exit 1
           fi
+          if git grep -I -nE 'BREVO_API_KEY[[:space:]]*=[[:space:]]*[^[:space:]#]+' -- . ':!.github/workflows' ':!backend/node_modules' ':!**/node_modules/**'; then
+            echo "Hardcoded BREVO_API_KEY detected"
+            exit 1
+          fi
+          if git grep -I -nE 'BREVO_API_KEY[[:space:]]*:[[:space:]]*["'\''][^"'\'']+' -- . ':!.github/workflows' ':!backend/node_modules' ':!**/node_modules/**'; then
+            echo "Hardcoded BREVO_API_KEY detected"
+            exit 1
+          fi
+          if grep -A2 -- '- key: BREVO_API_KEY' render.yaml | grep -q 'value:'; then
+            echo "BREVO_API_KEY must not have a plaintext value in render.yaml"
+            exit 1
+          fi
+          if ! grep -A2 -- '- key: BREVO_API_KEY' render.yaml | grep -q 'sync: false'; then
+            echo "BREVO_API_KEY must be a Render secret (sync: false)"
+            exit 1
+          fi
+          if ! grep -q 'https://api.brevo.com/v3/smtp/email' backend/lib/email.js; then
+            echo "Brevo HTTPS endpoint missing"
+            exit 1
+          fi
+
+      - name: Verify Brevo HTTPS provider works without SMTP
+        run: |
+          unset SMTP_HOST SMTP_USER SMTP_PASS SMTP_PORT SMTP_SECURE
+          export BREVO_API_KEY='ci'
+          export BREVO_SENDER_EMAIL='cardoria59330@gmail.com'
+          export BREVO_SENDER_NAME='Cardoria'
+          node --input-type=module -e '
+            import { isBrevoConfigured, isSmtpConfigured, isEmailConfigured } from "./lib/email.js";
+            if (!isBrevoConfigured()) {
+              console.error("Brevo should be configured without SMTP");
+              process.exit(1);
+            }
+            if (isSmtpConfigured()) {
+              console.error("SMTP must not be required when Brevo is set");
+              process.exit(1);
+            }
+            if (!isEmailConfigured()) {
+              console.error("Email should be ready via Brevo API");
+              process.exit(1);
+            }
+            console.log("brevo-without-smtp OK");
+          '
 
       - name: Start backend
         run: |
@@ -131,7 +177,7 @@ jobs:
           test "$code" = "200"
           grep -q '"ok":true' /tmp/cardoria-auth.json
 
-      - name: Verify SMTP missing is detected for authorized admin
+      - name: Verify email missing is detected for authorized admin
         run: |
           code=$(curl -sS -o /tmp/cardoria-smtp.json -w "%{http_code}" \
             -H "Content-Type: application/json" \
