@@ -1,6 +1,7 @@
 /**
  * Authentification Cardoria — comptes clients/admin, sessions et 2FA.
  */
+import crypto from "crypto";
 import { Router } from "express";
 import { getUserById, getUserByEmail, createUser, authenticateUser, setTotpSecret, getTotpSecret, ADMIN_ROLES } from "../lib/auth/users.js";
 import { createSession, revokeSession, validateSession } from "../lib/auth/session.js";
@@ -21,6 +22,26 @@ function normalizedEmail(value) {
 function validPassword(value) {
   const p = String(value || "");
   return p.length >= 10 && /[A-Za-z]/.test(p) && /\d/.test(p);
+}
+
+function secureStringEqual(a, b) {
+  const left = crypto.createHash("sha256").update(String(a || "")).digest();
+  const right = crypto.createHash("sha256").update(String(b || "")).digest();
+  return crypto.timingSafeEqual(left, right);
+}
+
+function authenticateConfiguredAdmin(email, password) {
+  const adminEmail = normalizedEmail(process.env.ADMIN_EMAIL || "Cardoria59330@gmail.com");
+  const adminPassword = String(process.env.ADMIN_LOGIN_PASSWORD || "");
+  if (!adminPassword || email !== adminEmail) return null;
+  if (!secureStringEqual(password, adminPassword)) {
+    throw Object.assign(new Error("Email ou mot de passe incorrect."), { status: 401 });
+  }
+  const user = getUserByEmail(email);
+  if (!user || !ADMIN_ROLES.includes(user.role)) {
+    throw Object.assign(new Error("Compte administrateur indisponible."), { status: 403 });
+  }
+  return user;
 }
 
 router.post("/register", authRateLimit, (req, res) => {
@@ -44,7 +65,7 @@ router.post("/login", authRateLimit, (req, res) => {
   try {
     const email = normalizedEmail(req.body?.email);
     const password = String(req.body?.password || "");
-    const user = authenticateUser(email, password);
+    const user = authenticateConfiguredAdmin(email, password) || authenticateUser(email, password);
     if (!user) return res.status(401).json({ ok: false, error: "Email ou mot de passe incorrect." });
     const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"] });
     logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });
