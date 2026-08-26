@@ -3,8 +3,32 @@
   var A = window.CardoriaAdmin;
   if (!A.protectAdmin()) return;
 
-  function exportData(format, type) {
-    window.open(A.BACKEND + "/api/admin/accounting/export?format=" + format + "&type=" + type + "&adminCode=" + encodeURIComponent(sessionStorage.getItem("cardoria_admin_code") || "CARDORIA59330"), "_blank");
+  async function exportData(format, type) {
+    try {
+      var token = sessionStorage.getItem("cardoria_session_token") || "";
+      var res = await fetch(A.BACKEND + "/api/admin/accounting/export?format=" + encodeURIComponent(format) + "&type=" + encodeURIComponent(type), {
+        headers: token ? { Authorization: "Bearer " + token } : {},
+        cache: "no-store"
+      });
+      if (res.status === 401) {
+        sessionStorage.removeItem("cardoria_admin_connected");
+        sessionStorage.removeItem("cardoria_session_token");
+        location.href = "admin-login.html";
+        return;
+      }
+      if (!res.ok) throw new Error("Export impossible");
+      var blob = await res.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "cardoria-" + type + "-" + Date.now() + (format === "pdf" ? ".html" : ".csv");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    } catch (e) {
+      alert(e.message || "Export impossible");
+    }
   }
 
   function renderSales(list) {
@@ -22,7 +46,7 @@
   function loadAll() {
     var q = A.qs("#searchQ").value;
     var license = A.qs("#filterLicense").value;
-    A.adminFetch("/api/admin/accounting/sales?q=" + encodeURIComponent(q) + "&license=" + license).then(function (d) { if (d.ok) renderSales(d.sales); });
+    A.adminFetch("/api/admin/accounting/sales?q=" + encodeURIComponent(q) + "&license=" + encodeURIComponent(license)).then(function (d) { if (d.ok) renderSales(d.sales); });
     A.adminFetch("/api/admin/accounting/purchases?q=" + encodeURIComponent(q)).then(function (d) { if (d.ok) renderPurchases(d.purchases); });
     A.adminFetch("/api/admin/accounting/stats").then(function (d) {
       if (!d.ok) return;
@@ -35,17 +59,18 @@
 
   A.renderShell("accounting", "Comptabilité", "Historique, exports et statistiques financières",
     '<div class="admin-filters">' +
-    '<input id="searchQ" placeholder="Recherche multicritères..." oninput="loadAll()">' +
-    '<select id="filterLicense" onchange="loadAll()"><option value="">Toutes licences</option><option value="pokemon">Pokémon</option><option value="yugioh">Yu-Gi-Oh!</option><option value="onepiece">One Piece</option><option value="lorcana">Lorcana</option><option value="magic">Magic</option></select>' +
+    '<input id="searchQ" placeholder="Recherche multicritères...">' +
+    '<select id="filterLicense"><option value="">Toutes licences</option><option value="pokemon">Pokémon</option><option value="yugioh">Yu-Gi-Oh!</option><option value="onepiece">One Piece</option><option value="lorcana">Lorcana</option><option value="magic">Magic</option></select>' +
     '<button class="btn btn-primary" type="button" id="expCsvSales">Export Excel (CSV)</button>' +
-    '<button class="btn btn-secondary" type="button" id="expPdfSales">Export PDF</button>' +
+    '<button class="btn btn-secondary" type="button" id="expPdfSales">Export imprimable</button>' +
     '<button class="btn btn-secondary" type="button" id="expCsvPurch">Export achats CSV</button></div>' +
     '<div class="admin-grid-2"><div class="admin-panel"><h2>Par licence</h2><ul id="statsLicense"></ul></div>' +
     '<div class="admin-panel"><h2>Par vendeur</h2><ul id="statsSeller"></ul></div></div>' +
     '<div class="admin-panel"><h2>Historique des ventes</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ID</th><th>Date</th><th>Client</th><th>Licence</th><th>Vendeur</th><th>Montant</th></tr></thead><tbody id="salesBody"></tbody></table></div></div>' +
     '<div class="admin-panel"><h2>Historique des achats</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ID</th><th>Date</th><th>Vendeur</th><th>Licence</th><th>Montant</th><th>Statut</th></tr></thead><tbody id="purchasesBody"></tbody></table></div></div>');
 
-  window.loadAll = loadAll;
+  A.qs("#searchQ").addEventListener("input", loadAll);
+  A.qs("#filterLicense").addEventListener("change", loadAll);
   A.qs("#expCsvSales").onclick = function () { exportData("csv", "sales"); };
   A.qs("#expPdfSales").onclick = function () { exportData("pdf", "sales"); };
   A.qs("#expCsvPurch").onclick = function () { exportData("csv", "purchases"); };
