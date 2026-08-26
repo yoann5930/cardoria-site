@@ -24,12 +24,27 @@ webhookRouter.post("/sumup", express.raw({ type: "application/json" }), async (r
   } catch (e) { console.error("SumUp webhook:", e.message); res.status(400).json({ ok: false, error: e.message }); }
 });
 
+const MANUAL_ORDER_STATUSES = new Set(["preparing", "shipped", "delivered", "cancelled"]);
+function assertManualStatus(status) {
+  const next = String(status || "").trim().toLowerCase();
+  if (!MANUAL_ORDER_STATUSES.has(next)) {
+    const error = new Error("Ce statut ne peut pas être défini manuellement");
+    error.status = 400;
+    throw error;
+  }
+  return next;
+}
+
 const router = Router();
 router.use(requireAdmin);
 router.get("/orders", (req, res) => res.json({ ok: true, orders: getAllOrders() }));
 router.put("/orders/:id/status", (req, res) => {
-  try { const order = updateOrderStatus(req.params.id, req.body.status, req.body); logAudit({ type: "marketplace", action: "order_status", user: req.authUser?.email || "admin", detail: `${req.params.id} → ${req.body.status}` }); res.json({ ok: true, order }); }
-  catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+  try {
+    const status = assertManualStatus(req.body.status);
+    const order = updateOrderStatus(req.params.id, status, req.body);
+    logAudit({ type: "marketplace", action: "order_status", user: req.authUser?.email || "admin", detail: `${req.params.id} → ${status}` });
+    res.json({ ok: true, order });
+  } catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message }); }
 });
 router.post("/orders/:id/shipping-label", async (req, res) => {
   try { res.json({ ok: true, ...(await generateShippingLabel(req.params.id, req.body.carrier)) }); }
@@ -46,8 +61,12 @@ router.get("/config", (req, res) => {
 });
 router.get("/stats", (req, res) => res.json({ ok: true, stats: getMarketplaceStats() }));
 router.put("/orders/:id/tracking", (req, res) => {
-  try { const order = updateOrderStatus(req.params.id, req.body.status || "shipped", { tracking: String(req.body.tracking || "").slice(0, 120), labelUrl: String(req.body.labelUrl || "").slice(0, 1000) }); logAudit({ type: "marketplace", action: "tracking", user: req.authUser?.email || "admin", detail: req.params.id }); res.json({ ok: true, order }); }
-  catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+  try {
+    const status = assertManualStatus(req.body.status || "shipped");
+    const order = updateOrderStatus(req.params.id, status, { tracking: String(req.body.tracking || "").slice(0, 120), labelUrl: String(req.body.labelUrl || "").slice(0, 1000) });
+    logAudit({ type: "marketplace", action: "tracking", user: req.authUser?.email || "admin", detail: req.params.id });
+    res.json({ ok: true, order });
+  } catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message }); }
 });
 router.post("/orders/:id/refund", async (req, res) => {
   try {
