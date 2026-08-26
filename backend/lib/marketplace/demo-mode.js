@@ -1,15 +1,14 @@
 /**
- * Mode de démonstration temporaire de la Marketplace Cardoria.
+ * Mode de démonstration Marketplace Cardoria.
  *
- * IMPORTANT : ce flag est volontairement activé pendant la phase de construction
- * de la Marketplace afin de permettre l'accès vendeur sans onboarding PayPal réel.
- * Il ne doit jamais être utilisé pour contourner le checkout acheteur PayPal.
- *
- * Nettoyage final Marketplace : passer DEMO_MODE_ENABLED à false puis supprimer
- * les bypass associés une fois l'étape Marketplace totalement validée.
+ * En production le mode demo est DESACTIVE par defaut. Il ne peut etre active
+ * que par une variable d'environnement explicite hors production, afin qu'un
+ * oubli de configuration ne puisse jamais ouvrir un bypass de paiement ou
+ * d'onboarding vendeur.
  */
-const DEMO_MODE_ENABLED = true;
-
 export function isMarketplaceDemoMode() {
-  return DEMO_MODE_ENABLED;
+  const requested = String(process.env.MARKETPLACE_DEMO_MODE || "").trim().toLowerCase();
+  const enabled = ["1", "true", "yes", "on"].includes(requested);
+  if (process.env.NODE_ENV === "production") return false;
+  return enabled;
 }
