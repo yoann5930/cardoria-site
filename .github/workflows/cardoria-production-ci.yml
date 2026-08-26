@@ -24,6 +24,7 @@ jobs:
       ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
       CORS_ORIGINS: 'http://127.0.0.1:10000'
       ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,13 +36,37 @@ jobs:
         run: |
           node --check server.js
           node --check routes/auth.js
+          node --check routes/marketplace-v1.js
+          node --check routes/marketplace-paypal.js
+          node --check routes/marketplace-admin.js
+          node --check routes/payments.js
+          node --check routes/payments-admin.js
+          node --check routes/gdpr.js
           node --check lib/auth.js
           node --check lib/auth/migrate.js
           node --check lib/auth/magicLink.js
+          node --check lib/marketplace/migrate.js
+          node --check lib/marketplace/orders.js
+          node --check lib/marketplace/sellers.js
+          node --check lib/marketplace/paypal.js
+          node --check lib/marketplace/paypal-events.js
+          node --check lib/marketplace/persistence.js
+          node --check lib/marketplace/v1/security.js
+          node --check lib/marketplace/v1/cart.js
+          node --check lib/payments/sumup.js
+          node --check lib/security/index.js
           node --check ../script.js
-          node --check ../js/admin/admin-login-secure.js
-          node --check ../js/admin/admin-email-login.js
-      - name: Reject client admin bypass
+          node --check ../js/marketplace-client.js
+          node --check ../js/marketplace-cart-page.js
+          node --check ../js/marketplace-listing.js
+          node --check ../js/marketplace-browse.js
+          node --check ../js/marketplace-sell.js
+          node --check ../js/marketplace-orders.js
+          node --check ../js/marketplace-seller.js
+          node --check ../js/marketplace-seller-dashboard.js
+          node --check ../js/marketplace-my-listings.js
+          node --check ../js/admin/admin-orders.js
+      - name: Reject security regressions
         working-directory: .
         run: |
           if grep -R -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' script.js js *.html 2>/dev/null; then
@@ -52,11 +77,23 @@ jobs:
             echo 'Direct admin bypass enabled'
             exit 1
           fi
+          if grep -n 'marketplaceRoutes' backend/server.js; then
+            echo 'Legacy marketplace router mounted'
+            exit 1
+          fi
+          if grep -A2 'MARKETPLACE_DEMO_MODE' render.yaml | grep -q 'true'; then
+            echo 'Marketplace demo enabled in production blueprint'
+            exit 1
+          fi
+          if grep -R -n 'api/marketplace/listings\|api/marketplace/orders?email' js *.html 2>/dev/null; then
+            echo 'Legacy marketplace endpoint still used by frontend'
+            exit 1
+          fi
       - name: Start backend
         run: |
           node server.js > /tmp/cardoria-backend.log 2>&1 &
           echo $! > /tmp/cardoria-backend.pid
-      - name: Health and public login checks
+      - name: Health and public marketplace checks
         run: |
           for i in {1..30}; do
             if curl --fail --silent http://127.0.0.1:10000/api/health/ > /tmp/cardoria-health.json; then
@@ -69,12 +106,29 @@ jobs:
           grep -q 'Admin Cardoria' /tmp/cardoria-login.html
           grep -q 'adminEmailLoginForm' /tmp/cardoria-login.html
           curl --fail --silent http://127.0.0.1:10000/api > /tmp/cardoria-api.json
-          cat /tmp/cardoria-api.json
-      - name: Protected route must require authentication
+          grep -q '6.0.0' /tmp/cardoria-api.json
+          curl --fail --silent 'http://127.0.0.1:10000/api/marketplace/v1/search?license=pokemon' > /tmp/cardoria-marketplace.json
+          grep -q '"ok":true' /tmp/cardoria-marketplace.json
+      - name: Sensitive marketplace routes require authentication
         run: |
-          code=$(curl -sS -o /tmp/cardoria-protected.json -w "%{http_code}" http://127.0.0.1:10000/api/health/full)
-          cat /tmp/cardoria-protected.json
+          code=$(curl -sS -o /tmp/gdpr.json -w "%{http_code}" -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:10000/api/gdpr/export)
+          cat /tmp/gdpr.json
           test "$code" = "401"
+          code=$(curl -sS -o /tmp/listing.json -w "%{http_code}" -H 'Content-Type: application/json' -d '{"sellerId":"fake","title":"x","price":1}' http://127.0.0.1:10000/api/marketplace/v1/listings)
+          cat /tmp/listing.json
+          test "$code" = "401"
+          code=$(curl -sS -o /tmp/checkout.json -w "%{http_code}" -H 'Content-Type: application/json' -d '{"userId":"fake"}' http://127.0.0.1:10000/api/marketplace/v1/paypal/checkout)
+          cat /tmp/checkout.json
+          test "$code" = "401"
+          code=$(curl -sS -o /tmp/protected.json -w "%{http_code}" http://127.0.0.1:10000/api/health/full)
+          cat /tmp/protected.json
+          test "$code" = "401"
+      - name: Security headers present
+        run: |
+          curl -sSI http://127.0.0.1:10000/ > /tmp/headers.txt
+          grep -qi '^content-security-policy:' /tmp/headers.txt
+          grep -qi '^x-content-type-options: nosniff' /tmp/headers.txt
+          grep -qi '^x-frame-options: DENY' /tmp/headers.txt
       - name: Stop backend
         if: always()
         run: |

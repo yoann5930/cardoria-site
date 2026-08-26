@@ -7,6 +7,7 @@ const FILES = {
   estimations: "estimations.json",
   users: "users.json",
   purchases: "purchases.json",
+  orders: "orders.json",
   audit: "audit-log.json",
   analytics: "site-analytics.json",
   settings: "settings.json",
@@ -26,17 +27,16 @@ export function readJson(key, fallback) {
     fs.writeFileSync(file, JSON.stringify(fallback, null, 2), "utf8");
     return fallback;
   }
-  try {
-    return JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch {
-    return fallback;
-  }
+  try { return JSON.parse(fs.readFileSync(file, "utf8")); }
+  catch { return fallback; }
 }
 
 export function writeJson(key, data) {
   ensureDir();
   const file = path.join(DATA_DIR, FILES[key] || key);
-  fs.writeFileSync(file, JSON.stringify(data, null, 2), "utf8");
+  const tmp = file + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf8");
+  fs.renameSync(tmp, file);
 }
 
 export function backupAll() {

@@ -1,12 +1,23 @@
 /**
- * Routes RGPD publiques.
+ * Routes RGPD Cardoria.
+ * Export/suppression ne peuvent viser que le compte de la session authentifiee.
  */
 import { Router } from "express";
 import { recordConsent, exportPersonalData, deletePersonalData } from "../lib/gdpr.js";
-import { validateBody, SCHEMAS } from "../lib/security/validate.js";
 import { apiRateLimit } from "../lib/security/rateLimit.js";
+import { validateSession } from "../lib/auth/session.js";
 
 const router = Router();
+
+function requireUser(req, res) {
+  const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "") || String(req.headers["x-session-token"] || "");
+  const user = validateSession(token);
+  if (!user) {
+    res.status(401).json({ ok: false, error: "Connexion Cardoria requise." });
+    return null;
+  }
+  return user;
+}
 
 router.post("/consent", apiRateLimit, (req, res) => {
   const body = req.body || {};
@@ -22,19 +33,17 @@ router.post("/consent", apiRateLimit, (req, res) => {
 });
 
 router.post("/export", apiRateLimit, (req, res) => {
-  const v = validateBody(SCHEMAS.gdprExport, req.body);
-  if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
-  res.json({ ok: true, data: exportPersonalData(v.data.email) });
+  const user = requireUser(req, res);
+  if (!user) return;
+  res.json({ ok: true, data: exportPersonalData(user.email) });
 });
 
 router.post("/delete", apiRateLimit, (req, res) => {
-  const v = validateBody({
-    ...SCHEMAS.gdprDelete,
-    confirm: { type: "string", required: true, minLength: 6, maxLength: 32, allowNewlines: false }
-  }, req.body);
-  if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (String(req.body?.confirm || "") !== "SUPPRIMER") return res.status(400).json({ ok: false, error: "Confirmation SUPPRIMER requise." });
   try {
-    const result = deletePersonalData(v.data.email, { confirmPhrase: v.data.confirm });
+    const result = deletePersonalData(user.email, { confirmPhrase: "SUPPRIMER" });
     res.json(result);
   } catch (e) {
     res.status(e.status || 500).json({ ok: false, error: e.message });

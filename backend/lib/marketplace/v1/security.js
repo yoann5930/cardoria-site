@@ -1,53 +1,63 @@
-/**
- * Sécurité marketplace v1 — droits vendeur / acheteur / admin.
- */
+/** Controle d'acces Marketplace Cardoria. */
+import { validateSession } from "../../auth/session.js";
+import { getSellerByAuthUserId } from "../sellers.js";
 import { getListing } from "../listings.js";
 import { getOrder } from "../orders.js";
-import { getSeller } from "../sellers.js";
 
 export class MarketplaceAuthError extends Error {
-  constructor(message, code = 403) {
-    super(message);
-    this.code = code;
-  }
+  constructor(message = "Acces refuse", code = 403) { super(message); this.name = "MarketplaceAuthError"; this.code = code; this.status = code; }
 }
-
-export function assertSellerOwnsListing(sellerId, listingId) {
-  const listing = getListing(listingId);
-  if (!listing) throw new MarketplaceAuthError("Annonce introuvable", 404);
-  if (listing.sellerId !== sellerId) throw new MarketplaceAuthError("Accès refusé — annonce d'un autre vendeur");
-  return listing;
+export function validateServerSidePrice(listingId, expectedUnitPrice, qty = 1) {
+  const listing = getListing(String(listingId || ""));
+  if (!listing || listing.status !== "active") throw Object.assign(new Error("Annonce indisponible"), { status: 409 });
+  const safeQty = Math.max(1, Math.min(20, Number(qty) || 1));
+  if (Number(listing.stock || 0) < safeQty) throw Object.assign(new Error("Stock insuffisant"), { status: 409 });
+  const serverPrice = Math.round(Number(listing.price || 0) * 100) / 100;
+  const comparedPrice = Math.round(Number(expectedUnitPrice || 0) * 100) / 100;
+  if (serverPrice <= 0 || serverPrice !== comparedPrice) throw Object.assign(new Error("Le prix a change. Rechargez votre panier."), { status: 409 });
+  return { listing, qty: safeQty, unitPrice: serverPrice };
 }
-
-export function assertSellerSession(body, query = {}) {
-  const sellerId = body?.sellerId || query?.sellerId;
-  const sellerEmail = body?.sellerEmail || query?.sellerEmail;
-  if (!sellerId) throw new MarketplaceAuthError("Identifiant vendeur requis");
-  const seller = getSeller(sellerId);
-  if (!seller) throw new MarketplaceAuthError("Vendeur introuvable", 404);
-  if (sellerEmail && seller.email.toLowerCase() !== String(sellerEmail).toLowerCase()) {
-    throw new MarketplaceAuthError("Session vendeur invalide");
-  }
+export function getMarketplaceUser(req) {
+  const header = String(req?.headers?.authorization || "");
+  const token = header.replace(/^Bearer\s+/i, "") || String(req?.headers?.["x-session-token"] || "");
+  const user = validateSession(token);
+  if (!user) throw new MarketplaceAuthError("Connexion Cardoria requise.", 401);
+  return user;
+}
+export function assertSellerSession(req, expectedSellerId = "") {
+  const user = getMarketplaceUser(req);
+  const seller = getSellerByAuthUserId(user.id);
+  if (!seller) throw new MarketplaceAuthError("Compte vendeur non lie a cette session. Les anciens profils doivent etre verifies par Cardoria.", 403);
+  if (expectedSellerId && seller.id !== String(expectedSellerId)) throw new MarketplaceAuthError("Ce compte ne possede pas ce profil vendeur.", 403);
   return seller;
 }
-
-export function assertBuyerOwnsOrder(orderId, buyerEmail, buyerId = "") {
-  const order = getOrder(orderId);
-  if (!order) throw new MarketplaceAuthError("Commande introuvable", 404);
-  const emailOk = buyerEmail && order.buyerEmail.toLowerCase() === String(buyerEmail).toLowerCase();
-  const idOk = buyerId && order.buyerId === buyerId;
-  if (!emailOk && !idOk) throw new MarketplaceAuthError("Accès refusé — commande d'un autre client");
-  return order;
-}
-
-export function validateServerSidePrice(listingId, clientPrice, qty = 1) {
+export function assertSellerOwnsListing(req, listingId) {
+  const seller = assertSellerSession(req);
   const listing = getListing(listingId);
-  if (!listing || listing.status !== "active") throw new MarketplaceAuthError("Annonce indisponible", 400);
-  if (listing.stock < qty) throw new MarketplaceAuthError("Stock insuffisant", 400);
-  const serverTotal = Math.round(listing.price * qty * 100) / 100;
-  const clientTotal = Math.round(Number(clientPrice) * 100) / 100;
-  if (Math.abs(serverTotal - clientTotal) > 0.02) {
-    throw new MarketplaceAuthError("Prix invalidé — actualisez le panier", 409);
-  }
-  return { listing, serverTotal };
+  if (!listing) throw new MarketplaceAuthError("Annonce introuvable.", 404);
+  if (listing.sellerId !== seller.id) throw new MarketplaceAuthError("Cette annonce ne vous appartient pas.", 403);
+  return { seller, listing };
+}
+export function assertBuyerOwnsOrder(req, orderId) {
+  const user = getMarketplaceUser(req);
+  const order = getOrder(orderId);
+  if (!order) throw new MarketplaceAuthError("Commande introuvable.", 404);
+  if (!order.buyerId || String(order.buyerId) !== String(user.id)) throw new MarketplaceAuthError("Cette commande ne vous appartient pas.", 403);
+  return { user, order };
+}
+export function assertOrderParticipant(req, orderId) {
+  const user = getMarketplaceUser(req);
+  const order = getOrder(orderId);
+  if (!order) throw new MarketplaceAuthError("Commande introuvable.", 404);
+  const buyer = order.buyerId && String(order.buyerId) === String(user.id);
+  const seller = getSellerByAuthUserId(user.id);
+  if (!buyer && (!seller || seller.id !== order.sellerId)) throw new MarketplaceAuthError("Acces refuse a cette commande.", 403);
+  return { user, order, seller: seller || null };
+}
+export function assertSellerOwnsOrder(req, orderId, expectedSellerId = "") {
+  const seller = assertSellerSession(req, expectedSellerId);
+  const order = getOrder(orderId);
+  if (!order) throw new MarketplaceAuthError("Commande introuvable.", 404);
+  if (order.sellerId !== seller.id) throw new MarketplaceAuthError("Cette commande ne vous appartient pas.", 403);
+  return { seller, order };
 }

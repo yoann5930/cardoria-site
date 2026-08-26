@@ -1,7 +1,4 @@
-/**
- * Expédition — Mondial Relay, Colissimo, Chronopost.
- * Génération d'étiquettes (API carrier ou modèle Cardoria si clés absentes).
- */
+/** Expedition Marketplace Cardoria. */
 import { getOrder, updateOrderStatus } from "./orders.js";
 import { logAudit } from "../audit.js";
 
@@ -12,62 +9,40 @@ const CARRIERS = {
 };
 
 export function getShippingOptions() {
-  return Object.entries(CARRIERS).map(([id, c]) => ({
-    id,
-    name: c.name,
-    price: c.baseCost,
-    estimatedDays: c.days
-  }));
+  return Object.entries(CARRIERS).map(([id, c]) => ({ id, name: c.name, price: c.baseCost, estimatedDays: c.days }));
 }
 
 export function calculateShipping(carrierId, weightKg = 0.05) {
   const carrier = CARRIERS[carrierId];
-  if (!carrier) throw new Error("Transporteur inconnu");
-  const extra = weightKg > 0.1 ? Math.ceil((weightKg - 0.1) / 0.1) * 0.5 : 0;
+  if (!carrier) throw Object.assign(new Error("Transporteur inconnu"), { status: 400 });
+  const safeWeight = Math.max(0.01, Math.min(5, Number(weightKg) || 0.05));
+  const extra = safeWeight > 0.1 ? Math.ceil((safeWeight - 0.1) / 0.1) * 0.5 : 0;
   return Math.round((carrier.baseCost + extra) * 100) / 100;
 }
 
 export async function generateShippingLabel(orderId, carrierId) {
   const order = getOrder(orderId);
-  if (!order) throw new Error("Commande introuvable");
-  const carrier = CARRIERS[carrierId || order.shippingCarrier];
-  if (!carrier) throw new Error("Transporteur invalide");
+  if (!order) throw Object.assign(new Error("Commande introuvable"), { status: 404 });
+  const id = carrierId || order.shippingCarrier;
+  const carrier = CARRIERS[id];
+  if (!carrier) throw Object.assign(new Error("Transporteur invalide"), { status: 400 });
 
-  const tracking = "CRD" + Date.now().toString(36).toUpperCase();
-  let labelUrl;
-
-  if (process.env.MONDIAL_RELAY_API_KEY && carrierId === "mondial_relay") {
-    labelUrl = await callCarrierApi("mondial_relay", order, tracking);
-  } else if (process.env.COLISSIMO_API_KEY && carrierId === "colissimo") {
-    labelUrl = await callCarrierApi("colissimo", order, tracking);
-  } else if (process.env.CHRONOPOST_API_KEY && carrierId === "chronopost") {
-    labelUrl = await callCarrierApi("chronopost", order, tracking);
-  } else {
-    labelUrl = generateMockLabel(order, carrier, tracking);
+  // Aucun faux bordereau n'est autorise en production. Tant que les SDK officiels
+  // ne sont pas branches, le vendeur saisit le suivi reel dans son espace vendeur.
+  if (process.env.NODE_ENV === "production") {
+    throw Object.assign(new Error(`Etiquette ${carrier.name} indisponible: integration transporteur officielle requise.`), { status: 501 });
   }
 
-  updateOrderStatus(orderId, "shipped", { tracking, labelUrl });
-  logAudit({ type: "marketplace", action: "label_generated", user: "system", detail: `${orderId} — ${carrier.name}` });
-
-  return { tracking, labelUrl, carrier: carrier.name };
+  const tracking = "DEMO-" + Date.now().toString(36).toUpperCase();
+  const labelUrl = generateDemoLabel(order, carrier, tracking);
+  updateOrderStatus(orderId, "preparing", { tracking: "", labelUrl: "" });
+  logAudit({ type: "marketplace", action: "demo_label_generated", user: "system", detail: `${orderId} — ${carrier.name}` });
+  return { tracking, labelUrl, carrier: carrier.name, demo: true };
 }
 
-async function callCarrierApi(carrier, order, tracking) {
-  /* Brancher ici les SDK officiels Mondial Relay / Colissimo / Chronopost */
-  console.log(`[Shipping] API ${carrier} — commande ${order.id}, suivi ${tracking}`);
-  return generateMockLabel(order, CARRIERS[carrier], tracking);
-}
-
-function generateMockLabel(order, carrier, tracking) {
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Étiquette ${order.id}</title>
-<style>body{font-family:Arial;padding:24px;border:2px dashed #333;max-width:400px}
-.barcode{font-family:monospace;font-size:24px;letter-spacing:4px;background:#eee;padding:12px;text-align:center}
-</style></head><body>
-<h2>${carrier.name}</h2><p><strong>Commande :</strong> ${order.id}</p>
-<p><strong>Destinataire :</strong> ${order.buyerName}<br>${order.shippingAddress}</p>
-<div class="barcode">${tracking}</div>
-<p style="font-size:11px">Étiquette Cardoria — configurer les clés API transporteur en production.</p>
-</body></html>`;
+function generateDemoLabel(order, carrier, tracking) {
+  const safe = (v) => String(v || "").replace(/[&<>"']/g, "");
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>DEMO ${safe(order.id)}</title></head><body><h2>DEMO — ${safe(carrier.name)}</h2><p>Commande ${safe(order.id)}</p><p>${safe(order.buyerName)}</p><p>${safe(order.shippingAddress)}</p><strong>${safe(tracking)}</strong><p>Document de demonstration — non valable pour expedition.</p></body></html>`;
   return "data:text/html;charset=utf-8," + encodeURIComponent(html);
 }
 

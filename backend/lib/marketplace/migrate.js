@@ -1,7 +1,12 @@
 /**
- * Schéma marketplace Cardoria — même base SQLite que le moteur cartes.
+ * Schema marketplace Cardoria — meme base SQLite que le moteur cartes.
  */
 import { getDb, normalizeText } from "../engine/database.js";
+
+function ensureColumn(db, table, column, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name);
+  if (!columns.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
 
 export function migrateMarketplace() {
   const db = getDb();
@@ -9,6 +14,7 @@ export function migrateMarketplace() {
     CREATE TABLE IF NOT EXISTS mk_sellers (
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
+      auth_user_id TEXT DEFAULT '',
       display_name TEXT NOT NULL,
       seller_type TEXT DEFAULT 'individual',
       verified INTEGER DEFAULT 0,
@@ -85,7 +91,6 @@ export function migrateMarketplace() {
       PRIMARY KEY (user_id, listing_id),
       FOREIGN KEY (listing_id) REFERENCES mk_listings(id) ON DELETE CASCADE
     );
-
     CREATE TABLE IF NOT EXISTS mk_wishlist (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT NOT NULL,
@@ -95,7 +100,6 @@ export function migrateMarketplace() {
       target_price REAL,
       created_at TEXT NOT NULL
     );
-
     CREATE TABLE IF NOT EXISTS mk_price_alerts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT NOT NULL,
@@ -107,12 +111,17 @@ export function migrateMarketplace() {
       last_notified_at TEXT,
       created_at TEXT NOT NULL
     );
+  `);
 
+  ensureColumn(db, "mk_sellers", "auth_user_id", "TEXT DEFAULT ''");
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_mk_sellers_auth_user ON mk_sellers(auth_user_id);
     CREATE INDEX IF NOT EXISTS idx_mk_listings_seller ON mk_listings(seller_id, status);
     CREATE INDEX IF NOT EXISTS idx_mk_listings_license ON mk_listings(license_slug, status);
     CREATE INDEX IF NOT EXISTS idx_mk_listings_price ON mk_listings(price);
     CREATE INDEX IF NOT EXISTS idx_mk_listings_title ON mk_listings(title_normalized);
     CREATE INDEX IF NOT EXISTS idx_mk_orders_buyer ON mk_orders(buyer_email);
+    CREATE INDEX IF NOT EXISTS idx_mk_orders_buyer_id ON mk_orders(buyer_id);
     CREATE INDEX IF NOT EXISTS idx_mk_orders_seller ON mk_orders(seller_id);
     CREATE INDEX IF NOT EXISTS idx_mk_favorites_user ON mk_favorites(user_id);
     CREATE INDEX IF NOT EXISTS idx_mk_wishlist_user ON mk_wishlist(user_id);
@@ -120,21 +129,10 @@ export function migrateMarketplace() {
   `);
 
   try {
-    db.exec(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS mk_listings_fts USING fts5(
-        title, description, license_slug, card_condition,
-        content='mk_listings', content_rowid='rowid',
-        tokenize='unicode61 remove_diacritics 2'
-      );
-    `);
+    db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS mk_listings_fts USING fts5(title, description, license_slug, card_condition, content='mk_listings', content_rowid='rowid', tokenize='unicode61 remove_diacritics 2');`);
     const fts = db.prepare("SELECT COUNT(*) AS c FROM mk_listings_fts").get()?.c ?? 0;
     const lst = db.prepare("SELECT COUNT(*) AS c FROM mk_listings").get()?.c ?? 0;
-    if (lst > 0 && fts === 0) {
-      db.exec(`
-        INSERT INTO mk_listings_fts(rowid, title, description, license_slug, card_condition)
-        SELECT rowid, title, description, license_slug, card_condition FROM mk_listings;
-      `);
-    }
+    if (lst > 0 && fts === 0) db.exec(`INSERT INTO mk_listings_fts(rowid, title, description, license_slug, card_condition) SELECT rowid, title, description, license_slug, card_condition FROM mk_listings;`);
   } catch { /* FTS optional */ }
 }
 
@@ -142,14 +140,8 @@ export function syncListingFts(rowid, listing) {
   try {
     const db = getDb();
     db.prepare("DELETE FROM mk_listings_fts WHERE rowid = ?").run(rowid);
-    db.prepare(
-      "INSERT INTO mk_listings_fts(rowid, title, description, license_slug, card_condition) VALUES (?,?,?,?,?)"
-    ).run(rowid, listing.title, listing.description || "", listing.license_slug || "", listing.card_condition);
+    db.prepare("INSERT INTO mk_listings_fts(rowid, title, description, license_slug, card_condition) VALUES (?,?,?,?,?)").run(rowid, listing.title, listing.description || "", listing.license_slug || "", listing.card_condition);
   } catch { /* ignore */ }
 }
-
-export function makeMarketId(prefix) {
-  return prefix + "-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + Math.floor(1000 + Math.random() * 9000);
-}
-
+export function makeMarketId(prefix) { return prefix + "-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + Math.floor(1000 + Math.random() * 9000); }
 export { normalizeText };

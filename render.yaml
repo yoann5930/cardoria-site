@@ -24,11 +24,13 @@ services:
       - key: CORS_ORIGINS
         value: https://cardoria-site-2.onrender.com,https://cardoria.fr,https://www.cardoria.fr
       - key: MARKETPLACE_DEMO_MODE
-        value: "true"
+        value: "false"
       - key: MARKETPLACE_COMMISSION_PERCENT
         value: "5"
       - key: MARKETPLACE_COMMISSION_INCLUDE_SHIPPING
         value: "false"
+      # PAYPAL_ENV reste sandbox tant que des identifiants Live verifies ne sont pas installes.
+      # Le passage Live doit etre atomique avec PAYPAL_CLIENT_ID/SECRET/partner Live.
       - key: PAYPAL_ENV
         value: sandbox
       - key: PAYPAL_DISBURSEMENT_MODE
@@ -42,4 +44,12 @@ services:
       - key: PAYPAL_PARTNER_MERCHANT_ID
         sync: false
       - key: PAYPAL_PARTNER_ATTRIBUTION_ID
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: SUMUP_API_KEY
+        sync: false
+      - key: SUMUP_MERCHANT_CODE
+        sync: false
+      - key: SUMUP_WEBHOOK_SECRET
         sync: false

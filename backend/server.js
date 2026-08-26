@@ -9,19 +9,13 @@ import developmentRoutes from "./routes/development.js";
 import analyticsRoutes from "./routes/analytics.js";
 import engineRoutes from "./routes/engine.js";
 import engineAdminRoutes from "./routes/engine-admin.js";
-import marketplaceRoutes from "./routes/marketplace.js";
 import marketplaceV1Routes from "./routes/marketplace-v1.js";
 import marketplaceAdminRoutes, { webhookRouter } from "./routes/marketplace-admin.js";
 import paymentsRoutes from "./routes/payments.js";
 import paymentsAdminRoutes from "./routes/payments-admin.js";
 import { seedEngineIfEmpty } from "./lib/engine/seed.js";
 import { initMarketplace } from "./lib/marketplace/index.js";
-import {
-  initMarketplacePersistence,
-  marketplacePersistenceMiddleware,
-  flushMarketplacePersistence,
-  closeMarketplacePersistence
-} from "./lib/marketplace/persistence.js";
+import { initMarketplacePersistence, marketplacePersistenceMiddleware, flushMarketplacePersistence, closeMarketplacePersistence } from "./lib/marketplace/persistence.js";
 import { initAi } from "./lib/ai/index.js";
 import { initSeo } from "./lib/seo/index.js";
 import { initMarketData } from "./lib/market/index.js";
@@ -55,63 +49,26 @@ import { initLaunch, connectionJournalMiddleware, maintenanceMiddleware } from "
 import systemRoutes from "./routes/system.js";
 
 dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PUBLIC_ROOT = path.resolve(__dirname, "..");
-const BLOCKED_PUBLIC_ROOTS = new Set([
-  "backend",
-  ".git",
-  ".github",
-  "node_modules",
-  "database",
-  "scripts",
-  "logs",
-  "backups"
-]);
-const PUBLIC_EXTENSIONS = new Set([
-  ".html", ".css", ".js", ".json", ".xml", ".txt",
-  ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico",
-  ".woff", ".woff2", ".ttf", ".map"
-]);
-
+const BLOCKED_PUBLIC_ROOTS = new Set(["backend", ".git", ".github", "node_modules", "database", "scripts", "logs", "backups"]);
+const PUBLIC_EXTENSIONS = new Set([".html", ".css", ".js", ".json", ".xml", ".txt", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".map"]);
 const app = express();
 const startup = { ok: true, degraded: [], startedAt: new Date().toISOString() };
 
 function safeInit(name, fn) {
-  try {
-    fn();
-    console.log(`[startup] ${name}: ok`);
-  } catch (error) {
-    startup.ok = false;
-    startup.degraded.push({ name, error: error?.message || String(error) });
-    console.error(`[startup] ${name}: degraded`, error);
-  }
+  try { fn(); console.log(`[startup] ${name}: ok`); }
+  catch (error) { startup.ok = false; startup.degraded.push({ name, error: error?.message || String(error) }); console.error(`[startup] ${name}: degraded`, error); }
 }
-
-process.on("unhandledRejection", (reason) => {
-  console.error("[process] unhandledRejection", reason);
-});
-process.on("uncaughtException", (error) => {
-  console.error("[process] uncaughtException", error);
-});
+process.on("unhandledRejection", (reason) => console.error("[process] unhandledRejection", reason));
+process.on("uncaughtException", (error) => console.error("[process] uncaughtException", error));
 
 applySecurityMiddleware(app);
 app.use("/api/marketplace/webhooks", marketplacePersistenceMiddleware, webhookRouter);
 app.use(express.json({ limit: process.env.BODY_LIMIT || "15mb" }));
-
-app.get("/api", (req, res) => {
-  res.json({ ok: true, service: "Cardoria API", version: "6.0.0" });
-});
-app.get("/api/health/startup", (req, res) => {
-  res.status(startup.ok ? 200 : 503).json({
-    ok: startup.ok,
-    status: startup.ok ? "healthy" : "degraded",
-    startedAt: startup.startedAt,
-    degraded: startup.degraded.map((item) => item.name)
-  });
-});
-
+app.get("/api", (req, res) => res.json({ ok: true, service: "Cardoria API", version: "6.0.0" }));
+app.get("/api/health/startup", (req, res) => res.status(startup.ok ? 200 : 503).json({ ok: startup.ok, status: startup.ok ? "healthy" : "degraded", startedAt: startup.startedAt, degraded: startup.degraded.map((item) => item.name) }));
 app.use(maintenanceMiddleware);
 app.use(connectionJournalMiddleware());
 app.use("/api/health", healthRoutes);
@@ -122,12 +79,8 @@ safeInit("ai", initAi);
 safeInit("engine-seed", seedEngineIfEmpty);
 safeInit("marketplace", initMarketplace);
 const marketplacePersistence = await initMarketplacePersistence();
-if (!marketplacePersistence.ok) {
-  startup.ok = false;
-  startup.degraded.push({ name: "marketplace-persistence", error: marketplacePersistence.error || "initialization_failed" });
-} else if (marketplacePersistence.configured) {
-  console.log(`[startup] marketplace-persistence: ok (${marketplacePersistence.restored ? "restored" : "initialized"})`);
-}
+if (!marketplacePersistence.ok) { startup.ok = false; startup.degraded.push({ name: "marketplace-persistence", error: marketplacePersistence.error || "initialization_failed" }); }
+else if (marketplacePersistence.configured) console.log(`[startup] marketplace-persistence: ok (${marketplacePersistence.restored ? "restored" : "initialized"})`);
 safeInit("market-data", initMarketData);
 safeInit("scanner", initScanner);
 safeInit("ai-enterprise", initAiEnterprise);
@@ -137,8 +90,9 @@ safeInit("seo", initSeo);
 safeInit("backup-scheduler", scheduleAutoBackup);
 safeInit("launch", initLaunch);
 
-app.use("/api/auth", authRoutes);
-app.use("/api/gdpr", gdprRoutes);
+// Toutes les mutations contenant des donnees critiques declenchent un snapshot PostgreSQL.
+app.use("/api/auth", marketplacePersistenceMiddleware, authRoutes);
+app.use("/api/gdpr", marketplacePersistenceMiddleware, gdprRoutes);
 app.use("/api/analytics", apiRateLimit, analyticsRoutes);
 app.use("/api/ai", aiRateLimit, aiRoutes);
 app.use("/api/scanner", aiRateLimit, scannerRoutes);
@@ -146,22 +100,16 @@ app.use("/api/ai-enterprise", aiRateLimit, aiEnterpriseRoutes);
 app.use("/api/ultimate", aiRateLimit, ultimateRoutes);
 app.use("/api/bigdata", apiRateLimit, bigdataAnalyticsRoutes);
 app.use("/api/engine", apiRateLimit, engineRoutes);
-app.use("/api/marketplace", marketplacePersistenceMiddleware);
-app.use("/api/marketplace", apiRateLimit, marketplaceRoutes);
-app.use("/api/marketplace", apiRateLimit, marketplaceV1Routes);
-app.use("/api/payments", apiRateLimit, paymentsRoutes);
+app.use("/api/marketplace", marketplacePersistenceMiddleware, apiRateLimit, marketplaceV1Routes);
+app.use("/api/payments", marketplacePersistenceMiddleware, apiRateLimit, paymentsRoutes);
 app.use("/api/seo", apiRateLimit, seoRoutes);
 
-app.use("/api/estimation-carte", (req, res, next) => {
-  if (req.method === "POST") return aiRateLimit(req, res, next);
-  next();
-}, estimationRoutes);
-
+app.use("/api/estimation-carte", (req, res, next) => { if (req.method === "POST") return aiRateLimit(req, res, next); next(); }, estimationRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/development", developmentRoutes);
 app.use("/api/admin/engine", engineAdminRoutes);
 app.use("/api/admin/marketplace", marketplacePersistenceMiddleware, marketplaceAdminRoutes);
-app.use("/api/admin/payments", paymentsAdminRoutes);
+app.use("/api/admin/payments", marketplacePersistenceMiddleware, paymentsAdminRoutes);
 app.use("/api/admin/seo", seoAdminRoutes);
 app.use("/api/admin/ai", aiAdminRoutes);
 app.use("/api/admin/market", marketAdminRoutes);
@@ -170,93 +118,54 @@ app.use("/api/admin/ai-enterprise", aiEnterpriseAdminRoutes);
 app.use("/api/admin/ultimate", ultimateAdminRoutes);
 app.use("/api/admin/bigdata", bigdataAdminRoutes);
 
-/** Legacy login conservé uniquement côté serveur pour transition. */
 app.post("/api/admin/login", authRateLimit, (req, res) => {
   const v = validateBody(SCHEMAS.legacyAdminLogin, req.body || {});
   if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
-
   const expected = process.env.ADMIN_CODE;
-  if (!expected || process.env.LEGACY_ADMIN_CODE === "false") {
-    return res.status(503).json({ ok: false, error: "Connexion legacy désactivée — utiliser /api/auth/login." });
-  }
-  if (v.data.code !== expected) {
-    logAudit({ type: "auth", action: "login_failed", user: "unknown", detail: "Code incorrect" });
-    return res.status(401).json({ ok: false, error: "Code incorrect" });
-  }
+  if (!expected || process.env.LEGACY_ADMIN_CODE === "false") return res.status(503).json({ ok: false, error: "Connexion legacy desactivee — utiliser /api/auth/login." });
+  if (v.data.code !== expected) { logAudit({ type: "auth", action: "login_failed", user: "unknown", detail: "Code incorrect" }); return res.status(401).json({ ok: false, error: "Code incorrect" }); }
   logAudit({ type: "auth", action: "login_success", user: "admin", detail: "Legacy code" });
   res.json({ ok: true, token: expected, legacy: true });
 });
 
-app.get(["/boutique", "/boutique/", "/pages/boutique", "/pages/boutique/"], (req, res) => {
-  res.redirect(308, "/boutique.html");
-});
-
+app.get(["/boutique", "/boutique/", "/pages/boutique", "/pages/boutique/"], (req, res) => res.redirect(308, "/boutique.html"));
 app.get("/script.js", (req, res, next) => {
   try {
     const scriptPath = path.join(PUBLIC_ROOT, "script.js");
     let source = fs.readFileSync(scriptPath, "utf8");
-    source = source
-      .replace('const BACKEND_URL="https://cardoria-site-2.onrender.com";', 'const BACKEND_URL=window.location.origin;')
-      .replace('const ADMIN_CODE_LOCAL="CARDORIA59330";', 'const ADMIN_CODE_LOCAL="";');
+    source = source.replace('const BACKEND_URL="https://cardoria-site-2.onrender.com";', 'const BACKEND_URL=window.location.origin;').replace('const ADMIN_CODE_LOCAL="CARDORIA59330";', 'const ADMIN_CODE_LOCAL="";');
     res.type("application/javascript; charset=utf-8").send(source);
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 });
 
 function sendPublicFile(req, res, next) {
   let requestPath;
-  try {
-    requestPath = decodeURIComponent(req.path || "/");
-  } catch {
-    return res.status(400).send("Requête invalide.");
-  }
-
+  try { requestPath = decodeURIComponent(req.path || "/"); } catch { return res.status(400).send("Requete invalide."); }
   if (requestPath.startsWith("/api/")) return next();
-  if (requestPath === "/") {
-    return res.sendFile(path.join(PUBLIC_ROOT, "index.html"));
-  }
-
+  if (requestPath === "/") return res.sendFile(path.join(PUBLIC_ROOT, "index.html"));
   const relativePath = requestPath.replace(/^\/+/, "");
   if (!relativePath || relativePath.includes("..")) return next();
-
   const firstSegment = relativePath.split("/")[0];
   if (BLOCKED_PUBLIC_ROOTS.has(firstSegment)) return res.status(404).send("Not found");
-
   const extension = path.extname(relativePath).toLowerCase();
   if (!PUBLIC_EXTENSIONS.has(extension)) return next();
-
   const absolutePath = path.resolve(PUBLIC_ROOT, relativePath);
-  if (absolutePath !== PUBLIC_ROOT && !absolutePath.startsWith(PUBLIC_ROOT + path.sep)) {
-    return res.status(403).send("Forbidden");
-  }
-
-  return res.sendFile(absolutePath, (error) => {
-    if (!error) return;
-    if (error.status === 404) return next();
-    return next(error);
-  });
+  if (absolutePath !== PUBLIC_ROOT && !absolutePath.startsWith(PUBLIC_ROOT + path.sep)) return res.status(403).send("Forbidden");
+  return res.sendFile(absolutePath, (error) => { if (!error) return; if (error.status === 404) return next(); return next(error); });
 }
-
 app.get("*", sendPublicFile);
 app.use(errorHandler);
 
 const port = process.env.PORT || 10000;
-const server = app.listen(port, "0.0.0.0", () => {
-  console.log(`Cardoria V6 single-host ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`);
-  console.log(`[startup] public root: ${PUBLIC_ROOT}`);
-});
-
+const server = app.listen(port, "0.0.0.0", () => { console.log(`Cardoria V6 single-host ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`); console.log(`[startup] public root: ${PUBLIC_ROOT}`); });
 function shutdown(signal) {
   console.log(`[process] ${signal} received, closing HTTP server`);
-  const forceExit = setTimeout(() => process.exit(1), 10000);
-  forceExit.unref();
+  const forceExit = setTimeout(() => process.exit(1), 10000); forceExit.unref();
   server.close(async () => {
     const persisted = await flushMarketplacePersistence(`shutdown-${signal.toLowerCase()}`);
     if (!persisted.ok) console.error("[marketplace-persistence] shutdown flush failed");
-    try { await closeMarketplacePersistence(); } catch { /* ignore */ }
-    clearTimeout(forceExit);
-    process.exit(persisted.ok ? 0 : 1);
+    try { await closeMarketplacePersistence(); } catch {}
+    clearTimeout(forceExit); process.exit(persisted.ok ? 0 : 1);
   });
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));

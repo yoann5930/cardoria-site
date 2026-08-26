@@ -1,6 +1,6 @@
 {
-  "name": "cardoria-v5-backend",
-  "version": "5.0.1",
+  "name": "cardoria-v6-backend",
+  "version": "6.0.0",
   "type": "module",
   "main": "server.js",
   "engines": {
