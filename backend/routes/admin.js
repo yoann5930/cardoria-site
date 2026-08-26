@@ -58,7 +58,8 @@ function normalizePurchase(body = {}, existing = {}) {
 
   const quantity = Math.max(1, Math.min(100000, Math.trunc(Number(body.quantity ?? existing.quantity ?? 1) || 1)));
   const allowedStatus = ["paid", "pending", "cancelled", "refunded"];
-  const status = allowedStatus.includes(String(body.status ?? existing.status || "paid")) ? String(body.status ?? existing.status || "paid") : "paid";
+  const requestedStatus = String(body.status ?? existing.status ?? "paid");
+  const status = allowedStatus.includes(requestedStatus) ? requestedStatus : "paid";
 
   return {
     ...existing,
