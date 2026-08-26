@@ -11,20 +11,31 @@ export function setOrderNotificationHook(fn) { _notifyHook = fn; }
 const STATUS_FLOW = ["pending", "paid", "preparing", "shipped", "delivered", "cancelled", "refunded"];
 const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"];
 
-export function createOrder({ listingId, buyerEmail, buyerName, buyerId, qty, shippingCarrier, shippingCost, shippingAddress }) {
+export function createOrder({ listingId, items = null, buyerEmail, buyerName, buyerId, qty, shippingCarrier, shippingCost, shippingAddress }) {
   const db = getDb();
-  const safeQty = Math.max(1, Math.min(20, Number(qty) || 1));
   const id = makeMarketId("MKT");
   const now = new Date().toISOString();
+  const rawLines = Array.isArray(items) && items.length ? items : [{ listingId, qty }];
   const transaction = db.transaction(() => {
-    const listing = getListing(listingId);
-    if (!listing || listing.status !== "active") throw Object.assign(new Error("Annonce indisponible"), { status: 409 });
-    const reserved = db.prepare("UPDATE mk_listings SET stock = stock - ?, updated_at = ? WHERE id = ? AND status = 'active' AND stock >= ?").run(safeQty, now, listingId, safeQty);
-    if (reserved.changes !== 1) throw Object.assign(new Error("Stock insuffisant"), { status: 409 });
-    const unitPrice = Number(listing.price);
+    const prepared = [];
+    let sellerId = "";
+    for (const raw of rawLines) {
+      const lineId = String(raw.listingId || "").trim();
+      const safeQty = Math.max(1, Math.min(20, Number(raw.qty) || 1));
+      const listing = getListing(lineId);
+      if (!listing || listing.status !== "active") throw Object.assign(new Error(`Annonce indisponible: ${lineId}`), { status: 409 });
+      if (sellerId && listing.sellerId !== sellerId) throw Object.assign(new Error("Une commande ne peut contenir qu'un seul vendeur."), { status: 400 });
+      sellerId = listing.sellerId;
+      const reserved = db.prepare("UPDATE mk_listings SET stock = stock - ?, updated_at = ? WHERE id = ? AND status = 'active' AND stock >= ?").run(safeQty, now, lineId, safeQty);
+      if (reserved.changes !== 1) throw Object.assign(new Error(`Stock insuffisant pour ${listing.title}`), { status: 409 });
+      const unitPrice = Math.round(Number(listing.price || 0) * 100) / 100;
+      prepared.push({ listingId: lineId, title: listing.title, qty: safeQty, unitPrice, lineTotal: Math.round(unitPrice * safeQty * 100) / 100 });
+    }
+    const primary = prepared[0];
     const ship = Math.max(0, Number(shippingCost) || 0);
-    const total = Math.round((unitPrice * safeQty + ship) * 100) / 100;
-    db.prepare(`INSERT INTO mk_orders (id,buyer_email,buyer_name,buyer_id,seller_id,listing_id,listing_title,qty,unit_price,shipping_cost,shipping_carrier,total,status,payment_status,shipping_address,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'pending','pending',?,?,?)`).run(id, String(buyerEmail || "").toLowerCase(), buyerName || "", buyerId || "", listing.sellerId, listingId, listing.title, safeQty, unitPrice, ship, shippingCarrier || "", total, shippingAddress || "", now, now);
+    const productsTotal = prepared.reduce((sum, line) => sum + line.lineTotal, 0);
+    const total = Math.round((productsTotal + ship) * 100) / 100;
+    db.prepare(`INSERT INTO mk_orders (id,buyer_email,buyer_name,buyer_id,seller_id,listing_id,listing_title,items_json,qty,unit_price,shipping_cost,shipping_carrier,total,status,payment_status,shipping_address,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending','pending',?,?,?)`).run(id, String(buyerEmail || "").toLowerCase(), buyerName || "", buyerId || "", sellerId, primary.listingId, primary.title, JSON.stringify(prepared), primary.qty, primary.unitPrice, ship, shippingCarrier || "", total, shippingAddress || "", now, now);
   });
   transaction();
   const order = getOrder(id);
@@ -46,11 +57,9 @@ function releaseReservedStock(order) {
 }
 function applyPaidSideEffectsOnce(order, previousStatus) {
   if (["paid", "preparing", "shipped", "delivered"].includes(previousStatus)) return;
-  // Le stock est deja reserve dans createOrder; ne jamais le decrementer une seconde fois.
   updateSellerStats(order.sellerId);
   try { ingestMarketplaceOrder(order); } catch (e) { console.warn("[Market] ingest order:", e.message); }
 }
-
 export function updateOrderStatus(id, status, extra = {}) {
   if (!STATUS_FLOW.includes(status)) throw new Error("Statut invalide");
   const prev = getOrder(id); if (!prev) throw new Error("Commande introuvable");
@@ -65,7 +74,6 @@ export function updateOrderStatus(id, status, extra = {}) {
   if (_notifyHook && updated) _notifyHook(updated, status, prev.status).catch?.(() => {});
   return updated;
 }
-
 export function markOrderPaymentStatus(id, paymentStatus, extra = {}) {
   if (!PAYMENT_STATUSES.includes(paymentStatus)) throw new Error("Statut paiement invalide");
   const patch = { ...extra, paymentStatus };
