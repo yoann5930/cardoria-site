@@ -72,7 +72,6 @@
     '<div class="admin-filters">' +
     '<input id="searchQ" placeholder="Recherche multicritères...">' +
     '<select id="filterLicense"><option value="">Toutes licences</option><option value="pokemon">Pokémon</option><option value="yugioh">Yu-Gi-Oh!</option><option value="onepiece">One Piece</option><option value="lorcana">Lorcana</option><option value="magic">Magic</option></select>' +
-    '<a class="btn btn-primary" href="admin-achats.html">+ Ajouter un achat</a>' +
     '<button class="btn btn-primary" type="button" id="expCsvSales">Export Excel (CSV)</button>' +
     '<button class="btn btn-secondary" type="button" id="expPdfSales">Export imprimable</button>' +
     '<button class="btn btn-secondary" type="button" id="expCsvPurch">Export achats CSV</button></div>' +
