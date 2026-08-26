@@ -9,7 +9,6 @@ import developmentRoutes from "./routes/development.js";
 import analyticsRoutes from "./routes/analytics.js";
 import engineRoutes from "./routes/engine.js";
 import engineAdminRoutes from "./routes/engine-admin.js";
-import marketplaceRoutes from "./routes/marketplace.js";
 import marketplaceV1Routes from "./routes/marketplace-v1.js";
 import marketplaceAdminRoutes, { webhookRouter } from "./routes/marketplace-admin.js";
 import paymentsRoutes from "./routes/payments.js";
@@ -59,57 +58,31 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PUBLIC_ROOT = path.resolve(__dirname, "..");
-const BLOCKED_PUBLIC_ROOTS = new Set([
-  "backend",
-  ".git",
-  ".github",
-  "node_modules",
-  "database",
-  "scripts",
-  "logs",
-  "backups"
-]);
-const PUBLIC_EXTENSIONS = new Set([
-  ".html", ".css", ".js", ".json", ".xml", ".txt",
-  ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico",
-  ".woff", ".woff2", ".ttf", ".map"
-]);
+const BLOCKED_PUBLIC_ROOTS = new Set(["backend", ".git", ".github", "node_modules", "database", "scripts", "logs", "backups"]);
+const PUBLIC_EXTENSIONS = new Set([".html", ".css", ".js", ".json", ".xml", ".txt", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".map"]);
 
 const app = express();
 const startup = { ok: true, degraded: [], startedAt: new Date().toISOString() };
 
 function safeInit(name, fn) {
-  try {
-    fn();
-    console.log(`[startup] ${name}: ok`);
-  } catch (error) {
+  try { fn(); console.log(`[startup] ${name}: ok`); }
+  catch (error) {
     startup.ok = false;
     startup.degraded.push({ name, error: error?.message || String(error) });
     console.error(`[startup] ${name}: degraded`, error);
   }
 }
 
-process.on("unhandledRejection", (reason) => {
-  console.error("[process] unhandledRejection", reason);
-});
-process.on("uncaughtException", (error) => {
-  console.error("[process] uncaughtException", error);
-});
+process.on("unhandledRejection", (reason) => console.error("[process] unhandledRejection", reason));
+process.on("uncaughtException", (error) => console.error("[process] uncaughtException", error));
 
 applySecurityMiddleware(app);
 app.use("/api/marketplace/webhooks", marketplacePersistenceMiddleware, webhookRouter);
 app.use(express.json({ limit: process.env.BODY_LIMIT || "15mb" }));
 
-app.get("/api", (req, res) => {
-  res.json({ ok: true, service: "Cardoria API", version: "6.0.0" });
-});
+app.get("/api", (req, res) => res.json({ ok: true, service: "Cardoria API", version: "6.0.0" }));
 app.get("/api/health/startup", (req, res) => {
-  res.status(startup.ok ? 200 : 503).json({
-    ok: startup.ok,
-    status: startup.ok ? "healthy" : "degraded",
-    startedAt: startup.startedAt,
-    degraded: startup.degraded.map((item) => item.name)
-  });
+  res.status(startup.ok ? 200 : 503).json({ ok: startup.ok, status: startup.ok ? "healthy" : "degraded", startedAt: startup.startedAt, degraded: startup.degraded.map((item) => item.name) });
 });
 
 app.use(maintenanceMiddleware);
@@ -147,7 +120,6 @@ app.use("/api/ultimate", aiRateLimit, ultimateRoutes);
 app.use("/api/bigdata", apiRateLimit, bigdataAnalyticsRoutes);
 app.use("/api/engine", apiRateLimit, engineRoutes);
 app.use("/api/marketplace", marketplacePersistenceMiddleware);
-app.use("/api/marketplace", apiRateLimit, marketplaceRoutes);
 app.use("/api/marketplace", apiRateLimit, marketplaceV1Routes);
 app.use("/api/payments", apiRateLimit, paymentsRoutes);
 app.use("/api/seo", apiRateLimit, seoRoutes);
@@ -170,15 +142,11 @@ app.use("/api/admin/ai-enterprise", aiEnterpriseAdminRoutes);
 app.use("/api/admin/ultimate", ultimateAdminRoutes);
 app.use("/api/admin/bigdata", bigdataAdminRoutes);
 
-/** Legacy login conservé uniquement côté serveur pour transition. */
 app.post("/api/admin/login", authRateLimit, (req, res) => {
   const v = validateBody(SCHEMAS.legacyAdminLogin, req.body || {});
   if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
-
   const expected = process.env.ADMIN_CODE;
-  if (!expected || process.env.LEGACY_ADMIN_CODE === "false") {
-    return res.status(503).json({ ok: false, error: "Connexion legacy désactivée — utiliser /api/auth/login." });
-  }
+  if (!expected || process.env.LEGACY_ADMIN_CODE === "false") return res.status(503).json({ ok: false, error: "Connexion legacy desactivee — utiliser /api/auth/login." });
   if (v.data.code !== expected) {
     logAudit({ type: "auth", action: "login_failed", user: "unknown", detail: "Code incorrect" });
     return res.status(401).json({ ok: false, error: "Code incorrect" });
@@ -187,50 +155,31 @@ app.post("/api/admin/login", authRateLimit, (req, res) => {
   res.json({ ok: true, token: expected, legacy: true });
 });
 
-app.get(["/boutique", "/boutique/", "/pages/boutique", "/pages/boutique/"], (req, res) => {
-  res.redirect(308, "/boutique.html");
-});
+app.get(["/boutique", "/boutique/", "/pages/boutique", "/pages/boutique/"], (req, res) => res.redirect(308, "/boutique.html"));
 
 app.get("/script.js", (req, res, next) => {
   try {
     const scriptPath = path.join(PUBLIC_ROOT, "script.js");
     let source = fs.readFileSync(scriptPath, "utf8");
-    source = source
-      .replace('const BACKEND_URL="https://cardoria-site-2.onrender.com";', 'const BACKEND_URL=window.location.origin;')
-      .replace('const ADMIN_CODE_LOCAL="CARDORIA59330";', 'const ADMIN_CODE_LOCAL="";');
+    source = source.replace('const BACKEND_URL="https://cardoria-site-2.onrender.com";', 'const BACKEND_URL=window.location.origin;').replace('const ADMIN_CODE_LOCAL="CARDORIA59330";', 'const ADMIN_CODE_LOCAL="";');
     res.type("application/javascript; charset=utf-8").send(source);
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 });
 
 function sendPublicFile(req, res, next) {
   let requestPath;
-  try {
-    requestPath = decodeURIComponent(req.path || "/");
-  } catch {
-    return res.status(400).send("Requête invalide.");
-  }
-
+  try { requestPath = decodeURIComponent(req.path || "/"); }
+  catch { return res.status(400).send("Requete invalide."); }
   if (requestPath.startsWith("/api/")) return next();
-  if (requestPath === "/") {
-    return res.sendFile(path.join(PUBLIC_ROOT, "index.html"));
-  }
-
+  if (requestPath === "/") return res.sendFile(path.join(PUBLIC_ROOT, "index.html"));
   const relativePath = requestPath.replace(/^\/+/, "");
   if (!relativePath || relativePath.includes("..")) return next();
-
   const firstSegment = relativePath.split("/")[0];
   if (BLOCKED_PUBLIC_ROOTS.has(firstSegment)) return res.status(404).send("Not found");
-
   const extension = path.extname(relativePath).toLowerCase();
   if (!PUBLIC_EXTENSIONS.has(extension)) return next();
-
   const absolutePath = path.resolve(PUBLIC_ROOT, relativePath);
-  if (absolutePath !== PUBLIC_ROOT && !absolutePath.startsWith(PUBLIC_ROOT + path.sep)) {
-    return res.status(403).send("Forbidden");
-  }
-
+  if (absolutePath !== PUBLIC_ROOT && !absolutePath.startsWith(PUBLIC_ROOT + path.sep)) return res.status(403).send("Forbidden");
   return res.sendFile(absolutePath, (error) => {
     if (!error) return;
     if (error.status === 404) return next();
