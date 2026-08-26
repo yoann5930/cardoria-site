@@ -1,7 +1,6 @@
 /**
  * Persistance durable Cardoria.
- * Marketplace + donnees runtime critiques (auth, ledger, commandes Boutique)
- * sont restaurees depuis PostgreSQL entre les redemarrages Render.
+ * Marketplace + donnees runtime critiques sont restaurees depuis PostgreSQL.
  */
 import pg from "pg";
 import { getDb } from "../engine/database.js";
@@ -30,14 +29,15 @@ function getPool() {
   return pool;
 }
 function sqliteRows(table) { return getDb().prepare(`SELECT * FROM ${quoteIdent(table)}`).all(); }
-async function ensureRuntimeSchema(client) {
+async function ensureRemoteSchema(client) {
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_runtime_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  // Migration additive: compatible avec la base Marketplace deja en production.
+  await client.query(`ALTER TABLE mk_sellers ADD COLUMN IF NOT EXISTS auth_user_id TEXT DEFAULT ''`);
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_mk_sellers_auth_user ON mk_sellers(auth_user_id)`);
 }
 function runtimePayload() {
   const tables = {};
-  for (const table of RUNTIME_TABLES) {
-    try { tables[table] = sqliteRows(table); } catch { tables[table] = []; }
-  }
+  for (const table of RUNTIME_TABLES) { try { tables[table] = sqliteRows(table); } catch { tables[table] = []; } }
   return { version: 1, tables, boutiqueOrders: readJson("orders", []), capturedAt: new Date().toISOString() };
 }
 async function writeRows(client, table, rows) {
@@ -46,7 +46,6 @@ async function writeRows(client, table, rows) {
     await client.query(`INSERT INTO ${quoteIdent(table)} (${columns.map(quoteIdent).join(",")}) VALUES (${columns.map((_, i) => `$${i + 1}`).join(",")})`, columns.map((c) => row[c]));
   }
 }
-
 async function snapshotNow(reason = "runtime") {
   if (!marketplacePersistenceConfigured()) return { ok: false, skipped: true, reason: "not_configured" };
   if (syncPromise) { dirty = true; return syncPromise; }
@@ -54,11 +53,11 @@ async function snapshotNow(reason = "runtime") {
     const client = await getPool().connect();
     try {
       await client.query("BEGIN");
-      await ensureRuntimeSchema(client);
+      await ensureRemoteSchema(client);
       const snapshots = new Map(MARKET_TABLES.map((table) => [table, sqliteRows(table)]));
       for (const table of MARKET_CHILD_FIRST) await client.query(`DELETE FROM ${quoteIdent(table)}`);
       for (const table of MARKET_TABLES) await writeRows(client, table, snapshots.get(table) || []);
-      await client.query(`INSERT INTO cardoria_runtime_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload, updated_at=NOW()`, [JSON.stringify(runtimePayload())]);
+      await client.query(`INSERT INTO cardoria_runtime_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()`, [JSON.stringify(runtimePayload())]);
       await client.query(`INSERT INTO marketplace_sync_meta (id,initialized,last_synced_at,source) VALUES ('primary',TRUE,NOW(),$1) ON CONFLICT (id) DO UPDATE SET initialized=TRUE,last_synced_at=NOW(),source=EXCLUDED.source`, [reason]);
       await client.query("COMMIT");
       lastError = ""; lastSyncedAt = new Date().toISOString(); initialized = true;
@@ -71,13 +70,10 @@ async function snapshotNow(reason = "runtime") {
   try { return await syncPromise; }
   finally { syncPromise = null; if (dirty) { dirty = false; scheduleMarketplaceSnapshot("queued-change", 100); } }
 }
-
 function restoreRuntime(payload) {
   if (!payload || typeof payload !== "object") return;
-  const sqlite = getDb();
-  sqlite.pragma("foreign_keys = OFF");
+  const sqlite = getDb(); sqlite.pragma("foreign_keys = OFF");
   const tx = sqlite.transaction(() => {
-    // Enfants avant parent pour eviter toute dependance lors du remplacement.
     ["auth_sessions","auth_reset_tokens","auth_magic_tokens","gdpr_consents","pay_transactions","auth_users"].forEach((table) => { try { sqlite.prepare(`DELETE FROM ${quoteIdent(table)}`).run(); } catch {} });
     for (const table of RUNTIME_TABLES) {
       for (const row of payload.tables?.[table] || []) {
@@ -89,11 +85,10 @@ function restoreRuntime(payload) {
   tx(); sqlite.pragma("foreign_keys = ON");
   if (Array.isArray(payload.boutiqueOrders)) writeJson("orders", payload.boutiqueOrders);
 }
-
 async function restoreFromPostgres() {
   const client = await getPool().connect();
   try {
-    await ensureRuntimeSchema(client);
+    await ensureRemoteSchema(client);
     const meta = await client.query("SELECT initialized,last_synced_at FROM marketplace_sync_meta WHERE id='primary' LIMIT 1");
     if (!meta.rows[0]?.initialized) return { restored: false };
     const payload = new Map();
@@ -116,7 +111,6 @@ async function restoreFromPostgres() {
     return { restored: true, lastSyncedAt };
   } finally { client.release(); }
 }
-
 export async function initMarketplacePersistence() {
   if (!marketplacePersistenceConfigured()) { console.log("[cardoria-persistence] disabled: MARKETPLACE_DATABASE_URL absente"); return { ok: true, configured: false }; }
   try {
