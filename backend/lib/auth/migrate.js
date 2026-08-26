@@ -82,15 +82,21 @@ function seedDefaultAdmin(db) {
   const email = String(process.env.ADMIN_EMAIL || "Cardoria59330@gmail.com").trim().toLowerCase();
   if (!email) return;
 
+  const configuredPassword = String(process.env.ADMIN_LOGIN_PASSWORD || "").trim();
   const existing = db.prepare("SELECT id, role, active FROM auth_users WHERE email = ?").get(email);
   if (existing) {
-    // Ne modifie jamais automatiquement un compte existant : son rôle et son état restent gérés par l'admin.
+    // ADMIN_LOGIN_PASSWORD est un secret Render. S'il est defini, il devient le mot de passe
+    // de connexion directe de l'admin existant sans jamais etre stocke en clair en base.
+    if (configuredPassword && ADMIN_ROLES.includes(existing.role) && existing.active) {
+      db.prepare("UPDATE auth_users SET password_hash = ?, updated_at = ? WHERE id = ?")
+        .run(hashPassword(configuredPassword), new Date().toISOString(), existing.id);
+    }
     return;
   }
 
-  // Le back-office utilise le lien magique. Si aucun mot de passe initial n'est fourni,
-  // on stocke un secret aléatoire impossible à deviner plutôt que de désactiver l'auth.
-  const password = process.env.ADMIN_INITIAL_PASSWORD || crypto.randomBytes(48).toString("base64url");
+  // Pour un nouveau compte, preferer le secret de connexion directe, sinon l'ancien secret
+  // d'initialisation. Sans aucun secret fourni, conserver un mot de passe aleatoire impraticable.
+  const password = configuredPassword || process.env.ADMIN_INITIAL_PASSWORD || crypto.randomBytes(48).toString("base64url");
   const now = new Date().toISOString();
   db.prepare(`
     INSERT INTO auth_users (id, email, password_hash, role, name, created_at, updated_at)
