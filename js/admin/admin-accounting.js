@@ -39,7 +39,7 @@
 
   function renderPurchases(list) {
     A.qs("#purchasesBody").innerHTML = list.map(function (p) {
-      return "<tr><td>" + p.id + "</td><td>" + p.date + "</td><td>" + p.seller + "</td><td>" + p.license + "</td><td>" + A.euro(p.amount) + "</td><td>" + p.status + "</td></tr>";
+      return "<tr><td>" + p.id + "</td><td>" + p.date + "</td><td>" + p.seller + "</td><td>" + (p.description || p.license || "—") + "</td><td>" + A.euro(p.amount) + "</td><td>" + (p.status || "—") + "</td></tr>";
     }).join("") || "<tr><td colspan='6'>Aucun achat</td></tr>";
   }
 
@@ -52,22 +52,35 @@
       if (!d.ok) return;
       var lic = Object.entries(d.byLicense || {}).map(function (e) { return "<li>" + e[0] + " : " + A.euro(e[1]) + "</li>"; }).join("");
       var sel = Object.entries(d.bySeller || {}).map(function (e) { return "<li>" + e[0] + " : " + A.euro(e[1]) + "</li>"; }).join("");
+      var purchCat = Object.entries(d.purchaseByCategory || {}).map(function (e) { return "<li>" + e[0] + " : " + A.euro(e[1]) + "</li>"; }).join("");
       A.qs("#statsLicense").innerHTML = lic || "<li>Aucune donnée</li>";
       A.qs("#statsSeller").innerHTML = sel || "<li>Aucune donnée</li>";
+      A.qs("#statsPurchaseCategory").innerHTML = purchCat || "<li>Aucun achat</li>";
+      A.qs("#accountingSalesTotal").textContent = A.euro(d.totalSales || 0);
+      A.qs("#accountingPurchasesTotal").textContent = A.euro(d.totalPurchases || 0);
+      A.qs("#accountingNetResult").textContent = A.euro(d.netResult || 0);
+      A.qs("#accountingPurchaseCount").textContent = (d.purchaseCount || 0) + " achat(s)";
     });
   }
 
-  A.renderShell("accounting", "Comptabilité", "Historique, exports et statistiques financières",
+  A.renderShell("accounting", "Comptabilité", "Historique, achats, exports et statistiques financières",
+    '<div class="admin-kpi-grid">' +
+    '<div class="admin-kpi"><label>Total ventes</label><strong id="accountingSalesTotal">0,00 €</strong><small>Ventes enregistrées</small></div>' +
+    '<div class="admin-kpi"><label>Total achats</label><strong id="accountingPurchasesTotal">0,00 €</strong><small id="accountingPurchaseCount">0 achat</small></div>' +
+    '<div class="admin-kpi"><label>Résultat net</label><strong id="accountingNetResult">0,00 €</strong><small>Ventes - achats</small></div>' +
+    '</div>' +
     '<div class="admin-filters">' +
     '<input id="searchQ" placeholder="Recherche multicritères...">' +
     '<select id="filterLicense"><option value="">Toutes licences</option><option value="pokemon">Pokémon</option><option value="yugioh">Yu-Gi-Oh!</option><option value="onepiece">One Piece</option><option value="lorcana">Lorcana</option><option value="magic">Magic</option></select>' +
+    '<a class="btn btn-primary" href="admin-achats.html">+ Ajouter un achat</a>' +
     '<button class="btn btn-primary" type="button" id="expCsvSales">Export Excel (CSV)</button>' +
     '<button class="btn btn-secondary" type="button" id="expPdfSales">Export imprimable</button>' +
     '<button class="btn btn-secondary" type="button" id="expCsvPurch">Export achats CSV</button></div>' +
-    '<div class="admin-grid-2"><div class="admin-panel"><h2>Par licence</h2><ul id="statsLicense"></ul></div>' +
-    '<div class="admin-panel"><h2>Par vendeur</h2><ul id="statsSeller"></ul></div></div>' +
+    '<div class="admin-grid-2"><div class="admin-panel"><h2>Ventes par licence</h2><ul id="statsLicense"></ul></div>' +
+    '<div class="admin-panel"><h2>Ventes par vendeur</h2><ul id="statsSeller"></ul></div></div>' +
+    '<div class="admin-panel"><h2>Achats par catégorie</h2><ul id="statsPurchaseCategory"></ul></div>' +
     '<div class="admin-panel"><h2>Historique des ventes</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ID</th><th>Date</th><th>Client</th><th>Licence</th><th>Vendeur</th><th>Montant</th></tr></thead><tbody id="salesBody"></tbody></table></div></div>' +
-    '<div class="admin-panel"><h2>Historique des achats</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ID</th><th>Date</th><th>Vendeur</th><th>Licence</th><th>Montant</th><th>Statut</th></tr></thead><tbody id="purchasesBody"></tbody></table></div></div>');
+    '<div class="admin-panel"><h2>Historique des achats</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ID</th><th>Date</th><th>Vendeur</th><th>Description</th><th>Montant</th><th>Statut</th></tr></thead><tbody id="purchasesBody"></tbody></table></div></div>');
 
   A.qs("#searchQ").addEventListener("input", loadAll);
   A.qs("#filterLicense").addEventListener("change", loadAll);
