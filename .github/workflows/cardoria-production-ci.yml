@@ -39,6 +39,7 @@ jobs:
         run: |
           node --check server.js
           node --check routes/auth.js
+          node --check routes/admin.js
           node --check routes/marketplace-v1.js
           node --check routes/marketplace-paypal.js
           node --check routes/marketplace-admin.js
@@ -48,6 +49,7 @@ jobs:
           node --check lib/auth.js
           node --check lib/auth/migrate.js
           node --check lib/auth/magicLink.js
+          node --check lib/auth/users.js
           node --check lib/marketplace/migrate.js
           node --check lib/marketplace/orders.js
           node --check lib/marketplace/sellers.js
@@ -69,6 +71,9 @@ jobs:
           node --check ../js/marketplace-seller-dashboard.js
           node --check ../js/marketplace-my-listings.js
           node --check ../js/admin/admin-orders.js
+          node --check ../js/admin/admin-accounting.js
+          node --check ../js/admin/admin-marketplace.js
+          node --check ../js/admin/admin-users.js
       - name: Reject security regressions
         working-directory: .
         run: |
@@ -92,6 +97,10 @@ jobs:
             echo 'Legacy marketplace endpoint still used by frontend'
             exit 1
           fi
+          if grep -R -n 'CARDORIA59330' js/admin 2>/dev/null; then
+            echo 'Hardcoded admin credential detected in admin frontend'
+            exit 1
+          fi
       - name: Start backend
         run: |
           node server.js > /tmp/cardoria-backend.log 2>&1 &
@@ -112,7 +121,7 @@ jobs:
           grep -q '6.0.0' /tmp/cardoria-api.json
           curl --fail --silent 'http://127.0.0.1:10000/api/marketplace/v1/search?license=pokemon' > /tmp/cardoria-marketplace.json
           grep -q '"ok":true' /tmp/cardoria-marketplace.json
-      - name: Sensitive marketplace routes require authentication
+      - name: Sensitive marketplace and admin routes require authentication
         run: |
           code=$(curl -sS -o /tmp/gdpr.json -w "%{http_code}" -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:10000/api/gdpr/export)
           cat /tmp/gdpr.json
@@ -126,6 +135,15 @@ jobs:
           code=$(curl -sS -o /tmp/protected.json -w "%{http_code}" http://127.0.0.1:10000/api/health/full)
           cat /tmp/protected.json
           test "$code" = "401"
+          for path in \
+            /api/admin/dashboard \
+            /api/admin/users \
+            /api/admin/marketplace/orders \
+            /api/admin/accounting/export?format=csv\&type=sales; do
+            code=$(curl -sS -o /tmp/admin-protected.json -w "%{http_code}" "http://127.0.0.1:10000${path}")
+            cat /tmp/admin-protected.json
+            test "$code" = "401"
+          done
       - name: Security headers present
         run: |
           curl -sSI http://127.0.0.1:10000/ > /tmp/headers.txt
