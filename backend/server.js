@@ -16,6 +16,7 @@ import paymentsAdminRoutes from "./routes/payments-admin.js";
 import { seedEngineIfEmpty } from "./lib/engine/seed.js";
 import { initMarketplace } from "./lib/marketplace/index.js";
 import { initMarketplacePersistence, marketplacePersistenceMiddleware, flushMarketplacePersistence, closeMarketplacePersistence } from "./lib/marketplace/persistence.js";
+import { emptyPublicCatalogOnce } from "./lib/marketplace/empty-catalog.js";
 import { initAi } from "./lib/ai/index.js";
 import { initSeo } from "./lib/seo/index.js";
 import { initMarketData } from "./lib/market/index.js";
@@ -79,8 +80,21 @@ safeInit("ai", initAi);
 safeInit("engine-seed", seedEngineIfEmpty);
 safeInit("marketplace", initMarketplace);
 const marketplacePersistence = await initMarketplacePersistence();
-if (!marketplacePersistence.ok) { startup.ok = false; startup.degraded.push({ name: "marketplace-persistence", error: marketplacePersistence.error || "initialization_failed" }); }
-else if (marketplacePersistence.configured) console.log(`[startup] marketplace-persistence: ok (${marketplacePersistence.restored ? "restored" : "initialized"})`);
+if (!marketplacePersistence.ok) {
+  startup.ok = false;
+  startup.degraded.push({ name: "marketplace-persistence", error: marketplacePersistence.error || "initialization_failed" });
+} else if (marketplacePersistence.configured) {
+  console.log(`[startup] marketplace-persistence: ok (${marketplacePersistence.restored ? "restored" : "initialized"})`);
+  try {
+    const catalogCleanup = await emptyPublicCatalogOnce();
+    if (catalogCleanup.applied) console.log("[startup] catalog-cleanup: all existing marketplace articles removed");
+    else console.log("[startup] catalog-cleanup: already applied");
+  } catch (error) {
+    startup.ok = false;
+    startup.degraded.push({ name: "catalog-cleanup", error: error?.message || String(error) });
+    console.error("[startup] catalog-cleanup: degraded", error);
+  }
+}
 safeInit("market-data", initMarketData);
 safeInit("scanner", initScanner);
 safeInit("ai-enterprise", initAiEnterprise);
