@@ -36,6 +36,11 @@ function validEmail(value) { return /^\S+@\S+\.\S+$/.test(String(value || "").tr
 function cleanText(value, max = 240) { return String(value || "").trim().slice(0, max); }
 function normalizedBuyer(value) { const v = cleanText(value, 40).toLowerCase(); return BUYERS.includes(v) ? v : "non_attribue"; }
 function normalizedPurchaseType(value) { const v = cleanText(value, 40); return PURCHASE_TYPES.includes(v) ? v : "legacy"; }
+function purchaseUnitPrice(p = {}) {
+  const type = normalizedPurchaseType(p.purchaseType), packaging = cleanText(p.packaging, 80), amount = Number(p.amount || 0), quantity = Math.max(1, Number(p.quantity || 1));
+  if (type !== "pokemon_card" || !["carte_unite", "lot_cartes"].includes(packaging) || !Number.isFinite(amount) || amount < 0) return null;
+  return Math.round((amount / quantity) * 10000) / 10000;
+}
 
 function normalizePurchase(body = {}, existing = {}) {
   const amount = Number(String(body.amount ?? existing.amount ?? "").replace(",", "."));
@@ -52,7 +57,9 @@ function normalizePurchase(body = {}, existing = {}) {
   const purchaseType = body.purchaseType !== undefined ? normalizedPurchaseType(body.purchaseType) : normalizedPurchaseType(existing.purchaseType);
   const packagingRaw = cleanText(body.packaging ?? existing.packaging, 80);
   const packaging = PACKAGING_TYPES.includes(packagingRaw) ? packagingRaw : (purchaseType === "pokemon_card" ? "carte_unite" : "other");
-  return { ...existing, date, seller, description, buyer, purchaseType, packaging, category: cleanText(body.category ?? existing.category, 80) || "autre", license: cleanText(body.license ?? existing.license, 80), quantity, amount: Math.round(amount * 100) / 100, paymentMethod: cleanText(body.paymentMethod ?? existing.paymentMethod, 80), reference: cleanText(body.reference ?? existing.reference, 120), status, notes: cleanText(body.notes ?? existing.notes, 1000) };
+  const roundedAmount = Math.round(amount * 100) / 100;
+  const unitPrice = purchaseUnitPrice({ purchaseType, packaging, amount: roundedAmount, quantity });
+  return { ...existing, date, seller, description, buyer, purchaseType, packaging, category: cleanText(body.category ?? existing.category, 80) || "autre", license: cleanText(body.license ?? existing.license, 80), quantity, amount: roundedAmount, unitPrice, paymentMethod: cleanText(body.paymentMethod ?? existing.paymentMethod, 80), reference: cleanText(body.reference ?? existing.reference, 120), status, notes: cleanText(body.notes ?? existing.notes, 1000) };
 }
 
 function normalizeSealedReference(body = {}, existing = {}) {
@@ -75,7 +82,7 @@ router.get("/accounting/sales", (req, res) => {
 
 router.get("/accounting/purchases", (req,res)=>{
   const q=(req.query.q||"").toLowerCase(),license=cleanText(req.query.license,80),category=cleanText(req.query.category,80),buyer=cleanText(req.query.buyer,40).toLowerCase(),purchaseType=cleanText(req.query.purchaseType,40),packaging=cleanText(req.query.packaging,80); let purchases=readJson("purchases",DEFAULT_PURCHASES);
-  if(license)purchases=purchases.filter((p)=>p.license===license); if(category)purchases=purchases.filter((p)=>p.category===category); if(buyer)purchases=purchases.filter((p)=>normalizedBuyer(p.buyer)===buyer); if(purchaseType)purchases=purchases.filter((p)=>normalizedPurchaseType(p.purchaseType)===purchaseType); if(packaging)purchases=purchases.filter((p)=>(p.packaging||"")===packaging); if(q)purchases=purchases.filter((p)=>JSON.stringify(p).toLowerCase().includes(q)); purchases=purchases.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||String(b.createdAt||"").localeCompare(String(a.createdAt||""))); res.json({ok:true,purchases});
+  if(license)purchases=purchases.filter((p)=>p.license===license); if(category)purchases=purchases.filter((p)=>p.category===category); if(buyer)purchases=purchases.filter((p)=>normalizedBuyer(p.buyer)===buyer); if(purchaseType)purchases=purchases.filter((p)=>normalizedPurchaseType(p.purchaseType)===purchaseType); if(packaging)purchases=purchases.filter((p)=>(p.packaging||"")===packaging); if(q)purchases=purchases.filter((p)=>JSON.stringify(p).toLowerCase().includes(q)); purchases=purchases.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||String(b.createdAt||"").localeCompare(String(a.createdAt||""))).map((p)=>({ ...p, unitPrice: purchaseUnitPrice(p) })); res.json({ok:true,purchases});
 });
 
 router.post("/accounting/purchases",WRITE_ADMIN,(req,res)=>{try{const purchases=readJson("purchases",DEFAULT_PURCHASES),now=new Date().toISOString(),purchase=normalizePurchase(req.body||{},{id:`ach_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`,createdAt:now,updatedAt:now,createdBy:req.authUser?.email||"admin"}); purchases.unshift(purchase);writeJson("purchases",purchases);logAudit({type:"accounting",action:"purchase_create",user:req.authUser?.email||"admin",detail:`${purchase.id} — ${purchase.buyer} — ${purchase.seller} — ${purchase.amount} EUR`});res.status(201).json({ok:true,purchase});}catch(e){res.status(e.status||400).json({ok:false,error:e.message});}});
