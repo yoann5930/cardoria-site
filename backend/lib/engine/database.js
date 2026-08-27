@@ -124,12 +124,45 @@ function migrate(database) {
       FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS sealed_products (
+      id TEXT PRIMARY KEY,
+      cardmarket_id INTEGER UNIQUE,
+      source TEXT NOT NULL DEFAULT 'manual',
+      name TEXT NOT NULL,
+      name_normalized TEXT NOT NULL,
+      category_name TEXT DEFAULT '',
+      packaging TEXT NOT NULL DEFAULT 'other',
+      extension TEXT DEFAULT '',
+      id_expansion INTEGER,
+      units_per_package INTEGER NOT NULL DEFAULT 1,
+      ean TEXT DEFAULT '',
+      image_url TEXT DEFAULT '',
+      cardmarket_url TEXT DEFAULT '',
+      sale_price REAL NOT NULL DEFAULT 0,
+      sale_price_manual INTEGER NOT NULL DEFAULT 0,
+      market_price REAL NOT NULL DEFAULT 0,
+      market_low REAL NOT NULL DEFAULT 0,
+      market_avg REAL NOT NULL DEFAULT 0,
+      market_avg1 REAL NOT NULL DEFAULT 0,
+      market_avg7 REAL NOT NULL DEFAULT 0,
+      market_avg30 REAL NOT NULL DEFAULT 0,
+      price_source TEXT DEFAULT '',
+      market_updated_at TEXT DEFAULT '',
+      active INTEGER NOT NULL DEFAULT 1,
+      notes TEXT DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_cards_license ON cards(license_slug, active);
     CREATE INDEX IF NOT EXISTS idx_cards_slug ON cards(license_slug, slug);
     CREATE INDEX IF NOT EXISTS idx_cards_name ON cards(name_normalized);
     CREATE INDEX IF NOT EXISTS idx_price_sources_card ON price_sources(card_id);
     CREATE INDEX IF NOT EXISTS idx_sales_card ON sales_history(card_id, sold_at);
     CREATE INDEX IF NOT EXISTS idx_card_price_history_card ON card_price_history(card_id, captured_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_sealed_active_packaging ON sealed_products(active, packaging);
+    CREATE INDEX IF NOT EXISTS idx_sealed_name ON sealed_products(name_normalized);
+    CREATE INDEX IF NOT EXISTS idx_sealed_cardmarket ON sealed_products(cardmarket_id);
   `);
 
   ensureColumn(database, "cards", "hit_family", "TEXT DEFAULT ''");

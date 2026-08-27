@@ -75,12 +75,15 @@ router.post("/login", authRateLimit, (req, res) => {
   }
 });
 
-router.post("/email/request", authRateLimit, async (req, res) => {
+async function handleMagicLinkRequest(req, res) {
   const v = validateBody(SCHEMAS.passwordResetRequest, req.body);
   if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
   try { res.json(await requestMagicLogin(v.data.email)); }
   catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
-});
+}
+
+router.post("/email/request", authRateLimit, handleMagicLinkRequest);
+router.post("/request-magic-link", authRateLimit, handleMagicLinkRequest);
 
 router.post("/email/confirm", authRateLimit, (req, res) => {
   try {

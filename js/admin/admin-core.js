@@ -40,8 +40,7 @@
       label: "Catalogue & ventes",
       icon: "▣",
       items: [
-        { href: "admin-catalogue.html", label: "Référence cartes", page: "catalog" },
-        { href: "admin-references-scelles.html", label: "Référence produits scellés", page: "sealed-reference" },
+        { href: "admin-catalogue.html", label: "Catalogue de référence", page: "catalog" },
         { href: "admin-marketplace.html", label: "Marketplace", page: "marketplace" }
       ]
     },

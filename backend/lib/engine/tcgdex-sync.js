@@ -4,6 +4,7 @@ import { ensureDefaultLicenses } from "./licenses.js";
 const API = "https://api.tcgdex.net/v2/fr";
 const SOURCE = "tcgdex-fr";
 const MAX_PRICE_BATCH = 2000;
+const IMAGE_REPAIR_BATCH = 600;
 
 function imageUrl(base, quality) { if (!base) return ""; return `${String(base).replace(/\/$/, "")}/${quality}.webp`; }
 function setIdFromCardId(cardId) { const id = String(cardId || ""); const pos = id.lastIndexOf("-"); return pos > 0 ? id.slice(0, pos) : ""; }
@@ -78,7 +79,7 @@ export async function syncPokemonCatalog({ force = false } = {}) {
   if (!Array.isArray(cards) || cards.length < 1000) throw new Error("TCGdex: catalogue cartes incomplet");
   if (!Array.isArray(sets) || !sets.length) throw new Error("TCGdex: liste des extensions indisponible");
   const setMap = new Map(sets.map((set) => [String(set.id || ""), set])); const now = new Date().toISOString();
-  const upsert = db.prepare(`INSERT INTO cards (id,license_slug,slug,name,name_normalized,extension,extension_code,number,rarity,hit_family,variants_json,illustration,image_hd,image_thumb,condition_note,avg_price,low_price,high_price,recommended_price,market_trend,trend_percent,sales_count,views,meta_title,meta_description,active,created_at,updated_at) VALUES (@id,'pokemon',@slug,@name,@name_normalized,@extension,@extension_code,@number,'','','{}','',@image_hd,@image_thumb,'NM',0,0,0,0,'stable',0,0,0,@meta_title,@meta_description,1,@created_at,@updated_at) ON CONFLICT(id) DO UPDATE SET name=excluded.name,name_normalized=excluded.name_normalized,extension=excluded.extension,extension_code=excluded.extension_code,number=excluded.number,image_hd=excluded.image_hd,image_thumb=excluded.image_thumb,meta_title=excluded.meta_title,meta_description=excluded.meta_description,active=1,updated_at=excluded.updated_at`);
+  const upsert = db.prepare(`INSERT INTO cards (id,license_slug,slug,name,name_normalized,extension,extension_code,number,rarity,hit_family,variants_json,illustration,image_hd,image_thumb,condition_note,avg_price,low_price,high_price,recommended_price,market_trend,trend_percent,sales_count,views,meta_title,meta_description,active,created_at,updated_at) VALUES (@id,'pokemon',@slug,@name,@name_normalized,@extension,@extension_code,@number,'','','{}','',@image_hd,@image_thumb,'NM',0,0,0,0,'stable',0,0,0,@meta_title,@meta_description,1,@created_at,@updated_at) ON CONFLICT(id) DO UPDATE SET name=excluded.name,name_normalized=excluded.name_normalized,extension=excluded.extension,extension_code=excluded.extension_code,number=excluded.number,image_hd=CASE WHEN excluded.image_hd<>'' THEN excluded.image_hd ELSE cards.image_hd END,image_thumb=CASE WHEN excluded.image_thumb<>'' THEN excluded.image_thumb ELSE cards.image_thumb END,meta_title=excluded.meta_title,meta_description=excluded.meta_description,active=1,updated_at=excluded.updated_at`);
   let imported = 0, withoutImage = 0;
   db.transaction(() => {
     for (const raw of cards) {
@@ -109,34 +110,39 @@ export async function syncPokemonReferenceCatalog({ priceLimit = 120, skipRariti
 
   const requestedPriceLimit = Number(priceLimit);
   const safePriceLimit = Number.isFinite(requestedPriceLimit) ? Math.max(0, Math.min(requestedPriceLimit, MAX_PRICE_BATCH)) : 120;
-  const candidates = safePriceLimit > 0
-    ? db.prepare(`SELECT id,name FROM cards WHERE license_slug='pokemon' AND active=1
-        ORDER BY CASE WHEN recommended_price<=0 THEN 0 ELSE 1 END,
+  const missingImagesBefore = Number(db.prepare(`SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND active=1 AND (image_hd='' OR image_hd IS NULL OR image_thumb='' OR image_thumb IS NULL)`).get()?.c || 0);
+  const effectiveLimit = missingImagesBefore > 0 ? Math.max(safePriceLimit, IMAGE_REPAIR_BATCH) : safePriceLimit;
+  const candidates = effectiveLimit > 0
+    ? db.prepare(`SELECT id,name,image_hd,image_thumb FROM cards WHERE license_slug='pokemon' AND active=1
+        ORDER BY CASE WHEN image_hd='' OR image_hd IS NULL OR image_thumb='' OR image_thumb IS NULL THEN 0 ELSE 1 END,
+                 CASE WHEN recommended_price<=0 THEN 0 ELSE 1 END,
                  CASE WHEN market_checked_at='' OR market_checked_at IS NULL THEN 0 ELSE 1 END,
-                 market_checked_at ASC, updated_at ASC LIMIT ?`).all(safePriceLimit)
+                 market_checked_at ASC, updated_at ASC LIMIT ?`).all(effectiveLimit)
     : [];
-  const updateDetail = db.prepare(`UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,avg_price=?,low_price=?,high_price=?,recommended_price=?,market_avg1=?,market_avg7=?,market_avg30=?,market_source=?,market_updated_at=?,market_checked_at=?,market_trend=?,trend_percent=?,updated_at=? WHERE id=?`);
-  const updateWithoutPrice = db.prepare(`UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,market_checked_at=?,updated_at=? WHERE id=?`);
+  const updateDetail = db.prepare(`UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,image_hd=CASE WHEN ?<>'' THEN ? ELSE image_hd END,image_thumb=CASE WHEN ?<>'' THEN ? ELSE image_thumb END,avg_price=?,low_price=?,high_price=?,recommended_price=?,market_avg1=?,market_avg7=?,market_avg30=?,market_source=?,market_updated_at=?,market_checked_at=?,market_trend=?,trend_percent=?,updated_at=? WHERE id=?`);
+  const updateWithoutPrice = db.prepare(`UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,image_hd=CASE WHEN ?<>'' THEN ? ELSE image_hd END,image_thumb=CASE WHEN ?<>'' THEN ? ELSE image_thumb END,market_checked_at=?,updated_at=? WHERE id=?`);
   const markChecked = db.prepare("UPDATE cards SET market_checked_at=? WHERE id=?");
   const deleteSource = db.prepare("DELETE FROM price_sources WHERE card_id=? AND source='cardmarket'");
   const insertSource = db.prepare("INSERT INTO price_sources(card_id,source,price,currency,weight,fetched_at) VALUES (?,'cardmarket',?,'EUR',0.55,?)");
   const insertHistory = db.prepare(`INSERT OR IGNORE INTO card_price_history(card_id,source,current_price,avg_price,low_price,high_price,avg1,avg7,avg30,captured_at) VALUES (?,'cardmarket',?,?,?,?,?,?,?,?)`);
-  let detailed = 0, priced = 0, rising = 0, falling = 0, stable = 0, unavailable = 0;
+  let detailed = 0, priced = 0, rising = 0, falling = 0, stable = 0, unavailable = 0, imagesRepaired = 0;
   const concurrency = 10;
   for (let i = 0; i < candidates.length; i += concurrency) {
     const batch = candidates.slice(i, i + concurrency);
     const details = await Promise.all(batch.map(async (c) => { try { return await fetchJson(`/cards/${encodeURIComponent(c.id.replace(/^pokemon-/,""))}`); } catch { return null; } }));
     db.transaction(() => {
       details.forEach((raw, index) => {
-        const cardId = batch[index].id; const stampedAt = new Date().toISOString();
+        const candidate = batch[index]; const cardId = candidate.id; const stampedAt = new Date().toISOString();
         if (!raw) { markChecked.run(stampedAt, cardId); unavailable += 1; return; }
         const variants = raw.variants || {}; const rarity = String(raw.rarity || ""); const family = pokemonHitFamily(rarity, raw.name, variants); const price = cardmarketReference(raw.pricing, variants);
+        const baseImage = String(raw.image || ""); const imageHd = imageUrl(baseImage, "high"); const imageThumb = imageUrl(baseImage, "low");
+        if (baseImage && (!candidate.image_hd || !candidate.image_thumb)) imagesRepaired += 1;
         if (!price) {
-          updateWithoutPrice.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), stampedAt, stampedAt, cardId);
+          updateWithoutPrice.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), imageHd, imageHd, imageThumb, imageThumb, stampedAt, stampedAt, cardId);
           detailed += 1; unavailable += 1; return;
         }
         const direction = marketDirection(price.change7);
-        updateDetail.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), price.avg, price.low, price.high, price.recommended, price.avg1, price.avg7, price.avg30, "cardmarket", price.updated || stampedAt, stampedAt, direction, price.change7, stampedAt, cardId);
+        updateDetail.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), imageHd, imageHd, imageThumb, imageThumb, price.avg, price.low, price.high, price.recommended, price.avg1, price.avg7, price.avg30, "cardmarket", price.updated || stampedAt, stampedAt, direction, price.change7, stampedAt, cardId);
         deleteSource.run(cardId); insertSource.run(cardId, price.recommended, price.updated || stampedAt);
         insertHistory.run(cardId, price.recommended, price.avg, price.low, price.high, price.avg1, price.avg7, price.avg30, price.updated || stampedAt);
         priced += 1; detailed += 1;
@@ -145,7 +151,8 @@ export async function syncPokemonReferenceCatalog({ priceLimit = 120, skipRariti
     })();
   }
   try { db.exec("DELETE FROM cards_fts; INSERT INTO cards_fts(rowid,name,extension,number,rarity,license_slug) SELECT rowid,name,extension,number,rarity,license_slug FROM cards;"); } catch {}
-  return { ok: true, source: SOURCE, rarities: rarities.length, rarityUpdated, detailed, priced, unavailable, rising, falling, stable, priceLimit: candidates.length, maxPriceBatch: MAX_PRICE_BATCH, syncedAt: new Date().toISOString() };
+  const missingImagesAfter = Number(db.prepare(`SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND active=1 AND (image_hd='' OR image_hd IS NULL OR image_thumb='' OR image_thumb IS NULL)`).get()?.c || 0);
+  return { ok: true, source: SOURCE, rarities: rarities.length, rarityUpdated, detailed, priced, unavailable, rising, falling, stable, priceLimit: candidates.length, maxPriceBatch: MAX_PRICE_BATCH, imageRepairBatch: IMAGE_REPAIR_BATCH, imagesRepaired, missingImagesBefore, missingImagesAfter, syncedAt: new Date().toISOString() };
 }
 
 export function getMarketPriceStatus() {
@@ -155,11 +162,12 @@ export function getMarketPriceStatus() {
     SUM(CASE WHEN market_trend='up' THEN 1 ELSE 0 END) AS rising,
     SUM(CASE WHEN market_trend='down' THEN 1 ELSE 0 END) AS falling,
     SUM(CASE WHEN market_trend='stable' AND recommended_price>0 THEN 1 ELSE 0 END) AS stable,
+    SUM(CASE WHEN image_hd='' OR image_hd IS NULL OR image_thumb='' OR image_thumb IS NULL THEN 1 ELSE 0 END) AS missingImages,
     MAX(market_checked_at) AS lastCheckedAt, MAX(market_updated_at) AS lastMarketUpdate
     FROM cards WHERE license_slug='pokemon' AND active=1`).get();
   return {
     total: Number(totals?.total || 0), priced: Number(totals?.priced || 0), rising: Number(totals?.rising || 0),
-    falling: Number(totals?.falling || 0), stable: Number(totals?.stable || 0),
+    falling: Number(totals?.falling || 0), stable: Number(totals?.stable || 0), missingImages: Number(totals?.missingImages || 0),
     lastCheckedAt: totals?.lastCheckedAt || "", lastMarketUpdate: totals?.lastMarketUpdate || "", source: "Cardmarket via TCGdex"
   };
 }

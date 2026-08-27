@@ -10,8 +10,8 @@ const { Pool } = pg;
 const MARKET_TABLES = ["mk_sellers","mk_listings","mk_orders","mk_reviews","mk_favorites","mk_wishlist","mk_price_alerts","mk_cart_items","mk_invoices","mk_disputes"];
 const MARKET_CHILD_FIRST = [...MARKET_TABLES].reverse();
 const RUNTIME_TABLES = ["auth_users","auth_sessions","auth_reset_tokens","auth_magic_tokens","gdpr_consents","pay_transactions"];
-const ENGINE_TABLES = ["licenses","cards","price_sources","sales_history","card_price_history"];
-const ENGINE_CHILD_FIRST = ["card_price_history","sales_history","price_sources","cards","licenses"];
+const ENGINE_TABLES = ["licenses","cards","price_sources","sales_history","card_price_history","sealed_products"];
+const ENGINE_CHILD_FIRST = ["card_price_history","sales_history","price_sources","cards","sealed_products","licenses"];
 
 let pool = null;
 let initialized = false;
@@ -51,7 +51,7 @@ function runtimePayload() {
 function enginePayload() {
   const tables = {};
   for (const table of ENGINE_TABLES) { try { tables[table] = sqliteRows(table); } catch { tables[table] = []; } }
-  return { version: 2, tables, capturedAt: new Date().toISOString() };
+  return { version: 3, tables, capturedAt: new Date().toISOString() };
 }
 async function writeRows(client, table, rows) {
   for (const row of rows) {

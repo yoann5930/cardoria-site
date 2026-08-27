@@ -9,7 +9,17 @@ import { searchCards, getCardById, createCard, updateCard, deleteCard, getCatalo
 import { setPriceSources, addSaleRecord, estimatePrice } from "../lib/engine/pricing.js";
 import { syncPokemonCatalog, syncPokemonReferenceCatalog, getMarketPriceStatus, getCardPriceHistory } from "../lib/engine/tcgdex-sync.js";
 import { refreshVisibleCardPrices } from "../lib/engine/visible-prices.js";
+import {
+  SEALED_PACKAGING_TYPES,
+  listSealedProducts,
+  createSealedProduct,
+  updateSealedProduct,
+  deleteSealedProduct,
+  getSealedCatalogStatus,
+  syncCardmarketSealedCatalog
+} from "../lib/engine/sealed-products.js";
 import "../lib/engine/daily-market-sync.js";
+import "../lib/engine/sealed-catalog-schedule.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -29,6 +39,34 @@ router.get("/cards/:id/price-history", (req, res) => {
   const card = getCardById(req.params.id);
   if (!card) return res.status(404).json({ ok: false, error: "Carte introuvable" });
   res.json({ ok: true, cardId: req.params.id, history: getCardPriceHistory(req.params.id, req.query.limit) });
+});
+
+router.get("/sealed", (req, res) => {
+  const references = listSealedProducts({ q: req.query.q || "", packaging: req.query.packaging || "", limit: req.query.limit || 10000 });
+  res.json({ ok: true, references, packagingTypes: SEALED_PACKAGING_TYPES, status: getSealedCatalogStatus() });
+});
+router.get("/sealed/status", (req, res) => res.json({ ok: true, ...getSealedCatalogStatus() }));
+router.post("/sealed/sync", async (req, res) => {
+  try {
+    const result = await syncCardmarketSealedCatalog({ force: Boolean(req.body?.force) });
+    logAudit({ type: "engine", action: "sealed_catalog_sync", user: req.authUser?.email || "admin", detail: `${result.products || result.active || 0} scelles · ${result.priced || 0} prix` });
+    res.json({ ok: true, ...result, status: getSealedCatalogStatus() });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message || "Synchronisation des produits scelles impossible" });
+  }
+});
+router.post("/sealed", (req, res) => {
+  try { const reference = createSealedProduct(req.body || {}); logAudit({ type: "engine", action: "sealed_create", user: req.authUser?.email || "admin", detail: reference.id }); res.status(201).json({ ok: true, reference }); }
+  catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message }); }
+});
+router.put("/sealed/:id", (req, res) => {
+  try { const reference = updateSealedProduct(req.params.id, req.body || {}); if (!reference) return res.status(404).json({ ok: false, error: "Reference scellee introuvable" }); logAudit({ type: "engine", action: "sealed_update", user: req.authUser?.email || "admin", detail: reference.id }); res.json({ ok: true, reference }); }
+  catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message }); }
+});
+router.delete("/sealed/:id", (req, res) => {
+  if (!deleteSealedProduct(req.params.id)) return res.status(404).json({ ok: false, error: "Reference scellee introuvable" });
+  logAudit({ type: "engine", action: "sealed_delete", user: req.authUser?.email || "admin", detail: req.params.id });
+  res.json({ ok: true, deletedId: req.params.id });
 });
 
 router.post("/licenses", (req, res) => {

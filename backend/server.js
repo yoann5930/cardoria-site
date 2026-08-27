@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import estimationRoutes from "./routes/estimation.js";
 import adminRoutes from "./routes/admin.js";
+import emailAdminRoutes from "./routes/email-admin.js";
 import developmentRoutes from "./routes/development.js";
 import analyticsRoutes from "./routes/analytics.js";
 import engineRoutes from "./routes/engine.js";
@@ -161,6 +162,7 @@ app.use("/api/seo", apiRateLimit, seoRoutes);
 
 app.use("/api/estimation-carte", (req, res, next) => { if (req.method === "POST") return aiRateLimit(req, res, next); next(); }, estimationRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin/email", emailAdminRoutes);
 app.use("/api/admin/development", developmentRoutes);
 app.use("/api/admin/engine", enginePersistenceMiddleware, engineAdminRoutes);
 app.use("/api/admin/marketplace", marketplacePersistenceMiddleware, marketplaceAdminRoutes);

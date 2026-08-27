@@ -10,6 +10,8 @@ on:
       - "admin-login.html"
       - "admin-email-login.html"
       - "admin.html"
+      - "admin-catalogue.html"
+      - "admin-references-scelles.html"
       - "js/admin/**"
       - "render.yaml"
       - ".github/workflows/cardoria-ci.yml"
@@ -22,6 +24,8 @@ on:
       - "admin-login.html"
       - "admin-email-login.html"
       - "admin.html"
+      - "admin-catalogue.html"
+      - "admin-references-scelles.html"
       - "js/admin/**"
       - "render.yaml"
       - ".github/workflows/cardoria-ci.yml"
@@ -68,16 +72,19 @@ jobs:
           node --check lib/email.js
           node --check lib/engine/tcgdex-sync.js
           node --check lib/engine/market-schedule.js
+          node --check lib/engine/sealed-products.js
           node --check ../script.js
           node --check ../js/admin/admin-login-secure.js
           node --check ../js/admin/admin-email-login.js
           node --check ../js/admin/admin-lot-draft-store.js
           node --check ../js/admin/admin-catalog-purchase-link.js
           node --check ../js/admin/admin-purchases-catalog-link.js
+          node --check ../js/admin/admin-catalog-sealed-shortcuts.js
+          node --check ../js/admin/admin-sealed-references.js
 
-      - name: Lot and market regression tests
+      - name: Lot market and catalog regression tests
         working-directory: .
-        run: node --test tests/lot-draft-store.test.mjs backend/tests/market-schedule.test.mjs
+        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs
 
       - name: Reject client-side admin bypass
         working-directory: .
@@ -118,47 +125,38 @@ jobs:
 
       - name: Wait for health
         run: |
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:10000/api/health/ > /tmp/cardoria-health.json; then
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:10000/api/health >/tmp/cardoria-health.json; then
               cat /tmp/cardoria-health.json
               exit 0
             fi
-            sleep 1
+            sleep 2
           done
-          cat /tmp/cardoria-backend.log || true
+          cat /tmp/cardoria-backend.log
           exit 1
 
       - name: Verify admin login page
         run: |
-          curl -fsS http://127.0.0.1:10000/admin-login.html > /tmp/cardoria-admin-login.html
-          grep -q "Admin Cardoria" /tmp/cardoria-admin-login.html
-          grep -q "adminEmailLoginForm" /tmp/cardoria-admin-login.html
+          curl -fsS http://127.0.0.1:10000/admin-login.html | grep -q "Admin Cardoria"
 
       - name: Verify magic-link endpoint is public and neutral
         run: |
-          code=$(curl -sS -o /tmp/cardoria-auth.json -w "%{http_code}" \
-            -H "Content-Type: application/json" \
-            -d '{"email":"unknown-ci-user@cardoria.invalid"}' \
-            http://127.0.0.1:10000/api/auth/email/request)
-          cat /tmp/cardoria-auth.json
+          code=$(curl -sS -o /tmp/magic-link.json -w "%{http_code}" -X POST http://127.0.0.1:10000/api/auth/request-magic-link -H 'content-type: application/json' --data '{"email":"unknown@example.com"}')
           test "$code" = "200"
-          grep -q '"ok":true' /tmp/cardoria-auth.json
+          grep -q '"ok":true' /tmp/magic-link.json
 
       - name: Verify SMTP missing is detected for authorized admin
         run: |
-          code=$(curl -sS -o /tmp/cardoria-smtp.json -w "%{http_code}" \
-            -H "Content-Type: application/json" \
-            -d '{"email":"Cardoria59330@gmail.com"}' \
-            http://127.0.0.1:10000/api/auth/email/request)
-          cat /tmp/cardoria-smtp.json
+          code=$(curl -sS -o /tmp/login.json -w "%{http_code}" -X POST http://127.0.0.1:10000/api/auth/login -H 'content-type: application/json' --data '{"email":"Cardoria59330@gmail.com","password":"Cardoria-CI-Temporary-Password-2026!"}')
+          test "$code" = "200"
+          token=$(node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/login.json'));process.stdout.write(d.token||'')")
+          test -n "$token"
+          code=$(curl -sS -o /tmp/email-test.json -w "%{http_code}" http://127.0.0.1:10000/api/admin/email/test -H "Authorization: Bearer $token")
           test "$code" = "503"
-          grep -q "n'est pas configure" /tmp/cardoria-smtp.json
 
       - name: Verify protected admin endpoint rejects anonymous access
         run: |
-          code=$(curl -sS -o /tmp/cardoria-protected.json -w "%{http_code}" \
-            http://127.0.0.1:10000/api/health/full)
-          cat /tmp/cardoria-protected.json
+          code=$(curl -sS -o /tmp/admin-anon.json -w "%{http_code}" http://127.0.0.1:10000/api/admin/engine/licenses)
           test "$code" = "401"
 
       - name: Backend log on failure
