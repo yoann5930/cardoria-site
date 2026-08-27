@@ -1,6 +1,8 @@
 import { getDb, normalizeText } from "./database.js";
 
 const API = "https://api.tcgdex.net/v2/fr";
+const VISIBLE_LIMIT = 100;
+const RETRY_MISSING_AFTER_MS = 6 * 60 * 60 * 1000;
 
 function round2(n) { return Math.round(Number(n || 0) * 100) / 100; }
 function percent(current, base) {
@@ -8,6 +10,12 @@ function percent(current, base) {
   return c > 0 && b > 0 ? round2(((c - b) / b) * 100) : 0;
 }
 function marketDirection(change) { return change > 2 ? "up" : change < -2 ? "down" : "stable"; }
+function shouldRetryMissing(row) {
+  if (Number(row?.recommended_price || 0) > 0) return false;
+  if (!row?.market_checked_at) return true;
+  const checkedAt = Date.parse(row.market_checked_at);
+  return !Number.isFinite(checkedAt) || (Date.now() - checkedAt) >= RETRY_MISSING_AFTER_MS;
+}
 
 async function fetchJson(path) {
   const controller = new AbortController();
@@ -53,19 +61,21 @@ function cardmarketReference(pricing, variants = {}) {
 }
 
 export async function refreshVisibleCardPrices(ids = []) {
-  const cleanIds = [...new Set((ids || []).map(String).filter((id) => /^pokemon-[a-zA-Z0-9_-]+$/.test(id)))].slice(0, 40);
-  if (!cleanIds.length) return { ok: true, checked: 0, priced: 0 };
+  const cleanIds = [...new Set((ids || []).map(String).filter((id) => /^pokemon-[a-zA-Z0-9_.-]+$/.test(id)))].slice(0, VISIBLE_LIMIT);
+  if (!cleanIds.length) return { ok: true, requested: 0, checked: 0, priced: 0, unavailable: 0 };
 
   const db = getDb();
   const select = db.prepare("SELECT id,market_checked_at,recommended_price FROM cards WHERE id=? AND license_slug='pokemon' AND active=1");
   const update = db.prepare(`UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,avg_price=?,low_price=?,high_price=?,recommended_price=?,market_avg1=?,market_avg7=?,market_avg30=?,market_source=?,market_updated_at=?,market_checked_at=?,market_trend=?,trend_percent=?,updated_at=? WHERE id=?`);
+  const updateWithoutPrice = db.prepare(`UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,market_checked_at=?,updated_at=? WHERE id=?`);
   const markChecked = db.prepare("UPDATE cards SET market_checked_at=? WHERE id=?");
   const deleteSource = db.prepare("DELETE FROM price_sources WHERE card_id=? AND source='cardmarket'");
   const insertSource = db.prepare("INSERT INTO price_sources(card_id,source,price,currency,weight,fetched_at) VALUES (?,'cardmarket',?,'EUR',0.55,?)");
   const insertHistory = db.prepare(`INSERT OR IGNORE INTO card_price_history(card_id,source,current_price,avg_price,low_price,high_price,avg1,avg7,avg30,captured_at) VALUES (?,'cardmarket',?,?,?,?,?,?,?,?)`);
 
-  const candidates = cleanIds.map((id) => select.get(id)).filter(Boolean).filter((row) => Number(row.recommended_price || 0) <= 0 && !row.market_checked_at);
-  let checked = 0, priced = 0;
+  const rows = cleanIds.map((id) => select.get(id)).filter(Boolean);
+  const candidates = rows.filter(shouldRetryMissing);
+  let checked = 0, priced = 0, unavailable = 0;
 
   for (let i = 0; i < candidates.length; i += 8) {
     const batch = candidates.slice(i, i + 8);
@@ -79,13 +89,18 @@ export async function refreshVisibleCardPrices(ids = []) {
         const cardId = batch[index].id;
         const stampedAt = new Date().toISOString();
         checked += 1;
-        if (!raw) { markChecked.run(stampedAt, cardId); return; }
+        if (!raw) {
+          markChecked.run(stampedAt, cardId);
+          unavailable += 1;
+          return;
+        }
         const variants = raw.variants || {};
         const rarity = String(raw.rarity || "");
         const family = hitFamily(rarity, raw.name, variants);
         const price = cardmarketReference(raw.pricing, variants);
         if (!price) {
-          update.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), 0, 0, 0, 0, 0, 0, 0, "", "", stampedAt, "stable", 0, stampedAt, cardId);
+          updateWithoutPrice.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), stampedAt, stampedAt, cardId);
+          unavailable += 1;
           return;
         }
         const change7 = percent(price.current, price.avg7);
@@ -99,5 +114,5 @@ export async function refreshVisibleCardPrices(ids = []) {
     })();
   }
 
-  return { ok: true, checked, priced };
+  return { ok: true, requested: rows.length, checked, priced, unavailable };
 }
