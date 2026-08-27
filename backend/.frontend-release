@@ -1,2 +1,2 @@
-cardoria-frontend-release=2026-08-28-audit-cleanup-1
-Includes: cleaned header branding, premium home refresh, analytics normalization, sealed catalog upsert fix.
+cardoria-frontend-release=2026-08-28-purchase-stock-1
+Includes: admin stock now derives from paid Pokemon purchases, existing purchases are backfilled dynamically, lot/catalog references are resolved when available.
