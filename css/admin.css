@@ -5,9 +5,20 @@
 .admin-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px;padding:0 8px}
 .admin-brand img{width:48px;border-radius:8px}
 .admin-brand span{font-weight:900;letter-spacing:.08em;color:#ffe18a;font-size:14px}
-.admin-nav{display:flex;flex-direction:column;gap:4px}
-.admin-nav a{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;font-size:14px;font-weight:700;color:#baaf97;transition:background .2s,color .2s}
-.admin-nav a:hover,.admin-nav a.active{background:rgba(212,175,55,.12);color:#ffe18a}
+.admin-nav{display:flex;flex-direction:column;gap:8px}
+.admin-nav-group{border:1px solid rgba(212,175,55,.14);border-radius:14px;background:rgba(255,255,255,.018);overflow:hidden}
+.admin-nav-group-btn{width:100%;display:grid;grid-template-columns:24px 1fr 18px;align-items:center;gap:8px;padding:12px 13px;border:0;background:transparent;color:#d3c7ad;text-align:left;font:inherit;font-size:13px;font-weight:900;cursor:pointer}
+.admin-nav-group-btn:hover,.admin-nav-group.is-open>.admin-nav-group-btn{background:rgba(212,175,55,.1);color:#ffe18a}
+.admin-nav-group-icon{display:flex;align-items:center;justify-content:center;color:#d4af37;font-size:14px}
+.admin-nav-group-label{min-width:0}
+.admin-nav-chevron{justify-self:end;font-size:20px;line-height:1;transition:transform .2s ease}
+.admin-nav-group.is-open .admin-nav-chevron{transform:rotate(90deg)}
+.admin-subnav{display:none;padding:4px 8px 9px 34px;border-top:1px solid rgba(212,175,55,.08)}
+.admin-nav-group.is-open .admin-subnav{display:flex;flex-direction:column;gap:2px}
+.admin-nav a,.admin-subnav-link{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:10px;font-size:13px;font-weight:700;color:#9f9787;transition:background .2s,color .2s}
+.admin-nav a:hover,.admin-nav a.active,.admin-subnav-link:hover,.admin-subnav-link.active{background:rgba(212,175,55,.12);color:#ffe18a}
+.admin-subnav-dot{color:rgba(212,175,55,.55);font-size:12px}
+.admin-subnav-link.active .admin-subnav-dot{color:#ffe18a}
 .admin-nav-section{margin:18px 0 8px;padding:0 14px;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:rgba(212,175,55,.5)}
 .admin-main{padding:28px 32px 48px;overflow-x:hidden}
 .admin-topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:28px;flex-wrap:wrap}
