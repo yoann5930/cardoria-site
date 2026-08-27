@@ -14,15 +14,21 @@
       }).join("");
       A.qs("#licSelect").innerHTML = opts;
       A.qs("#cardLicense").innerHTML = opts;
+      var pokemon = licenses.find(function (l) { return l.slug === "pokemon"; });
+      var count = A.qs("#pokemonCount");
+      if (count) count.textContent = pokemon ? String(pokemon.cardCount || 0) + " cartes Pokémon" : "0 carte Pokémon";
     });
   }
 
-  function renderCards(cards) {
+  function renderCards(cards, pagination) {
     A.qs("#catalogBody").innerHTML = (cards || []).map(function (c) {
       return "<tr><td>" + c.name + "</td><td>" + c.license + "</td><td>" + c.extension + "</td><td>" + c.number + "</td><td>" + A.euro(c.prices.recommended) + "</td><td>" +
         '<button type="button" class="btn btn-secondary" data-edit="' + c.id + '">Modifier</button> ' +
         '<button type="button" class="btn btn-secondary" data-del="' + c.id + '">Supprimer</button></td></tr>";
     }).join("") || "<tr><td colspan='6'>Aucune carte</td></tr>";
+
+    var total = A.qs("#catalogTotal");
+    if (total) total.textContent = pagination ? String(pagination.total || 0) + " fiche(s) dans la base" : "";
 
     A.qs("#catalogBody").querySelectorAll("[data-edit]").forEach(function (btn) {
       btn.onclick = function () { editCard(btn.dataset.edit); };
@@ -39,7 +45,26 @@
   function loadCatalog() {
     var q = A.qs("#catSearch").value;
     A.adminFetch("/api/admin/engine/cards?q=" + encodeURIComponent(q) + "&limit=100").then(function (d) {
-      if (d.ok) renderCards(d.cards);
+      if (d.ok) renderCards(d.cards, d.pagination);
+    });
+  }
+
+  function syncPokemon() {
+    var button = A.qs("#syncPokemon");
+    var status = A.qs("#syncPokemonStatus");
+    if (button) button.disabled = true;
+    if (status) status.textContent = "Synchronisation des cartes Pokémon en cours…";
+    A.adminFetch("/api/admin/engine/sync/pokemon", { method: "POST", body: "{}" }).then(function (d) {
+      if (!d.ok) {
+        if (status) status.textContent = d.error || "Synchronisation impossible.";
+        return;
+      }
+      if (status) status.textContent = (d.count || d.imported || 0) + " cartes Pokémon synchronisées depuis TCGdex FR.";
+      return loadLicenses().then(loadCatalog);
+    }).catch(function () {
+      if (status) status.textContent = "Synchronisation impossible.";
+    }).finally(function () {
+      if (button) button.disabled = false;
     });
   }
 
@@ -90,7 +115,7 @@
     var req = selectedId
       ? A.adminFetch("/api/admin/engine/cards/" + selectedId, { method: "PUT", body: JSON.stringify(body) })
       : A.adminFetch("/api/admin/engine/cards", { method: "POST", body: JSON.stringify(body) });
-    req.then(function () { resetForm(); loadCatalog(); });
+    req.then(function () { resetForm(); loadLicenses(); loadCatalog(); });
   }
 
   function addLicense() {
@@ -104,7 +129,11 @@
     }).then(function () { loadLicenses(); A.qs("#licSlug").value = ""; A.qs("#licName").value = ""; });
   }
 
-  A.renderShell("catalog", "Moteur Cardoria", "Catalogue centralisé, licences et gestion des fiches",
+  A.renderShell("catalog", "Base de cartes", "Référentiel central des cartes, licences, extensions et images",
+    '<div class="admin-panel"><div class="admin-filters" style="align-items:center">' +
+    '<button class="btn btn-primary" type="button" id="syncPokemon">Synchroniser Pokémon</button>' +
+    '<strong id="pokemonCount">0 carte Pokémon</strong>' +
+    '<span id="syncPokemonStatus" style="color:#baaf97;font-size:13px">Source : TCGdex français</span></div></div>' +
     '<div class="admin-grid-2">' +
     '<div class="admin-panel"><h2 id="formTitle">Ajouter une carte</h2>' +
     '<div class="admin-filters" style="flex-direction:column;align-items:stretch">' +
@@ -128,7 +157,7 @@
     '<select id="licSelect" disabled style="opacity:.7"><option>Licences existantes</option></select>' +
     '<button class="btn btn-primary" type="button" id="addLicense">Ajouter la licence</button></div></div></div>' +
     '<div class="admin-panel"><div class="admin-filters"><input id="catSearch" placeholder="Rechercher…" oninput="loadCatalogAdmin()">' +
-    '<button class="btn btn-secondary" type="button" id="reloadCat">Actualiser</button></div>' +
+    '<button class="btn btn-secondary" type="button" id="reloadCat">Actualiser</button><span id="catalogTotal" style="color:#baaf97;font-size:13px"></span></div>' +
     '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Nom</th><th>Licence</th><th>Extension</th><th>N°</th><th>Prix</th><th>Actions</th></tr></thead><tbody id="catalogBody"></tbody></table></div></div>');
 
   window.loadCatalogAdmin = loadCatalog;
@@ -136,6 +165,7 @@
   A.qs("#resetCard").onclick = resetForm;
   A.qs("#addLicense").onclick = addLicense;
   A.qs("#reloadCat").onclick = loadCatalog;
+  A.qs("#syncPokemon").onclick = syncPokemon;
 
   loadLicenses().then(loadCatalog);
 })();
