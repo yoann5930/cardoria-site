@@ -24,7 +24,7 @@
     A.qs("#catalogBody").innerHTML = (cards || []).map(function (c) {
       return "<tr><td>" + c.name + "</td><td>" + c.license + "</td><td>" + c.extension + "</td><td>" + c.number + "</td><td>" + A.euro(c.prices.recommended) + "</td><td>" +
         '<button type="button" class="btn btn-secondary" data-edit="' + c.id + '">Modifier</button> ' +
-        '<button type="button" class="btn btn-secondary" data-del="' + c.id + '">Supprimer</button></td></tr>";
+        '<button type="button" class="btn btn-secondary" data-del="' + c.id + '">Supprimer</button></td></tr>';
     }).join("") || "<tr><td colspan='6'>Aucune carte</td></tr>";
 
     var total = A.qs("#catalogTotal");
