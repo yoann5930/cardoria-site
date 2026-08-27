@@ -72,6 +72,7 @@ jobs:
           node --check lib/email.js
           node --check lib/engine/tcgdex-sync.js
           node --check lib/engine/market-schedule.js
+          node --check lib/engine/sealed-products.js
           node --check ../script.js
           node --check ../js/admin/admin-login-secure.js
           node --check ../js/admin/admin-email-login.js
