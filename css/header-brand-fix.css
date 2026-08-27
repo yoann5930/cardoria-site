@@ -1,4 +1,4 @@
-/* Cardoria header emblem — rendered directly as a real image, no pseudo-element. */
+/* Cardoria header emblem — force the dedicated SVG even if legacy HTML still references the wide PNG. */
 .header .brand {
   display: inline-flex;
   align-items: center;
@@ -9,6 +9,7 @@
 
 .header .brand > img {
   display: block !important;
+  content: url('/assets/logo/cardoria-header-mark.svg?v=3') !important;
   flex: 0 0 58px;
   width: 58px !important;
   height: 58px !important;
