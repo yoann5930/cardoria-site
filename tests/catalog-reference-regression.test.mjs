@@ -34,19 +34,25 @@ test('sealed products live directly inside the reference catalog', () => {
   assert.match(legacySealedPage, /admin-catalogue\.html#scelles/);
 });
 
-test('sealed catalog has a real persistent database and public market sync', () => {
+test('sealed catalog has a real persistent database, product images and market prices', () => {
   assert.match(engineDb, /CREATE TABLE IF NOT EXISTS sealed_products/);
   assert.match(sealedEngine, /CREATE TABLE IF NOT EXISTS sealed_products/);
-  assert.match(sealedEngine, /cardmarket_id INTEGER UNIQUE/);
+  assert.match(sealedEngine, /tcgplayer_id/);
+  assert.match(sealedEngine, /image_url/);
   assert.match(sealedEngine, /sale_price REAL/);
   assert.match(sealedEngine, /market_price REAL/);
-  assert.match(sealedEngine, /products_nonsingles_6\.json/);
-  assert.match(sealedEngine, /price_guide_6\.json/);
-  assert.match(sealedEngine, /syncCardmarketSealedCatalog/);
+  assert.match(sealedEngine, /https:\/\/tcgcsv\.com\/tcgplayer/);
+  assert.match(sealedEngine, /\/groups/);
+  assert.match(sealedEngine, /\/products/);
+  assert.match(sealedEngine, /\/prices/);
+  assert.match(sealedEngine, /api\.frankfurter\.dev\/v2\/rate\/USD\/EUR/);
+  assert.match(sealedEngine, /product\.imageUrl/);
+  assert.match(sealedEngine, /marketPrice/);
   assert.match(engineAdmin, /router\.get\("\/sealed"/);
   assert.match(engineAdmin, /router\.post\("\/sealed\/sync"/);
   assert.match(integratedSealed, /Synchroniser les scellés/);
   assert.match(integratedSealed, /autoSyncTried/);
+  assert.match(integratedSealed, /x\.imageUrl/);
 });
 
 test('sealed data and manual selling prices survive restarts', () => {
