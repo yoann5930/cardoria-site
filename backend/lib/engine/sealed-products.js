@@ -322,7 +322,7 @@ export async function syncCardmarketSealedCatalog({ force = false } = {}) {
     price_source,market_updated_at,active,notes,created_at,updated_at
   ) VALUES (@id,@tcgplayer_id,@tcgplayer_group_id,'tcgcsv',@name,@name_normalized,'Sealed Products',@packaging,@extension,@units_per_package,@image_url,@product_url,
     @sale_price,0,@market_price,@market_price_usd,@market_low,@market_avg,0,0,0,@fx_usd_eur,'EUR',@price_source,@market_updated_at,1,'',@created_at,@updated_at)
-  ON CONFLICT(tcgplayer_id) DO UPDATE SET
+  ON CONFLICT(tcgplayer_id) WHERE tcgplayer_id IS NOT NULL DO UPDATE SET
     source='tcgcsv',tcgplayer_group_id=excluded.tcgplayer_group_id,name=excluded.name,name_normalized=excluded.name_normalized,category_name='Sealed Products',
     packaging=excluded.packaging,extension=excluded.extension,units_per_package=excluded.units_per_package,
     image_url=CASE WHEN excluded.image_url<>'' THEN excluded.image_url ELSE sealed_products.image_url END,
