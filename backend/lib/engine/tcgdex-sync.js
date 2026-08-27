@@ -79,7 +79,11 @@ export async function syncPokemonReferenceCatalog({ priceLimit = 120 } = {}) {
     }
   })();
 
-  const candidates = db.prepare("SELECT id,name FROM cards WHERE license_slug='pokemon' AND active=1 AND (hit_family<>'' OR rarity LIKE '%Rare%') ORDER BY CASE WHEN recommended_price=0 THEN 0 ELSE 1 END, updated_at ASC LIMIT ?").all(Math.max(0, Math.min(Number(priceLimit)||120, 500)));
+  const requestedPriceLimit = Number(priceLimit);
+  const safePriceLimit = Number.isFinite(requestedPriceLimit) ? Math.max(0, Math.min(requestedPriceLimit, 500)) : 120;
+  const candidates = safePriceLimit > 0
+    ? db.prepare("SELECT id,name FROM cards WHERE license_slug='pokemon' AND active=1 AND (hit_family<>'' OR rarity LIKE '%Rare%') ORDER BY CASE WHEN recommended_price=0 THEN 0 ELSE 1 END, updated_at ASC LIMIT ?").all(safePriceLimit)
+    : [];
   const updateDetail = db.prepare("UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,avg_price=?,low_price=?,high_price=?,recommended_price=?,updated_at=? WHERE id=?");
   const deleteSource = db.prepare("DELETE FROM price_sources WHERE card_id=? AND source='cardmarket'");
   const insertSource = db.prepare("INSERT INTO price_sources(card_id,source,price,currency,weight,fetched_at) VALUES (?,'cardmarket',?,'EUR',0.55,?)");
