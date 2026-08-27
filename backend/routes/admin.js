@@ -41,6 +41,15 @@ function purchaseUnitPrice(p = {}) {
   if (type !== "pokemon_card" || !["carte_unite", "lot_cartes"].includes(packaging) || !Number.isFinite(amount) || amount < 0) return null;
   return Math.round((amount / quantity) * 10000) / 10000;
 }
+function extractLotCards(notes = "") {
+  const match = String(notes || "").match(/\[LOT_CARDS\]\s*(\[[^\n\r]*\])/);
+  if (!match) return null;
+  try {
+    const ids = JSON.parse(match[1]);
+    if (!Array.isArray(ids)) return null;
+    return ids.map((id) => cleanText(id, 120)).filter(Boolean);
+  } catch { return null; }
+}
 
 function normalizePurchase(body = {}, existing = {}) {
   const amount = Number(String(body.amount ?? existing.amount ?? "").replace(",", "."));
@@ -57,9 +66,15 @@ function normalizePurchase(body = {}, existing = {}) {
   const purchaseType = body.purchaseType !== undefined ? normalizedPurchaseType(body.purchaseType) : normalizedPurchaseType(existing.purchaseType);
   const packagingRaw = cleanText(body.packaging ?? existing.packaging, 80);
   const packaging = PACKAGING_TYPES.includes(packagingRaw) ? packagingRaw : (purchaseType === "pokemon_card" ? "carte_unite" : "other");
+  const notes = cleanText(body.notes ?? existing.notes, 10000);
+  const lotCards = packaging === "lot_cartes" && purchaseType === "pokemon_card" ? extractLotCards(notes) : null;
+  if (packaging === "lot_cartes" && purchaseType === "pokemon_card") {
+    if (!lotCards) throw Object.assign(new Error(`Ajoute exactement ${quantity} carte(s) au lot avant de valider l'achat.`), { status: 400 });
+    if (lotCards.length !== quantity) throw Object.assign(new Error(`Lot invalide : ${quantity} carte(s) attendue(s), ${lotCards.length} ajoutée(s).`), { status: 400 });
+  }
   const roundedAmount = Math.round(amount * 100) / 100;
   const unitPrice = purchaseUnitPrice({ purchaseType, packaging, amount: roundedAmount, quantity });
-  return { ...existing, date, seller, description, buyer, purchaseType, packaging, category: cleanText(body.category ?? existing.category, 80) || "autre", license: cleanText(body.license ?? existing.license, 80), quantity, amount: roundedAmount, unitPrice, paymentMethod: cleanText(body.paymentMethod ?? existing.paymentMethod, 80), reference: cleanText(body.reference ?? existing.reference, 120), status, notes: cleanText(body.notes ?? existing.notes, 1000) };
+  return { ...existing, date, seller, description, buyer, purchaseType, packaging, category: cleanText(body.category ?? existing.category, 80) || "autre", license: cleanText(body.license ?? existing.license, 80), quantity, amount: roundedAmount, unitPrice, lotCards: lotCards || [], paymentMethod: cleanText(body.paymentMethod ?? existing.paymentMethod, 80), reference: cleanText(body.reference ?? existing.reference, 120), status, notes };
 }
 
 function normalizeSealedReference(body = {}, existing = {}) {
