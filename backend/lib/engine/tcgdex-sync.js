@@ -17,8 +17,8 @@ async function fetchJson(path) {
 
 export function pokemonHitFamily(rarity, name = "", variants = {}) {
   const r = normalizeText(rarity); const n = normalizeText(name);
-  if (r.includes("hyper") || r.includes("gold") || r.includes("doree") || r.includes("dorée")) return "Gold";
-  if (r.includes("special illustration") || r.includes("illustration speciale") || r.includes("illustration spéciale") || r.includes("sar")) return "SAR / Special Illustration Rare";
+  if (r.includes("hyper") || r.includes("gold") || r.includes("doree")) return "Gold";
+  if (r.includes("special illustration") || r.includes("illustration speciale") || r.includes("sar")) return "SAR / Special Illustration Rare";
   if (r.includes("illustration rare") || r === "rare illustration" || r.includes("art rare") || r === "ar") return "AR / Illustration Rare";
   if (r.includes("secret")) return "Secret / Hyper Rare";
   if (r.includes("ultra rare")) return "Full Art / Ultra Rare";
@@ -70,12 +70,12 @@ export async function syncPokemonCatalog({ force = false } = {}) {
 export async function syncPokemonReferenceCatalog({ priceLimit = 120 } = {}) {
   ensureDefaultLicenses(); const db = getDb(); const rarities = await fetchJson("/rarities");
   if (!Array.isArray(rarities)) throw new Error("TCGdex: raretés indisponibles");
-  const updateRarity = db.prepare("UPDATE cards SET rarity=?,hit_family=?,updated_at=? WHERE id=? AND license_slug='pokemon'");
-  const now = new Date().toISOString(); let rarityUpdated = 0;
+  const updateRarity = db.prepare("UPDATE cards SET rarity=?,hit_family=? WHERE id=? AND license_slug='pokemon'");
+  let rarityUpdated = 0;
   const rarityResults = await Promise.all(rarities.map(async (rarity) => ({ rarity: String(rarity), cards: await fetchJson(`/cards?rarity=eq:${encodeURIComponent(String(rarity))}`) })));
   db.transaction(() => {
     for (const group of rarityResults) for (const raw of (Array.isArray(group.cards) ? group.cards : [])) {
-      const id = `pokemon-${raw.id}`; const family = pokemonHitFamily(group.rarity, raw.name); const result = updateRarity.run(group.rarity, family, now, id); rarityUpdated += result.changes || 0;
+      const id = `pokemon-${raw.id}`; const family = pokemonHitFamily(group.rarity, raw.name); const result = updateRarity.run(group.rarity, family, id); rarityUpdated += result.changes || 0;
     }
   })();
 
@@ -90,9 +90,9 @@ export async function syncPokemonReferenceCatalog({ priceLimit = 120 } = {}) {
     const details = await Promise.all(batch.map(async (c) => { try { return await fetchJson(`/cards/${encodeURIComponent(c.id.replace(/^pokemon-/,""))}`); } catch { return null; } }));
     db.transaction(() => {
       details.forEach((raw, index) => {
-        if (!raw) return; const cardId = batch[index].id; const variants = raw.variants || {}; const rarity = String(raw.rarity || ""); const family = pokemonHitFamily(rarity, raw.name, variants); const price = cardmarketReference(raw.pricing, variants);
-        updateDetail.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), price?.avg || 0, price?.low || 0, price?.high || 0, price?.recommended || 0, new Date().toISOString(), cardId);
-        if (price?.recommended) { deleteSource.run(cardId); insertSource.run(cardId, price.recommended, price.updated || new Date().toISOString()); priced += 1; }
+        if (!raw) return; const cardId = batch[index].id; const variants = raw.variants || {}; const rarity = String(raw.rarity || ""); const family = pokemonHitFamily(rarity, raw.name, variants); const price = cardmarketReference(raw.pricing, variants); const stampedAt = new Date().toISOString();
+        updateDetail.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), price?.avg || 0, price?.low || 0, price?.high || 0, price?.recommended || 0, stampedAt, cardId);
+        if (price?.recommended) { deleteSource.run(cardId); insertSource.run(cardId, price.recommended, price.updated || stampedAt); priced += 1; }
         detailed += 1;
       });
     })();
