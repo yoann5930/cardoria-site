@@ -1,4 +1,4 @@
-/* Dedicated Cardoria header emblem. Avoids using the wide premium logo as a tiny thumbnail. */
+/* Cardoria header emblem — rendered directly as a real image, no pseudo-element. */
 .header .brand {
   display: inline-flex;
   align-items: center;
@@ -8,17 +8,22 @@
 }
 
 .header .brand > img {
-  display: none !important;
+  display: block !important;
+  flex: 0 0 58px;
+  width: 58px !important;
+  height: 58px !important;
+  max-width: 58px;
+  object-fit: contain !important;
+  object-position: center;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 5px 14px rgba(212,175,55,.28));
 }
 
 .header .brand::before {
-  content: "";
-  display: block;
-  flex: 0 0 58px;
-  width: 58px;
-  height: 58px;
-  background: url('/assets/logo/cardoria-header-mark.svg?v=2') center/contain no-repeat;
-  filter: drop-shadow(0 5px 14px rgba(212,175,55,.28));
+  content: none !important;
+  display: none !important;
 }
 
 .header .brand > span {
@@ -32,10 +37,11 @@
 
 @media (max-width: 720px) {
   .header .brand { gap: 10px; }
-  .header .brand::before {
+  .header .brand > img {
     flex-basis: 50px;
-    width: 50px;
-    height: 50px;
+    width: 50px !important;
+    height: 50px !important;
+    max-width: 50px;
   }
   .header .brand > span { font-size: 17px; }
 }
