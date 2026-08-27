@@ -40,7 +40,7 @@ html.cardoria-loading body {
 .cardoria-loader::after {
   content: "";
   position: absolute;
-  width: min(72vw, 720px);
+  width: min(82vw, 820px);
   aspect-ratio: 1;
   border: 1px solid rgba(212, 175, 55, 0.08);
   border-radius: 50%;
@@ -59,7 +59,7 @@ html.cardoria-loading body {
 .cardoria-loader__content {
   position: relative;
   z-index: 2;
-  width: min(88vw, 560px);
+  width: min(92vw, 700px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -68,11 +68,11 @@ html.cardoria-loading body {
 
 .cardoria-loader__emblem {
   position: relative;
-  width: clamp(138px, 18vw, 190px);
+  width: clamp(250px, 31vw, 380px);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 24px;
 }
 
 .cardoria-loader__orbit,
@@ -86,12 +86,12 @@ html.cardoria-loading body {
 
 .cardoria-loader__orbit {
   border: 1px solid rgba(212, 175, 55, 0.34);
-  box-shadow: 0 0 38px rgba(212, 175, 55, 0.11);
+  box-shadow: 0 0 48px rgba(212, 175, 55, 0.14);
   animation: cardoriaSpin 7s linear infinite;
 }
 
 .cardoria-loader__orbit::before {
-  inset: 9px;
+  inset: 12px;
   border: 1px solid transparent;
   border-top-color: rgba(255, 232, 160, 0.9);
   border-right-color: rgba(212, 175, 55, 0.35);
@@ -99,65 +99,55 @@ html.cardoria-loading body {
 }
 
 .cardoria-loader__orbit::after {
-  inset: -5px;
+  inset: -7px;
   border: 1px solid transparent;
   border-bottom-color: rgba(212, 175, 55, 0.7);
-  filter: drop-shadow(0 0 7px rgba(212, 175, 55, 0.55));
+  filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.55));
 }
 
 .cardoria-loader__logo-shell {
-  width: 74%;
+  width: 91%;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(26, 23, 16, 0.92) 0%, rgba(7, 7, 7, 0.98) 72%);
+  background: radial-gradient(circle, rgba(26, 23, 16, 0.7) 0%, rgba(7, 7, 7, 0.92) 76%);
   box-shadow:
     0 0 0 1px rgba(255, 225, 132, 0.12),
-    0 18px 50px rgba(0, 0, 0, 0.58),
-    0 0 34px rgba(212, 175, 55, 0.12);
+    0 18px 56px rgba(0, 0, 0, 0.58),
+    0 0 48px rgba(212, 175, 55, 0.14);
   animation: cardoriaLogoPulse 2.6s ease-in-out infinite;
 }
 
 .cardoria-loader__logo {
-  width: 76%;
-  height: 76%;
+  width: 94%;
+  height: 94%;
   object-fit: contain;
-  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.55));
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.6));
 }
 
 .cardoria-loader__eyebrow {
   margin: 0 0 10px;
   color: #d8bb68;
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.34em;
   text-transform: uppercase;
 }
 
-.cardoria-loader__title {
-  margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(2.5rem, 8vw, 5.2rem);
-  font-weight: 500;
-  line-height: 0.92;
-  letter-spacing: 0.14em;
-  color: #fffaf0;
-  text-indent: 0.14em;
-  text-shadow: 0 0 26px rgba(212, 175, 55, 0.12);
-}
+.cardoria-loader__title { display:none; }
 
 .cardoria-loader__tagline {
-  margin: 18px 0 0;
-  max-width: 390px;
+  margin: 14px 0 0;
+  max-width: 430px;
   color: rgba(244, 238, 220, 0.64);
-  font-size: clamp(0.82rem, 2vw, 0.96rem);
+  font-size: clamp(0.84rem, 2vw, 1rem);
   letter-spacing: 0.08em;
 }
 
 .cardoria-loader__progress {
-  width: min(76vw, 360px);
-  margin-top: 42px;
+  width: min(76vw, 400px);
+  margin-top: 34px;
 }
 
 .cardoria-loader__track {
@@ -217,30 +207,16 @@ html.cardoria-loading body {
   border-bottom: 1px solid #d4af37;
 }
 
-@keyframes cardoriaSpin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes cardoriaLogoPulse {
-  0%, 100% { transform: scale(0.98); }
-  50% { transform: scale(1.025); }
-}
-
-@keyframes cardoriaAura {
-  0%, 100% { transform: scale(0.96); opacity: 0.5; }
-  50% { transform: scale(1.03); opacity: 1; }
-}
-
-@keyframes cardoriaGridDrift {
-  from { transform: perspective(700px) rotateX(62deg) translateY(15%) translateX(0); }
-  to { transform: perspective(700px) rotateX(62deg) translateY(15%) translateX(54px); }
-}
+@keyframes cardoriaSpin { to { transform: rotate(360deg); } }
+@keyframes cardoriaLogoPulse { 0%,100% { transform: scale(.985); } 50% { transform: scale(1.035); } }
+@keyframes cardoriaAura { 0%,100% { transform: scale(.96); opacity:.5; } 50% { transform: scale(1.03); opacity:1; } }
+@keyframes cardoriaGridDrift { from { transform: perspective(700px) rotateX(62deg) translateY(15%) translateX(0); } to { transform: perspective(700px) rotateX(62deg) translateY(15%) translateX(54px); } }
 
 @media (max-width: 640px) {
-  .cardoria-loader__emblem { margin-bottom: 24px; }
-  .cardoria-loader__progress { margin-top: 34px; }
-  .cardoria-loader__corner--tl { top: 18px; left: 18px; }
-  .cardoria-loader__corner--br { right: 18px; bottom: 18px; }
+  .cardoria-loader__emblem { width: clamp(220px, 72vw, 320px); margin-bottom:20px; }
+  .cardoria-loader__progress { margin-top:28px; }
+  .cardoria-loader__corner--tl { top:18px; left:18px; }
+  .cardoria-loader__corner--br { right:18px; bottom:18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
