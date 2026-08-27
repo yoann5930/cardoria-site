@@ -1,0 +1,103 @@
+import { getDb, normalizeText } from "./database.js";
+
+const API = "https://api.tcgdex.net/v2/fr";
+
+function round2(n) { return Math.round(Number(n || 0) * 100) / 100; }
+function percent(current, base) {
+  const c = Number(current || 0), b = Number(base || 0);
+  return c > 0 && b > 0 ? round2(((c - b) / b) * 100) : 0;
+}
+function marketDirection(change) { return change > 2 ? "up" : change < -2 ? "down" : "stable"; }
+
+async function fetchJson(path) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(API + path, { headers: { Accept: "application/json", "User-Agent": "Cardoria/6.0" }, signal: controller.signal });
+    if (!response.ok) throw new Error(`TCGdex ${response.status} ${path}`);
+    return await response.json();
+  } finally { clearTimeout(timer); }
+}
+
+function hitFamily(rarity, name = "", variants = {}) {
+  const r = normalizeText(rarity); const n = normalizeText(name);
+  if (r.includes("hyper") || r.includes("gold") || r.includes("doree")) return "Gold";
+  if (r.includes("special illustration") || r.includes("illustration speciale") || r.includes("sar")) return "SAR / Special Illustration Rare";
+  if (r.includes("illustration rare") || r.includes("art rare") || r === "ar") return "AR / Illustration Rare";
+  if (r.includes("secret")) return "Secret / Hyper Rare";
+  if (r.includes("ultra rare")) return "Full Art / Ultra Rare";
+  if (r.includes("double rare") || r.includes("doublement rare")) return "Double Rare";
+  if (n.includes("vmax") || n.includes("vstar")) return "VMAX / VSTAR";
+  if (/\b(ex|v)\b/i.test(String(name || ""))) return "V / ex";
+  if (variants?.holo) return "Holo";
+  if (variants?.reverse) return "Reverse Holo";
+  if (r.includes("rare")) return "Rare";
+  return "";
+}
+
+function cardmarketReference(pricing, variants = {}) {
+  const cm = pricing?.cardmarket;
+  if (!cm || String(cm.unit || "EUR").toUpperCase() !== "EUR") return null;
+  const holo = variants?.holo && !variants?.normal;
+  const pick = (...values) => values.find((v) => Number.isFinite(Number(v)) && Number(v) > 0);
+  const avg1 = holo ? pick(cm["avg1-holo"], cm.avg1) : pick(cm.avg1, cm["avg1-holo"]);
+  const avg7 = holo ? pick(cm["avg7-holo"], cm.avg7) : pick(cm.avg7, cm["avg7-holo"]);
+  const avg30 = holo ? pick(cm["avg30-holo"], cm.avg30) : pick(cm.avg30, cm["avg30-holo"]);
+  const trend = holo ? pick(cm["trend-holo"], cm.trend, avg1, avg7, avg30) : pick(cm.trend, avg1, avg7, avg30, cm["trend-holo"]);
+  const avg = holo ? pick(cm["avg-holo"], avg7, trend, cm.avg) : pick(cm.avg, avg7, trend, cm["avg-holo"]);
+  const low = holo ? pick(cm["low-holo"], cm.low, avg) : pick(cm.low, cm["low-holo"], avg);
+  const current = Number(trend || avg1 || avg7 || avg || 0);
+  if (!current) return null;
+  const high = Math.max(Number(avg || 0), Number(current || 0), Number(avg1 || 0), Number(avg7 || 0), Number(avg30 || 0));
+  return { current: round2(current), avg: round2(avg || current), low: round2(low || current), high: round2(high || current), avg1: round2(avg1 || 0), avg7: round2(avg7 || 0), avg30: round2(avg30 || 0), updated: cm.updated || null };
+}
+
+export async function refreshVisibleCardPrices(ids = []) {
+  const cleanIds = [...new Set((ids || []).map(String).filter((id) => /^pokemon-[a-zA-Z0-9_-]+$/.test(id)))].slice(0, 40);
+  if (!cleanIds.length) return { ok: true, checked: 0, priced: 0 };
+
+  const db = getDb();
+  const select = db.prepare("SELECT id,market_checked_at,recommended_price FROM cards WHERE id=? AND license_slug='pokemon' AND active=1");
+  const update = db.prepare(`UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,avg_price=?,low_price=?,high_price=?,recommended_price=?,market_avg1=?,market_avg7=?,market_avg30=?,market_source=?,market_updated_at=?,market_checked_at=?,market_trend=?,trend_percent=?,updated_at=? WHERE id=?`);
+  const markChecked = db.prepare("UPDATE cards SET market_checked_at=? WHERE id=?");
+  const deleteSource = db.prepare("DELETE FROM price_sources WHERE card_id=? AND source='cardmarket'");
+  const insertSource = db.prepare("INSERT INTO price_sources(card_id,source,price,currency,weight,fetched_at) VALUES (?,'cardmarket',?,'EUR',0.55,?)");
+  const insertHistory = db.prepare(`INSERT OR IGNORE INTO card_price_history(card_id,source,current_price,avg_price,low_price,high_price,avg1,avg7,avg30,captured_at) VALUES (?,'cardmarket',?,?,?,?,?,?,?,?)`);
+
+  const candidates = cleanIds.map((id) => select.get(id)).filter(Boolean).filter((row) => Number(row.recommended_price || 0) <= 0 && !row.market_checked_at);
+  let checked = 0, priced = 0;
+
+  for (let i = 0; i < candidates.length; i += 8) {
+    const batch = candidates.slice(i, i + 8);
+    const details = await Promise.all(batch.map(async (c) => {
+      try { return await fetchJson(`/cards/${encodeURIComponent(c.id.replace(/^pokemon-/, ""))}`); }
+      catch { return null; }
+    }));
+
+    db.transaction(() => {
+      details.forEach((raw, index) => {
+        const cardId = batch[index].id;
+        const stampedAt = new Date().toISOString();
+        checked += 1;
+        if (!raw) { markChecked.run(stampedAt, cardId); return; }
+        const variants = raw.variants || {};
+        const rarity = String(raw.rarity || "");
+        const family = hitFamily(rarity, raw.name, variants);
+        const price = cardmarketReference(raw.pricing, variants);
+        if (!price) {
+          update.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), 0, 0, 0, 0, 0, 0, 0, "", "", stampedAt, "stable", 0, stampedAt, cardId);
+          return;
+        }
+        const change7 = percent(price.current, price.avg7);
+        const direction = marketDirection(change7);
+        update.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), price.avg, price.low, price.high, price.current, price.avg1, price.avg7, price.avg30, "cardmarket", price.updated || stampedAt, stampedAt, direction, change7, stampedAt, cardId);
+        deleteSource.run(cardId);
+        insertSource.run(cardId, price.current, price.updated || stampedAt);
+        insertHistory.run(cardId, price.current, price.avg, price.low, price.high, price.avg1, price.avg7, price.avg30, price.updated || stampedAt);
+        priced += 1;
+      });
+    })();
+  }
+
+  return { ok: true, checked, priced };
+}
