@@ -1,0 +1,2 @@
+cardoria-frontend-release=2026-08-28-audit-cleanup-1
+Includes: cleaned header branding, premium home refresh, analytics normalization, sealed catalog upsert fix.
