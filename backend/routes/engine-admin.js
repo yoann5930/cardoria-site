@@ -7,6 +7,7 @@ import { logAudit } from "../lib/audit.js";
 import { listLicenses, getLicense, createLicense, updateLicense, deleteLicense } from "../lib/engine/licenses.js";
 import { searchCards, getCardById, createCard, updateCard, deleteCard } from "../lib/engine/cards.js";
 import { setPriceSources, addSaleRecord, estimatePrice } from "../lib/engine/pricing.js";
+import { syncPokemonCatalog } from "../lib/engine/tcgdex-sync.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -39,6 +40,16 @@ router.delete("/licenses/:slug", (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
+router.post("/sync/pokemon", async (req, res) => {
+  try {
+    const result = await syncPokemonCatalog({ force: true });
+    logAudit({ type: "engine", action: "pokemon_catalog_sync", user: "admin", detail: `${result.count || 0} cartes` });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message || "Synchronisation Pokémon impossible" });
   }
 });
 
