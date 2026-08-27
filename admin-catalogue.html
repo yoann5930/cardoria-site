@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Base de cartes — Cardoria Enterprise</title>
-<link rel="stylesheet" href="/style.css?v=20260827-2">
-<link rel="stylesheet" href="/css/admin.css?v=20260827-2">
+<title>Catalogue de référence — Cardoria Enterprise</title>
+<link rel="stylesheet" href="/style.css?v=20260827-3">
+<link rel="stylesheet" href="/css/admin.css?v=20260827-3">
 <link rel="icon" href="/assets/logo/cardoria-premium.png">
 <style>
 #catalogFallback{min-height:100vh;background:#06080d;color:#fff8e8;padding:32px;font-family:Arial,sans-serif}
@@ -17,7 +17,7 @@
 <body>
 <div id="catalogFallback">
   <div class="box">
-    <h1>Base de cartes Cardoria</h1>
+    <h1>Catalogue de référence Cardoria</h1>
     <p>Chargement de l’administration…</p>
     <p id="catalogFallbackStatus" style="color:#baaf97">Si cet écran reste affiché, le script d’administration n’a pas démarré.</p>
     <button type="button" onclick="location.reload(true)" style="padding:10px 16px;border-radius:10px;border:1px solid #d4af37;background:#17130a;color:#ffe18a;font-weight:700;cursor:pointer">Recharger</button>
@@ -33,14 +33,14 @@ window.addEventListener('unhandledrejection', function () {
   if (el) el.textContent = 'Erreur pendant le chargement des données. Recharge la page.';
 });
 </script>
-<script src="/js/admin/admin-core.js?v=20260827-2"></script>
-<script src="/js/admin/admin-catalog.js?v=20260827-2"></script>
+<script src="/js/admin/admin-core.js?v=20260827-3"></script>
+<script src="/js/admin/admin-catalog.js?v=20260827-3"></script>
 <script>
 setTimeout(function () {
   var fallback = document.getElementById('catalogFallback');
   if (fallback && window.CardoriaAdmin) {
     var status = document.getElementById('catalogFallbackStatus');
-    if (status) status.textContent = 'Le noyau admin est chargé, mais la page catalogue ne s’est pas initialisée.';
+    if (status) status.textContent = 'Le noyau admin est chargé, mais le catalogue ne s’est pas initialisé.';
   }
 }, 4000);
 </script>

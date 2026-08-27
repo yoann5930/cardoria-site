@@ -1,171 +1,155 @@
 (function () {
   "use strict";
   var A = window.CardoriaAdmin;
-  if (!A.protectAdmin()) return;
+  if (!A || !A.protectAdmin()) return;
 
   var selectedId = null;
   var licenses = [];
 
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function optionList(rows, placeholder) {
+    return '<option value="">' + esc(placeholder) + '</option>' + (rows || []).map(function (row) {
+      return '<option value="' + esc(row.value) + '">' + esc(row.value) + (row.count != null ? ' (' + row.count + ')' : '') + '</option>';
+    }).join('');
+  }
+
   function loadLicenses() {
     return A.adminFetch("/api/admin/engine/licenses").then(function (d) {
       licenses = d.licenses || [];
-      var opts = licenses.map(function (l) {
-        return '<option value="' + l.slug + '">' + l.name + "</option>";
-      }).join("");
+      var opts = licenses.map(function (l) { return '<option value="' + esc(l.slug) + '">' + esc(l.name) + '</option>'; }).join('');
       A.qs("#licSelect").innerHTML = opts;
       A.qs("#cardLicense").innerHTML = opts;
       var pokemon = licenses.find(function (l) { return l.slug === "pokemon"; });
-      var count = A.qs("#pokemonCount");
-      if (count) count.textContent = pokemon ? String(pokemon.cardCount || 0) + " cartes Pokémon" : "0 carte Pokémon";
+      A.qs("#pokemonCount").textContent = pokemon ? String(pokemon.cardCount || 0) + " cartes Pokémon" : "0 carte Pokémon";
     });
+  }
+
+  function loadFacets() {
+    return A.adminFetch("/api/admin/engine/catalog/facets?license=pokemon").then(function (d) {
+      if (!d.ok) return;
+      var rarity = A.qs("#filterRarity");
+      var hit = A.qs("#filterHit");
+      var extension = A.qs("#filterExtension");
+      var currentRarity = rarity.value, currentHit = hit.value, currentExt = extension.value;
+      rarity.innerHTML = optionList(d.rarities || [], "Toutes les raretés");
+      hit.innerHTML = optionList(d.hitFamilies || [], "Tous les types de hit");
+      extension.innerHTML = optionList(d.extensions || [], "Toutes les extensions");
+      rarity.value = currentRarity; hit.value = currentHit; extension.value = currentExt;
+    });
+  }
+
+  function holoLabel(c) {
+    var v = c.variants || {};
+    var labels = [];
+    if (v.holo) labels.push("Holo");
+    if (v.reverse) labels.push("Reverse");
+    if (v.firstEdition) labels.push("1re éd.");
+    return labels.join(" · ") || "—";
   }
 
   function renderCards(cards, pagination) {
     A.qs("#catalogBody").innerHTML = (cards || []).map(function (c) {
-      return "<tr><td>" + c.name + "</td><td>" + c.license + "</td><td>" + c.extension + "</td><td>" + c.number + "</td><td>" + A.euro(c.prices.recommended) + "</td><td>" +
-        '<button type="button" class="btn btn-secondary" data-edit="' + c.id + '">Modifier</button> ' +
-        '<button type="button" class="btn btn-secondary" data-del="' + c.id + '">Supprimer</button></td></tr>';
-    }).join("") || "<tr><td colspan='6'>Aucune carte</td></tr>";
-
-    var total = A.qs("#catalogTotal");
-    if (total) total.textContent = pagination ? String(pagination.total || 0) + " fiche(s) dans la base" : "";
-
-    A.qs("#catalogBody").querySelectorAll("[data-edit]").forEach(function (btn) {
-      btn.onclick = function () { editCard(btn.dataset.edit); };
-    });
-    A.qs("#catalogBody").querySelectorAll("[data-del]").forEach(function (btn) {
-      btn.onclick = function () {
-        if (confirm("Supprimer cette carte ?")) {
-          A.adminFetch("/api/admin/engine/cards/" + btn.dataset.del, { method: "DELETE" }).then(loadCatalog);
-        }
-      };
-    });
+      var img = c.imageThumb ? '<img src="' + esc(c.imageThumb) + '" alt="" loading="lazy" style="width:54px;height:75px;object-fit:contain;border-radius:6px">' : '—';
+      var price = Number(c.prices && c.prices.recommended || 0);
+      return '<tr>' +
+        '<td>' + img + '</td>' +
+        '<td><strong>' + esc(c.name) + '</strong><br><small style="color:#baaf97">' + esc(c.extension) + ' #' + esc(c.number) + '</small></td>' +
+        '<td>' + esc(c.rarity || '—') + '</td>' +
+        '<td><span class="admin-badge admin-badge--gold">' + esc(c.hitFamily || 'Standard') + '</span></td>' +
+        '<td>' + esc(holoLabel(c)) + '</td>' +
+        '<td><strong>' + (price > 0 ? esc(A.euro(price)) : '—') + '</strong><br><small style="color:#baaf97">bas ' + (Number(c.prices && c.prices.low || 0) > 0 ? esc(A.euro(c.prices.low)) : '—') + '</small></td>' +
+        '<td><button type="button" class="btn btn-secondary" data-edit="' + esc(c.id) + '">Modifier</button></td>' +
+      '</tr>';
+    }).join('') || '<tr><td colspan="7">Aucune carte pour ces filtres.</td></tr>';
+    A.qs("#catalogTotal").textContent = pagination ? String(pagination.total || 0) + " carte(s)" : "";
+    A.qs("#catalogBody").querySelectorAll("[data-edit]").forEach(function (btn) { btn.onclick = function () { editCard(btn.dataset.edit); }; });
   }
 
   function loadCatalog() {
-    var q = A.qs("#catSearch").value;
-    A.adminFetch("/api/admin/engine/cards?q=" + encodeURIComponent(q) + "&limit=100").then(function (d) {
+    var params = new URLSearchParams();
+    params.set("limit", "100");
+    params.set("q", A.qs("#catSearch").value || "");
+    params.set("rarity", A.qs("#filterRarity").value || "");
+    params.set("hitFamily", A.qs("#filterHit").value || "");
+    params.set("extension", A.qs("#filterExtension").value || "");
+    params.set("variant", A.qs("#filterVariant").value || "");
+    params.set("sort", A.qs("#filterSort").value || "rarity");
+    A.adminFetch("/api/admin/engine/cards?" + params.toString()).then(function (d) {
       if (d.ok) renderCards(d.cards, d.pagination);
+      else A.qs("#catalogBody").innerHTML = '<tr><td colspan="7">Erreur de chargement.</td></tr>';
     });
+  }
+
+  function syncReference() {
+    var button = A.qs("#syncReference");
+    var status = A.qs("#syncPokemonStatus");
+    button.disabled = true;
+    status.textContent = "Mise à jour des raretés et prix Cardmarket…";
+    A.adminFetch("/api/admin/engine/sync/pokemon-reference", { method: "POST", body: JSON.stringify({ priceLimit: 120 }) }).then(function (d) {
+      if (!d.ok) { status.textContent = d.error || "Enrichissement impossible."; return; }
+      status.textContent = (d.rarityUpdated || 0) + " raretés mises à jour · " + (d.priced || 0) + " tarifs Cardmarket actualisés";
+      return loadFacets().then(loadCatalog);
+    }).catch(function () { status.textContent = "Enrichissement impossible."; }).finally(function () { button.disabled = false; });
   }
 
   function syncPokemon() {
-    var button = A.qs("#syncPokemon");
-    var status = A.qs("#syncPokemonStatus");
-    if (button) button.disabled = true;
-    if (status) status.textContent = "Synchronisation des cartes Pokémon en cours…";
+    var button = A.qs("#syncPokemon"); var status = A.qs("#syncPokemonStatus"); button.disabled = true; status.textContent = "Synchronisation du référentiel Pokémon…";
     A.adminFetch("/api/admin/engine/sync/pokemon", { method: "POST", body: "{}" }).then(function (d) {
-      if (!d.ok) {
-        if (status) status.textContent = d.error || "Synchronisation impossible.";
-        return;
-      }
-      if (status) status.textContent = (d.count || d.imported || 0) + " cartes Pokémon synchronisées depuis TCGdex FR.";
-      return loadLicenses().then(loadCatalog);
-    }).catch(function () {
-      if (status) status.textContent = "Synchronisation impossible.";
-    }).finally(function () {
-      if (button) button.disabled = false;
-    });
+      status.textContent = d.ok ? (d.count || d.imported || 0) + " cartes Pokémon synchronisées." : (d.error || "Synchronisation impossible.");
+      if (d.ok) return loadLicenses().then(loadFacets).then(loadCatalog);
+    }).finally(function () { button.disabled = false; });
   }
 
   function editCard(id) {
-    A.adminFetch("/api/admin/engine/cards/" + id).then(function (d) {
-      if (!d.ok || !d.card) return;
-      var c = d.card;
-      selectedId = c.id;
-      A.qs("#cardLicense").value = c.license;
-      A.qs("#cardName").value = c.name;
-      A.qs("#cardExt").value = c.extension;
-      A.qs("#cardNum").value = c.number;
-      A.qs("#cardRarity").value = c.rarity;
-      A.qs("#cardIll").value = c.illustration;
-      A.qs("#cardImg").value = c.imageHd;
-      A.qs("#cardAvg").value = c.prices.avg;
-      A.qs("#cardLow").value = c.prices.low;
-      A.qs("#cardHigh").value = c.prices.high;
-      A.qs("#formTitle").textContent = "Modifier la carte";
+    A.adminFetch("/api/admin/engine/cards/" + encodeURIComponent(id)).then(function (d) {
+      if (!d.ok || !d.card) return; var c = d.card; selectedId = c.id;
+      A.qs("#cardLicense").value = c.license; A.qs("#cardName").value = c.name; A.qs("#cardExt").value = c.extension; A.qs("#cardNum").value = c.number; A.qs("#cardRarity").value = c.rarity; A.qs("#cardHit").value = c.hitFamily || ""; A.qs("#cardIll").value = c.illustration; A.qs("#cardImg").value = c.imageHd; A.qs("#cardAvg").value = c.prices.avg; A.qs("#cardLow").value = c.prices.low; A.qs("#cardHigh").value = c.prices.high; A.qs("#formTitle").textContent = "Modifier la carte";
     });
   }
 
   function resetForm() {
     selectedId = null;
-    ["cardName", "cardExt", "cardNum", "cardRarity", "cardIll", "cardImg", "cardAvg", "cardLow", "cardHigh"].forEach(function (id) {
-      var el = A.qs("#" + id);
-      if (el) el.value = "";
-    });
+    ["cardName","cardExt","cardNum","cardRarity","cardHit","cardIll","cardImg","cardAvg","cardLow","cardHigh"].forEach(function (id) { var el = A.qs("#" + id); if (el) el.value = ""; });
     A.qs("#formTitle").textContent = "Ajouter une carte";
   }
 
   function saveCard() {
-    var body = {
-      license: A.qs("#cardLicense").value,
-      name: A.qs("#cardName").value,
-      extension: A.qs("#cardExt").value,
-      number: A.qs("#cardNum").value,
-      rarity: A.qs("#cardRarity").value,
-      illustration: A.qs("#cardIll").value,
-      imageHd: A.qs("#cardImg").value,
-      prices: {
-        avg: Number(A.qs("#cardAvg").value) || 0,
-        low: Number(A.qs("#cardLow").value) || 0,
-        high: Number(A.qs("#cardHigh").value) || 0,
-        recommended: Number(A.qs("#cardAvg").value) || 0
-      }
-    };
-    var req = selectedId
-      ? A.adminFetch("/api/admin/engine/cards/" + selectedId, { method: "PUT", body: JSON.stringify(body) })
-      : A.adminFetch("/api/admin/engine/cards", { method: "POST", body: JSON.stringify(body) });
-    req.then(function () { resetForm(); loadLicenses(); loadCatalog(); });
+    var body = { license:A.qs("#cardLicense").value, name:A.qs("#cardName").value, extension:A.qs("#cardExt").value, number:A.qs("#cardNum").value, rarity:A.qs("#cardRarity").value, hitFamily:A.qs("#cardHit").value, illustration:A.qs("#cardIll").value, imageHd:A.qs("#cardImg").value, prices:{ avg:Number(A.qs("#cardAvg").value)||0, low:Number(A.qs("#cardLow").value)||0, high:Number(A.qs("#cardHigh").value)||0, recommended:Number(A.qs("#cardAvg").value)||0 } };
+    var req = selectedId ? A.adminFetch("/api/admin/engine/cards/" + encodeURIComponent(selectedId), { method:"PUT", body:JSON.stringify(body) }) : A.adminFetch("/api/admin/engine/cards", { method:"POST", body:JSON.stringify(body) });
+    req.then(function () { resetForm(); return loadFacets().then(loadCatalog); });
   }
 
   function addLicense() {
-    A.adminFetch("/api/admin/engine/licenses", {
-      method: "POST",
-      body: JSON.stringify({
-        slug: A.qs("#licSlug").value,
-        name: A.qs("#licName").value,
-        icon: A.qs("#licIcon").value || "🃏"
-      })
-    }).then(function () { loadLicenses(); A.qs("#licSlug").value = ""; A.qs("#licName").value = ""; });
+    A.adminFetch("/api/admin/engine/licenses", { method:"POST", body:JSON.stringify({ slug:A.qs("#licSlug").value, name:A.qs("#licName").value, icon:A.qs("#licIcon").value || "🃏" }) }).then(function () { loadLicenses(); });
   }
 
-  A.renderShell("catalog", "Base de cartes", "Référentiel central des cartes, licences, extensions et images",
+  A.renderShell("catalog", "Catalogue de référence", "Pokémon : images, extensions, raretés, hits, variantes et tarifs de référence",
     '<div class="admin-panel"><div class="admin-filters" style="align-items:center">' +
-    '<button class="btn btn-primary" type="button" id="syncPokemon">Synchroniser Pokémon</button>' +
-    '<strong id="pokemonCount">0 carte Pokémon</strong>' +
-    '<span id="syncPokemonStatus" style="color:#baaf97;font-size:13px">Source : TCGdex français</span></div></div>' +
-    '<div class="admin-grid-2">' +
-    '<div class="admin-panel"><h2 id="formTitle">Ajouter une carte</h2>' +
-    '<div class="admin-filters" style="flex-direction:column;align-items:stretch">' +
-    '<select id="cardLicense"></select>' +
-    '<input id="cardName" placeholder="Nom de la carte">' +
-    '<input id="cardExt" placeholder="Extension">' +
-    '<input id="cardNum" placeholder="Numéro">' +
-    '<input id="cardRarity" placeholder="Rareté">' +
-    '<input id="cardIll" placeholder="Illustrateur">' +
-    '<input id="cardImg" placeholder="URL image HD">' +
-    '<input id="cardAvg" type="number" step="0.01" placeholder="Prix moyen €">' +
-    '<input id="cardLow" type="number" step="0.01" placeholder="Prix bas €">' +
-    '<input id="cardHigh" type="number" step="0.01" placeholder="Prix haut €">' +
-    '<button class="btn btn-primary" type="button" id="saveCard">Enregistrer</button>' +
-    '<button class="btn btn-secondary" type="button" id="resetCard">Réinitialiser</button></div></div>' +
-    '<div class="admin-panel"><h2>Nouvelle licence</h2>' +
-    '<div class="admin-filters" style="flex-direction:column;align-items:stretch">' +
-    '<input id="licSlug" placeholder="slug (ex: disney)">' +
-    '<input id="licName" placeholder="Nom affiché">' +
-    '<input id="licIcon" placeholder="Emoji icône">' +
-    '<select id="licSelect" disabled style="opacity:.7"><option>Licences existantes</option></select>' +
-    '<button class="btn btn-primary" type="button" id="addLicense">Ajouter la licence</button></div></div></div>' +
-    '<div class="admin-panel"><div class="admin-filters"><input id="catSearch" placeholder="Rechercher…" oninput="loadCatalogAdmin()">' +
-    '<button class="btn btn-secondary" type="button" id="reloadCat">Actualiser</button><span id="catalogTotal" style="color:#baaf97;font-size:13px"></span></div>' +
-    '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Nom</th><th>Licence</th><th>Extension</th><th>N°</th><th>Prix</th><th>Actions</th></tr></thead><tbody id="catalogBody"></tbody></table></div></div>');
+      '<button class="btn btn-primary" type="button" id="syncPokemon">Synchroniser les cartes</button>' +
+      '<button class="btn btn-secondary" type="button" id="syncReference">Mettre à jour raretés + prix</button>' +
+      '<strong id="pokemonCount">0 carte Pokémon</strong>' +
+      '<span id="syncPokemonStatus" style="color:#baaf97;font-size:13px">Référence : TCGdex FR + Cardmarket</span>' +
+    '</div></div>' +
+    '<div class="admin-panel"><h2>Filtres du catalogue</h2><div class="admin-filters">' +
+      '<input id="catSearch" placeholder="Nom, numéro, extension…">' +
+      '<select id="filterRarity"><option value="">Toutes les raretés</option></select>' +
+      '<select id="filterHit"><option value="">Tous les types de hit</option></select>' +
+      '<select id="filterVariant"><option value="">Toutes variantes</option><option value="holo">Holo</option><option value="reverse">Reverse Holo</option></select>' +
+      '<select id="filterExtension"><option value="">Toutes les extensions</option></select>' +
+      '<select id="filterSort"><option value="rarity">Rareté : plus forte</option><option value="rarity_asc">Rareté : plus faible</option><option value="price">Prix : décroissant</option><option value="price_asc">Prix : croissant</option><option value="extension">Extension / numéro</option><option value="name">Nom</option></select>' +
+      '<button class="btn btn-secondary" type="button" id="reloadCat">Actualiser</button><span id="catalogTotal" style="color:#baaf97"></span>' +
+    '</div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Image</th><th>Carte</th><th>Rareté officielle</th><th>Type de hit</th><th>Variante</th><th>Tarif réf.</th><th>Action</th></tr></thead><tbody id="catalogBody"></tbody></table></div></div>' +
+    '<div class="admin-grid-2"><div class="admin-panel"><h2 id="formTitle">Ajouter une carte</h2><div class="admin-filters" style="flex-direction:column;align-items:stretch">' +
+      '<select id="cardLicense"></select><input id="cardName" placeholder="Nom"><input id="cardExt" placeholder="Extension"><input id="cardNum" placeholder="Numéro"><input id="cardRarity" placeholder="Rareté officielle"><input id="cardHit" placeholder="Type de hit"><input id="cardIll" placeholder="Illustrateur"><input id="cardImg" placeholder="URL image HD"><input id="cardAvg" type="number" step="0.01" placeholder="Prix moyen €"><input id="cardLow" type="number" step="0.01" placeholder="Prix bas €"><input id="cardHigh" type="number" step="0.01" placeholder="Prix haut €"><button class="btn btn-primary" id="saveCard" type="button">Enregistrer</button><button class="btn btn-secondary" id="resetCard" type="button">Réinitialiser</button>' +
+    '</div></div><div class="admin-panel"><h2>Nouvelle licence</h2><div class="admin-filters" style="flex-direction:column;align-items:stretch"><input id="licSlug" placeholder="slug"><input id="licName" placeholder="Nom affiché"><input id="licIcon" placeholder="Emoji"><select id="licSelect" disabled></select><button class="btn btn-primary" id="addLicense" type="button">Ajouter la licence</button></div></div></div>');
 
   window.loadCatalogAdmin = loadCatalog;
-  A.qs("#saveCard").onclick = saveCard;
-  A.qs("#resetCard").onclick = resetForm;
-  A.qs("#addLicense").onclick = addLicense;
-  A.qs("#reloadCat").onclick = loadCatalog;
-  A.qs("#syncPokemon").onclick = syncPokemon;
-
-  loadLicenses().then(loadCatalog);
+  ["catSearch","filterRarity","filterHit","filterVariant","filterExtension","filterSort"].forEach(function (id) { A.qs("#" + id).addEventListener(id === "catSearch" ? "input" : "change", loadCatalog); });
+  A.qs("#reloadCat").onclick = loadCatalog; A.qs("#syncPokemon").onclick = syncPokemon; A.qs("#syncReference").onclick = syncReference; A.qs("#saveCard").onclick = saveCard; A.qs("#resetCard").onclick = resetForm; A.qs("#addLicense").onclick = addLicense;
+  loadLicenses().then(loadFacets).then(loadCatalog);
 })();
