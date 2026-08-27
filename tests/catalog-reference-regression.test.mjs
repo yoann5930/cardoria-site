@@ -8,6 +8,12 @@ const sealedSchedule = fs.readFileSync('backend/lib/engine/sealed-catalog-schedu
 const engineDb = fs.readFileSync('backend/lib/engine/database.js','utf8');
 const persistence = fs.readFileSync('backend/lib/marketplace/persistence.js','utf8');
 const engineAdmin = fs.readFileSync('backend/routes/engine-admin.js','utf8');
+const marketplaceAdmin = fs.readFileSync('backend/routes/marketplace-admin.js','utf8');
+const cardoriaStock = fs.readFileSync('backend/lib/marketplace/cardoria-stock.js','utf8');
+const adminStock = fs.readFileSync('js/admin/admin-stock.js','utf8');
+const purchaseStockSync = fs.readFileSync('js/admin/admin-purchases-stock-sync.js','utf8');
+const purchasesHtml = fs.readFileSync('admin-achats-cartes.html','utf8');
+const stockHtml = fs.readFileSync('admin-stock.html','utf8');
 const catalogHtml = fs.readFileSync('admin-catalogue.html','utf8');
 const integratedSealed = fs.readFileSync('js/admin/admin-catalog-sealed-shortcuts.js','utf8');
 const core = fs.readFileSync('js/admin/admin-core.js','utf8');
@@ -86,4 +92,27 @@ test('reference catalog exposes image repair controls', () => {
   assert.match(integratedSealed, /market-prices\/status/);
   assert.match(integratedSealed, /sync\/pokemon-reference/);
   assert.match(integratedSealed, /priceLimit:2000/);
+});
+
+test('purchased Pokemon cards feed the real Cardoria stock', () => {
+  assert.match(cardoriaStock, /purchaseCardCounts/);
+  assert.match(cardoriaStock, /catalog-card:/);
+  assert.match(cardoriaStock, /lot_cartes/);
+  assert.match(cardoriaStock, /purchasedQuantity/);
+  assert.match(cardoriaStock, /soldQuantity/);
+  assert.match(cardoriaStock, /Math\.max\(0, purchased - sold\)/);
+  assert.match(marketplaceAdmin, /\/cardoria-stock\/sync/);
+  assert.match(purchaseStockSync, /\/api\/admin\/marketplace\/cardoria-stock\/sync/);
+  assert.match(purchasesHtml, /admin-purchases-stock-sync\.js/);
+});
+
+test('LIVE means visible in boutique and CACHER preserves stock off-store', () => {
+  assert.match(cardoriaStock, /live \? "active" : "draft"/);
+  assert.match(cardoriaStock, /row\.status === "active"/);
+  assert.match(marketplaceAdmin, /\/cardoria-stock\/:id\/live/);
+  assert.match(adminStock, />CACHER</);
+  assert.match(adminStock, />LIVE</);
+  assert.match(adminStock, /EN BOUTIQUE/);
+  assert.match(adminStock, /CACHÉE/);
+  assert.match(stockHtml, /admin-stock\.js\?v=20260827-8/);
 });

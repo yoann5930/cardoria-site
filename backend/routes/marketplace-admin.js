@@ -3,6 +3,7 @@ import { Router } from "express";
 import express from "express";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logAudit } from "../lib/audit.js";
+import { readJson } from "../lib/storage.js";
 import { getAllOrders, updateOrderStatus } from "../lib/marketplace/orders.js";
 import { searchListings } from "../lib/marketplace/listings.js";
 import { listSellers, setSellerVerified } from "../lib/marketplace/sellers.js";
@@ -15,6 +16,7 @@ import { listAllListingsAdmin } from "../lib/marketplace/v1/listings.js";
 import { getMarketplaceStats } from "../lib/marketplace/v1/index.js";
 import { listDisputes, resolveDispute } from "../lib/marketplace/v1/disputes.js";
 import { exportAccountingCsv, getInvoiceHtmlByOrder } from "../lib/marketplace/v1/invoices.js";
+import { listCardoriaStock, setCardoriaStockLive, syncExistingPurchasesToCardoriaStock } from "../lib/marketplace/cardoria-stock.js";
 
 export const webhookRouter = Router();
 webhookRouter.post("/sumup", express.raw({ type: "application/json" }), async (req, res) => {
@@ -54,6 +56,28 @@ router.post("/orders/:id/shipping-label", WRITE_ADMIN, async (req, res) => {
   try { res.json({ ok: true, ...(await generateShippingLabel(req.params.id, req.body.carrier)) }); }
   catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message }); }
 });
+
+router.get("/cardoria-stock", (req, res) => {
+  try { res.json({ ok: true, stock: listCardoriaStock({ q: req.query.q || "" }) }); }
+  catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message || "Stock Cardoria indisponible" }); }
+});
+router.post("/cardoria-stock/sync", WRITE_ADMIN, (req, res) => {
+  try {
+    const purchases = readJson("purchases", []);
+    const result = syncExistingPurchasesToCardoriaStock(purchases);
+    logAudit({ type: "stock", action: "purchase_stock_sync", user: req.authUser?.email || "admin", detail: `${result.purchasesSynced || 0} achats · ${result.linkedCards || 0} cartes liees` });
+    res.json({ ok: true, ...result, stock: listCardoriaStock({ q: req.query.q || "" }) });
+  } catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message || "Synchronisation du stock impossible" }); }
+});
+router.put("/cardoria-stock/:id/live", WRITE_ADMIN, (req, res) => {
+  try {
+    const live = req.body?.live === true;
+    const item = setCardoriaStockLive(req.params.id, live);
+    logAudit({ type: "stock", action: live ? "stock_live" : "stock_hide", user: req.authUser?.email || "admin", detail: `${req.params.id} → ${live ? "LIVE" : "CACHE"}` });
+    res.json({ ok: true, item });
+  } catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message || "Modification de visibilité impossible" }); }
+});
+
 router.get("/listings", (req, res) => res.json({ ok: true, listings: listAllListingsAdmin(req.query) }));
 router.get("/listings/search", (req, res) => res.json({ ok: true, ...searchListings({ ...req.query, activeOnly: false }) }));
 router.get("/sellers", (req, res) => res.json({ ok: true, sellers: listSellers() }));
