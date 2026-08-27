@@ -6,9 +6,16 @@
       var history=row.querySelector("[data-history]");if(!history)return;
       var id=history.getAttribute("data-history");var cell=history.closest("td");
       if(!id||!cell||cell.querySelector("[data-add-purchase]"))return;
-      var btn=document.createElement("button");btn.type="button";btn.className="btn btn-primary";btn.style.marginLeft="6px";btn.textContent="Ajouter aux achats";btn.setAttribute("data-add-purchase",id);
-      btn.onclick=function(e){e.preventDefault();e.stopPropagation();location.href="admin-achats-cartes.html?source=card&id="+encodeURIComponent(id);};
-      cell.appendChild(btn);
+
+      var unitBtn=document.createElement("button");
+      unitBtn.type="button";unitBtn.className="btn btn-primary";unitBtn.style.marginLeft="6px";unitBtn.textContent="Ajouter aux achats";unitBtn.setAttribute("data-add-purchase",id);
+      unitBtn.onclick=function(e){e.preventDefault();e.stopPropagation();location.href="admin-achats-cartes.html?source=card&id="+encodeURIComponent(id)+"&packaging=carte_unite";};
+      cell.appendChild(unitBtn);
+
+      var lotBtn=document.createElement("button");
+      lotBtn.type="button";lotBtn.className="btn btn-secondary";lotBtn.style.marginLeft="6px";lotBtn.textContent="Ajouter en lot";lotBtn.setAttribute("data-add-purchase-lot",id);
+      lotBtn.onclick=function(e){e.preventDefault();e.stopPropagation();location.href="admin-achats-cartes.html?source=card&id="+encodeURIComponent(id)+"&packaging=lot_cartes";};
+      cell.appendChild(lotBtn);
     });
   }
   var observer=new MutationObserver(function(){enhance();});
