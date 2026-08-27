@@ -6,33 +6,59 @@
   var SESSION_KEY = "cardoria_session_token";
   var CSRF_KEY = "cardoria_csrf_token";
 
-  var NAV = [
-    { section: "Pilotage" },
-    { href: "admin.html", label: "Tableau de bord", page: "dashboard" },
-    { href: "admin-statistiques.html", label: "Statistiques site", page: "stats" },
-    { section: "Opérations" },
-    { href: "admin-comptabilite.html", label: "Comptabilité", page: "accounting" },
-    { href: "admin-achats.html", label: "Achats", page: "purchases" },
-    { href: "admin-paiements.html", label: "Paiements SumUp", page: "payments" },
-    { href: "admin-commandes.html", label: "Commandes", page: "orders" },
-    { href: "admin-stock.html", label: "Stock", page: "stock" },
-    { href: "admin-estimations.html", label: "Estimations", page: "estimations" },
-    { href: "admin-ia.html", label: "IA Premium", page: "ai" },
-    { href: "admin-scanner.html", label: "Scanner IA", page: "scanner" },
-    { href: "admin-marche.html", label: "Données marché", page: "marche" },
-    { href: "admin-sante.html", label: "Santé & fiabilité", page: "sante" },
-    { href: "admin-performance-ia.html", label: "Performance IA", page: "performance" },
-    { href: "admin-ai-enterprise.html", label: "IA Enterprise", page: "ai-enterprise" },
-    { href: "admin-ultimate.html", label: "Ultimate Enterprise", page: "ultimate" },
-    { href: "admin-bigdata.html", label: "Big Data Engine", page: "bigdata" },
-    { section: "Catalogue" },
-    { href: "admin-catalogue.html", label: "Moteur cartes", page: "catalog" },
-    { href: "admin-marketplace.html", label: "Marketplace", page: "marketplace" },
-    { section: "Administration" },
-    { href: "admin-utilisateurs.html", label: "Utilisateurs", page: "users" },
-    { href: "admin-journal.html", label: "Journal", page: "audit" },
-    { href: "admin-integrations.html", label: "Google & SEO", page: "integrations" },
-    { href: "admin-seo.html", label: "SEO Enterprise", page: "seo" }
+  var NAV_GROUPS = [
+    {
+      label: "Pilotage",
+      icon: "◈",
+      items: [
+        { href: "admin.html", label: "Tableau de bord", page: "dashboard" },
+        { href: "admin-statistiques.html", label: "Statistiques site", page: "stats" }
+      ]
+    },
+    {
+      label: "Commerce & gestion",
+      icon: "€",
+      items: [
+        { href: "admin-comptabilite.html", label: "Comptabilité", page: "accounting" },
+        { href: "admin-achats.html", label: "Achats", page: "purchases" },
+        { href: "admin-paiements.html", label: "Paiements SumUp", page: "payments" },
+        { href: "admin-commandes.html", label: "Commandes", page: "orders" },
+        { href: "admin-stock.html", label: "Stock", page: "stock" },
+        { href: "admin-estimations.html", label: "Estimations", page: "estimations" }
+      ]
+    },
+    {
+      label: "Catalogue & ventes",
+      icon: "▣",
+      items: [
+        { href: "admin-catalogue.html", label: "Moteur cartes", page: "catalog" },
+        { href: "admin-marketplace.html", label: "Marketplace", page: "marketplace" }
+      ]
+    },
+    {
+      label: "IA & marché",
+      icon: "✦",
+      items: [
+        { href: "admin-ia.html", label: "IA Premium", page: "ai" },
+        { href: "admin-scanner.html", label: "Scanner IA", page: "scanner" },
+        { href: "admin-marche.html", label: "Données marché", page: "marche" },
+        { href: "admin-sante.html", label: "Santé & fiabilité", page: "sante" },
+        { href: "admin-performance-ia.html", label: "Performance IA", page: "performance" },
+        { href: "admin-ai-enterprise.html", label: "IA Enterprise", page: "ai-enterprise" },
+        { href: "admin-ultimate.html", label: "Ultimate Enterprise", page: "ultimate" },
+        { href: "admin-bigdata.html", label: "Big Data Engine", page: "bigdata" }
+      ]
+    },
+    {
+      label: "Administration",
+      icon: "⚙",
+      items: [
+        { href: "admin-utilisateurs.html", label: "Utilisateurs", page: "users" },
+        { href: "admin-journal.html", label: "Journal", page: "audit" },
+        { href: "admin-integrations.html", label: "Google & SEO", page: "integrations" },
+        { href: "admin-seo.html", label: "SEO Enterprise", page: "seo" }
+      ]
+    }
   ];
 
   function qs(sel, root) { return (root || document).querySelector(sel); }
@@ -68,10 +94,18 @@
   }
 
   function renderShell(activePage, title, subtitle, mainHtml) {
-    var navHtml = NAV.map(function (item) {
-      if (item.section) return '<div class="admin-nav-section">' + item.section + "</div>";
-      var cls = item.page === activePage ? " active" : "";
-      return '<a class="' + cls.trim() + '" href="' + item.href + '">' + item.label + "</a>";
+    var navHtml = NAV_GROUPS.map(function (group, groupIndex) {
+      var groupActive = group.items.some(function (item) { return item.page === activePage; });
+      var links = group.items.map(function (item) {
+        var cls = item.page === activePage ? " active" : "";
+        return '<a class="admin-subnav-link' + cls + '" href="' + item.href + '"><span class="admin-subnav-dot">•</span><span>' + item.label + "</span></a>";
+      }).join("");
+      return '<div class="admin-nav-group' + (groupActive ? " is-open" : "") + '">' +
+        '<button type="button" class="admin-nav-group-btn" aria-expanded="' + (groupActive ? "true" : "false") + '" data-admin-nav-group="' + groupIndex + '">' +
+          '<span class="admin-nav-group-icon">' + group.icon + '</span><span class="admin-nav-group-label">' + group.label + '</span><span class="admin-nav-chevron">›</span>' +
+        '</button>' +
+        '<div class="admin-subnav">' + links + '</div>' +
+      '</div>';
     }).join("");
 
     document.body.className = "admin-app";
@@ -86,6 +120,23 @@
       '<div class="admin-topbar"><div><h1>' + title + "</h1>" + (subtitle ? "<p>" + subtitle + "</p>" : "") + "</div></div>" +
       mainHtml +
       "</main></div>";
+
+    document.querySelectorAll("[data-admin-nav-group]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var group = button.closest(".admin-nav-group");
+        if (!group) return;
+        var nextOpen = !group.classList.contains("is-open");
+        document.querySelectorAll(".admin-nav-group").forEach(function (other) {
+          other.classList.remove("is-open");
+          var otherButton = other.querySelector(".admin-nav-group-btn");
+          if (otherButton) otherButton.setAttribute("aria-expanded", "false");
+        });
+        if (nextOpen) {
+          group.classList.add("is-open");
+          button.setAttribute("aria-expanded", "true");
+        }
+      });
+    });
 
     qs("#adminLogoutBtn").addEventListener("click", adminLogout);
   }
