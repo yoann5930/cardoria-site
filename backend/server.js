@@ -14,7 +14,7 @@ import marketplaceAdminRoutes, { webhookRouter } from "./routes/marketplace-admi
 import paymentsRoutes from "./routes/payments.js";
 import paymentsAdminRoutes from "./routes/payments-admin.js";
 import { seedEngineIfEmpty } from "./lib/engine/seed.js";
-import { syncPokemonCatalog } from "./lib/engine/tcgdex-sync.js";
+import { syncPokemonCatalog, syncPokemonReferenceCatalog } from "./lib/engine/tcgdex-sync.js";
 import { initMarketplace } from "./lib/marketplace/index.js";
 import { initMarketplacePersistence, marketplacePersistenceMiddleware, enginePersistenceMiddleware, flushMarketplacePersistence, flushEnginePersistence, closeMarketplacePersistence } from "./lib/marketplace/persistence.js";
 import { emptyPublicCatalogOnce } from "./lib/marketplace/empty-catalog.js";
@@ -109,6 +109,15 @@ try {
   startup.ok = false;
   startup.degraded.push({ name: "pokemon-catalog", error: error?.message || String(error) });
   console.error("[startup] pokemon-catalog: degraded", error);
+}
+
+try {
+  const referenceSync = await syncPokemonReferenceCatalog({ priceLimit: 0 });
+  console.log(`[startup] pokemon-reference: ${referenceSync.rarityUpdated || 0} rarity mappings updated (${referenceSync.rarities || 0} rarities)`);
+  const saved = await flushEnginePersistence("tcgdex-reference-rarities");
+  if (!saved.ok) console.error("[startup] pokemon-reference: persistence failed", saved.error || "unknown");
+} catch (error) {
+  console.error("[startup] pokemon-reference: optional sync skipped", error?.message || String(error));
 }
 
 safeInit("market-data", initMarketData);
