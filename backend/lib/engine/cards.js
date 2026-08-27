@@ -5,6 +5,19 @@ import { getDb, normalizeText, slugify, makeCardId, rowToCard, syncFts } from ".
 import { getLicense } from "./licenses.js";
 import { setPriceSources, recalculateCardPrices, getSalesHistory } from "./pricing.js";
 
+function compactReference(value) {
+  return normalizeText(value).replace(/[^a-z0-9]/g, "");
+}
+
+export function referenceSearchAliases(value = "") {
+  const compact = compactReference(value);
+  if (!compact || !/\d/.test(compact)) return [];
+  const aliases = new Set([compact]);
+  const withoutFrenchMarker = compact.replace(/fr(?=\d)/g, "");
+  if (withoutFrenchMarker) aliases.add(withoutFrenchMarker);
+  return [...aliases];
+}
+
 export function searchCards({ q = "", license = "", extension = "", rarity = "", hitFamily = "", variant = "", page = 1, limit = 24, sort = "name", activeOnly = true } = {}) {
   const db = getDb();
   const safeLimit = Math.min(Math.max(Number(limit) || 24, 1), 100);
@@ -20,9 +33,29 @@ export function searchCards({ q = "", license = "", extension = "", rarity = "",
   if (variant === "holo") conditions.push("c.variants_json LIKE '%\"holo\":true%'");
   if (variant === "reverse") conditions.push("c.variants_json LIKE '%\"reverse\":true%'");
   if (q) {
-    conditions.push("(c.name_normalized LIKE ? OR c.number LIKE ? OR c.extension LIKE ? OR c.rarity LIKE ? OR c.hit_family LIKE ?)");
-    const like = `%${normalizeText(q)}%`;
-    params.push(like, like, like, `%${q}%`, `%${q}%`);
+    const normalized = normalizeText(q);
+    const like = `%${normalized}%`;
+    const referenceAliases = referenceSearchAliases(q);
+    const referenceSql = `LOWER(
+      REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(c.extension_code,''),'-',''),' ',''),'_',''),'.','') ||
+      REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(c.number,''),'-',''),' ',''),'_',''),'.','')
+    )`;
+    const clauses = [
+      "c.name_normalized LIKE ?",
+      "LOWER(c.number) LIKE ?",
+      "LOWER(c.extension) LIKE ?",
+      "LOWER(c.extension_code) LIKE ?",
+      "LOWER(c.id) LIKE ?",
+      "LOWER(c.slug) LIKE ?",
+      "LOWER(c.rarity) LIKE ?",
+      "LOWER(c.hit_family) LIKE ?"
+    ];
+    params.push(like, like, like, like, like, like, like, like);
+    for (const alias of referenceAliases) {
+      clauses.push(`${referenceSql} LIKE ?`);
+      params.push(`%${alias}%`);
+    }
+    conditions.push(`(${clauses.join(" OR ")})`);
   }
   const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
   const order = sortOrder(sort);
