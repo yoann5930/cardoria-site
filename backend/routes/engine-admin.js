@@ -1,19 +1,25 @@
 /**
- * Administration du moteur Cardoria — licences et cartes.
+ * Administration du moteur Cardoria — licences, cartes et suivi marché.
  */
 import { Router } from "express";
 import { requireAdmin } from "../lib/auth.js";
 import { logAudit } from "../lib/audit.js";
-import { listLicenses, getLicense, createLicense, updateLicense, deleteLicense } from "../lib/engine/licenses.js";
+import { listLicenses, createLicense, updateLicense, deleteLicense } from "../lib/engine/licenses.js";
 import { searchCards, getCardById, createCard, updateCard, deleteCard, getCatalogFacets } from "../lib/engine/cards.js";
 import { setPriceSources, addSaleRecord, estimatePrice } from "../lib/engine/pricing.js";
-import { syncPokemonCatalog, syncPokemonReferenceCatalog } from "../lib/engine/tcgdex-sync.js";
+import { syncPokemonCatalog, syncPokemonReferenceCatalog, getMarketPriceStatus, getCardPriceHistory } from "../lib/engine/tcgdex-sync.js";
 
 const router = Router();
 router.use(requireAdmin);
 
 router.get("/licenses", (req, res) => res.json({ ok: true, licenses: listLicenses({ activeOnly: false }) }));
 router.get("/catalog/facets", (req, res) => res.json({ ok: true, ...getCatalogFacets({ license: req.query.license || "pokemon" }) }));
+router.get("/market-prices/status", (req, res) => res.json({ ok: true, ...getMarketPriceStatus() }));
+router.get("/cards/:id/price-history", (req, res) => {
+  const card = getCardById(req.params.id);
+  if (!card) return res.status(404).json({ ok: false, error: "Carte introuvable" });
+  res.json({ ok: true, cardId: req.params.id, history: getCardPriceHistory(req.params.id, req.query.limit) });
+});
 
 router.post("/licenses", (req, res) => {
   try { const license = createLicense(req.body || {}); logAudit({ type: "engine", action: "license_create", user: "admin", detail: license.slug }); res.json({ ok: true, license }); }
@@ -35,9 +41,9 @@ router.post("/sync/pokemon", async (req, res) => {
 router.post("/sync/pokemon-reference", async (req, res) => {
   try {
     const priceLimit = Math.min(Math.max(Number(req.body?.priceLimit) || 120, 0), 500);
-    const result = await syncPokemonReferenceCatalog({ priceLimit });
+    const result = await syncPokemonReferenceCatalog({ priceLimit, skipRarities: Boolean(req.body?.skipRarities) });
     logAudit({ type: "engine", action: "pokemon_reference_sync", user: "admin", detail: `${result.rarityUpdated || 0} raretés, ${result.priced || 0} prix` });
-    res.json({ ok: true, ...result });
+    res.json({ ok: true, ...result, marketStatus: getMarketPriceStatus() });
   } catch (e) { res.status(502).json({ ok: false, error: e.message || "Enrichissement Pokémon impossible" }); }
 });
 

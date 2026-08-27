@@ -120,6 +120,23 @@ try {
   console.error("[startup] pokemon-reference: optional sync skipped", error?.message || String(error));
 }
 
+async function refreshMarketPrices(reason = "scheduled-market-refresh") {
+  try {
+    const result = await syncPokemonReferenceCatalog({ priceLimit: 120, skipRarities: true });
+    console.log(`[market-prices] ${result.priced || 0} prices refreshed · ${result.rising || 0} up · ${result.falling || 0} down · ${result.stable || 0} stable`);
+    const saved = await flushEnginePersistence(reason);
+    if (!saved.ok) console.error("[market-prices] persistence failed", saved.error || "unknown");
+  } catch (error) {
+    console.error("[market-prices] refresh skipped", error?.message || String(error));
+  }
+}
+const marketRefreshDelay = Math.max(60000, Number(process.env.MARKET_PRICE_REFRESH_DELAY_MS) || 120000);
+const marketRefreshInterval = Math.max(3600000, Number(process.env.MARKET_PRICE_REFRESH_INTERVAL_MS) || 21600000);
+const firstMarketRefresh = setTimeout(() => refreshMarketPrices("startup-market-refresh"), marketRefreshDelay);
+firstMarketRefresh.unref?.();
+const marketRefreshTimer = setInterval(() => refreshMarketPrices("scheduled-market-refresh"), marketRefreshInterval);
+marketRefreshTimer.unref?.();
+
 safeInit("market-data", initMarketData);
 safeInit("scanner", initScanner);
 safeInit("ai-enterprise", initAiEnterprise);
@@ -129,7 +146,6 @@ safeInit("seo", initSeo);
 safeInit("backup-scheduler", scheduleAutoBackup);
 safeInit("launch", initLaunch);
 
-// Toutes les mutations contenant des donnees critiques declenchent un snapshot PostgreSQL.
 app.use("/api/auth", marketplacePersistenceMiddleware, authRoutes);
 app.use("/api/gdpr", marketplacePersistenceMiddleware, gdprRoutes);
 app.use("/api/analytics", apiRateLimit, analyticsRoutes);
@@ -199,6 +215,8 @@ const port = process.env.PORT || 10000;
 const server = app.listen(port, "0.0.0.0", () => { console.log(`Cardoria V6 single-host ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`); console.log(`[startup] public root: ${PUBLIC_ROOT}`); });
 function shutdown(signal) {
   console.log(`[process] ${signal} received, closing HTTP server`);
+  clearTimeout(firstMarketRefresh);
+  clearInterval(marketRefreshTimer);
   const forceExit = setTimeout(() => process.exit(1), 10000); forceExit.unref();
   server.close(async () => {
     const enginePersisted = await flushEnginePersistence(`shutdown-${signal.toLowerCase()}`);

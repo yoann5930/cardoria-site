@@ -29,6 +29,13 @@ function ensureColumn(database, table, column, definition) {
   if (!columns.includes(column)) database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
+function variation(current, base) {
+  const c = Number(current || 0);
+  const b = Number(base || 0);
+  if (!c || !b) return 0;
+  return Math.round((((c - b) / b) * 100) * 100) / 100;
+}
+
 function migrate(database) {
   database.exec(`
     CREATE TABLE IF NOT EXISTS licenses (
@@ -63,6 +70,12 @@ function migrate(database) {
       recommended_price REAL DEFAULT 0,
       market_trend TEXT DEFAULT 'stable',
       trend_percent REAL DEFAULT 0,
+      market_avg1 REAL DEFAULT 0,
+      market_avg7 REAL DEFAULT 0,
+      market_avg30 REAL DEFAULT 0,
+      market_source TEXT DEFAULT '',
+      market_updated_at TEXT DEFAULT '',
+      market_checked_at TEXT DEFAULT '',
       sales_count INTEGER DEFAULT 0,
       views INTEGER DEFAULT 0,
       meta_title TEXT DEFAULT '',
@@ -95,16 +108,40 @@ function migrate(database) {
       FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS card_price_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'cardmarket',
+      current_price REAL DEFAULT 0,
+      avg_price REAL DEFAULT 0,
+      low_price REAL DEFAULT 0,
+      high_price REAL DEFAULT 0,
+      avg1 REAL DEFAULT 0,
+      avg7 REAL DEFAULT 0,
+      avg30 REAL DEFAULT 0,
+      captured_at TEXT NOT NULL,
+      UNIQUE(card_id, source, captured_at),
+      FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_cards_license ON cards(license_slug, active);
     CREATE INDEX IF NOT EXISTS idx_cards_slug ON cards(license_slug, slug);
     CREATE INDEX IF NOT EXISTS idx_cards_name ON cards(name_normalized);
     CREATE INDEX IF NOT EXISTS idx_price_sources_card ON price_sources(card_id);
     CREATE INDEX IF NOT EXISTS idx_sales_card ON sales_history(card_id, sold_at);
+    CREATE INDEX IF NOT EXISTS idx_card_price_history_card ON card_price_history(card_id, captured_at DESC);
   `);
 
   ensureColumn(database, "cards", "hit_family", "TEXT DEFAULT ''");
   ensureColumn(database, "cards", "variants_json", "TEXT DEFAULT '{}'");
+  ensureColumn(database, "cards", "market_avg1", "REAL DEFAULT 0");
+  ensureColumn(database, "cards", "market_avg7", "REAL DEFAULT 0");
+  ensureColumn(database, "cards", "market_avg30", "REAL DEFAULT 0");
+  ensureColumn(database, "cards", "market_source", "TEXT DEFAULT ''");
+  ensureColumn(database, "cards", "market_updated_at", "TEXT DEFAULT ''");
+  ensureColumn(database, "cards", "market_checked_at", "TEXT DEFAULT ''");
   database.exec("CREATE INDEX IF NOT EXISTS idx_cards_rarity_hit ON cards(rarity, hit_family, active)");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_cards_market_update ON cards(license_slug, market_checked_at, active)");
 
   let ftsAvailable = true;
   try {
@@ -158,6 +195,9 @@ export function rowToCard(row, extras = {}) {
   if (!row) return null;
   let variants = {};
   try { variants = JSON.parse(row.variants_json || "{}"); } catch {}
+  const current = Number(row.recommended_price || row.avg_price || 0);
+  const avg7 = Number(row.market_avg7 || 0);
+  const avg30 = Number(row.market_avg30 || 0);
   return {
     id: row.id,
     license: row.license_slug,
@@ -174,6 +214,16 @@ export function rowToCard(row, extras = {}) {
     imageThumb: row.image_thumb || row.image_hd,
     condition: row.condition_note,
     prices: { avg: row.avg_price, low: row.low_price, high: row.high_price, recommended: row.recommended_price },
+    market: {
+      source: row.market_source || "",
+      updatedAt: row.market_updated_at || "",
+      checkedAt: row.market_checked_at || "",
+      avg1: Number(row.market_avg1 || 0),
+      avg7,
+      avg30,
+      change7: variation(current, avg7),
+      change30: variation(current, avg30)
+    },
     marketTrend: row.market_trend,
     trendPercent: row.trend_percent,
     salesCount: row.sales_count,
