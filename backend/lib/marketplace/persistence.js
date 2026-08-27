@@ -101,7 +101,7 @@ async function snapshotEngineNow(reason = "engine") {
     } finally { client.release(); }
   })();
   try { return await engineSyncPromise; }
-  finally { syncPromise = null; if (engineDirty) { engineDirty = false; scheduleEngineSnapshot("queued-engine-change", 150); } }
+  finally { engineSyncPromise = null; if (engineDirty) { engineDirty = false; scheduleEngineSnapshot("queued-engine-change", 150); } }
 }
 function restoreRuntime(payload) {
   if (!payload || typeof payload !== "object") return;
@@ -185,7 +185,7 @@ export function scheduleMarketplaceSnapshot(reason = "api-write", delayMs = 150)
 export function scheduleEngineSnapshot(reason = "engine-write", delayMs = 300) {
   if (!marketplacePersistenceConfigured()) return;
   engineDirty = true; if (engineSyncTimer) clearTimeout(engineSyncTimer);
-  engineSyncTimer = setTimeout(async () => { engineSyncTimer = null; if (!engineDirty) return; engineDirty = false; try { await snapshotEngineNow(reason); } catch {} }, Math.max(0, Number(delayMs) || 0)); syncTimer.unref?.();
+  engineSyncTimer = setTimeout(async () => { engineSyncTimer = null; if (!engineDirty) return; engineDirty = false; try { await snapshotEngineNow(reason); } catch {} }, Math.max(0, Number(delayMs) || 0)); engineSyncTimer.unref?.();
 }
 export function marketplacePersistenceMiddleware(req, res, next) {
   if (["POST","PUT","PATCH","DELETE"].includes(String(req.method || "GET").toUpperCase())) res.on("finish", () => { if (res.statusCode < 500) scheduleMarketplaceSnapshot(`${req.method} ${req.path || ""}`); });
