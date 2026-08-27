@@ -4,6 +4,9 @@ import fs from 'node:fs';
 
 const syncSource = fs.readFileSync('backend/lib/engine/tcgdex-sync.js','utf8');
 const sealedEngine = fs.readFileSync('backend/lib/engine/sealed-products.js','utf8');
+const sealedSchedule = fs.readFileSync('backend/lib/engine/sealed-catalog-schedule.js','utf8');
+const engineDb = fs.readFileSync('backend/lib/engine/database.js','utf8');
+const persistence = fs.readFileSync('backend/lib/marketplace/persistence.js','utf8');
 const engineAdmin = fs.readFileSync('backend/routes/engine-admin.js','utf8');
 const catalogHtml = fs.readFileSync('admin-catalogue.html','utf8');
 const integratedSealed = fs.readFileSync('js/admin/admin-catalog-sealed-shortcuts.js','utf8');
@@ -32,6 +35,7 @@ test('sealed products live directly inside the reference catalog', () => {
 });
 
 test('sealed catalog has a real persistent database and public market sync', () => {
+  assert.match(engineDb, /CREATE TABLE IF NOT EXISTS sealed_products/);
   assert.match(sealedEngine, /CREATE TABLE IF NOT EXISTS sealed_products/);
   assert.match(sealedEngine, /cardmarket_id INTEGER UNIQUE/);
   assert.match(sealedEngine, /sale_price REAL/);
@@ -43,6 +47,25 @@ test('sealed catalog has a real persistent database and public market sync', () 
   assert.match(engineAdmin, /router\.post\("\/sealed\/sync"/);
   assert.match(integratedSealed, /Synchroniser les scellés/);
   assert.match(integratedSealed, /autoSyncTried/);
+});
+
+test('sealed data and manual selling prices survive restarts', () => {
+  assert.match(persistence, /ENGINE_TABLES = \[[^\]]*"sealed_products"/s);
+  assert.match(persistence, /ENGINE_CHILD_FIRST = \[[^\]]*"sealed_products"/s);
+  assert.match(persistence, /version: 3/);
+  assert.match(persistence, /engineSyncPromise = null/);
+  assert.match(persistence, /engineSyncTimer\.unref/);
+  assert.match(sealedEngine, /sale_price_manual/);
+  assert.match(sealedEngine, /CASE WHEN sealed_products\.sale_price_manual=1 THEN sealed_products\.sale_price ELSE excluded\.sale_price END/);
+});
+
+test('sealed database fills automatically and refreshes at Paris noon', () => {
+  assert.match(engineAdmin, /sealed-catalog-schedule\.js/);
+  assert.match(sealedSchedule, /startup-sealed-catalog/);
+  assert.match(sealedSchedule, /daily-sealed-catalog-paris-noon/);
+  assert.match(sealedSchedule, /nextParisNoon/);
+  assert.match(sealedSchedule, /12:00 Europe\/Paris/);
+  assert.match(sealedSchedule, /flushEnginePersistence/);
 });
 
 test('all important Pokemon sealed families are integrated', () => {
