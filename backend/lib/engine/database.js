@@ -24,6 +24,11 @@ export function getDb() {
   return db;
 }
 
+function ensureColumn(database, table, column, definition) {
+  const columns = database.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  if (!columns.includes(column)) database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
 function migrate(database) {
   database.exec(`
     CREATE TABLE IF NOT EXISTS licenses (
@@ -46,6 +51,8 @@ function migrate(database) {
       extension_code TEXT DEFAULT '',
       number TEXT DEFAULT '',
       rarity TEXT DEFAULT '',
+      hit_family TEXT DEFAULT '',
+      variants_json TEXT DEFAULT '{}',
       illustration TEXT DEFAULT '',
       image_hd TEXT DEFAULT '',
       image_thumb TEXT DEFAULT '',
@@ -95,6 +102,10 @@ function migrate(database) {
     CREATE INDEX IF NOT EXISTS idx_sales_card ON sales_history(card_id, sold_at);
   `);
 
+  ensureColumn(database, "cards", "hit_family", "TEXT DEFAULT ''");
+  ensureColumn(database, "cards", "variants_json", "TEXT DEFAULT '{}'");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_cards_rarity_hit ON cards(rarity, hit_family, active)");
+
   let ftsAvailable = true;
   try {
     database.exec(`
@@ -118,25 +129,16 @@ function migrate(database) {
           SELECT rowid, name, extension, number, rarity, license_slug FROM cards;
         `);
       }
-    } catch {
-      // FTS5 reste optionnel : la recherche LIKE prendra le relais.
-    }
+    } catch {}
   }
 }
 
 export function normalizeText(str) {
-  return String(str || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
+  return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
 export function slugify(str) {
-  return normalizeText(str)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 120) || "carte";
+  return normalizeText(str).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 120) || "carte";
 }
 
 export function makeCardId(licenseSlug, slug) {
@@ -147,14 +149,15 @@ export function syncFts(cardRowid, card) {
   try {
     const dbi = getDb();
     dbi.prepare("DELETE FROM cards_fts WHERE rowid = ?").run(cardRowid);
-    dbi.prepare(
-      "INSERT INTO cards_fts(rowid, name, extension, number, rarity, license_slug) VALUES (?,?,?,?,?,?)"
-    ).run(cardRowid, card.name, card.extension, card.number, card.rarity, card.license_slug);
-  } catch { /* FTS optional */ }
+    dbi.prepare("INSERT INTO cards_fts(rowid, name, extension, number, rarity, license_slug) VALUES (?,?,?,?,?,?)")
+      .run(cardRowid, card.name, card.extension, card.number, card.rarity, card.license_slug);
+  } catch {}
 }
 
 export function rowToCard(row, extras = {}) {
   if (!row) return null;
+  let variants = {};
+  try { variants = JSON.parse(row.variants_json || "{}"); } catch {}
   return {
     id: row.id,
     license: row.license_slug,
@@ -164,16 +167,13 @@ export function rowToCard(row, extras = {}) {
     extensionCode: row.extension_code,
     number: row.number,
     rarity: row.rarity,
+    hitFamily: row.hit_family || "",
+    variants,
     illustration: row.illustration,
     imageHd: row.image_hd,
     imageThumb: row.image_thumb || row.image_hd,
     condition: row.condition_note,
-    prices: {
-      avg: row.avg_price,
-      low: row.low_price,
-      high: row.high_price,
-      recommended: row.recommended_price
-    },
+    prices: { avg: row.avg_price, low: row.low_price, high: row.high_price, recommended: row.recommended_price },
     marketTrend: row.market_trend,
     trendPercent: row.trend_percent,
     salesCount: row.sales_count,
