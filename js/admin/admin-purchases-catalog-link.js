@@ -29,12 +29,15 @@
     var form=qs("purchaseForm");if(form)form.scrollIntoView({behavior:"smooth",block:"start"});
   }
   async function prefillFromUrl(){
-    var params=new URLSearchParams(location.search),source=params.get("source"),id=params.get("id");
+    var params=new URLSearchParams(location.search),source=params.get("source"),id=params.get("id"),requestedPackaging=params.get("packaging");
     if(!source||!id)return;
     try{
       if(source==="card"){
         var d=await A.adminFetch("/api/admin/engine/cards/"+encodeURIComponent(id));
-        if(d.ok&&d.card){var c=d.card;fillCommon({description:(c.name||"Carte Pokémon")+(c.extension?" — "+c.extension:"")+(c.number?" #"+c.number:""),reference:"catalog-card:"+c.id,packaging:"carte_unite",quantity:1,notes:"Ajouté depuis le catalogue de référence Cardoria."});}
+        if(d.ok&&d.card){
+          var c=d.card,packaging=requestedPackaging==="lot_cartes"?"lot_cartes":"carte_unite";
+          fillCommon({description:(c.name||"Carte Pokémon")+(c.extension?" — "+c.extension:"")+(c.number?" #"+c.number:""),reference:"catalog-card:"+c.id,packaging:packaging,quantity:1,notes:packaging==="lot_cartes"?"Lot créé depuis le catalogue de référence Cardoria.":"Ajouté depuis le catalogue de référence Cardoria."});
+        }
       }else if(source==="sealed"){
         var s=await A.adminFetch("/api/admin/catalog/sealed-references");
         var r=(s.references||[]).find(function(x){return x.id===id;});
