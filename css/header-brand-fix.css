@@ -1,5 +1,4 @@
-/* Cardoria header brand correction — keeps the existing logo asset, but crops/zooms it
-   so the emblem is readable instead of rendering the whole padded artwork as a thumbnail. */
+/* Dedicated Cardoria header emblem. Avoids using the wide premium logo as a tiny thumbnail. */
 .header .brand {
   display: inline-flex;
   align-items: center;
@@ -9,21 +8,17 @@
 }
 
 .header .brand > img {
-  display: none;
+  display: none !important;
 }
 
 .header .brand::before {
   content: "";
   display: block;
-  flex: 0 0 62px;
-  width: 62px;
-  height: 54px;
-  background-image: url('/assets/logo/cardoria-premium.png');
-  background-repeat: no-repeat;
-  background-position: left center;
-  background-size: 255% auto;
-  border-radius: 12px;
-  filter: drop-shadow(0 4px 12px rgba(212,175,55,.22));
+  flex: 0 0 58px;
+  width: 58px;
+  height: 58px;
+  background: url('/assets/logo/cardoria-header-mark.svg?v=2') center/contain no-repeat;
+  filter: drop-shadow(0 5px 14px rgba(212,175,55,.28));
 }
 
 .header .brand > span {
@@ -36,17 +31,11 @@
 }
 
 @media (max-width: 720px) {
-  .header .brand {
-    gap: 10px;
-  }
-
+  .header .brand { gap: 10px; }
   .header .brand::before {
-    flex-basis: 52px;
-    width: 52px;
-    height: 46px;
+    flex-basis: 50px;
+    width: 50px;
+    height: 50px;
   }
-
-  .header .brand > span {
-    font-size: 17px;
-  }
+  .header .brand > span { font-size: 17px; }
 }
