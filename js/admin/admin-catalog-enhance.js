@@ -114,7 +114,7 @@
   function visibleIds() {
     var body = document.getElementById("catalogBody");
     if (!body) return [];
-    return Array.from(body.querySelectorAll("[data-history]")).map(function (button) { return button.getAttribute("data-history"); }).filter(Boolean).slice(0, 40);
+    return Array.from(body.querySelectorAll("[data-history]")).map(function (button) { return button.getAttribute("data-history"); }).filter(Boolean).slice(0, 100);
   }
 
   function markClickable() {
@@ -135,11 +135,15 @@
     lastSignature = signature;
     refreshRunning = true;
     A.adminFetch("/api/admin/engine/market-prices/visible", { method: "POST", body: JSON.stringify({ ids: ids }) }).then(function (d) {
-      if (!d.ok || !d.checked) return;
+      if (!d.ok) return;
       var status = document.getElementById("syncPokemonStatus");
-      if (status && d.priced) status.textContent = d.priced + " valeur(s) marché ajoutée(s) sur les cartes visibles";
-      var reload = document.getElementById("reloadCat");
-      if (reload) reload.click();
+      if (status && d.checked) {
+        status.textContent = (d.priced || 0) + " valeur(s) ajoutée(s) · " + (d.unavailable || 0) + " sans tarif chez la source · " + (d.checked || 0) + " contrôlée(s)";
+      }
+      if (d.checked) {
+        var reload = document.getElementById("reloadCat");
+        if (reload) reload.click();
+      }
       var market = document.getElementById("marketPriced");
       if (market && d.marketStatus) market.textContent = (d.marketStatus.priced || 0) + " / " + (d.marketStatus.total || 0) + " tarifées";
     }).finally(function () { refreshRunning = false; });
