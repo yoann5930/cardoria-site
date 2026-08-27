@@ -31,7 +31,7 @@
       label: "Catalogue & ventes",
       icon: "▣",
       items: [
-        { href: "admin-catalogue.html", label: "Moteur cartes", page: "catalog" },
+        { href: "admin-catalogue.html", label: "Référence cartes", page: "catalog" },
         { href: "admin-marketplace.html", label: "Marketplace", page: "marketplace" }
       ]
     },
