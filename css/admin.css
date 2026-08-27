@@ -1,9 +1,9 @@
 /* Cardoria Enterprise Back-Office */
 .admin-app{margin:0;background:#06080d;color:#fff8e8;min-height:100vh}
 .admin-layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
-.admin-sidebar{background:linear-gradient(180deg,#0a0c12,#07080c);border-right:1px solid rgba(212,175,55,.25);padding:24px 16px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.admin-sidebar{background:linear-gradient(180deg,#0a0c12,#07080c);border-right:1px solid rgba(212,175,55,.25);padding:24px 16px;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:2}
 .admin-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px;padding:0 8px}
-.admin-brand img{width:48px;border-radius:8px}
+.admin-brand img{display:none}
 .admin-brand span{font-weight:900;letter-spacing:.08em;color:#ffe18a;font-size:14px}
 .admin-nav{display:flex;flex-direction:column;gap:8px}
 .admin-nav-group{border:1px solid rgba(212,175,55,.14);border-radius:14px;background:rgba(255,255,255,.018);overflow:hidden}
@@ -20,7 +20,8 @@
 .admin-subnav-dot{color:rgba(212,175,55,.55);font-size:12px}
 .admin-subnav-link.active .admin-subnav-dot{color:#ffe18a}
 .admin-nav-section{margin:18px 0 8px;padding:0 14px;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:rgba(212,175,55,.5)}
-.admin-main{padding:28px 32px 48px;overflow-x:hidden}
+.admin-main{padding:28px 32px 48px;overflow-x:hidden;position:relative;isolation:isolate}
+.admin-main::before{content:"";position:fixed;z-index:-1;pointer-events:none;left:calc(260px + (100vw - 260px)/2);top:52%;transform:translate(-50%,-50%);width:min(68vw,980px);height:min(68vw,980px);background:url('/assets/logo/cardoria-premium.png') center/contain no-repeat;opacity:.075;filter:drop-shadow(0 0 45px rgba(212,175,55,.2));}
 .admin-topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:28px;flex-wrap:wrap}
 .admin-topbar h1{margin:0 0 6px;font-size:clamp(24px,3vw,34px);color:#ffe18a}
 .admin-topbar p{margin:0;color:#baaf97;font-size:14px}
@@ -58,5 +59,5 @@
 .admin-form-grid input,.admin-form-grid textarea{background:rgba(255,255,255,.06);color:#fff8e8}
 .admin-form-grid textarea{resize:vertical}
 .admin-form-wide{grid-column:1/-1}
-@media(max-width:1024px){.admin-layout{grid-template-columns:1fr}.admin-sidebar{position:relative;height:auto}.admin-kpi-grid{grid-template-columns:repeat(2,1fr)}.admin-grid-2{grid-template-columns:1fr}}
+@media(max-width:1024px){.admin-layout{grid-template-columns:1fr}.admin-sidebar{position:relative;height:auto}.admin-main::before{left:50%;width:min(88vw,760px);height:min(88vw,760px)}.admin-kpi-grid{grid-template-columns:repeat(2,1fr)}.admin-grid-2{grid-template-columns:1fr}}
 @media(max-width:640px){.admin-main{padding:18px 16px 32px}.admin-kpi-grid{grid-template-columns:1fr}.admin-form-grid{grid-template-columns:1fr}.admin-form-wide{grid-column:auto}}

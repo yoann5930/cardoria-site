@@ -8,7 +8,7 @@
 
     var css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "/css/site-loader.css?v=1";
+    css.href = "/css/site-loader.css?v=2";
     document.head.appendChild(css);
 
     var loader = document.createElement("div");
@@ -24,11 +24,10 @@
         '<div class="cardoria-loader__emblem" aria-hidden="true">' +
           '<span class="cardoria-loader__orbit"></span>' +
           '<span class="cardoria-loader__logo-shell">' +
-            '<img class="cardoria-loader__logo" src="/assets/logo/cardoria-premium.png" alt="" onerror="this.onerror=null;this.src=\'/logo-cardoria.jpg\'">' +
+            '<img class="cardoria-loader__logo" src="/assets/logo/cardoria-premium.png" alt="">' +
           '</span>' +
         '</div>' +
         '<p class="cardoria-loader__eyebrow">Le Royaume des Collectionneurs</p>' +
-        '<p class="cardoria-loader__title">CARDORIA</p>' +
         '<p class="cardoria-loader__tagline">L\'univers premium des cartes à collectionner.</p>' +
         '<div class="cardoria-loader__progress" aria-hidden="true">' +
           '<div class="cardoria-loader__track"><span class="cardoria-loader__bar" id="cardoriaLoaderBar"></span></div>' +

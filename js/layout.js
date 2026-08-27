@@ -2,8 +2,7 @@
   "use strict";
 
   var A = window.CARDORIA_ASSETS || {
-    logo: "/assets/logo/cardoria-premium.png",
-    logoFallback: "/logo-cardoria.jpg"
+    logo: "/assets/logo/cardoria-premium.png"
   };
 
   function pageBase() {
@@ -16,7 +15,7 @@
     if (!slot) return;
     slot.innerHTML =
       '<header class="header"><div class="container nav">' +
-      '<a class="brand" href="' + base + 'index.html"><img src="' + A.logo + '" alt="Cardoria — cartes TCG premium" width="58" height="42" loading="eager" decoding="async" onerror="this.onerror=null;this.src=\'' + A.logoFallback + '\'"><span>CARDORIA</span></a>' +
+      '<a class="brand" href="' + base + 'index.html"><img src="' + A.logo + '" alt="Cardoria — cartes TCG premium" width="58" height="42" loading="eager" decoding="async"><span>CARDORIA</span></a>' +
       '<button class="burger" type="button" aria-label="Ouvrir le menu" onclick="toggleMenu()">Menu</button>' +
       '<nav class="menu" id="menu" aria-label="Navigation principale">' +
       '<a href="' + base + 'index.html">Accueil</a>' +
@@ -45,7 +44,7 @@
       '<footer class="footer-premium">' +
       '<div class="container footer-grid">' +
       '<div class="footer-brand">' +
-      '<img src="' + A.logo + '" alt="Cardoria logo" width="90" height="65" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=\'' + A.logoFallback + '\'">' +
+      '<img src="' + A.logo + '" alt="Cardoria logo" width="90" height="65" loading="lazy" decoding="async">' +
       "<p>Plateforme premium française : estimation IA, marketplace, rachat et expertise cartes TCG.</p>" +
       '<p class="footer-email"><a href="mailto:Cardoria59330@gmail.com">Cardoria59330@gmail.com</a></p>' +
       "</div>" +
