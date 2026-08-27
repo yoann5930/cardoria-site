@@ -1,10 +1,12 @@
 import crypto from "crypto";
 import { getDb, normalizeText } from "./database.js";
 
-const PRODUCT_URL = "https://downloads.s3.cardmarket.com/productCatalog/productList/products_nonsingles_6.json";
-const PRICE_URL = "https://downloads.s3.cardmarket.com/productCatalog/priceGuide/price_guide_6.json";
-const SOURCE = "cardmarket-public";
-const FRESH_MS = 6 * 60 * 60 * 1000;
+const TCGCSV_BASE = "https://tcgcsv.com/tcgplayer";
+const POKEMON_CATEGORY_ID = 3;
+const FX_URL = "https://api.frankfurter.dev/v2/rate/USD/EUR";
+const SOURCE = "tcgcsv-tcgplayer";
+const FRESH_MS = 20 * 60 * 60 * 1000;
+const REQUEST_DELAY_MS = 110;
 
 export const SEALED_PACKAGING_TYPES = [
   "booster","blister","duopack","tripack","quadpack","bundle","mini_bundle","demi_display","display","case_display",
@@ -21,6 +23,11 @@ function positive(...values) {
     if (Number.isFinite(n) && n > 0) return n;
   }
   return 0;
+}
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+function ensureColumn(db, name, definition) {
+  const cols = db.prepare("PRAGMA table_info(sealed_products)").all().map((row) => row.name);
+  if (!cols.includes(name)) db.exec(`ALTER TABLE sealed_products ADD COLUMN ${name} ${definition}`);
 }
 
 export function ensureSealedSchema() {
@@ -55,9 +62,17 @@ export function ensureSealedSchema() {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+  `);
+  ensureColumn(db, "tcgplayer_id", "INTEGER");
+  ensureColumn(db, "tcgplayer_group_id", "INTEGER");
+  ensureColumn(db, "product_url", "TEXT DEFAULT ''");
+  ensureColumn(db, "market_price_usd", "REAL NOT NULL DEFAULT 0");
+  ensureColumn(db, "fx_usd_eur", "REAL NOT NULL DEFAULT 0");
+  ensureColumn(db, "market_currency", "TEXT DEFAULT 'EUR'");
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_sealed_tcgplayer ON sealed_products(tcgplayer_id) WHERE tcgplayer_id IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_sealed_active_packaging ON sealed_products(active, packaging);
     CREATE INDEX IF NOT EXISTS idx_sealed_name ON sealed_products(name_normalized);
-    CREATE INDEX IF NOT EXISTS idx_sealed_cardmarket ON sealed_products(cardmarket_id);
   `);
   return db;
 }
@@ -77,7 +92,7 @@ export function classifySealedPackaging(name = "", categoryName = "") {
   if (/3[- ]?pack.*blister|tri[- ]?pack|tripack/.test(n)) return "tripack";
   if (/2[- ]?pack.*blister|duo[- ]?pack|duopack/.test(n)) return "duopack";
   if (/blister/.test(n) || /blister/.test(c)) return "blister";
-  if (/booster\s*(box|display)|display/.test(n) || /booster\s*box/.test(c)) return "display";
+  if (/booster\s*(box|display)|display/.test(n)) return "display";
   if (/mini\s*tin/.test(n)) return "mini_tin";
   if (/\btin\b|pokebox/.test(n)) return /pokebox/.test(n) ? "pokebox" : "tin";
   if (/build\s*&?\s*battle\s*stadium/.test(n)) return "build_battle_stadium";
@@ -99,12 +114,15 @@ export function classifySealedPackaging(name = "", categoryName = "") {
   return "other";
 }
 
-export function isSealedCardmarketProduct(record = {}) {
-  const category = normalizeText(record.categoryName || record.category || "");
-  const name = normalizeText(record.name || "");
-  if (category.includes("accessor")) return false;
-  if (category.includes("booster") || category.includes("sealed")) return true;
-  return /(booster|display|elite trainer|etb|bundle|blister|tin\b|pokebox|build\s*&?\s*battle|deck\b|premium collection|poster collection|binder collection|calendar|advent|ultra premium|upc\b|collection box|boxed collection)/.test(name) && !/(sleeve|binder page|deck box|playmat|toploader|accessor)/.test(name);
+function extendedNames(product = {}) {
+  return new Set((Array.isArray(product.extendedData) ? product.extendedData : []).map((item) => normalizeText(item?.name || item?.displayName || "")));
+}
+export function isSealedTcgProduct(product = {}) {
+  const n = normalizeText(product.name || product.cleanName || "");
+  const extended = extendedNames(product);
+  if (extended.has("number") || extended.has("card number") || extended.has("rarity")) return false;
+  if (/(sleeve|deck box|playmat|toploader|binder page|portfolio|divider|dice|coin|marker|accessor)/.test(n)) return false;
+  return /(booster|display|elite trainer|\betb\b|bundle|blister|\btin\b|pokebox|build\s*&?\s*battle|\bdeck\b|premium collection|poster collection|binder collection|calendar|advent|ultra premium|\bupc\b|collection box|boxed collection|collector chest|trainer toolkit|battle academy)/.test(n);
 }
 
 export function inferSealedUnits(name = "", packaging = "other") {
@@ -115,34 +133,40 @@ export function inferSealedUnits(name = "", packaging = "other") {
   return defaults[packaging] || 1;
 }
 
-export function pickSealedMarketPrice(price = {}) {
-  return round2(positive(price.trend, price.avg7, price.avg30, price.avg, price.avg1, price.low));
+function pickTcgPrice(rows = []) {
+  const candidates = Array.isArray(rows) ? rows : [];
+  const preferred = candidates.find((row) => normalizeText(row?.subTypeName) === "normal") || candidates.find((row) => positive(row?.marketPrice, row?.midPrice, row?.lowPrice) > 0) || {};
+  return {
+    market: round2(positive(preferred.marketPrice, preferred.midPrice, preferred.lowPrice)),
+    low: round2(positive(preferred.lowPrice, preferred.directLowPrice)),
+    mid: round2(positive(preferred.midPrice, preferred.marketPrice)),
+    high: round2(positive(preferred.highPrice, preferred.midPrice))
+  };
 }
 
-function extractProducts(payload) {
-  if (Array.isArray(payload)) return payload;
-  for (const key of ["products", "data", "items"]) if (Array.isArray(payload?.[key])) return payload[key];
-  return [];
-}
-function extractPrices(payload) {
-  if (Array.isArray(payload)) return payload;
-  for (const key of ["priceGuides", "prices", "data", "items"]) if (Array.isArray(payload?.[key])) return payload[key];
-  return [];
-}
-async function fetchJson(url) {
+async function fetchJson(url, timeoutMs = 30000) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 60000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Cardoria/6.0" }, signal: controller.signal });
-    if (!response.ok) throw new Error(`Cardmarket ${response.status}`);
+    const response = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Cardoria/6.0 sealed-catalog" }, signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status} ${url}`);
     return await response.json();
   } finally { clearTimeout(timer); }
 }
+async function usdEurRate() {
+  try {
+    const payload = await fetchJson(FX_URL, 15000);
+    const rate = Number(payload?.rate || 0);
+    if (Number.isFinite(rate) && rate > 0) return rate;
+  } catch {}
+  return 0;
+}
+function extractResults(payload) { return Array.isArray(payload?.results) ? payload.results : []; }
 
 function rowToReference(row) {
   return {
     id: row.id,
-    cardmarketId: row.cardmarket_id == null ? null : Number(row.cardmarket_id),
+    tcgplayerId: row.tcgplayer_id == null ? null : Number(row.tcgplayer_id),
     source: row.source,
     name: row.name,
     license: "pokemon",
@@ -152,15 +176,18 @@ function rowToReference(row) {
     unitsPerPackage: Number(row.units_per_package || 1),
     ean: row.ean || "",
     imageUrl: row.image_url || "",
-    cardmarketUrl: row.cardmarket_url || "",
+    productUrl: row.product_url || "",
     salePrice: Number(row.sale_price || 0),
     salePriceManual: Boolean(row.sale_price_manual),
     marketPrice: Number(row.market_price || 0),
+    marketPriceUsd: Number(row.market_price_usd || 0),
     marketLow: Number(row.market_low || 0),
     marketAvg: Number(row.market_avg || 0),
     marketAvg1: Number(row.market_avg1 || 0),
     marketAvg7: Number(row.market_avg7 || 0),
     marketAvg30: Number(row.market_avg30 || 0),
+    fxUsdEur: Number(row.fx_usd_eur || 0),
+    marketCurrency: row.market_currency || "EUR",
     priceSource: row.price_source || "",
     marketUpdatedAt: row.market_updated_at || "",
     notes: row.notes || "",
@@ -175,13 +202,13 @@ export function getSealedCatalogStatus() {
   const row = db.prepare(`SELECT COUNT(*) AS total,
     SUM(CASE WHEN active=1 THEN 1 ELSE 0 END) AS active,
     SUM(CASE WHEN active=1 AND market_price>0 THEN 1 ELSE 0 END) AS priced,
-    SUM(CASE WHEN active=1 AND source='cardmarket' THEN 1 ELSE 0 END) AS cardmarket,
+    SUM(CASE WHEN active=1 AND source='tcgcsv' THEN 1 ELSE 0 END) AS provider,
     SUM(CASE WHEN active=1 AND source='manual' THEN 1 ELSE 0 END) AS manual,
-    MAX(CASE WHEN source='cardmarket' THEN market_updated_at ELSE '' END) AS last_sync
+    MAX(CASE WHEN source='tcgcsv' THEN market_updated_at ELSE '' END) AS last_sync
     FROM sealed_products`).get() || {};
   return {
     total: Number(row.total || 0), active: Number(row.active || 0), priced: Number(row.priced || 0),
-    cardmarket: Number(row.cardmarket || 0), manual: Number(row.manual || 0), lastSyncAt: row.last_sync || "", source: SOURCE
+    provider: Number(row.provider || 0), manual: Number(row.manual || 0), lastSyncAt: row.last_sync || "", source: SOURCE
   };
 }
 
@@ -193,7 +220,7 @@ export function listSealedProducts({ q = "", packaging = "", limit = 10000, acti
   if (q) { clauses.push("(name_normalized LIKE ? OR extension LIKE ? OR ean LIKE ? OR category_name LIKE ?)"); const like = `%${normalizeText(q)}%`; params.push(like, `%${q}%`, `%${q}%`, `%${q}%`); }
   const safeLimit = Math.min(Math.max(Number(limit) || 10000, 1), 20000);
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-  const rows = db.prepare(`SELECT * FROM sealed_products ${where} ORDER BY CASE WHEN sale_price>0 THEN 0 ELSE 1 END, name ASC LIMIT ?`).all(...params, safeLimit);
+  const rows = db.prepare(`SELECT * FROM sealed_products ${where} ORDER BY CASE WHEN sale_price>0 THEN 0 ELSE 1 END, extension DESC, name ASC LIMIT ?`).all(...params, safeLimit);
   return rows.map(rowToReference);
 }
 
@@ -242,53 +269,86 @@ export async function syncCardmarketSealedCatalog({ force = false } = {}) {
   const db = ensureSealedSchema();
   const status = getSealedCatalogStatus();
   const last = Date.parse(status.lastSyncAt || "");
-  if (!force && status.cardmarket >= 50 && Number.isFinite(last) && Date.now() - last < FRESH_MS) return { ok: true, skipped: true, reason: "fresh", ...status };
+  if (!force && status.provider >= 20 && Number.isFinite(last) && Date.now() - last < FRESH_MS) return { ok: true, skipped: true, reason: "fresh", ...status };
 
-  const [productPayload, pricePayload] = await Promise.all([fetchJson(PRODUCT_URL), fetchJson(PRICE_URL)]);
-  const products = extractProducts(productPayload);
-  const prices = extractPrices(pricePayload);
-  if (products.length < 100 || prices.length < 100) throw new Error("Catalogue public Cardmarket incomplet.");
-  const priceById = new Map(prices.map((price) => [String(price?.idProduct ?? ""), price]));
-  const sealed = products.filter((product) => product?.idProduct != null && product?.name && isSealedCardmarketProduct(product));
-  if (sealed.length < 20) throw new Error("Aucun catalogue Pokémon scellé fiable reçu de Cardmarket.");
+  const fx = await usdEurRate();
+  if (!fx) throw new Error("Conversion USD/EUR indisponible : prix scelles non modifies.");
+  const groupsPayload = await fetchJson(`${TCGCSV_BASE}/${POKEMON_CATEGORY_ID}/groups`);
+  const groups = extractResults(groupsPayload);
+  if (groups.length < 50) throw new Error("Catalogue groupes Pokemon TCGCSV incomplet.");
+
+  const collected = [];
+  let groupsRead = 0, groupsFailed = 0;
+  for (const group of groups) {
+    const groupId = Number(group?.groupId || 0);
+    if (!groupId) continue;
+    try {
+      await sleep(REQUEST_DELAY_MS);
+      const productsPayload = await fetchJson(`${TCGCSV_BASE}/${POKEMON_CATEGORY_ID}/${groupId}/products`);
+      const sealedProducts = extractResults(productsPayload).filter(isSealedTcgProduct);
+      groupsRead += 1;
+      if (!sealedProducts.length) continue;
+      await sleep(REQUEST_DELAY_MS);
+      const pricesPayload = await fetchJson(`${TCGCSV_BASE}/${POKEMON_CATEGORY_ID}/${groupId}/prices`);
+      const pricesById = new Map();
+      for (const price of extractResults(pricesPayload)) {
+        const key = Number(price?.productId || 0);
+        if (!key) continue;
+        const bucket = pricesById.get(key) || [];
+        bucket.push(price); pricesById.set(key, bucket);
+      }
+      for (const product of sealedProducts) {
+        const tcgplayerId = Number(product?.productId || 0);
+        if (!tcgplayerId) continue;
+        const priceUsd = pickTcgPrice(pricesById.get(tcgplayerId) || []);
+        const packaging = classifySealedPackaging(product.name, "sealed products");
+        collected.push({
+          tcgplayerId, groupId, name: cleanText(product.name || product.cleanName, 240), extension: cleanText(group?.name || "", 180), packaging,
+          units: inferSealedUnits(product.name, packaging), imageUrl: cleanText(product.imageUrl || "", 800), productUrl: cleanText(product.url || "", 800),
+          marketUsd: priceUsd.market, marketEur: round2(priceUsd.market * fx), lowEur: round2(priceUsd.low * fx), midEur: round2(priceUsd.mid * fx), highEur: round2(priceUsd.high * fx)
+        });
+      }
+    } catch (error) {
+      groupsFailed += 1;
+      console.warn(`[sealed-catalog] group ${groupId} skipped:`, error?.message || String(error));
+    }
+  }
+  if (collected.length < 20) throw new Error("Catalogue Pokemon scelle TCGCSV insuffisant : aucune modification appliquee.");
 
   const now = new Date().toISOString();
   const upsert = db.prepare(`INSERT INTO sealed_products (
-    id,cardmarket_id,source,name,name_normalized,category_name,packaging,extension,id_expansion,units_per_package,ean,image_url,cardmarket_url,
-    sale_price,sale_price_manual,market_price,market_low,market_avg,market_avg1,market_avg7,market_avg30,price_source,market_updated_at,active,notes,created_at,updated_at
-  ) VALUES (@id,@cardmarket_id,'cardmarket',@name,@name_normalized,@category_name,@packaging,@extension,@id_expansion,@units_per_package,@ean,'',@cardmarket_url,
-    @sale_price,0,@market_price,@market_low,@market_avg,@market_avg1,@market_avg7,@market_avg30,@price_source,@market_updated_at,1,'',@created_at,@updated_at)
-  ON CONFLICT(cardmarket_id) DO UPDATE SET
-    source='cardmarket',name=excluded.name,name_normalized=excluded.name_normalized,category_name=excluded.category_name,packaging=excluded.packaging,
-    extension=CASE WHEN sealed_products.extension<>'' THEN sealed_products.extension ELSE excluded.extension END,id_expansion=excluded.id_expansion,
-    units_per_package=CASE WHEN sealed_products.units_per_package>1 THEN sealed_products.units_per_package ELSE excluded.units_per_package END,
-    ean=CASE WHEN sealed_products.ean<>'' THEN sealed_products.ean ELSE excluded.ean END,cardmarket_url=excluded.cardmarket_url,
+    id,tcgplayer_id,tcgplayer_group_id,source,name,name_normalized,category_name,packaging,extension,units_per_package,image_url,product_url,
+    sale_price,sale_price_manual,market_price,market_price_usd,market_low,market_avg,market_avg1,market_avg7,market_avg30,fx_usd_eur,market_currency,
+    price_source,market_updated_at,active,notes,created_at,updated_at
+  ) VALUES (@id,@tcgplayer_id,@tcgplayer_group_id,'tcgcsv',@name,@name_normalized,'Sealed Products',@packaging,@extension,@units_per_package,@image_url,@product_url,
+    @sale_price,0,@market_price,@market_price_usd,@market_low,@market_avg,0,0,0,@fx_usd_eur,'EUR',@price_source,@market_updated_at,1,'',@created_at,@updated_at)
+  ON CONFLICT(tcgplayer_id) DO UPDATE SET
+    source='tcgcsv',tcgplayer_group_id=excluded.tcgplayer_group_id,name=excluded.name,name_normalized=excluded.name_normalized,category_name='Sealed Products',
+    packaging=excluded.packaging,extension=excluded.extension,units_per_package=excluded.units_per_package,
+    image_url=CASE WHEN excluded.image_url<>'' THEN excluded.image_url ELSE sealed_products.image_url END,
+    product_url=CASE WHEN excluded.product_url<>'' THEN excluded.product_url ELSE sealed_products.product_url END,
     sale_price=CASE WHEN sealed_products.sale_price_manual=1 THEN sealed_products.sale_price ELSE excluded.sale_price END,
-    market_price=excluded.market_price,market_low=excluded.market_low,market_avg=excluded.market_avg,market_avg1=excluded.market_avg1,
-    market_avg7=excluded.market_avg7,market_avg30=excluded.market_avg30,price_source=excluded.price_source,market_updated_at=excluded.market_updated_at,
-    active=1,updated_at=excluded.updated_at`);
+    market_price=excluded.market_price,market_price_usd=excluded.market_price_usd,market_low=excluded.market_low,market_avg=excluded.market_avg,
+    fx_usd_eur=excluded.fx_usd_eur,market_currency='EUR',price_source=excluded.price_source,market_updated_at=excluded.market_updated_at,active=1,updated_at=excluded.updated_at`);
 
   let priced = 0;
   const transaction = db.transaction(() => {
-    db.prepare("UPDATE sealed_products SET active=0,updated_at=? WHERE source='cardmarket'").run(now);
-    for (const product of sealed) {
-      const cmId = Number(product.idProduct);
-      const price = priceById.get(String(product.idProduct)) || {};
-      const packaging = classifySealedPackaging(product.name, product.categoryName);
-      const marketPrice = pickSealedMarketPrice(price);
-      if (marketPrice > 0) priced += 1;
+    db.prepare("UPDATE sealed_products SET active=0,updated_at=? WHERE source='tcgcsv'").run(now);
+    for (const product of collected) {
+      if (product.marketEur > 0) priced += 1;
       upsert.run({
-        id: `sealed-cardmarket-${cmId}`, cardmarket_id: cmId, name: cleanText(product.name, 240), name_normalized: normalizeText(product.name),
-        category_name: cleanText(product.categoryName, 160), packaging, extension: cleanText(product.expansionName || product.nameExpansion || "", 160),
-        id_expansion: product.idExpansion == null || product.idExpansion === "" ? null : Number(product.idExpansion), units_per_package: inferSealedUnits(product.name, packaging),
-        ean: cleanText(product.ean || product.EAN || product.barcode || "", 80), cardmarket_url: `https://www.cardmarket.com/en/Pokemon/Products?idProduct=${cmId}`,
-        sale_price: marketPrice, market_price: marketPrice, market_low: round2(positive(price.low, price["low-holo"])), market_avg: round2(positive(price.avg, price["avg-holo"])),
-        market_avg1: round2(positive(price.avg1, price["avg1-holo"])), market_avg7: round2(positive(price.avg7, price["avg7-holo"])),
-        market_avg30: round2(positive(price.avg30, price["avg30-holo"])), price_source: SOURCE, market_updated_at: now, created_at: now, updated_at: now
+        id: `sealed-tcgplayer-${product.tcgplayerId}`, tcgplayer_id: product.tcgplayerId, tcgplayer_group_id: product.groupId,
+        name: product.name, name_normalized: normalizeText(product.name), packaging: product.packaging, extension: product.extension,
+        units_per_package: product.units, image_url: product.imageUrl, product_url: product.productUrl,
+        sale_price: product.marketEur, market_price: product.marketEur, market_price_usd: product.marketUsd,
+        market_low: product.lowEur, market_avg: product.midEur || product.marketEur, fx_usd_eur: fx,
+        price_source: SOURCE, market_updated_at: now, created_at: now, updated_at: now
       });
     }
   });
   transaction();
   const next = getSealedCatalogStatus();
-  return { ok: true, skipped: false, source: SOURCE, downloadedProducts: products.length, downloadedPrices: prices.length, products: sealed.length, priced, ...next };
+  return { ok: true, skipped: false, source: SOURCE, groups: groups.length, groupsRead, groupsFailed, products: collected.length, priced, fxUsdEur: fx, ...next };
 }
+
+ensureSealedSchema();
