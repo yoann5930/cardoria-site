@@ -15,15 +15,18 @@ function recentMatchingEstimate({ customerEmail, cardName, cardId }) {
   const id = clean(cardId, 250);
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
 
+  if (!email || !name) return null;
+
   return estimations.find((item) => {
     const created = Date.parse(item?.createdAt || "");
     if (!Number.isFinite(created) || created < cutoff) return false;
-    if (id && String(item?.cardId || "") === id) return true;
-    if (email && name) {
-      return String(item?.customerEmail || "").trim().toLowerCase() === email &&
-        String(item?.cardName || "").trim().toLowerCase() === name;
-    }
-    return false;
+
+    const sameEmail = String(item?.customerEmail || "").trim().toLowerCase() === email;
+    if (!sameEmail) return false;
+
+    const sameCardId = id && String(item?.cardId || "") === id;
+    const sameCardName = String(item?.cardName || "").trim().toLowerCase() === name;
+    return Boolean(sameCardId || sameCardName);
   }) || null;
 }
 
