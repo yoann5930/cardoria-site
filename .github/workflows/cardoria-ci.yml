@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "backend/**"
+      - "tests/**"
       - "script.js"
       - "admin-login.html"
       - "admin-email-login.html"
@@ -16,6 +17,7 @@ on:
     branches: [main]
     paths:
       - "backend/**"
+      - "tests/**"
       - "script.js"
       - "admin-login.html"
       - "admin-email-login.html"
@@ -58,13 +60,24 @@ jobs:
         run: |
           node --check server.js
           node --check routes/auth.js
+          node --check routes/admin.js
+          node --check routes/engine-admin.js
           node --check lib/auth.js
           node --check lib/auth/migrate.js
           node --check lib/auth/magicLink.js
           node --check lib/email.js
+          node --check lib/engine/tcgdex-sync.js
+          node --check lib/engine/market-schedule.js
           node --check ../script.js
           node --check ../js/admin/admin-login-secure.js
           node --check ../js/admin/admin-email-login.js
+          node --check ../js/admin/admin-lot-draft-store.js
+          node --check ../js/admin/admin-catalog-purchase-link.js
+          node --check ../js/admin/admin-purchases-catalog-link.js
+
+      - name: Lot and market regression tests
+        working-directory: .
+        run: node --test tests/lot-draft-store.test.mjs backend/tests/market-schedule.test.mjs
 
       - name: Reject client-side admin bypass
         working-directory: .
