@@ -10,8 +10,8 @@ const { Pool } = pg;
 const MARKET_TABLES = ["mk_sellers","mk_listings","mk_orders","mk_reviews","mk_favorites","mk_wishlist","mk_price_alerts","mk_cart_items","mk_invoices","mk_disputes"];
 const MARKET_CHILD_FIRST = [...MARKET_TABLES].reverse();
 const RUNTIME_TABLES = ["auth_users","auth_sessions","auth_reset_tokens","auth_magic_tokens","gdpr_consents","pay_transactions"];
-const ENGINE_TABLES = ["licenses","cards","price_sources","sales_history"];
-const ENGINE_CHILD_FIRST = ["sales_history","price_sources","cards","licenses"];
+const ENGINE_TABLES = ["licenses","cards","price_sources","sales_history","card_price_history"];
+const ENGINE_CHILD_FIRST = ["card_price_history","sales_history","price_sources","cards","licenses"];
 
 let pool = null;
 let initialized = false;
@@ -40,7 +40,6 @@ function sqliteRows(table) { return getDb().prepare(`SELECT * FROM ${quoteIdent(
 async function ensureRemoteSchema(client) {
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_runtime_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_engine_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-  // Migration additive: compatible avec la base Marketplace deja en production.
   await client.query(`ALTER TABLE mk_sellers ADD COLUMN IF NOT EXISTS auth_user_id TEXT DEFAULT ''`);
   await client.query(`CREATE INDEX IF NOT EXISTS idx_mk_sellers_auth_user ON mk_sellers(auth_user_id)`);
 }
@@ -52,7 +51,7 @@ function runtimePayload() {
 function enginePayload() {
   const tables = {};
   for (const table of ENGINE_TABLES) { try { tables[table] = sqliteRows(table); } catch { tables[table] = []; } }
-  return { version: 1, tables, capturedAt: new Date().toISOString() };
+  return { version: 2, tables, capturedAt: new Date().toISOString() };
 }
 async function writeRows(client, table, rows) {
   for (const row of rows) {
@@ -127,7 +126,7 @@ function restoreEngine(payload) {
     for (const table of ENGINE_TABLES) {
       for (const row of payload.tables?.[table] || []) {
         const cols = Object.keys(row); if (!cols.length) continue;
-        sqlite.prepare(`INSERT INTO ${quoteIdent(table)} (${cols.map(quoteIdent).join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...cols.map((c) => row[c]));
+        try { sqlite.prepare(`INSERT INTO ${quoteIdent(table)} (${cols.map(quoteIdent).join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...cols.map((c) => row[c])); } catch {}
       }
     }
   });
