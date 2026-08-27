@@ -2,15 +2,34 @@
 import { sanitizeObject } from "./sanitize.js";
 import { logError } from "../monitoring/errors.js";
 
+const PUBLIC_RELEASE = "cardoria-premium-20260828-1";
+
 export function applySecurityMiddleware(app) {
   app.set("trust proxy", 1);
   app.use((req, res, next) => {
     req.requestId = "req_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     res.setHeader("X-Request-Id", req.requestId);
+    res.setHeader("X-Cardoria-Release", PUBLIC_RELEASE);
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(self)");
+
+    // Les pages publiques doivent toujours refléter le dernier déploiement.
+    // Les anciens écrans Cardoria ont été longtemps servis avec des URLs stables,
+    // donc on interdit explicitement aux navigateurs/proxies de conserver le HTML.
+    if (req.method === "GET" || req.method === "HEAD") {
+      const publicPath = String(req.path || "");
+      if (publicPath === "/" || publicPath.endsWith(".html") || publicPath.endsWith("/")) {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+        res.setHeader("Surrogate-Control", "no-store");
+      } else if (publicPath.endsWith(".css") || publicPath.endsWith(".js")) {
+        res.setHeader("Cache-Control", "no-cache, max-age=0, must-revalidate");
+      }
+    }
+
     // Le site historique contient encore quelques scripts/styles inline. CSP reste
     // donc compatible tout en bloquant objets, iframes, base-uri et origines inconnues.
     res.setHeader("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com; upgrade-insecure-requests");
