@@ -8,6 +8,7 @@ import { listLicenses, createLicense, updateLicense, deleteLicense } from "../li
 import { searchCards, getCardById, createCard, updateCard, deleteCard, getCatalogFacets } from "../lib/engine/cards.js";
 import { setPriceSources, addSaleRecord, estimatePrice } from "../lib/engine/pricing.js";
 import { syncPokemonCatalog, syncPokemonReferenceCatalog, getMarketPriceStatus, getCardPriceHistory } from "../lib/engine/tcgdex-sync.js";
+import { refreshVisibleCardPrices } from "../lib/engine/visible-prices.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -15,6 +16,14 @@ router.use(requireAdmin);
 router.get("/licenses", (req, res) => res.json({ ok: true, licenses: listLicenses({ activeOnly: false }) }));
 router.get("/catalog/facets", (req, res) => res.json({ ok: true, ...getCatalogFacets({ license: req.query.license || "pokemon" }) }));
 router.get("/market-prices/status", (req, res) => res.json({ ok: true, ...getMarketPriceStatus() }));
+router.post("/market-prices/visible", async (req, res) => {
+  try {
+    const result = await refreshVisibleCardPrices(req.body?.ids || []);
+    res.json({ ok: true, ...result, marketStatus: getMarketPriceStatus() });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message || "Actualisation des cartes visibles impossible" });
+  }
+});
 router.get("/cards/:id/price-history", (req, res) => {
   const card = getCardById(req.params.id);
   if (!card) return res.status(404).json({ ok: false, error: "Carte introuvable" });
