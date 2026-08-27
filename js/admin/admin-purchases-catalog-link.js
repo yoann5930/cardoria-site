@@ -8,6 +8,7 @@
   function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
   function readLot(){try{var v=JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]");return Array.isArray(v)?v:[];}catch(e){return [];}}
   function writeLot(v){localStorage.setItem(STORAGE_KEY,JSON.stringify(v));}
+  function clearLot(){localStorage.removeItem(STORAGE_KEY);}
   function setLabel(inputId,text){var el=qs(inputId);if(!el||!el.parentElement)return;var label=el.parentElement;for(var i=0;i<label.childNodes.length;i++){if(label.childNodes[i].nodeType===3){label.childNodes[i].nodeValue=text;return;}}}
 
   function ensureLotBox(){
@@ -21,8 +22,10 @@
 
   function renderLot(){
     ensureLotBox();var box=qs("purchaseLotCards"),packaging=qs("pPackaging");if(!box||!packaging)return;
-    var isLot=packaging.value==="lot_cartes";box.hidden=!isLot;if(!isLot)return;
-    var cards=readLot(),expected=Math.max(1,Number(qs("pQty").value||1)),counter=qs("purchaseLotCounter"),state=qs("purchaseLotState"),body=qs("purchaseLotBody"),submit=qs("purchaseForm").querySelector('button[type="submit"]');
+    var isLot=packaging.value==="lot_cartes";box.hidden=!isLot;
+    var submit=qs("purchaseForm")&&qs("purchaseForm").querySelector('button[type="submit"]');
+    if(!isLot){if(submit)submit.disabled=false;return;}
+    var cards=readLot(),expected=Math.max(1,Number(qs("pQty").value||1)),counter=qs("purchaseLotCounter"),state=qs("purchaseLotState"),body=qs("purchaseLotBody");
     if(counter)counter.textContent=cards.length+" / "+expected+" carte(s)";
     if(state){
       if(cards.length===expected){state.textContent="Lot complet : tu peux valider l’achat.";state.style.color="";}
@@ -82,9 +85,14 @@
     },true);
   }
 
+  function watchSuccess(){
+    var msg=qs("pMessage");if(!msg||msg.dataset.lotWatch)return;msg.dataset.lotWatch="1";
+    new MutationObserver(function(){if(msg.textContent.trim()==="Achat enregistré."){clearLot();renderLot();}}).observe(msg,{childList:true,characterData:true,subtree:true});
+  }
+
   function start(){
     var packaging=qs("pPackaging");if(!packaging){setTimeout(start,100);return;}
-    ensureLotBox();packaging.addEventListener("change",updateLotLabels);qs("pQty").addEventListener("input",renderLot);updateLotLabels();installSubmitGuard();prefillFromUrl();
+    ensureLotBox();packaging.addEventListener("change",updateLotLabels);qs("pQty").addEventListener("input",renderLot);updateLotLabels();installSubmitGuard();watchSuccess();prefillFromUrl();
   }
   start();
 })();
