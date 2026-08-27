@@ -34,7 +34,7 @@ export function searchCards({ q = "", license = "", extension = "", rarity = "",
 function sortOrder(sort) {
   const rarityRank = `CASE c.hit_family
     WHEN 'Gold' THEN 100 WHEN 'SAR / Special Illustration Rare' THEN 95 WHEN 'Secret / Hyper Rare' THEN 90
-    WHEN 'AR / Illustration Rare' THEN 85 WHEN 'Full Art' THEN 80 WHEN 'Ultra Rare' THEN 75
+    WHEN 'AR / Illustration Rare' THEN 85 WHEN 'Full Art / Ultra Rare' THEN 80 WHEN 'Full Art' THEN 80 WHEN 'Ultra Rare' THEN 75
     WHEN 'Double Rare' THEN 70 WHEN 'VMAX / VSTAR' THEN 65 WHEN 'V / ex' THEN 60
     WHEN 'Holo' THEN 50 WHEN 'Reverse Holo' THEN 45 WHEN 'Rare' THEN 40
     WHEN 'Peu Commune' THEN 20 WHEN 'Commune' THEN 10 ELSE 0 END`;
