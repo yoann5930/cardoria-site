@@ -14,8 +14,9 @@ import marketplaceAdminRoutes, { webhookRouter } from "./routes/marketplace-admi
 import paymentsRoutes from "./routes/payments.js";
 import paymentsAdminRoutes from "./routes/payments-admin.js";
 import { seedEngineIfEmpty } from "./lib/engine/seed.js";
+import { syncPokemonCatalog } from "./lib/engine/tcgdex-sync.js";
 import { initMarketplace } from "./lib/marketplace/index.js";
-import { initMarketplacePersistence, marketplacePersistenceMiddleware, flushMarketplacePersistence, closeMarketplacePersistence } from "./lib/marketplace/persistence.js";
+import { initMarketplacePersistence, marketplacePersistenceMiddleware, enginePersistenceMiddleware, flushMarketplacePersistence, flushEnginePersistence, closeMarketplacePersistence } from "./lib/marketplace/persistence.js";
 import { emptyPublicCatalogOnce } from "./lib/marketplace/empty-catalog.js";
 import { initAi } from "./lib/ai/index.js";
 import { initSeo } from "./lib/seo/index.js";
@@ -95,6 +96,21 @@ if (!marketplacePersistence.ok) {
     console.error("[startup] catalog-cleanup: degraded", error);
   }
 }
+
+try {
+  const pokemonSync = await syncPokemonCatalog();
+  if (pokemonSync.skipped) console.log(`[startup] pokemon-catalog: already populated (${pokemonSync.count} cards)`);
+  else {
+    console.log(`[startup] pokemon-catalog: imported ${pokemonSync.imported} real cards from ${pokemonSync.source} (${pokemonSync.sets} sets)`);
+    const saved = await flushEnginePersistence("tcgdex-pokemon-sync");
+    if (!saved.ok) console.error("[startup] pokemon-catalog: persistence failed", saved.error || "unknown");
+  }
+} catch (error) {
+  startup.ok = false;
+  startup.degraded.push({ name: "pokemon-catalog", error: error?.message || String(error) });
+  console.error("[startup] pokemon-catalog: degraded", error);
+}
+
 safeInit("market-data", initMarketData);
 safeInit("scanner", initScanner);
 safeInit("ai-enterprise", initAiEnterprise);
@@ -121,7 +137,7 @@ app.use("/api/seo", apiRateLimit, seoRoutes);
 app.use("/api/estimation-carte", (req, res, next) => { if (req.method === "POST") return aiRateLimit(req, res, next); next(); }, estimationRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/development", developmentRoutes);
-app.use("/api/admin/engine", engineAdminRoutes);
+app.use("/api/admin/engine", enginePersistenceMiddleware, engineAdminRoutes);
 app.use("/api/admin/marketplace", marketplacePersistenceMiddleware, marketplaceAdminRoutes);
 app.use("/api/admin/payments", marketplacePersistenceMiddleware, paymentsAdminRoutes);
 app.use("/api/admin/seo", seoAdminRoutes);
@@ -176,10 +192,12 @@ function shutdown(signal) {
   console.log(`[process] ${signal} received, closing HTTP server`);
   const forceExit = setTimeout(() => process.exit(1), 10000); forceExit.unref();
   server.close(async () => {
+    const enginePersisted = await flushEnginePersistence(`shutdown-${signal.toLowerCase()}`);
     const persisted = await flushMarketplacePersistence(`shutdown-${signal.toLowerCase()}`);
+    if (!enginePersisted.ok) console.error("[cardoria-engine-persistence] shutdown flush failed");
     if (!persisted.ok) console.error("[marketplace-persistence] shutdown flush failed");
     try { await closeMarketplacePersistence(); } catch {}
-    clearTimeout(forceExit); process.exit(persisted.ok ? 0 : 1);
+    clearTimeout(forceExit); process.exit(persisted.ok && enginePersisted.ok ? 0 : 1);
   });
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));
