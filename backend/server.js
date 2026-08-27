@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import estimationRoutes from "./routes/estimation.js";
+import rachatRoutes from "./routes/rachat.js";
 import adminRoutes from "./routes/admin.js";
 import emailAdminRoutes from "./routes/email-admin.js";
 import developmentRoutes from "./routes/development.js";
@@ -161,6 +162,7 @@ app.use("/api/payments", marketplacePersistenceMiddleware, apiRateLimit, payment
 app.use("/api/seo", apiRateLimit, seoRoutes);
 
 app.use("/api/estimation-carte", (req, res, next) => { if (req.method === "POST") return aiRateLimit(req, res, next); next(); }, estimationRoutes);
+app.use("/api/rachat", apiRateLimit, rachatRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/email", emailAdminRoutes);
 app.use("/api/admin/development", developmentRoutes);
@@ -200,10 +202,16 @@ function sendPublicFile(req, res, next) {
   try { requestPath = decodeURIComponent(req.path || "/"); } catch { return res.status(400).send("Requete invalide."); }
   if (requestPath.startsWith("/api/")) return next();
   if (requestPath === "/") return res.sendFile(path.join(PUBLIC_ROOT, "index.html"));
-  const relativePath = requestPath.replace(/^\/+/, "");
+
+  let relativePath = requestPath.replace(/^\/+/, "");
   if (!relativePath || relativePath.includes("..")) return next();
   const firstSegment = relativePath.split("/")[0];
   if (BLOCKED_PUBLIC_ROOTS.has(firstSegment)) return res.status(404).send("Not found");
+
+  // Les URLs publiques /pages/.../ correspondent à des dossiers réels avec index.html.
+  // Elles étaient auparavant ignorées car elles n'avaient pas d'extension.
+  if (requestPath.endsWith("/")) relativePath = path.posix.join(relativePath, "index.html");
+
   const extension = path.extname(relativePath).toLowerCase();
   if (!PUBLIC_EXTENSIONS.has(extension)) return next();
   const absolutePath = path.resolve(PUBLIC_ROOT, relativePath);
@@ -224,7 +232,7 @@ function shutdown(signal) {
     const enginePersisted = await flushEnginePersistence(`shutdown-${signal.toLowerCase()}`);
     const persisted = await flushMarketplacePersistence(`shutdown-${signal.toLowerCase()}`);
     if (!enginePersisted.ok) console.error("[cardoria-engine-persistence] shutdown flush failed");
-    if (!persisted.ok) console.error("[marketplace-persistence] shutdown flush failed");
+    if (!persisted.ok) console.error("[cardoria-persistence] shutdown flush failed");
     try { await closeMarketplacePersistence(); } catch {}
     clearTimeout(forceExit); process.exit(persisted.ok && enginePersisted.ok ? 0 : 1);
   });
