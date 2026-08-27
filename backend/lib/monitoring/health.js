@@ -10,6 +10,7 @@ import { getErrorStats } from "./errors.js";
 import { listBackups } from "../backup/full.js";
 import { isSumUpConfigured } from "../payments/sumup.js";
 import { isSmtpConfigured } from "../email.js";
+import { getMarketplacePersistenceStatus } from "../marketplace/persistence.js";
 
 const DB_PATH = path.join(DATA_DIR, "cardoria-engine.db");
 
@@ -37,6 +38,27 @@ function checkDisk() {
   }
 }
 
+function checkPostgres() {
+  const status = getMarketplacePersistenceStatus();
+  const configured = Boolean(status.configured);
+  const healthy = configured && Boolean(status.initialized) && !status.lastError;
+
+  let note = "SQLite actif";
+  if (configured && healthy) note = "PostgreSQL actif — persistance restaurée";
+  else if (configured && status.lastError) note = "PostgreSQL configuré — erreur de synchronisation";
+  else if (configured) note = "PostgreSQL configuré — initialisation en cours";
+
+  return {
+    ok: healthy,
+    configured,
+    initialized: Boolean(status.initialized),
+    syncing: Boolean(status.syncing),
+    dirty: Boolean(status.dirty),
+    lastSyncedAt: status.lastSyncedAt || null,
+    note
+  };
+}
+
 export function getHealthReport() {
   const mem = process.memoryUsage();
   const uptime = process.uptime();
@@ -44,7 +66,7 @@ export function getHealthReport() {
 
   return {
     status: "ok",
-    version: process.env.APP_VERSION || "5.8.0",
+    version: process.env.APP_VERSION || "6.0.0",
     environment: process.env.NODE_ENV || "development",
     uptimeSeconds: Math.round(uptime),
     timestamp: new Date().toISOString(),
@@ -54,11 +76,7 @@ export function getHealthReport() {
       openai: { ok: !!process.env.OPENAI_API_KEY, configured: !!process.env.OPENAI_API_KEY },
       smtp: { ok: isSmtpConfigured(), configured: isSmtpConfigured() },
       sumup: { ok: isSumUpConfigured(), configured: isSumUpConfigured() },
-      postgres: {
-        ok: !!process.env.DATABASE_URL,
-        configured: !!process.env.DATABASE_URL,
-        note: process.env.DATABASE_URL ? "URL définie — migration PG à activer" : "SQLite actif"
-      }
+      postgres: checkPostgres()
     },
     memory: {
       rssMb: Math.round(mem.rss / 1024 / 1024),
