@@ -19,6 +19,7 @@ import {
   syncCardmarketSealedCatalog
 } from "../lib/engine/sealed-products.js";
 import "../lib/engine/daily-market-sync.js";
+import "../lib/engine/sealed-catalog-schedule.js";
 
 const router = Router();
 router.use(requireAdmin);
