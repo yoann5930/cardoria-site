@@ -10,8 +10,8 @@ const { Pool } = pg;
 const MARKET_TABLES = ["mk_sellers","mk_listings","mk_orders","mk_reviews","mk_favorites","mk_wishlist","mk_price_alerts","mk_cart_items","mk_invoices","mk_disputes"];
 const MARKET_CHILD_FIRST = [...MARKET_TABLES].reverse();
 const RUNTIME_TABLES = ["auth_users","auth_sessions","auth_reset_tokens","auth_magic_tokens","gdpr_consents","pay_transactions"];
-const ENGINE_TABLES = ["licenses","cards","price_sources","sales_history","card_price_history"];
-const ENGINE_CHILD_FIRST = ["card_price_history","sales_history","price_sources","cards","licenses"];
+const ENGINE_TABLES = ["licenses","cards","price_sources","sales_history","card_price_history","sealed_products"];
+const ENGINE_CHILD_FIRST = ["card_price_history","sales_history","price_sources","cards","sealed_products","licenses"];
 
 let pool = null;
 let initialized = false;
@@ -51,7 +51,7 @@ function runtimePayload() {
 function enginePayload() {
   const tables = {};
   for (const table of ENGINE_TABLES) { try { tables[table] = sqliteRows(table); } catch { tables[table] = []; } }
-  return { version: 2, tables, capturedAt: new Date().toISOString() };
+  return { version: 3, tables, capturedAt: new Date().toISOString() };
 }
 async function writeRows(client, table, rows) {
   for (const row of rows) {
@@ -101,7 +101,7 @@ async function snapshotEngineNow(reason = "engine") {
     } finally { client.release(); }
   })();
   try { return await engineSyncPromise; }
-  finally { engineSyncPromise = null; if (engineDirty) { engineDirty = false; scheduleEngineSnapshot("queued-engine-change", 150); } }
+  finally { syncPromise = null; if (engineDirty) { engineDirty = false; scheduleEngineSnapshot("queued-engine-change", 150); } }
 }
 function restoreRuntime(payload) {
   if (!payload || typeof payload !== "object") return;
@@ -185,7 +185,7 @@ export function scheduleMarketplaceSnapshot(reason = "api-write", delayMs = 150)
 export function scheduleEngineSnapshot(reason = "engine-write", delayMs = 300) {
   if (!marketplacePersistenceConfigured()) return;
   engineDirty = true; if (engineSyncTimer) clearTimeout(engineSyncTimer);
-  engineSyncTimer = setTimeout(async () => { engineSyncTimer = null; if (!engineDirty) return; engineDirty = false; try { await snapshotEngineNow(reason); } catch {} }, Math.max(0, Number(delayMs) || 0)); engineSyncTimer.unref?.();
+  engineSyncTimer = setTimeout(async () => { engineSyncTimer = null; if (!engineDirty) return; engineDirty = false; try { await snapshotEngineNow(reason); } catch {} }, Math.max(0, Number(delayMs) || 0)); syncTimer.unref?.();
 }
 export function marketplacePersistenceMiddleware(req, res, next) {
   if (["POST","PUT","PATCH","DELETE"].includes(String(req.method || "GET").toUpperCase())) res.on("finish", () => { if (res.statusCode < 500) scheduleMarketplaceSnapshot(`${req.method} ${req.path || ""}`); });
