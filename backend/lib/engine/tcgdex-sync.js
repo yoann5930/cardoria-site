@@ -3,6 +3,7 @@ import { ensureDefaultLicenses } from "./licenses.js";
 
 const API = "https://api.tcgdex.net/v2/fr";
 const SOURCE = "tcgdex-fr";
+const MAX_PRICE_BATCH = 2000;
 
 function imageUrl(base, quality) { if (!base) return ""; return `${String(base).replace(/\/$/, "")}/${quality}.webp`; }
 function setIdFromCardId(cardId) { const id = String(cardId || ""); const pos = id.lastIndexOf("-"); return pos > 0 ? id.slice(0, pos) : ""; }
@@ -107,19 +108,20 @@ export async function syncPokemonReferenceCatalog({ priceLimit = 120, skipRariti
   }
 
   const requestedPriceLimit = Number(priceLimit);
-  const safePriceLimit = Number.isFinite(requestedPriceLimit) ? Math.max(0, Math.min(requestedPriceLimit, 500)) : 120;
+  const safePriceLimit = Number.isFinite(requestedPriceLimit) ? Math.max(0, Math.min(requestedPriceLimit, MAX_PRICE_BATCH)) : 120;
   const candidates = safePriceLimit > 0
     ? db.prepare(`SELECT id,name FROM cards WHERE license_slug='pokemon' AND active=1
-        ORDER BY CASE WHEN hit_family<>'' OR rarity LIKE '%Rare%' THEN 0 ELSE 1 END,
-                 CASE WHEN market_checked_at='' THEN 0 ELSE 1 END,
+        ORDER BY CASE WHEN recommended_price<=0 THEN 0 ELSE 1 END,
+                 CASE WHEN market_checked_at='' OR market_checked_at IS NULL THEN 0 ELSE 1 END,
                  market_checked_at ASC, updated_at ASC LIMIT ?`).all(safePriceLimit)
     : [];
   const updateDetail = db.prepare(`UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,avg_price=?,low_price=?,high_price=?,recommended_price=?,market_avg1=?,market_avg7=?,market_avg30=?,market_source=?,market_updated_at=?,market_checked_at=?,market_trend=?,trend_percent=?,updated_at=? WHERE id=?`);
+  const updateWithoutPrice = db.prepare(`UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,market_checked_at=?,updated_at=? WHERE id=?`);
   const markChecked = db.prepare("UPDATE cards SET market_checked_at=? WHERE id=?");
   const deleteSource = db.prepare("DELETE FROM price_sources WHERE card_id=? AND source='cardmarket'");
   const insertSource = db.prepare("INSERT INTO price_sources(card_id,source,price,currency,weight,fetched_at) VALUES (?,'cardmarket',?,'EUR',0.55,?)");
   const insertHistory = db.prepare(`INSERT OR IGNORE INTO card_price_history(card_id,source,current_price,avg_price,low_price,high_price,avg1,avg7,avg30,captured_at) VALUES (?,'cardmarket',?,?,?,?,?,?,?,?)`);
-  let detailed = 0, priced = 0, rising = 0, falling = 0, stable = 0;
+  let detailed = 0, priced = 0, rising = 0, falling = 0, stable = 0, unavailable = 0;
   const concurrency = 10;
   for (let i = 0; i < candidates.length; i += concurrency) {
     const batch = candidates.slice(i, i + concurrency);
@@ -127,11 +129,11 @@ export async function syncPokemonReferenceCatalog({ priceLimit = 120, skipRariti
     db.transaction(() => {
       details.forEach((raw, index) => {
         const cardId = batch[index].id; const stampedAt = new Date().toISOString();
-        if (!raw) { markChecked.run(stampedAt, cardId); return; }
+        if (!raw) { markChecked.run(stampedAt, cardId); unavailable += 1; return; }
         const variants = raw.variants || {}; const rarity = String(raw.rarity || ""); const family = pokemonHitFamily(rarity, raw.name, variants); const price = cardmarketReference(raw.pricing, variants);
         if (!price) {
-          updateDetail.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), 0, 0, 0, 0, 0, 0, 0, "", "", stampedAt, "stable", 0, stampedAt, cardId);
-          detailed += 1; return;
+          updateWithoutPrice.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), stampedAt, stampedAt, cardId);
+          detailed += 1; unavailable += 1; return;
         }
         const direction = marketDirection(price.change7);
         updateDetail.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), price.avg, price.low, price.high, price.recommended, price.avg1, price.avg7, price.avg30, "cardmarket", price.updated || stampedAt, stampedAt, direction, price.change7, stampedAt, cardId);
@@ -143,7 +145,7 @@ export async function syncPokemonReferenceCatalog({ priceLimit = 120, skipRariti
     })();
   }
   try { db.exec("DELETE FROM cards_fts; INSERT INTO cards_fts(rowid,name,extension,number,rarity,license_slug) SELECT rowid,name,extension,number,rarity,license_slug FROM cards;"); } catch {}
-  return { ok: true, source: SOURCE, rarities: rarities.length, rarityUpdated, detailed, priced, rising, falling, stable, priceLimit: candidates.length, syncedAt: new Date().toISOString() };
+  return { ok: true, source: SOURCE, rarities: rarities.length, rarityUpdated, detailed, priced, unavailable, rising, falling, stable, priceLimit: candidates.length, maxPriceBatch: MAX_PRICE_BATCH, syncedAt: new Date().toISOString() };
 }
 
 export function getMarketPriceStatus() {

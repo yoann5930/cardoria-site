@@ -9,6 +9,7 @@ import { searchCards, getCardById, createCard, updateCard, deleteCard, getCatalo
 import { setPriceSources, addSaleRecord, estimatePrice } from "../lib/engine/pricing.js";
 import { syncPokemonCatalog, syncPokemonReferenceCatalog, getMarketPriceStatus, getCardPriceHistory } from "../lib/engine/tcgdex-sync.js";
 import { refreshVisibleCardPrices } from "../lib/engine/visible-prices.js";
+import "../lib/engine/daily-market-sync.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -49,7 +50,7 @@ router.post("/sync/pokemon", async (req, res) => {
 });
 router.post("/sync/pokemon-reference", async (req, res) => {
   try {
-    const priceLimit = Math.min(Math.max(Number(req.body?.priceLimit) || 120, 0), 500);
+    const priceLimit = Math.min(Math.max(Number(req.body?.priceLimit) || 120, 0), 2000);
     const result = await syncPokemonReferenceCatalog({ priceLimit, skipRarities: Boolean(req.body?.skipRarities) });
     logAudit({ type: "engine", action: "pokemon_reference_sync", user: "admin", detail: `${result.rarityUpdated || 0} raretés, ${result.priced || 0} prix` });
     res.json({ ok: true, ...result, marketStatus: getMarketPriceStatus() });
