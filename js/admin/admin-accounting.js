@@ -6,6 +6,7 @@
   function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
   function buyerLabel(v){v=String(v||"").toLowerCase();return v==="yoann"?"Yoann":v==="valentin"?"Valentin":"Non attribué";}
   function typeLabel(v){return v==="consumable"?"Consommable":v==="equipment"?"Matériel":v==="pokemon_card"?"Carte Pokémon":"Ancien achat";}
+  function unitPriceLabel(p){return p.purchaseType==="pokemon_card"&&p.unitPrice!=null?A.euro(p.unitPrice):"—";}
 
   async function exportData(format, type) {
     try {
@@ -24,8 +25,8 @@
 
   function renderPurchases(list) {
     A.qs("#purchasesBody").innerHTML = list.map(function (p) {
-      return "<tr><td>" + esc(p.id) + "</td><td>" + esc(p.date) + "</td><td><strong>" + buyerLabel(p.buyer) + "</strong></td><td>" + esc(typeLabel(p.purchaseType)) + "</td><td>" + esc(p.seller) + "</td><td>" + esc(p.description || p.license || "—") + "</td><td>" + A.euro(p.amount) + "</td><td>" + esc(p.status || "—") + "</td></tr>";
-    }).join("") || "<tr><td colspan='8'>Aucun achat</td></tr>";
+      return "<tr><td>" + esc(p.id) + "</td><td>" + esc(p.date) + "</td><td><strong>" + buyerLabel(p.buyer) + "</strong></td><td>" + esc(typeLabel(p.purchaseType)) + "</td><td>" + esc(p.seller) + "</td><td>" + esc(p.description || p.license || "—") + "</td><td>" + A.euro(p.amount) + "</td><td>" + unitPriceLabel(p) + "</td><td>" + esc(p.status || "—") + "</td></tr>";
+    }).join("") || "<tr><td colspan='9'>Aucun achat</td></tr>";
   }
 
   function loadAll() {
@@ -55,7 +56,7 @@
     '<div class="admin-grid-2"><div class="admin-panel"><h2>Ventes par licence</h2><ul id="statsLicense"></ul></div><div class="admin-panel"><h2>Ventes par vendeur</h2><ul id="statsSeller"></ul></div></div>' +
     '<div class="admin-panel"><h2>Achats par catégorie</h2><ul id="statsPurchaseCategory"></ul></div>' +
     '<div class="admin-panel"><h2>Historique des ventes</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ID</th><th>Date</th><th>Client</th><th>Licence</th><th>Vendeur</th><th>Montant</th></tr></thead><tbody id="salesBody"></tbody></table></div></div>' +
-    '<div class="admin-panel"><h2>Historique des achats</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ID</th><th>Date</th><th>Acheteur</th><th>Type</th><th>Vendeur</th><th>Description</th><th>Montant</th><th>Statut</th></tr></thead><tbody id="purchasesBody"></tbody></table></div></div>');
+    '<div class="admin-panel"><h2>Historique des achats</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ID</th><th>Date</th><th>Acheteur</th><th>Type</th><th>Vendeur</th><th>Description</th><th>Montant</th><th>Prix / carte</th><th>Statut</th></tr></thead><tbody id="purchasesBody"></tbody></table></div></div>');
 
   A.qs("#searchQ").addEventListener("input", loadAll); A.qs("#filterLicense").addEventListener("change", loadAll); A.qs("#filterBuyer").addEventListener("change",loadAll);
   A.qs("#expCsvSales").onclick = function () { exportData("csv", "sales"); }; A.qs("#expPdfSales").onclick = function () { exportData("pdf", "sales"); }; A.qs("#expCsvPurch").onclick = function () { exportData("csv", "purchases"); }; loadAll();
