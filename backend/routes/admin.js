@@ -17,6 +17,16 @@ const DELETE_ADMIN = requireAuth({ roles: ["super_admin", "admin"], action: "del
 const BACKUP_ADMIN = requireAuth({ roles: ["super_admin", "admin"], action: "backup" });
 
 const DEFAULT_PURCHASES = [];
+const DEFAULT_SEALED_REFERENCES = [];
+const BUYERS = ["yoann", "valentin"];
+const PURCHASE_TYPES = ["pokemon_card", "consumable", "equipment"];
+const PACKAGING_TYPES = [
+  "carte_unite", "lot_cartes", "booster", "blister", "duopack", "tripack", "quadpack", "bundle", "mini_bundle",
+  "demi_display", "display", "case_display", "etb", "etb_pokemon_center", "upc", "coffret", "collection_box", "tin", "pokebox",
+  "mini_tin", "build_battle", "build_battle_stadium", "deck", "theme_deck", "battle_deck", "league_battle_deck", "starter_deck",
+  "premium_collection", "poster_collection", "binder_collection", "calendar", "advent_calendar", "case_carton", "master_case",
+  "sleeve_pack", "toploader_pack", "semi_rigid_pack", "team_bag_pack", "envelope_pack", "box_storage", "other"
+];
 const DEFAULT_ANALYTICS = {
   days: [],
   sources: { google: 0, facebook: 0, instagram: 0, direct: 0, witnot: 0 },
@@ -60,12 +70,21 @@ function normalizePurchase(body = {}, existing = {}) {
   const allowedStatus = ["paid", "pending", "cancelled", "refunded"];
   const requestedStatus = String(body.status ?? existing.status ?? "paid");
   const status = allowedStatus.includes(requestedStatus) ? requestedStatus : "paid";
+  const buyerRaw = cleanText(body.buyer ?? existing.buyer, 40).toLowerCase();
+  const buyer = BUYERS.includes(buyerRaw) ? buyerRaw : "yoann";
+  const purchaseTypeRaw = cleanText(body.purchaseType ?? existing.purchaseType, 40);
+  const purchaseType = PURCHASE_TYPES.includes(purchaseTypeRaw) ? purchaseTypeRaw : "pokemon_card";
+  const packagingRaw = cleanText(body.packaging ?? existing.packaging, 80);
+  const packaging = PACKAGING_TYPES.includes(packagingRaw) ? packagingRaw : (purchaseType === "pokemon_card" ? "carte_unite" : "other");
 
   return {
     ...existing,
     date,
     seller,
     description,
+    buyer,
+    purchaseType,
+    packaging,
     category: cleanText(body.category ?? existing.category, 80) || "autre",
     license: cleanText(body.license ?? existing.license, 80),
     quantity,
@@ -73,6 +92,24 @@ function normalizePurchase(body = {}, existing = {}) {
     paymentMethod: cleanText(body.paymentMethod ?? existing.paymentMethod, 80),
     reference: cleanText(body.reference ?? existing.reference, 120),
     status,
+    notes: cleanText(body.notes ?? existing.notes, 1000)
+  };
+}
+
+function normalizeSealedReference(body = {}, existing = {}) {
+  const name = cleanText(body.name ?? existing.name, 180);
+  if (!name) throw Object.assign(new Error("Le nom du produit est obligatoire."), { status: 400 });
+  const packagingRaw = cleanText(body.packaging ?? existing.packaging, 80);
+  const packaging = PACKAGING_TYPES.includes(packagingRaw) ? packagingRaw : "other";
+  const units = Math.max(1, Math.min(10000, Math.trunc(Number(body.unitsPerPackage ?? existing.unitsPerPackage ?? 1) || 1)));
+  return {
+    ...existing,
+    name,
+    license: cleanText(body.license ?? existing.license, 80) || "pokemon",
+    extension: cleanText(body.extension ?? existing.extension, 140),
+    packaging,
+    unitsPerPackage: units,
+    ean: cleanText(body.ean ?? existing.ean, 40),
     notes: cleanText(body.notes ?? existing.notes, 1000)
   };
 }
@@ -105,9 +142,15 @@ router.get("/accounting/purchases", (req, res) => {
   const q = (req.query.q || "").toLowerCase();
   const license = cleanText(req.query.license, 80);
   const category = cleanText(req.query.category, 80);
+  const buyer = cleanText(req.query.buyer, 40).toLowerCase();
+  const purchaseType = cleanText(req.query.purchaseType, 40);
+  const packaging = cleanText(req.query.packaging, 80);
   let purchases = readJson("purchases", DEFAULT_PURCHASES);
   if (license) purchases = purchases.filter((p) => p.license === license);
   if (category) purchases = purchases.filter((p) => p.category === category);
+  if (buyer) purchases = purchases.filter((p) => (p.buyer || "yoann") === buyer);
+  if (purchaseType) purchases = purchases.filter((p) => (p.purchaseType || "pokemon_card") === purchaseType);
+  if (packaging) purchases = purchases.filter((p) => (p.packaging || "carte_unite") === packaging);
   if (q) purchases = purchases.filter((p) => JSON.stringify(p).toLowerCase().includes(q));
   purchases = purchases.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
   res.json({ ok: true, purchases });
@@ -125,7 +168,7 @@ router.post("/accounting/purchases", WRITE_ADMIN, (req, res) => {
     });
     purchases.unshift(purchase);
     writeJson("purchases", purchases);
-    logAudit({ type: "accounting", action: "purchase_create", user: req.authUser?.email || "admin", detail: `${purchase.id} — ${purchase.seller} — ${purchase.amount} EUR` });
+    logAudit({ type: "accounting", action: "purchase_create", user: req.authUser?.email || "admin", detail: `${purchase.id} — ${purchase.buyer} — ${purchase.seller} — ${purchase.amount} EUR` });
     res.status(201).json({ ok: true, purchase });
   } catch (e) {
     res.status(e.status || 400).json({ ok: false, error: e.message });
@@ -160,7 +203,7 @@ router.delete("/accounting/purchases/:id", DELETE_ADMIN, (req, res) => {
 router.get("/accounting/stats", (req, res) => {
   const sales = readJson("analytics", DEFAULT_ANALYTICS).sales || [];
   const purchases = readJson("purchases", DEFAULT_PURCHASES);
-  const byLicense = {}, bySeller = {}, purchaseByLicense = {}, purchaseBySeller = {}, purchaseByCategory = {};
+  const byLicense = {}, bySeller = {}, purchaseByLicense = {}, purchaseBySeller = {}, purchaseByCategory = {}, purchaseByBuyer = {}, purchaseByType = {};
   sales.forEach((s) => {
     byLicense[s.license] = (byLicense[s.license] || 0) + Number(s.amount || 0);
     bySeller[s.seller] = (bySeller[s.seller] || 0) + Number(s.amount || 0);
@@ -169,10 +212,15 @@ router.get("/accounting/stats", (req, res) => {
     const license = p.license || "sans licence";
     const seller = p.seller || "inconnu";
     const category = p.category || "autre";
+    const buyer = p.buyer || "yoann";
+    const purchaseType = p.purchaseType || "pokemon_card";
     purchaseByLicense[license] = (purchaseByLicense[license] || 0) + Number(p.amount || 0);
     purchaseBySeller[seller] = (purchaseBySeller[seller] || 0) + Number(p.amount || 0);
     purchaseByCategory[category] = (purchaseByCategory[category] || 0) + Number(p.amount || 0);
+    purchaseByBuyer[buyer] = (purchaseByBuyer[buyer] || 0) + Number(p.amount || 0);
+    purchaseByType[purchaseType] = (purchaseByType[purchaseType] || 0) + Number(p.amount || 0);
   });
+  BUYERS.forEach((buyer) => { if (purchaseByBuyer[buyer] == null) purchaseByBuyer[buyer] = 0; });
   const totalSales = sales.reduce((a, s) => a + Number(s.amount || 0), 0);
   const totalPurchases = purchases.reduce((a, p) => a + Number(p.amount || 0), 0);
   res.json({
@@ -182,11 +230,45 @@ router.get("/accounting/stats", (req, res) => {
     purchaseByLicense,
     purchaseBySeller,
     purchaseByCategory,
+    purchaseByBuyer,
+    purchaseByType,
+    buyers: BUYERS,
+    packagingTypes: PACKAGING_TYPES,
     totalSales,
     totalPurchases,
+    cardoriaPurchaseTotal: totalPurchases,
     netResult: totalSales - totalPurchases,
     purchaseCount: purchases.length
   });
+});
+
+router.get("/catalog/sealed-references", (req, res) => {
+  const q = String(req.query.q || "").toLowerCase();
+  const packaging = cleanText(req.query.packaging, 80);
+  let references = readJson("sealed-references", DEFAULT_SEALED_REFERENCES);
+  if (packaging) references = references.filter((r) => r.packaging === packaging);
+  if (q) references = references.filter((r) => JSON.stringify(r).toLowerCase().includes(q));
+  res.json({ ok: true, references, packagingTypes: PACKAGING_TYPES });
+});
+router.post("/catalog/sealed-references", WRITE_ADMIN, (req, res) => {
+  try {
+    const list = readJson("sealed-references", DEFAULT_SEALED_REFERENCES);
+    const now = new Date().toISOString();
+    const reference = normalizeSealedReference(req.body || {}, { id: `seal_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`, createdAt: now, updatedAt: now });
+    list.unshift(reference); writeJson("sealed-references", list); res.status(201).json({ ok: true, reference });
+  } catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message }); }
+});
+router.put("/catalog/sealed-references/:id", WRITE_ADMIN, (req, res) => {
+  try {
+    const list = readJson("sealed-references", DEFAULT_SEALED_REFERENCES); const i = list.findIndex((r) => r.id === req.params.id);
+    if (i < 0) return res.status(404).json({ ok: false, error: "Référence introuvable." });
+    list[i] = normalizeSealedReference(req.body || {}, { ...list[i], updatedAt: new Date().toISOString() }); writeJson("sealed-references", list); res.json({ ok: true, reference: list[i] });
+  } catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message }); }
+});
+router.delete("/catalog/sealed-references/:id", DELETE_ADMIN, (req, res) => {
+  const list = readJson("sealed-references", DEFAULT_SEALED_REFERENCES); const i = list.findIndex((r) => r.id === req.params.id);
+  if (i < 0) return res.status(404).json({ ok: false, error: "Référence introuvable." });
+  list.splice(i, 1); writeJson("sealed-references", list); res.json({ ok: true });
 });
 
 router.get("/accounting/export", EXPORT_ADMIN, (req, res) => {
