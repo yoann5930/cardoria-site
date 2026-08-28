@@ -27,6 +27,9 @@ jobs:
         with:
           node-version: "22.22.0"
           package-manager-cache: false
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --omit=dev
       - name: Syntax checks
         run: |
           node --check backend/lib/accounting/purchase-stats.js
