@@ -33,7 +33,23 @@ function quoteIdent(name) {
   return `"${name}"`;
 }
 
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!value || typeof value !== "object") return value;
+  return Object.keys(value).sort().reduce((acc, key) => {
+    acc[key] = canonicalize(value[key]);
+    return acc;
+  }, {});
+}
+
+function canonicalStringify(value) {
+  return JSON.stringify(canonicalize(value));
+}
+
 async function ensureSchema(client) {
+  await client.query(`CREATE TABLE IF NOT EXISTS cardoria_runtime_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  await client.query(`CREATE TABLE IF NOT EXISTS cardoria_engine_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  await client.query(`CREATE TABLE IF NOT EXISTS marketplace_sync_meta (id TEXT PRIMARY KEY, initialized BOOLEAN NOT NULL DEFAULT FALSE, last_synced_at TIMESTAMPTZ, source TEXT DEFAULT '')`);
   await client.query(`
     CREATE TABLE IF NOT EXISTS cardoria_backups (
       id TEXT PRIMARY KEY,
@@ -92,7 +108,7 @@ function summarize(row) {
 
 export async function createDurableBackup({ label = "", actor = "system" } = {}) {
   const payload = snapshotPayload();
-  const serialized = JSON.stringify(payload);
+  const serialized = canonicalStringify(payload);
   const id = backupId();
   const sha256 = crypto.createHash("sha256").update(serialized).digest("hex");
   const client = await getPool().connect();
@@ -129,7 +145,7 @@ export async function inspectDurableBackup(id) {
     const result = await client.query("SELECT id,label,created_by,created_at,size_bytes,sha256,payload FROM cardoria_backups WHERE id=$1 LIMIT 1", [id]);
     if (!result.rows[0]) throw Object.assign(new Error("Sauvegarde introuvable"), { status: 404 });
     const row = result.rows[0];
-    const serialized = JSON.stringify(row.payload);
+    const serialized = canonicalStringify(row.payload);
     const sha256 = crypto.createHash("sha256").update(serialized).digest("hex");
     if (row.sha256 && row.sha256 !== sha256) throw Object.assign(new Error("Integrite de la sauvegarde invalide"), { status: 422 });
     return { ...summarize(row), payload: row.payload, integrityOk: true };
@@ -193,6 +209,7 @@ export async function restoreDurableBackup(id, { actor = "admin", dryRun = false
   }
 
   const preservedSuperAdmins = sqliteRows("auth_users").filter((row) => row.role === "super_admin" && Number(row.active || 0) === 1);
+  if (!preservedSuperAdmins.length) throw Object.assign(new Error("Restauration bloquee: aucun super administrateur actif a preserver."), { status: 409 });
   const preRestore = await createDurableBackup({ label: `pre-restore-${id}`, actor });
   const client = await getPool().connect();
   try {
