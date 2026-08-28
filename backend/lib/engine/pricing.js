@@ -14,12 +14,15 @@ const SOURCE_WEIGHTS = {
 
 const CONDITION_MULTIPLIERS = {
   mint: 1.15,
+  m: 1.15,
   nm: 1.0,
   ex: 0.85,
   gd: 0.65,
   lp: 0.75,
   mp: 0.55,
+  pl: 0.55,
   hp: 0.35,
+  po: 0.2,
   dmg: 0.2
 };
 
@@ -123,7 +126,7 @@ export function estimatePrice(cardId, condition = "nm") {
     marketTrend: card.market_trend,
     trendPercent: card.trend_percent,
     variationAlert: Math.abs(variation) >= 10 ? (variation > 0 ? "hausse" : "baisse") : null,
-    sources: sources.map((s) => ({ source: s.source, price: s.price })),
+    sources: sources.map((s) => ({ source: s.source, price: s.price, currency: s.currency || "EUR", fetchedAt: s.fetchedAt || "" })),
     computedAt: new Date().toISOString()
   };
 }
@@ -143,6 +146,23 @@ export function getSalesHistory(cardId, limit = 50) {
   return getDb().prepare(
     "SELECT sold_at AS date, price, condition, channel FROM sales_history WHERE card_id = ? ORDER BY sold_at DESC LIMIT ?"
   ).all(cardId, limit);
+}
+
+export function getSalesStats(cardId) {
+  const row = getDb().prepare(`
+    SELECT COUNT(*) AS count,
+           COALESCE(SUM(price), 0) AS revenue,
+           COALESCE(AVG(price), 0) AS average_price,
+           MAX(sold_at) AS last_sold_at
+    FROM sales_history
+    WHERE card_id = ?
+  `).get(cardId) || {};
+  return {
+    count: Number(row.count || 0),
+    revenue: round2(row.revenue),
+    averagePrice: round2(row.average_price),
+    lastSoldAt: row.last_sold_at || ""
+  };
 }
 
 function normalizeCondition(c) {
