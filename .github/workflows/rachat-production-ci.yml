@@ -1,0 +1,89 @@
+name: Cardoria Rachat CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  rachat-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      LEGACY_ADMIN_CODE: 'false'
+      ADMIN_AUTH_DISABLED: 'false'
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Install backend
+        run: npm install --omit=dev
+      - name: Syntax checks
+        run: |
+          node --check server.js
+          node --check routes/rachat.js
+          node --check routes/rachat-admin.js
+          node --check lib/rachat/workflow.js
+          node --check lib/storage.js
+          node --check lib/marketplace/persistence.js
+          node --check ../js/admin/admin-rachat.js
+      - name: Rachat architecture guards
+        working-directory: .
+        run: |
+          grep -q 'rachat-proposals' backend/lib/storage.js
+          grep -q 'rachatProposals: readJson("rachat-proposals"' backend/lib/marketplace/persistence.js
+          grep -q 'purchases: readJson("purchases"' backend/lib/marketplace/persistence.js
+          grep -q 'writeJson("rachat-proposals", payload.rachatProposals)' backend/lib/marketplace/persistence.js
+          grep -q 'app.use("/api/rachat", marketplacePersistenceMiddleware' backend/server.js
+          grep -q 'app.use("/api/admin/rachat", marketplacePersistenceMiddleware' backend/server.js
+          grep -q 'createPurchaseFromProposal' backend/lib/rachat/workflow.js
+          grep -q 'authenticityConfirmed' backend/lib/rachat/workflow.js
+          grep -q 'rachatProposalId' backend/lib/rachat/workflow.js
+          grep -q 'admin-rachat.html' js/admin/admin-estimations.js
+          grep -q 'Paiement enregistré + envoyer au stock' js/admin/admin-rachat.js
+          if grep -A80 'router.post("/propositions"' backend/routes/rachat.js | grep -q 'writeJson("purchases"'; then
+            echo 'A Rachat proposal must not be stored as an accounting purchase'
+            exit 1
+          fi
+      - name: Full Rachat to Boutique stock E2E
+        run: node tests/rachat-workflow.mjs
+      - name: Start backend
+        run: |
+          node server.js > /tmp/cardoria-rachat.log 2>&1 &
+          echo $! > /tmp/cardoria-rachat.pid
+      - name: Wait for backend
+        run: |
+          ready=false
+          for i in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/startup.json; then
+              if grep -q '"ready":true' /tmp/startup.json; then ready=true; break; fi
+            fi
+            sleep 1
+          done
+          test "$ready" = "true"
+      - name: Rachat routes and pages checks
+        working-directory: .
+        run: |
+          curl --fail --silent http://127.0.0.1:10000/admin-rachat.html | grep -q 'admin-rachat.js'
+          curl --fail --silent http://127.0.0.1:10000/rachat-suivi.html | grep -q 'Offre de rachat'
+          code=$(curl -sS -o /tmp/rachat-admin.json -w "%{http_code}" http://127.0.0.1:10000/api/admin/rachat)
+          test "$code" = "401"
+          code=$(curl -sS -o /tmp/rachat-offer.json -w "%{http_code}" 'http://127.0.0.1:10000/api/rachat/offres/not-found?token=invalid')
+          test "$code" = "404"
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-rachat.pid ]; then kill $(cat /tmp/cardoria-rachat.pid) || true; fi
+          cat /tmp/cardoria-rachat.log || true
