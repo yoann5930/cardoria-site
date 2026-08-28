@@ -24,14 +24,15 @@ body{background:#07090d;color:#f5f2e9;min-height:100vh}.wrap{width:min(760px,cal
 <script>
 (function(){
   "use strict";
-  var params=new URLSearchParams(location.search),id=params.get("id")||"",token=params.get("token")||"";
+  var params=new URLSearchParams(location.search),id=params.get("id")||"",token=params.get("token")||"",currentOffer=null;
   var content=document.getElementById("content"),status=document.getElementById("status");
   function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
   function euro(v){return Number(v||0).toFixed(2).replace(".",",")+" €"}
   function date(v){try{return new Date(v).toLocaleDateString("fr-FR")}catch(e){return v||"—"}}
   function render(o){
+    currentOffer=o;
     var decided=o.customerDecision&&o.customerDecision.decision;
-    content.innerHTML='<h1>'+esc(o.cardName||"Votre carte")+'</h1><p>Cardoria vous propose :</p><div class="amount">'+euro(o.offer&&o.offer.amount)+'</div><div class="grid"><div><small>Carte</small><strong>'+esc(o.cardName||"—")+'</strong></div><div><small>Licence</small><strong>'+esc(o.cardGame||"—")+'</strong></div><div><small>État</small><strong>'+esc(o.condition||"—")+'</strong></div><div><small>Offre valable jusqu’au</small><strong>'+esc(date(o.offer&&o.offer.expiresAt))+'</strong></div></div>'+(o.offer&&o.offer.note?'<p><strong>Message Cardoria :</strong><br>'+esc(o.offer.note)+'</p>':'')+(decided?'<p><strong>Votre réponse a déjà été enregistrée : '+(decided==='accepted'?'offre acceptée':'offre refusée')+'.</strong></p>':'<div class="actions"><button class="accept" id="acceptBtn">Accepter l’offre</button><button class="refuse" id="refuseBtn">Refuser l’offre</button></div>');
+    content.innerHTML='<h1>'+esc(o.cardName||"Votre carte")+'</h1><p>Cardoria vous propose :</p><div class="amount">'+euro(o.offer&&o.offer.amount)+'</div><div class="grid"><div><small>Carte</small><strong>'+esc(o.cardName||"—")+'</strong></div><div><small>Licence</small><strong>'+esc(o.cardGame||"—")+'</strong></div><div><small>État</small><strong>'+esc(o.condition||"—")+'</strong></div><div><small>Offre valable jusqu’au</small><strong>'+esc(date(o.offer&&o.offer.expiresAt))+'</strong></div></div>'+(o.offer&&o.offer.note?'<p><strong>Message Cardoria :</strong><br>'+esc(o.offer.note)+'</p>':'')+(decided?'<p><strong>Votre réponse a été enregistrée : '+(decided==='accepted'?'offre acceptée':'offre refusée')+'.</strong></p>':'<div class="actions"><button class="accept" id="acceptBtn">Accepter l’offre</button><button class="refuse" id="refuseBtn">Refuser l’offre</button></div>');
     if(!decided){document.getElementById("acceptBtn").onclick=function(){decide("accepted")};document.getElementById("refuseBtn").onclick=function(){decide("refused")};}
   }
   async function load(){
@@ -41,7 +42,13 @@ body{background:#07090d;color:#f5f2e9;min-height:100vh}.wrap{width:min(760px,cal
   async function decide(decision){
     var label=decision==='accepted'?'accepter':'refuser';if(!confirm('Confirmer : '+label+' cette offre ?'))return;
     document.querySelectorAll('.actions button').forEach(function(b){b.disabled=true});status.className='status';status.textContent='Enregistrement…';
-    try{var r=await fetch('/api/rachat/offres/'+encodeURIComponent(id)+'/decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,decision:decision})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'Réponse impossible.');status.className='status ok';status.textContent=decision==='accepted'?'Votre acceptation est enregistrée. Cardoria attend maintenant la carte.':'Votre refus est enregistré.';await load()}catch(e){status.className='status error';status.textContent=e.message||'Réponse impossible.';document.querySelectorAll('.actions button').forEach(function(b){b.disabled=false})}
+    try{
+      var r=await fetch('/api/rachat/offres/'+encodeURIComponent(id)+'/decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,decision:decision})}),d=await r.json();
+      if(!r.ok||!d.ok)throw new Error(d.error||'Réponse impossible.');
+      status.className='status ok';
+      status.textContent=decision==='accepted'?'Votre acceptation est enregistrée. Cardoria attend maintenant la carte.':'Votre refus est enregistré.';
+      if(currentOffer){currentOffer.customerDecision={decision:decision,at:new Date().toISOString()};render(currentOffer)}
+    }catch(e){status.className='status error';status.textContent=e.message||'Réponse impossible.';document.querySelectorAll('.actions button').forEach(function(b){b.disabled=false})}
   }
   load();
 })();
