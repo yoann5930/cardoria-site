@@ -41,7 +41,26 @@ function normalizeSetCode(value) {
   const raw = String(value || "").trim();
   if (/^sv/i.test(raw)) return `SV${raw.slice(2)}`;
   if (/^s\d/i.test(raw)) return `S${raw.slice(1)}`;
+  if (/^sm/i.test(raw)) return `SM${raw.slice(2)}`;
+  if (/^xy/i.test(raw)) return `XY${raw.slice(2)}`;
+  if (/^bw/i.test(raw)) return `BW${raw.slice(2)}`;
+  if (/^dp/i.test(raw)) return `DP${raw.slice(2)}`;
   return raw;
+}
+
+function officialFamily(code) {
+  if (/^SV/i.test(code)) return "SV";
+  if (/^S\d/i.test(code)) return "S";
+  if (/^SM/i.test(code)) return "SM";
+  if (/^XY/i.test(code)) return "XY";
+  if (/^BW/i.test(code)) return "BW";
+  if (/^DP/i.test(code)) return "DP";
+  return "";
+}
+
+function supportedOfficialSet(value) {
+  const code = normalizeSetCode(value);
+  return Boolean(officialFamily(code));
 }
 
 function normalizedNumber(value) {
@@ -63,23 +82,21 @@ function koreanIdFromJapaneseId(id) {
 
 function imageCandidates(extensionCode, number) {
   const code = normalizeSetCode(extensionCode);
+  const family = officialFamily(code);
   const num = normalizedNumber(number);
-  if (!code || !num) return [];
+  if (!family || !code || !num) return [];
   const rawNumber = String(number || "").trim();
-
-  if (/^SV/i.test(code)) {
-    return [
-      `${IMAGE_ROOT}/SV/${code}/${code}_${num}.png?w=512`,
-      `${IMAGE_ROOT}/SV/${code}/${code}_${rawNumber}.png?w=512`
-    ].filter((value, index, array) => value && array.indexOf(value) === index);
+  const candidates = [
+    `${IMAGE_ROOT}/${family}/${code}/${code}_${num}.png?w=512`,
+    `${IMAGE_ROOT}/${family}/${code}/${code}_${rawNumber}.png?w=512`
+  ];
+  // Some older Korean assets use the same family directory but lowercase or
+  // unpadded card numbers. We only accept a candidate after an image response.
+  if (family !== "SV" && family !== "S") {
+    candidates.push(`${IMAGE_ROOT}/${family}/${code.toLowerCase()}/${code}_${num}.png?w=512`);
+    candidates.push(`${IMAGE_ROOT}/${family}/${code}/${code.toLowerCase()}_${num}.png?w=512`);
   }
-  if (/^S\d/i.test(code)) {
-    return [
-      `${IMAGE_ROOT}/S/${code}/${code}_${num}.png?w=512`,
-      `${IMAGE_ROOT}/S/${code}/${code}_${rawNumber}.png?w=512`
-    ].filter((value, index, array) => value && array.indexOf(value) === index);
-  }
-  return [];
+  return candidates.filter((value, index, array) => value && array.indexOf(value) === index);
 }
 
 async function probeImage(url) {
@@ -127,6 +144,21 @@ function frenchEquivalent(db, japaneseId) {
   return db.prepare("SELECT * FROM cards WHERE id=? AND license_slug='pokemon' AND language='fr' AND active=1 LIMIT 1").get(`pokemon-${raw}`) || null;
 }
 
+function proxyMarketSource(ja) {
+  const source = String(ja?.market_source || "").toLowerCase();
+  if (!Number(ja?.recommended_price || 0)) return "";
+  if (source.includes("cardmarket")) return "cardmarket-jp-proxy";
+  if (source.includes("zebradex")) return "zebradex-jp-proxy";
+  return source ? "japanese-market-proxy" : "";
+}
+
+function proxyMarketNote(source) {
+  if (source === "cardmarket-jp-proxy") return "Référence de marché japonaise Cardmarket utilisée comme proxy; ce n'est pas un prix de vente coréen certifié.";
+  if (source === "zebradex-jp-proxy") return "Cote japonaise ZebraDex utilisée comme proxy; ce n'est pas un prix de vente coréen certifié.";
+  if (source) return "Référence de marché japonaise utilisée comme proxy; ce n'est pas un prix de vente coréen certifié.";
+  return "";
+}
+
 function insertKoreanFromReference(db, ja, verified, imageUrl, now) {
   const fr = ja ? frenchEquivalent(db, ja.id) : null;
   const id = ja ? koreanIdFromJapaneseId(ja.id) : `pokemon-ko-${verified.extensionCode}-${verified.number}`;
@@ -139,7 +171,7 @@ function insertKoreanFromReference(db, ja, verified, imageUrl, now) {
   const hitFamily = fr?.hit_family || ja?.hit_family || "";
   const variants = ja?.variants_json || fr?.variants_json || "{}";
   const recommended = Number(ja?.recommended_price || 0);
-  const marketSource = recommended > 0 && String(ja?.market_source || "").includes("cardmarket") ? "cardmarket-product-proxy" : "";
+  const marketSource = proxyMarketSource(ja);
 
   const row = {
     id,
@@ -179,7 +211,7 @@ function insertKoreanFromReference(db, ja, verified, imageUrl, now) {
     image_source: imageUrl ? "pokemon-korea-official" : "",
     catalog_source: "pokemon-korea-official",
     catalog_source_url: verified.officialDetail || "https://pokemoncard.co.kr/cards",
-    price_source_note: marketSource ? "Référence Cardmarket du produit multilingue; prix coréen à confirmer si marché spécifique disponible." : "",
+    price_source_note: proxyMarketNote(marketSource),
     now
   };
 
@@ -244,22 +276,26 @@ export function syncKoreanCardmarketProxyPrices() {
   const rows = db.prepare(`SELECT k.id AS ko_id,j.* FROM cards k
     JOIN cards j ON j.id='pokemon-ja-' || substr(k.id,length('pokemon-ko-')+1)
     WHERE k.license_slug='pokemon' AND k.language='ko' AND k.active=1
-      AND k.recommended_price<=0 AND j.language='ja' AND j.recommended_price>0
-      AND lower(COALESCE(j.market_source,'')) LIKE '%cardmarket%'`).all();
+      AND k.recommended_price<=0 AND j.language='ja' AND j.recommended_price>0`).all();
   const update = db.prepare(`UPDATE cards SET avg_price=?,low_price=?,high_price=?,recommended_price=?,market_avg1=?,market_avg7=?,market_avg30=?,
-    market_source='cardmarket-product-proxy',market_updated_at=?,market_checked_at=?,market_trend=?,trend_percent=?,
-    price_source_note='Référence Cardmarket du produit multilingue; prix coréen à confirmer si marché spécifique disponible.',updated_at=? WHERE id=?`);
+    market_source=?,market_updated_at=?,market_checked_at=?,market_trend=?,trend_percent=?,price_source_note=?,updated_at=? WHERE id=? AND recommended_price<=0`);
   let updated = 0;
   db.transaction(() => {
     for (const row of rows) {
+      const source = proxyMarketSource(row);
+      if (!source) continue;
       updated += update.run(Number(row.avg_price || row.recommended_price || 0), Number(row.low_price || row.recommended_price || 0),
         Number(row.high_price || row.recommended_price || 0), Number(row.recommended_price || 0), Number(row.market_avg1 || 0),
-        Number(row.market_avg7 || 0), Number(row.market_avg30 || 0), String(row.market_updated_at || ""), now,
-        String(row.market_trend || "stable"), Number(row.trend_percent || 0), now, row.ko_id).changes || 0;
+        Number(row.market_avg7 || 0), Number(row.market_avg30 || 0), source, String(row.market_updated_at || ""), now,
+        String(row.market_trend || "stable"), Number(row.trend_percent || 0), proxyMarketNote(source), now, row.ko_id).changes || 0;
     }
   })();
-  if (updated) console.log(`[pokemon-korea-prices] ${updated} Korean card(s) received a Cardmarket product reference`);
+  if (updated) console.log(`[pokemon-korea-prices] ${updated} Korean card(s) received a verified Japanese market proxy`);
   return { ok: true, updated };
+}
+
+function officialSqlPredicate(alias = "j") {
+  return `(lower(${alias}.extension_code) LIKE 'sv%' OR lower(${alias}.extension_code) GLOB 's[0-9]*' OR lower(${alias}.extension_code) LIKE 'sm%' OR lower(${alias}.extension_code) LIKE 'xy%' OR lower(${alias}.extension_code) LIKE 'bw%' OR lower(${alias}.extension_code) LIKE 'dp%')`;
 }
 
 export function getKoreanOfficialBackfillStatus() {
@@ -271,7 +307,7 @@ export function getKoreanOfficialBackfillStatus() {
   const missingPrices = Number(db.prepare("SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND language='ko' AND active=1 AND recommended_price<=0").get()?.c || 0);
   const pendingOfficial = Number(db.prepare(`SELECT COUNT(*) AS c FROM cards j
     WHERE j.license_slug='pokemon' AND j.language='ja' AND j.active=1
-      AND (lower(j.extension_code) LIKE 'sv%' OR lower(j.extension_code) GLOB 's[0-9]*')
+      AND ${officialSqlPredicate('j')}
       AND NOT EXISTS (SELECT 1 FROM cards k WHERE k.id='pokemon-ko-' || substr(j.id,length('pokemon-ja-')+1) AND k.active=1)
       AND (COALESCE(j.korea_official_checked_at,'')='' OR j.korea_official_checked_at<?)`).get(retryBefore)?.c || 0);
   return { ko, official, missingImages, missingPrices, pendingOfficial };
@@ -306,18 +342,18 @@ export async function backfillKoreanOfficialCards({ limit = 120, discover = true
     const safeLimit = Math.min(Math.max(Number(limit) || 120, 1), 400);
     const targets = db.prepare(`SELECT j.* FROM cards j
       WHERE j.license_slug='pokemon' AND j.language='ja' AND j.active=1
-        AND (lower(j.extension_code) LIKE 'sv%' OR lower(j.extension_code) GLOB 's[0-9]*')
+        AND ${officialSqlPredicate('j')}
         AND COALESCE(j.number,'')<>''
         AND NOT EXISTS (SELECT 1 FROM cards k WHERE k.id='pokemon-ko-' || substr(j.id,length('pokemon-ja-')+1) AND k.active=1)
         AND (COALESCE(j.korea_official_checked_at,'')='' OR j.korea_official_checked_at<?)
-      ORDER BY CASE WHEN lower(j.extension_code)='sv9a' THEN 0 WHEN lower(j.extension_code) LIKE 'sv%' THEN 1 ELSE 2 END,
+      ORDER BY CASE WHEN lower(j.extension_code)='sv9a' THEN 0 WHEN lower(j.extension_code) LIKE 'sv%' THEN 1 WHEN lower(j.extension_code) GLOB 's[0-9]*' THEN 2 ELSE 3 END,
         CASE WHEN COALESCE(j.korea_official_checked_at,'')='' THEN 0 ELSE 1 END,
         j.extension_code DESC,j.id LIMIT ?`).all(retryBefore, safeLimit);
 
     const mark = db.prepare("UPDATE cards SET korea_official_checked_at=? WHERE id=?");
     for (let offset = 0; offset < targets.length; offset += CONCURRENCY) {
       const batch = targets.slice(offset, offset + CONCURRENCY);
-      const results = await Promise.all(batch.map(async (ja) => ({ ja, imageUrl: await firstExistingImage(ja.extension_code, ja.number) })));
+      const results = await Promise.all(batch.map(async (ja) => ({ ja, imageUrl: supportedOfficialSet(ja.extension_code) ? await firstExistingImage(ja.extension_code, ja.number) : "" })));
       db.transaction(() => {
         for (const result of results) {
           checked += 1;
