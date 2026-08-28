@@ -45,7 +45,14 @@ async function ensureRemoteSchema(client) {
 function runtimePayload() {
   const tables = {};
   for (const table of RUNTIME_TABLES) { try { tables[table] = sqliteRows(table); } catch { tables[table] = []; } }
-  return { version: 1, tables, boutiqueOrders: readJson("orders", []), capturedAt: new Date().toISOString() };
+  return {
+    version: 2,
+    tables,
+    boutiqueOrders: readJson("orders", []),
+    purchases: readJson("purchases", []),
+    rachatProposals: readJson("rachat-proposals", []),
+    capturedAt: new Date().toISOString()
+  };
 }
 function enginePayload() {
   const tables = {};
@@ -123,6 +130,8 @@ function restoreRuntime(payload) {
   });
   tx(); sqlite.pragma("foreign_keys = ON");
   if (Array.isArray(payload.boutiqueOrders)) writeJson("orders", payload.boutiqueOrders);
+  if (Array.isArray(payload.purchases)) writeJson("purchases", payload.purchases);
+  if (Array.isArray(payload.rachatProposals)) writeJson("rachat-proposals", payload.rachatProposals);
 }
 function restoreEngine(payload) {
   if (!payload || typeof payload !== "object") return false;
