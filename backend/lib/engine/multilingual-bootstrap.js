@@ -8,6 +8,8 @@ import { getDb } from "./database.js";
 
 const READY_MINIMUMS = { en: 23000, ja: 12000, ko: 200 };
 const PRICE_LANGUAGES = ["en", "ja"];
+const FOREIGN_PRICE_BATCH = 800;
+const KOREAN_DISCOVERY_BATCH = 240;
 
 try {
   ensureCatalogFrenchLocalizationSchema();
@@ -21,6 +23,7 @@ let localized = false;
 let imageRepairRunning = false;
 let zebraRepairRunning = false;
 let priceRepairRunning = false;
+let koreanBackfillRunning = false;
 let dirtyImages = false;
 let persistenceDirty = false;
 let koreanBackfillDone = false;
@@ -77,32 +80,36 @@ async function checkpoint(reason) {
 }
 
 async function ensureKoreanOfficialBackfill() {
-  if (koreanBackfillDone || busy) return { ok: true, skipped: true };
+  if (koreanBackfillDone || busy || koreanBackfillRunning || imageRepairRunning || zebraRepairRunning || priceRepairRunning) return { ok: true, skipped: true };
   busy = true;
+  koreanBackfillRunning = true;
   try {
-    const result = await backfillKoreanOfficialCards({ limit: 160, discover: true });
-    koreanBackfillDone = true;
+    const result = await backfillKoreanOfficialCards({ limit: KOREAN_DISCOVERY_BATCH, discover: true });
+    const pending = Number(result?.status?.pendingOfficial || 0);
+    koreanBackfillDone = pending === 0;
     if (result.added > 0 || result.updated > 0) {
       dirtyImages = true;
       persistenceDirty = true;
     }
+    console.log(`[pokemon-korea-progress] added=${result.added || 0} found=${result.found || 0} remaining=${pending} complete=${koreanBackfillDone ? 'yes' : 'no'}`);
     logCatalogCoverage();
     return result;
   } catch (error) {
     console.error("[pokemon-korea-official] backfill failed", error?.message || String(error));
     return { ok: false, error: error?.message || String(error) };
   } finally {
+    koreanBackfillRunning = false;
     busy = false;
   }
 }
 
 async function runForeignPriceRepairPass() {
-  if (!localized || busy || imageRepairRunning || zebraRepairRunning || priceRepairRunning) return;
+  if (!localized || busy || imageRepairRunning || zebraRepairRunning || priceRepairRunning || koreanBackfillRunning) return;
   priceRepairRunning = true;
   try {
     for (const language of PRICE_LANGUAGES) {
       const before = getMarketPriceStatus({ language });
-      const result = await syncPokemonReferenceCatalog({ language, priceLimit: 120, skipRarities: true });
+      const result = await syncPokemonReferenceCatalog({ language, priceLimit: FOREIGN_PRICE_BATCH, skipRarities: true });
       const after = getMarketPriceStatus({ language });
       console.log(`[catalog-price-repair:${language}] checked=${result.detailed || 0} priced-now=${result.priced || 0} coverage=${after.priced}/${after.total} missing=${Math.max(0, after.total - after.priced)} images=${after.missingImages}`);
       if (after.priced > before.priced || result.imagesRepaired > 0) {
@@ -161,7 +168,7 @@ export async function localizeAndCheckpointMultilingualCatalog(reason = "catalog
 }
 
 async function runZebraRepairPass() {
-  if (!localized || busy || imageRepairRunning || zebraRepairRunning || priceRepairRunning) return;
+  if (!localized || busy || imageRepairRunning || zebraRepairRunning || priceRepairRunning || koreanBackfillRunning) return;
   const tcgStatus = getMultilingualImageRepairStatus();
   if (tcgStatus.totalPending > 0) return;
   const zebraStatus = getZebraDexRepairStatus();
@@ -185,7 +192,7 @@ async function runZebraRepairPass() {
 }
 
 async function runImageRepairPass() {
-  if (!localized || busy || imageRepairRunning || zebraRepairRunning || priceRepairRunning) return;
+  if (!localized || busy || imageRepairRunning || zebraRepairRunning || priceRepairRunning || koreanBackfillRunning) return;
   const before = getMultilingualImageRepairStatus();
   if (!before.totalPending) {
     await runZebraRepairPass();
@@ -214,8 +221,10 @@ const readinessTimer = setInterval(async () => {
     const result = await localizeAndCheckpointMultilingualCatalog("catalog-ready-checkpoint");
     if (result.ok) {
       clearInterval(readinessTimer);
-      setTimeout(() => runImageRepairPass(), 5000).unref?.();
-      setTimeout(() => runForeignPriceRepairPass(), 20000).unref?.();
+      // Prices first: the old order caused the long image pass to suppress the
+      // first EN/JA price refresh entirely.
+      setTimeout(() => runForeignPriceRepairPass(), 5000).unref?.();
+      setTimeout(() => runImageRepairPass(), 60000).unref?.();
     }
   } else if (readinessChecks >= 60) {
     clearInterval(readinessTimer);
@@ -224,28 +233,31 @@ const readinessTimer = setInterval(async () => {
 }, 10000);
 readinessTimer.unref?.();
 
-const imageRepairTimer = setInterval(() => runImageRepairPass(), 45000);
-imageRepairTimer.unref?.();
-const zebraRepairTimer = setInterval(() => runZebraRepairPass(), 120000);
-zebraRepairTimer.unref?.();
-const foreignPriceTimer = setInterval(() => runForeignPriceRepairPass(), 60 * 60 * 1000);
+const koreanDiscoveryTimer = setInterval(() => ensureKoreanOfficialBackfill(), 2 * 60 * 1000);
+koreanDiscoveryTimer.unref?.();
+const foreignPriceTimer = setInterval(() => runForeignPriceRepairPass(), 5 * 60 * 1000);
 foreignPriceTimer.unref?.();
+const imageRepairTimer = setInterval(() => runImageRepairPass(), 90 * 1000);
+imageRepairTimer.unref?.();
+const zebraRepairTimer = setInterval(() => runZebraRepairPass(), 3 * 60 * 1000);
+zebraRepairTimer.unref?.();
 
 const checkpointTimer = setInterval(async () => {
-  if (!localized || imageRepairRunning || zebraRepairRunning || priceRepairRunning || (!dirtyImages && !persistenceDirty)) return;
+  if (!localized || imageRepairRunning || zebraRepairRunning || priceRepairRunning || koreanBackfillRunning || (!dirtyImages && !persistenceDirty)) return;
   await checkpoint("periodic-catalog-checkpoint");
 }, 5 * 60 * 1000);
 checkpointTimer.unref?.();
 
 async function close() {
   clearInterval(readinessTimer);
+  clearInterval(koreanDiscoveryTimer);
   clearInterval(imageRepairTimer);
   clearInterval(zebraRepairTimer);
   clearInterval(foreignPriceTimer);
   clearInterval(checkpointTimer);
   try {
     const state = catalogReady();
-    if (state.ready && !imageRepairRunning && !zebraRepairRunning && !priceRepairRunning) await checkpoint("shutdown-checkpoint");
+    if (state.ready && !imageRepairRunning && !zebraRepairRunning && !priceRepairRunning && !koreanBackfillRunning) await checkpoint("shutdown-checkpoint");
     else await checkpoint("shutdown-raw-checkpoint");
   } catch {}
   try { await closeMultilingualCardPersistence(); } catch {}
