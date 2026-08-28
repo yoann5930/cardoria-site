@@ -7,6 +7,16 @@ function money(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
+function clean(value, max = 500) {
+  return String(value == null ? "" : value).trim().slice(0, max);
+}
+
+function validateEmail(value) {
+  const email = clean(value, 254).toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw Object.assign(new Error("Adresse email invalide."), { status: 400 });
+  return email;
+}
+
 function validateItems(rawItems) {
   if (!Array.isArray(rawItems) || !rawItems.length) {
     throw Object.assign(new Error("Panier vide"), { status: 400 });
@@ -15,14 +25,18 @@ function validateItems(rawItems) {
   const catalog = new Map(
     listBoutiqueProducts({ includeDisabled: false }).map((product) => [String(product.id), product])
   );
+  const combined = new Map();
+  for (const raw of rawItems) {
+    const ref = clean(raw?.ref || raw?.id, 240);
+    const qty = Math.max(1, Math.min(20, Math.trunc(Number(raw?.qty) || 1)));
+    combined.set(ref, (combined.get(ref) || 0) + qty);
+  }
 
-  return rawItems.map((raw) => {
-    const ref = String(raw.ref || raw.id || "").trim();
+  return Array.from(combined.entries()).map(([ref, qty]) => {
     const product = catalog.get(ref);
     if (!product || product.boutiqueEnabled === false) {
       throw Object.assign(new Error(`Produit indisponible: ${ref || "référence manquante"}`), { status: 400 });
     }
-    const qty = Math.max(1, Math.min(20, Math.trunc(Number(raw.qty) || 1)));
     if (qty > Number(product.stock || 0)) {
       throw Object.assign(new Error(`Stock insuffisant pour ${product.name} (${product.stock} disponible).`), { status: 409 });
     }
@@ -39,32 +53,47 @@ function validateItems(rawItems) {
   });
 }
 
-export async function createLiveBoutiqueCheckout({ customerName, customerEmail, items, shipping, successUrl, trafficSource, visitorId }) {
+export async function createLiveBoutiqueCheckout({ customerName, customerEmail, customerPhone, address, postalCode, city, country, items, shipping, successUrl, trafficSource, visitorId }) {
+  const name = clean(customerName, 120);
+  const email = validateEmail(customerEmail);
+  const phone = clean(customerPhone, 40);
+  const street = clean(address, 300);
+  const zip = clean(postalCode, 20);
+  const locality = clean(city, 120);
+  const countryName = clean(country, 80) || "France";
+  if (!name) throw Object.assign(new Error("Nom du client obligatoire."), { status: 400 });
+  if (!phone) throw Object.assign(new Error("Téléphone obligatoire pour la livraison."), { status: 400 });
+  if (!street || !zip || !locality) throw Object.assign(new Error("Adresse, code postal et ville obligatoires pour la livraison."), { status: 400 });
+
   const verifiedItems = validateItems(items);
   const shippingCost = 0;
   const total = money(verifiedItems.reduce((sum, item) => sum + item.qty * item.price, 0) + shippingCost);
   const orderId = "CMD-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomInt(1000, 10000);
   const now = new Date().toISOString();
+  const fullAddress = [street, `${zip} ${locality}`.trim(), countryName].filter(Boolean).join("\n");
   const order = {
     id: orderId,
     date: now.slice(0, 10),
     createdAt: now,
     updatedAt: now,
-    client: String(customerName || "").slice(0, 120),
-    email: String(customerEmail || "").trim().toLowerCase().slice(0, 254),
-    address: "",
+    client: name,
+    email,
+    phone,
+    address: fullAddress,
+    shippingAddress: { address: street, postalCode: zip, city: locality, country: countryName },
     items: verifiedItems,
     payment: "En attente SumUp",
     paymentStatus: "pending",
     status: "En attente SumUp",
-    shipping: shipping || "Standard",
+    shipping: clean(shipping, 120) || "Standard",
     shippingCost,
+    carrier: "",
     tracking: "",
     total,
     sumupCheckoutId: "",
     sumupTransactionId: "",
     trafficSource: trafficSource === "witnot" ? "witnot" : "",
-    visitorId: visitorId || ""
+    visitorId: clean(visitorId, 200)
   };
 
   const orders = readJson("orders", []);
