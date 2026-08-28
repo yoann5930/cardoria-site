@@ -1,11 +1,15 @@
 (function () {
   "use strict";
 
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
+  var BACKEND = (window.CARDORIA_SEO && window.CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
   var ADMIN_CODE_KEY = "cardoria_admin_code";
   var SESSION_KEY = "cardoria_session_token";
   var CSRF_KEY = "cardoria_csrf_token";
+  var EXPIRES_KEY = "cardoria_session_expires_at";
+  var ROLE_KEY = "cardoria_admin_role";
+  var ADMIN_ROLES = ["super_admin", "admin", "employee"];
   var sessionValidationStarted = false;
+  var sessionValidationTimer = null;
 
   var NAV_GROUPS = [
     {
@@ -87,9 +91,28 @@
 
   function qs(sel, root) { return (root || document).querySelector(sel); }
   function euro(n) { return Number(n || 0).toFixed(2).replace(".", ",") + " €"; }
-
   function getCode() { return sessionStorage.getItem(ADMIN_CODE_KEY) || ""; }
   function getSessionToken() { return sessionStorage.getItem(SESSION_KEY) || ""; }
+  function getAdminRole() { return sessionStorage.getItem(ROLE_KEY) || ""; }
+  function isAdminRole(role) { return ADMIN_ROLES.indexOf(String(role || "")) >= 0; }
+
+  function getExpiryMs() {
+    var raw = sessionStorage.getItem(EXPIRES_KEY) || "";
+    var ms = Date.parse(raw);
+    return Number.isFinite(ms) ? ms : 0;
+  }
+
+  function hasLocallyValidSession() {
+    return !!getSessionToken() && isAdminRole(getAdminRole()) && getExpiryMs() > Date.now();
+  }
+
+  function hideAdmin() {
+    if (document && document.documentElement) document.documentElement.style.visibility = "hidden";
+  }
+
+  function revealAdmin() {
+    if (document && document.documentElement) document.documentElement.style.visibility = "";
+  }
 
   function clearAdminSession() {
     sessionStorage.removeItem("cardoria_admin_connected");
@@ -97,20 +120,36 @@
     sessionStorage.removeItem(CSRF_KEY);
     sessionStorage.removeItem(ADMIN_CODE_KEY);
     sessionStorage.removeItem("cardoria_admin_email");
-    sessionStorage.removeItem("cardoria_session_expires_at");
+    sessionStorage.removeItem(EXPIRES_KEY);
+    sessionStorage.removeItem(ROLE_KEY);
   }
 
   function goToLogin() {
     if (!/admin-login\.html$/i.test(location.pathname)) location.replace("admin-login.html");
   }
 
+  function rejectAdminSession() {
+    clearAdminSession();
+    goToLogin();
+    return false;
+  }
+
+  function acceptVerifiedSession(user) {
+    if (!user || !isAdminRole(user.role)) return rejectAdminSession();
+    var expiresAt = String(user.expiresAt || sessionStorage.getItem(EXPIRES_KEY) || "");
+    var expiresMs = Date.parse(expiresAt);
+    if (!Number.isFinite(expiresMs) || expiresMs <= Date.now()) return rejectAdminSession();
+    sessionStorage.setItem("cardoria_admin_connected", "yes");
+    sessionStorage.setItem(ROLE_KEY, user.role);
+    sessionStorage.setItem(EXPIRES_KEY, expiresAt);
+    if (user.email) sessionStorage.setItem("cardoria_admin_email", user.email);
+    revealAdmin();
+    return true;
+  }
+
   function validateAdminSession() {
+    if (!hasLocallyValidSession()) return Promise.resolve(rejectAdminSession());
     var token = getSessionToken();
-    if (!token) {
-      clearAdminSession();
-      goToLogin();
-      return Promise.resolve(false);
-    }
     var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     var timer = controller ? setTimeout(function () { controller.abort(); }, 8000) : null;
     return fetch(BACKEND + "/api/auth/me", {
@@ -119,41 +158,33 @@
       headers: { Authorization: "Bearer " + token },
       signal: controller ? controller.signal : undefined
     }).then(function (response) {
-      if (response.status === 401 || response.status === 403) {
-        clearAdminSession();
-        goToLogin();
-        return false;
+      if (response.status === 401) return rejectAdminSession();
+      if (!response.ok) {
+        if (hasLocallyValidSession()) { revealAdmin(); return true; }
+        return rejectAdminSession();
       }
-      if (!response.ok) return true;
       return response.json().then(function (data) {
-        if (!data || !data.ok || !data.user) {
-          clearAdminSession();
-          goToLogin();
-          return false;
-        }
-        sessionStorage.setItem("cardoria_admin_connected", "yes");
-        return true;
-      }).catch(function () { return true; });
+        if (!data || !data.ok || !data.user) return rejectAdminSession();
+        return acceptVerifiedSession(data.user);
+      }).catch(function () {
+        if (hasLocallyValidSession()) { revealAdmin(); return true; }
+        return rejectAdminSession();
+      });
     }).catch(function () {
-      // Une panne réseau transitoire ne doit pas déconnecter l'administrateur.
-      return true;
+      if (hasLocallyValidSession()) { revealAdmin(); return true; }
+      return rejectAdminSession();
     }).finally(function () {
       if (timer) clearTimeout(timer);
     });
   }
 
   function protectAdmin() {
-    var token = getSessionToken();
-    if (!token) {
-      clearAdminSession();
-      goToLogin();
-      return false;
-    }
-    sessionStorage.setItem("cardoria_admin_connected", "yes");
+    hideAdmin();
+    if (!hasLocallyValidSession()) return rejectAdminSession();
     if (!sessionValidationStarted) {
       sessionValidationStarted = true;
-      setTimeout(validateAdminSession, 20);
-      setInterval(validateAdminSession, 120000);
+      validateAdminSession();
+      sessionValidationTimer = setInterval(validateAdminSession, 120000);
     }
     return true;
   }
@@ -166,6 +197,7 @@
     var maxAttempts = method === "GET" ? 2 : 1;
 
     function attempt(index) {
+      if (!hasLocallyValidSession()) return Promise.resolve({ ok: false, error: "Session expirée.", status: 401 });
       var headers = Object.assign({}, opts.headers || {});
       var token = getSessionToken();
       if (token) headers.Authorization = "Bearer " + token;
@@ -185,10 +217,9 @@
       });
 
       return fetch(BACKEND + path, requestOptions).then(function (response) {
-        if (response.status === 401 || response.status === 403) {
-          clearAdminSession();
-          goToLogin();
-          return { ok: false, error: "Session expirée.", status: response.status };
+        if (response.status === 401) {
+          rejectAdminSession();
+          return { ok: false, error: "Session expirée.", status: 401 };
         }
         if ([502, 503, 504].indexOf(response.status) >= 0 && index + 1 < maxAttempts) {
           return wait(650).then(function () { return attempt(index + 1); });
@@ -198,7 +229,7 @@
           try { data = text ? JSON.parse(text) : {}; }
           catch (e) { data = { ok: response.ok, error: response.ok ? "Réponse serveur invalide." : "Erreur serveur." }; }
           if (typeof data.ok === "undefined") data.ok = response.ok;
-          if (!response.ok && !data.error) data.error = "Erreur serveur (" + response.status + ").";
+          if (!response.ok && !data.error) data.error = response.status === 403 ? "Droits insuffisants." : "Erreur serveur (" + response.status + ").";
           data.status = response.status;
           return data;
         });
@@ -290,8 +321,9 @@
 
   function adminLogout() {
     var token = getSessionToken();
-    if (token) fetch(BACKEND + "/api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + token } }).catch(function () {});
+    if (sessionValidationTimer) clearInterval(sessionValidationTimer);
     clearAdminSession();
+    if (token) fetch(BACKEND + "/api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + token } }).catch(function () {});
     location.replace("admin-login.html");
   }
 
@@ -318,7 +350,7 @@
   function fmtEv(e) { if (!e) return "—"; var sign = e.percent > 0 ? "+" : ""; return sign + (e.percent ?? 0) + " %"; }
 
   function formatMarketIndex(idx, rec) {
-    if (!idx || !idx.cardoriaMarketScore && idx.cardoriaMarketScore !== 0) return "";
+    if (!idx || (!idx.cardoriaMarketScore && idx.cardoriaMarketScore !== 0)) return "";
     var ev = idx.evolution || {}, recHtml = "";
     if (rec && rec.primary) {
       recHtml = "<tr><th>Recommandation</th><td><span class='admin-badge admin-badge--gold'>" + rec.primary.label + "</span>" + (rec.maxBuyPrice != null ? " — max " + euro(rec.maxBuyPrice) : "") + "<br><span style='font-size:12px;color:#baaf97'>" + (rec.primary.detail || "") + "</span></td></tr>";
@@ -347,5 +379,20 @@
     return "<tr><th colspan='2' style='color:#ffe18a;padding-top:12px'>Données marché Cardoria (moteur collecte)</th></tr><tr><th>Volume ventes</th><td>" + (ms.volume || 0) + "</td></tr><tr><th>Prix médian</th><td>" + euro(ms.medianPrice) + "</td></tr><tr><th>Rachat moyen</th><td>" + euro(ms.buybackAvg) + "</td></tr><tr><th>Évol. 7 j</th><td>" + (ev.days7 ?? 0) + " %</td></tr><tr><th>Évol. 30 j</th><td>" + (ev.days30 ?? 0) + " %</td></tr><tr><th>Évol. 90 j</th><td>" + (ev.days90 ?? 0) + " %</td></tr><tr><th>Évol. 1 an</th><td>" + (ev.days1y ?? 0) + " %</td></tr><tr><th>Indice liquidité</th><td>" + (ms.indices?.liquidity ?? "—") + " / 100</td></tr><tr><th>Indice demande</th><td>" + (ms.indices?.demand ?? "—") + " / 100</td></tr><tr><th>Indice rareté</th><td>" + (ms.indices?.rarity ?? "—") + " / 100</td></tr>";
   }
 
-  window.CardoriaAdmin = { BACKEND: BACKEND, protectAdmin: protectAdmin, validateAdminSession: validateAdminSession, adminFetch: adminFetch, renderShell: renderShell, adminLogout: adminLogout, drawChart: drawChart, periodButtons: periodButtons, euro: euro, qs: qs, formatAdminPricing: formatAdminPricing, formatCardoriaIntelligence: formatCardoriaIntelligence, formatMarketStatsBlock: formatMarketStatsBlock, formatMarketIndex: formatMarketIndex };
+  window.CardoriaAdmin = {
+    BACKEND: BACKEND,
+    protectAdmin: protectAdmin,
+    validateAdminSession: validateAdminSession,
+    adminFetch: adminFetch,
+    renderShell: renderShell,
+    adminLogout: adminLogout,
+    drawChart: drawChart,
+    periodButtons: periodButtons,
+    euro: euro,
+    qs: qs,
+    formatAdminPricing: formatAdminPricing,
+    formatCardoriaIntelligence: formatCardoriaIntelligence,
+    formatMarketStatsBlock: formatMarketStatsBlock,
+    formatMarketIndex: formatMarketIndex
+  };
 })();
