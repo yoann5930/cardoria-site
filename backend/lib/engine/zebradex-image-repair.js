@@ -21,6 +21,19 @@ function slug(value) {
   return normalizeText(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+function numberKey(value) {
+  const raw = String(value || "").trim().split("/")[0].trim();
+  const match = raw.match(/(\d+)$/);
+  if (match) return String(Number(match[1]));
+  return slug(raw);
+}
+
+function codeNumberKey(codeSlug) {
+  const raw = String(codeSlug || "").toLowerCase();
+  const match = raw.match(/(?:^|-)(\d+)$/);
+  return match ? String(Number(match[1])) : numberKey(raw);
+}
+
 function decodeHtml(value) {
   return String(value || "")
     .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
@@ -56,8 +69,6 @@ async function imageExists(url) {
   try {
     let response = await fetch(url, { method: "HEAD", headers: { "User-Agent": "Cardoria/6.0" }, signal: controller.signal });
     if (response.ok && String(response.headers.get("content-type") || "").toLowerCase().startsWith("image/")) return true;
-    // Some media/CDN endpoints do not implement HEAD reliably. A tiny ranged GET
-    // is still a strict image check and avoids rejecting a valid ZebraDex scan.
     response = await fetch(url, { method: "GET", headers: { Range: "bytes=0-128", "User-Agent": "Cardoria/6.0" }, signal: controller.signal });
     return (response.ok || response.status === 206) && String(response.headers.get("content-type") || "").toLowerCase().startsWith("image/");
   } catch {
@@ -136,7 +147,8 @@ function parseCardLinks(html, series) {
   while ((match = hrefRegex.exec(html))) {
     const href = match[1];
     if (!href.includes(`/${series.language}/tcg/pokemon/`)) continue;
-    cards.push({ href, codeSlug: String(match[2] || "").toLowerCase(), nameSlug: String(match[3] || "").toLowerCase(), itemId: String(match[4] || "") });
+    const codeSlug = String(match[2] || "").toLowerCase();
+    cards.push({ href, codeSlug, numberKey: codeNumberKey(codeSlug), nameSlug: String(match[3] || "").toLowerCase(), itemId: String(match[4] || "") });
   }
   const unique = [...new Map(cards.map((row) => [`${row.codeSlug}:${row.itemId}`, row])).values()];
   pageCache.set(key, { at: Date.now(), cards: unique });
@@ -153,10 +165,9 @@ async function loadSeriesCards(series) {
 }
 
 function chooseCard(card, zebraCards) {
-  const numberSlug = slug(card.number);
-  if (!numberSlug) return null;
-  const suffix = `-${numberSlug}`;
-  let candidates = zebraCards.filter((row) => row.codeSlug === numberSlug || row.codeSlug.endsWith(suffix));
+  const wantedNumber = numberKey(card.number);
+  if (!wantedNumber) return null;
+  let candidates = zebraCards.filter((row) => row.numberKey === wantedNumber);
   if (!candidates.length) return null;
   if (candidates.length === 1) return candidates[0];
   const names = [card.name, card.source_name].map(slug).filter(Boolean);
@@ -169,12 +180,13 @@ function chooseCard(card, zebraCards) {
 
 async function resolveZebraDex(card, seriesIndex) {
   const series = chooseSeries(card, seriesIndex);
-  if (!series) return null;
+  if (!series) return { reason: "series" };
   const zebraCards = await loadSeriesCards(series);
+  if (!zebraCards.length) return { reason: "series_cards" };
   const matched = chooseCard(card, zebraCards);
-  if (!matched) return null;
+  if (!matched) return { reason: "card" };
   const imageUrl = `${MEDIA}/images/pokemon/${series.language}/1/${series.seriesId}/item/${matched.itemId}.webp?v=5`;
-  if (!(await imageExists(imageUrl))) return null;
+  if (!(await imageExists(imageUrl))) return { reason: "image" };
   return { imageUrl, zebraLanguage: series.language, seriesId: series.seriesId, itemId: matched.itemId };
 }
 
@@ -190,8 +202,7 @@ export function getZebraDexRepairStatus() {
     FROM cards WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1
       AND (COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='') GROUP BY language`).all(retryBefore);
   return {
-    missing: Number(row?.missing || 0),
-    pending: Number(row?.pending || 0),
+    missing: Number(row?.missing || 0), pending: Number(row?.pending || 0),
     languages: Object.fromEntries(byLanguage.map((item) => [item.language, { missing: Number(item.missing || 0), pending: Number(item.pending || 0) }]))
   };
 }
@@ -212,11 +223,12 @@ export async function repairImagesWithZebraDex({ limit = 100 } = {}) {
   if (!seriesIndex.length) return { ok: false, requested: targets.length, repaired: 0, unresolved: targets.length, error: "zebradex_series_unavailable", ...getZebraDexRepairStatus() };
 
   const now = new Date().toISOString();
-  const resolved = [];
-  const unresolved = [];
+  const resolved = [], unresolved = [];
+  const reasons = { series: 0, series_cards: 0, card: 0, image: 0 };
   for (const card of targets) {
     const image = await resolveZebraDex(card, seriesIndex);
-    if (image) resolved.push({ card, image }); else unresolved.push(card);
+    if (image?.imageUrl) resolved.push({ card, image });
+    else { unresolved.push(card); if (image?.reason && Object.prototype.hasOwnProperty.call(reasons, image.reason)) reasons[image.reason] += 1; }
   }
 
   const update = db.prepare(`UPDATE cards SET image_hd=?,image_thumb=?,image_language=?,image_source='zebradex',zebradex_checked_at=?,updated_at=? WHERE id=?`);
@@ -228,6 +240,6 @@ export async function repairImagesWithZebraDex({ limit = 100 } = {}) {
   const repairedFr = resolved.filter(({ card }) => card.language === "fr").length;
   if (repairedFr > 0) scheduleEngineSnapshot("zebradex-fr-image-repair", 30000);
   const status = getZebraDexRepairStatus();
-  console.log(`[zebradex-image-repair] requested=${targets.length} repaired=${resolved.length} repaired-fr=${repairedFr} unresolved=${unresolved.length} remaining=${status.missing} pending=${status.pending}`);
-  return { ok: true, requested: targets.length, repaired: resolved.length, repairedFr, unresolved: unresolved.length, ...status };
+  console.log(`[zebradex-image-repair] requested=${targets.length} repaired=${resolved.length} repaired-fr=${repairedFr} unresolved=${unresolved.length} reasons=series:${reasons.series},series-cards:${reasons.series_cards},card:${reasons.card},image:${reasons.image} remaining=${status.missing} pending=${status.pending}`);
+  return { ok: true, requested: targets.length, repaired: resolved.length, repairedFr, unresolved: unresolved.length, reasons, ...status };
 }
