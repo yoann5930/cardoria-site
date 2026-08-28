@@ -1,5 +1,6 @@
 import { restoreMultilingualCards, persistMultilingualCards, closeMultilingualCardPersistence } from "./multilingual-card-persistence.js";
 import { ensureCatalogFrenchLocalizationSchema, localizeMultilingualCatalogToFrench } from "./catalog-french-localization.js";
+import { getMultilingualImageRepairStatus, repairMultilingualImages } from "./multilingual-image-repair.js";
 import { getDb } from "./database.js";
 
 const READY_MINIMUMS = { en: 23000, ja: 12000, ko: 200 };
@@ -13,6 +14,7 @@ try {
 
 let busy = false;
 let localized = false;
+let imageRepairRunning = false;
 
 function languageCounts() {
   const db = getDb();
@@ -62,13 +64,33 @@ export async function localizeAndCheckpointMultilingualCatalog(reason = "catalog
   }
 }
 
+async function runImageRepairPass() {
+  if (!localized || busy || imageRepairRunning) return;
+  const before = getMultilingualImageRepairStatus();
+  if (!before.totalPending) return;
+  imageRepairRunning = true;
+  try {
+    const result = await repairMultilingualImages({ limit: 500 });
+    if (result.repaired > 0 && result.totalPending === 0) {
+      await checkpoint("image-repair-pass-complete");
+    }
+  } catch (error) {
+    console.error("[multilingual-image-repair] pass failed", error?.message || String(error));
+  } finally {
+    imageRepairRunning = false;
+  }
+}
+
 let readinessChecks = 0;
 const readinessTimer = setInterval(async () => {
   readinessChecks += 1;
   const state = catalogReady();
   if (state.ready) {
     const result = await localizeAndCheckpointMultilingualCatalog("catalog-ready-checkpoint");
-    if (result.ok) clearInterval(readinessTimer);
+    if (result.ok) {
+      clearInterval(readinessTimer);
+      setTimeout(() => runImageRepairPass(), 5000).unref?.();
+    }
   } else if (readinessChecks >= 60) {
     clearInterval(readinessTimer);
     console.warn(`[multilingual-bootstrap] catalog readiness timeout EN=${state.counts.en} JA=${state.counts.ja} KO=${state.counts.ko}`);
@@ -76,18 +98,22 @@ const readinessTimer = setInterval(async () => {
 }, 10000);
 readinessTimer.unref?.();
 
+const imageRepairTimer = setInterval(() => runImageRepairPass(), 45000);
+imageRepairTimer.unref?.();
+
 const checkpointTimer = setInterval(async () => {
-  if (!localized) return;
-  await localizeAndCheckpointMultilingualCatalog("periodic-checkpoint");
+  if (!localized || imageRepairRunning) return;
+  await checkpoint("periodic-checkpoint");
 }, 15 * 60 * 1000);
 checkpointTimer.unref?.();
 
 async function close() {
   clearInterval(readinessTimer);
+  clearInterval(imageRepairTimer);
   clearInterval(checkpointTimer);
   try {
     const state = catalogReady();
-    if (state.ready) await localizeAndCheckpointMultilingualCatalog("shutdown-checkpoint");
+    if (state.ready && !imageRepairRunning) await localizeAndCheckpointMultilingualCatalog("shutdown-checkpoint");
     else await checkpoint("shutdown-raw-checkpoint");
   } catch {}
   try { await closeMultilingualCardPersistence(); } catch {}
