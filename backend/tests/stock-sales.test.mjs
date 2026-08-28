@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getDb } from "../lib/engine/database.js";
+import { migrateAi } from "../lib/ai/migrate.js";
 import { migrateMarketData } from "../lib/market/migrate.js";
 import { getInventorySalesStats } from "../lib/engine/pricing.js";
 import { ingestAdminManualSale, ingestAdminFeedbackOutcome } from "../lib/market/ingest.js";
 import { recordMarketTransaction } from "../lib/market/record.js";
 
 const db = getDb();
+migrateAi();
 migrateMarketData();
 
 function seedCard() {
@@ -25,6 +27,8 @@ function cleanup(cardId, license) {
   db.prepare("DELETE FROM market_transactions WHERE card_id=?").run(cardId);
   db.prepare("DELETE FROM sales_history WHERE card_id=?").run(cardId);
   db.prepare("DELETE FROM market_card_stats WHERE card_id=?").run(cardId);
+  db.prepare("DELETE FROM ai_price_history WHERE card_id=?").run(cardId);
+  db.prepare("DELETE FROM ai_trends WHERE card_id=?").run(cardId);
   db.prepare("DELETE FROM price_sources WHERE card_id=?").run(cardId);
   db.prepare("DELETE FROM cards WHERE id=?").run(cardId);
   db.prepare("DELETE FROM licenses WHERE slug=?").run(license);
