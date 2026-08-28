@@ -1,2 +1,2 @@
-cardoria-frontend-release=2026-08-28-boutique-orders-admin-1
-Includes: Admin Boutique order workflow with paid-order protection, preparation/shipping/delivery statuses, carrier and tracking, address and internal notes, cancellation review flag, SumUp resync, KPIs and cache-busted admin assets.
+cardoria-frontend-release=2026-08-28-boutique-stock-orders-100
+Includes: authoritative paid-purchase Boutique inventory, pending reservations, sold stock, refund holds, oversell detection, complete shipping identity/address, La Poste/Mondial Relay/Relais Colis, mandatory tracking before shipment, SumUp resync and full refund action, automatic stock release after confirmed refund, Admin stock source unification, cache-busted Boutique/Admin assets, and production CI gates for the complete workflow.
