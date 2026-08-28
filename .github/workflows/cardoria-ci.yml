@@ -74,6 +74,8 @@ jobs:
           node --check lib/engine/tcgdex-sync.js
           node --check lib/engine/market-schedule.js
           node --check lib/engine/sealed-products.js
+          node --check lib/market/ingest.js
+          node --check lib/market/record.js
           node --check ../script.js
           node --check ../js/admin/admin-core.js
           node --check ../js/admin/admin-login-secure.js
@@ -83,10 +85,11 @@ jobs:
           node --check ../js/admin/admin-purchases-catalog-link.js
           node --check ../js/admin/admin-catalog-sealed-shortcuts.js
           node --check ../js/admin/admin-sealed-references.js
+          node --check ../js/admin/admin-stock.js
 
-      - name: Lot market catalog admin session and navigation regression tests
+      - name: Admin and stock regression tests
         working-directory: .
-        run: node --test tests/admin-session-guard.test.mjs tests/admin-navigation.test.mjs tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs
+        run: node --test tests/admin-session-guard.test.mjs tests/admin-navigation.test.mjs tests/admin-stock-pricing.test.mjs tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs backend/tests/stock-sales.test.mjs
 
       - name: Reject client-side admin bypass
         working-directory: .
