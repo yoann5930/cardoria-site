@@ -1,0 +1,38 @@
+name: Cardoria Admin Purchases CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/routes/admin.js"
+      - "admin-achats-cartes.html"
+      - "js/admin/admin-purchase-reference-capacity.js"
+      - "js/admin/admin-purchases-catalog-link.js"
+      - "tests/admin-purchase-reference.test.mjs"
+      - ".github/workflows/cardoria-admin-purchases-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/routes/admin.js"
+      - "admin-achats-cartes.html"
+      - "js/admin/admin-purchase-reference-capacity.js"
+      - "js/admin/admin-purchases-catalog-link.js"
+      - "tests/admin-purchase-reference.test.mjs"
+      - ".github/workflows/cardoria-admin-purchases-ci.yml"
+
+jobs:
+  purchase-reference-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+      - name: Syntax checks
+        run: |
+          node --check backend/routes/admin.js
+          node --check js/admin/admin-purchase-reference-capacity.js
+          node --check js/admin/admin-purchases-catalog-link.js
+      - name: Full catalog reference regression
+        run: node --test tests/admin-purchase-reference.test.mjs

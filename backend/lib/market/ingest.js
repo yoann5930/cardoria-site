@@ -20,6 +20,7 @@ export function ingestMarketplaceOrder(order) {
     cardId: listing.cardId,
     type: "listing_sale",
     salePrice: order.unitPrice,
+    quantity: order.qty,
     condition: listing.condition,
     language: listing.language || "",
     license: listing.license,
@@ -72,6 +73,7 @@ export function ingestEstimationOutcome({
       cardId,
       type: "sale",
       salePrice,
+      quantity: 1,
       condition,
       language: language || detection.language,
       license: detection.license,
@@ -95,7 +97,8 @@ export function ingestAdminFeedbackOutcome({
   priceActualBuy,
   priceActualSell,
   resaleDelayDays,
-  condition
+  condition,
+  quantity = 1
 }) {
   if (!cardId) return null;
   const results = [];
@@ -106,6 +109,7 @@ export function ingestAdminFeedbackOutcome({
       cardId,
       type: "buyback",
       buybackPrice: priceActualBuy,
+      quantity,
       condition,
       license: detection.license,
       extension: detection.extension,
@@ -123,6 +127,7 @@ export function ingestAdminFeedbackOutcome({
       cardId,
       type: "sale",
       salePrice: priceActualSell,
+      quantity,
       condition,
       license: detection.license,
       extension: detection.extension,
@@ -151,6 +156,7 @@ export function ingestAdminManualSale(cardId, body) {
     type: body.type || "admin_sale",
     salePrice: body.price || body.salePrice,
     buybackPrice: body.buybackPrice,
+    quantity: body.quantity || body.qty || 1,
     condition: body.condition,
     language: body.language,
     seller: body.seller,

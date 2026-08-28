@@ -12,6 +12,7 @@ import { refreshVisibleCardPrices } from "../lib/engine/visible-prices.js";
 import {
   SEALED_PACKAGING_TYPES,
   listSealedProducts,
+  getSealedProduct,
   createSealedProduct,
   updateSealedProduct,
   deleteSealedProduct,
@@ -46,6 +47,11 @@ router.get("/sealed", (req, res) => {
   res.json({ ok: true, references, packagingTypes: SEALED_PACKAGING_TYPES, status: getSealedCatalogStatus() });
 });
 router.get("/sealed/status", (req, res) => res.json({ ok: true, ...getSealedCatalogStatus() }));
+router.get("/sealed/:id", (req, res) => {
+  const reference = getSealedProduct(req.params.id);
+  if (!reference) return res.status(404).json({ ok: false, error: "Reference scellee introuvable" });
+  res.json({ ok: true, reference });
+});
 router.post("/sealed/sync", async (req, res) => {
   try {
     const result = await syncCardmarketSealedCatalog({ force: Boolean(req.body?.force) });
@@ -103,13 +109,13 @@ router.post("/sync/pokemon-reference", async (req, res) => {
 router.get("/cards", (req, res) => res.json({ ok: true, ...searchCards({ ...req.query, activeOnly: false }) }));
 router.get("/cards/:id", (req, res) => { const card = getCardById(req.params.id); if (!card) return res.status(404).json({ ok: false, error: "Carte introuvable" }); res.json({ ok: true, card }); });
 router.post("/cards", (req, res) => {
-  try { const card = createCard(req.body || {}); logAudit({ type: "engine", action: "card_create", user: req.authUser?.email || "admin", detail: card.id }); res.json({ ok: true, card }); }
+  try { const card = createCard(req.body || {}); logAudit({ type: "engine", action: "card_create", user: "admin", detail: card.id }); res.json({ ok: true, card }); }
   catch (e) { res.status(400).json({ ok: false, error: e.message }); }
 });
-router.put("/cards/:id", (req, res) => { const card = updateCard(req.params.id, req.body || {}); if (!card) return res.status(404).json({ ok: false, error: "Carte introuvable" }); logAudit({ type: "engine", action: "card_update", user: req.authUser?.email || "admin", detail: req.params.id }); res.json({ ok: true, card }); });
-router.delete("/cards/:id", (req, res) => { if (!deleteCard(req.params.id)) return res.status(404).json({ ok: false, error: "Carte introuvable" }); logAudit({ type: "engine", action: "card_delete", user: req.authUser?.email || "admin", detail: req.params.id }); res.json({ ok: true }); });
-router.put("/cards/:id/prices", (req, res) => { const card = getCardById(req.params.id); if (!card) return res.status(404).json({ ok: false, error: "Carte introuvable" }); const prices = setPriceSources(req.params.id, req.body?.sources || []); logAudit({ type: "engine", action: "price_update", user: req.authUser?.email || "admin", detail: req.params.id }); res.json({ ok: true, prices, card: getCardById(req.params.id) }); });
-router.post("/cards/:id/sales", (req, res) => { const card = getCardById(req.params.id); if (!card) return res.status(404).json({ ok: false, error: "Carte introuvable" }); const history = addSaleRecord(req.params.id, req.body || {}); logAudit({ type: "engine", action: "sale_add", user: req.authUser?.email || "admin", detail: req.params.id }); res.json({ ok: true, salesHistory: history, card: getCardById(req.params.id) }); });
+router.put("/cards/:id", (req, res) => { const card = updateCard(req.params.id, req.body || {}); if (!card) return res.status(404).json({ ok: false, error: "Carte introuvable" }); logAudit({ type: "engine", action: "card_update", user: "admin", detail: req.params.id }); res.json({ ok: true, card }); });
+router.delete("/cards/:id", (req, res) => { if (!deleteCard(req.params.id)) return res.status(404).json({ ok: false, error: "Carte introuvable" }); logAudit({ type: "engine", action: "card_delete", user: "admin", detail: req.params.id }); res.json({ ok: true }); });
+router.put("/cards/:id/prices", (req, res) => { const card = getCardById(req.params.id); if (!card) return res.status(404).json({ ok: false, error: "Carte introuvable" }); const prices = setPriceSources(req.params.id, req.body?.sources || []); logAudit({ type: "engine", action: "price_update", user: "admin", detail: req.params.id }); res.json({ ok: true, prices, card: getCardById(req.params.id) }); });
+router.post("/cards/:id/sales", (req, res) => { const card = getCardById(req.params.id); if (!card) return res.status(404).json({ ok: false, error: "Carte introuvable" }); const history = addSaleRecord(req.params.id, req.body || {}); logAudit({ type: "engine", action: "sale_add", user: "admin", detail: req.params.id }); res.json({ ok: true, salesHistory: history, card: getCardById(req.params.id) }); });
 router.post("/estimate-price", (req, res) => { const estimate = estimatePrice(req.body?.cardId, req.body?.condition); if (!estimate) return res.status(404).json({ ok: false, error: "Carte introuvable" }); res.json({ ok: true, estimate }); });
 
 export default router;

@@ -8,6 +8,8 @@ import { getEstimations } from "../routes/estimation.js";
 import { listAnalyses } from "../lib/ai/training.js";
 import { getWitnotStats } from "../lib/attribution/witnot.js";
 import { listUsers, createUser, getUserByEmail, updateUserAdmin } from "../lib/auth/users.js";
+import { buildPurchaseAccountingStats } from "../lib/accounting/purchase-stats.js";
+import { getAccountingSales } from "../lib/accounting/sales-stats.js";
 
 const router = Router();
 const USER_ADMIN = requireAuth({ roles: ["super_admin", "admin"], action: "users" });
@@ -21,7 +23,7 @@ const DEFAULT_SEALED_REFERENCES = [];
 const BUYERS = ["yoann", "valentin"];
 const PURCHASE_TYPES = ["pokemon_card", "consumable", "equipment"];
 const PACKAGING_TYPES = ["carte_unite","lot_cartes","booster","blister","duopack","tripack","quadpack","bundle","mini_bundle","demi_display","display","case_display","etb","etb_pokemon_center","upc","coffret","collection_box","tin","pokebox","mini_tin","build_battle","build_battle_stadium","deck","theme_deck","battle_deck","league_battle_deck","starter_deck","premium_collection","poster_collection","binder_collection","calendar","advent_calendar","case_carton","master_case","sleeve_pack","toploader_pack","semi_rigid_pack","team_bag_pack","envelope_pack","box_storage","other"];
-const DEFAULT_ANALYTICS = { days: [], sources: { google: 0, facebook: 0, instagram: 0, direct: 0, witnot: 0 }, devices: { mobile: 0, desktop: 0, tablet: 0 }, avgSessionSeconds: 0, topPages: [], topSearches: [], topCards: [], sales: [] };
+const DEFAULT_ANALYTICS = { days: [], sources: { google: 0, facebook: 0, instagram: 0, direct: 0, witnot: 0 }, devices: { mobile: 0, desktop: 0, tablet: 0 }, avgSessionSeconds: 0, topPages: [], topSearches: [], topCards: [] };
 
 function periodFilter(dateStr, period) {
   const d = new Date(dateStr); if (Number.isNaN(d.getTime())) return false; const now = new Date();
@@ -47,7 +49,7 @@ function extractLotCards(notes = "") {
   try {
     const ids = JSON.parse(match[1]);
     if (!Array.isArray(ids)) return null;
-    return ids.map((id) => cleanText(id, 120)).filter(Boolean);
+    return ids.map((id) => cleanText(id, 180)).filter(Boolean);
   } catch { return null; }
 }
 
@@ -74,7 +76,7 @@ function normalizePurchase(body = {}, existing = {}) {
   }
   const roundedAmount = Math.round(amount * 100) / 100;
   const unitPrice = purchaseUnitPrice({ purchaseType, packaging, amount: roundedAmount, quantity });
-  return { ...existing, date, seller, description, buyer, purchaseType, packaging, category: cleanText(body.category ?? existing.category, 80) || "autre", license: cleanText(body.license ?? existing.license, 80), quantity, amount: roundedAmount, unitPrice, lotCards: lotCards || [], paymentMethod: cleanText(body.paymentMethod ?? existing.paymentMethod, 80), reference: cleanText(body.reference ?? existing.reference, 120), status, notes };
+  return { ...existing, date, seller, description, buyer, purchaseType, packaging, category: cleanText(body.category ?? existing.category, 80) || "autre", license: cleanText(body.license ?? existing.license, 80), quantity, amount: roundedAmount, unitPrice, lotCards: lotCards || [], paymentMethod: cleanText(body.paymentMethod ?? existing.paymentMethod, 80), reference: cleanText(body.reference ?? existing.reference, 240), status, notes };
 }
 
 function normalizeSealedReference(body = {}, existing = {}) {
@@ -91,8 +93,13 @@ router.get("/dashboard", (req, res) => {
 });
 
 router.get("/accounting/sales", (req, res) => {
-  const q=(req.query.q||"").toLowerCase(), license=req.query.license||""; let sales=readJson("analytics",DEFAULT_ANALYTICS).sales||[];
-  if(license)sales=sales.filter((s)=>s.license===license); if(q)sales=sales.filter((s)=>JSON.stringify(s).toLowerCase().includes(q)); res.json({ok:true,sales});
+  const q = String(req.query.q || "").toLowerCase();
+  const source = cleanText(req.query.source, 40).toLowerCase();
+  const accounting = getAccountingSales();
+  let sales = accounting.sales;
+  if (source) sales = sales.filter((sale) => sale.source === source);
+  if (q) sales = sales.filter((sale) => JSON.stringify(sale).toLowerCase().includes(q));
+  res.json({ ok: true, sales, unresolvedMarketplace: accounting.unresolvedMarketplace, unresolvedMarketplaceCount: accounting.unresolvedMarketplace.length });
 });
 
 router.get("/accounting/purchases", (req,res)=>{
@@ -105,11 +112,19 @@ router.put("/accounting/purchases/:id",WRITE_ADMIN,(req,res)=>{try{const purchas
 router.delete("/accounting/purchases/:id",DELETE_ADMIN,(req,res)=>{const purchases=readJson("purchases",DEFAULT_PURCHASES),i=purchases.findIndex((p)=>p.id===req.params.id);if(i<0)return res.status(404).json({ok:false,error:"Achat introuvable."});const [removed]=purchases.splice(i,1);writeJson("purchases",purchases);logAudit({type:"accounting",action:"purchase_delete",user:req.authUser?.email||"admin",detail:removed.id});res.json({ok:true,deletedId:removed.id});});
 
 router.get("/accounting/stats",(req,res)=>{
-  const sales=readJson("analytics",DEFAULT_ANALYTICS).sales||[],purchases=readJson("purchases",DEFAULT_PURCHASES),byLicense={},bySeller={},purchaseByLicense={},purchaseBySeller={},purchaseByCategory={},purchaseByBuyer={yoann:0,valentin:0,non_attribue:0},purchaseByType={};
-  sales.forEach((s)=>{byLicense[s.license]=(byLicense[s.license]||0)+Number(s.amount||0);bySeller[s.seller]=(bySeller[s.seller]||0)+Number(s.amount||0);});
-  purchases.forEach((p)=>{const license=p.license||"sans licence",seller=p.seller||"inconnu",category=p.category||"autre",buyer=normalizedBuyer(p.buyer),type=normalizedPurchaseType(p.purchaseType),amount=Number(p.amount||0);purchaseByLicense[license]=(purchaseByLicense[license]||0)+amount;purchaseBySeller[seller]=(purchaseBySeller[seller]||0)+amount;purchaseByCategory[category]=(purchaseByCategory[category]||0)+amount;purchaseByBuyer[buyer]=(purchaseByBuyer[buyer]||0)+amount;purchaseByType[type]=(purchaseByType[type]||0)+amount;});
-  const totalSales=sales.reduce((a,s)=>a+Number(s.amount||0),0),totalPurchases=purchases.reduce((a,p)=>a+Number(p.amount||0),0);
-  res.json({ok:true,byLicense,bySeller,purchaseByLicense,purchaseBySeller,purchaseByCategory,purchaseByBuyer,purchaseByType,buyers:BUYERS,packagingTypes:PACKAGING_TYPES,totalSales,totalPurchases,cardoriaPurchaseTotal:totalPurchases,netResult:totalSales-totalPurchases,purchaseCount:purchases.length});
+  const accounting = getAccountingSales();
+  const sales = accounting.sales;
+  const purchaseStats=buildPurchaseAccountingStats(readJson("purchases",DEFAULT_PURCHASES),{normalizeBuyer:normalizedBuyer,normalizeType:normalizedPurchaseType});
+  const byLicense={},bySeller={},byChannel={};
+  sales.forEach((sale)=>{
+    const license=sale.license||sale.source||"autre",seller=sale.seller||"Cardoria",channel=sale.channel||sale.source||"autre",amount=Number(sale.amount||0);
+    byLicense[license]=(byLicense[license]||0)+amount;
+    bySeller[seller]=(bySeller[seller]||0)+amount;
+    byChannel[channel]=(byChannel[channel]||0)+amount;
+  });
+  const totalSales=accounting.totalRevenue,totalPurchases=purchaseStats.total;
+  const unresolvedMarketplaceGross=accounting.unresolvedMarketplace.reduce((sum,row)=>sum+Number(row.grossAmount||0),0);
+  res.json({ok:true,byLicense,bySeller,byChannel,purchaseByLicense:purchaseStats.byLicense,purchaseBySeller:purchaseStats.bySeller,purchaseByCategory:purchaseStats.byCategory,purchaseByBuyer:purchaseStats.byBuyer,purchaseByType:purchaseStats.byType,buyers:BUYERS,packagingTypes:PACKAGING_TYPES,totalSales,boutiqueRevenue:accounting.boutiqueRevenue,marketplaceRevenue:accounting.marketplaceRevenue,unresolvedMarketplaceCount:accounting.unresolvedMarketplace.length,unresolvedMarketplaceGross,totalPurchases,cardoriaPurchaseTotal:totalPurchases,netResult:totalSales-totalPurchases,purchaseCount:purchaseStats.count});
 });
 
 router.get("/catalog/sealed-references",(req,res)=>{const q=String(req.query.q||"").toLowerCase(),packaging=cleanText(req.query.packaging,80);let references=readJson("sealed-references",DEFAULT_SEALED_REFERENCES);if(packaging)references=references.filter((r)=>r.packaging===packaging);if(q)references=references.filter((r)=>JSON.stringify(r).toLowerCase().includes(q));res.json({ok:true,references,packagingTypes:PACKAGING_TYPES});});
@@ -117,7 +132,19 @@ router.post("/catalog/sealed-references",WRITE_ADMIN,(req,res)=>{try{const list=
 router.put("/catalog/sealed-references/:id",WRITE_ADMIN,(req,res)=>{try{const list=readJson("sealed-references",DEFAULT_SEALED_REFERENCES),i=list.findIndex((r)=>r.id===req.params.id);if(i<0)return res.status(404).json({ok:false,error:"Référence introuvable."});list[i]=normalizeSealedReference(req.body||{},{...list[i],updatedAt:new Date().toISOString()});writeJson("sealed-references",list);res.json({ok:true,reference:list[i]});}catch(e){res.status(e.status||400).json({ok:false,error:e.message});}});
 router.delete("/catalog/sealed-references/:id",DELETE_ADMIN,(req,res)=>{const list=readJson("sealed-references",DEFAULT_SEALED_REFERENCES),i=list.findIndex((r)=>r.id===req.params.id);if(i<0)return res.status(404).json({ok:false,error:"Référence introuvable."});list.splice(i,1);writeJson("sealed-references",list);res.json({ok:true});});
 
-router.get("/accounting/export",EXPORT_ADMIN,(req,res)=>{const format=req.query.format||"csv",type=req.query.type||"sales",data=type==="purchases"?readJson("purchases",DEFAULT_PURCHASES):(readJson("analytics",DEFAULT_ANALYTICS).sales||[]);logAudit({type:"export",action:`export_${format}`,user:req.authUser?.email||"admin",detail:`${type} — ${data.length} lignes`});if(format==="csv"||format==="excel"){const headers=Object.keys(data[0]||{id:"",date:"",amount:""}),rows=[headers.join(";"),...data.map((row)=>headers.map((h)=>csvEscape(row[h])).join(";"))];res.setHeader("Content-Type","text/csv; charset=utf-8");res.setHeader("Content-Disposition",`attachment; filename="cardoria-${type}-${Date.now()}.csv"`);return res.send("\uFEFF"+rows.join("\n"));}if(format==="pdf"){const headers=Object.keys(data[0]||{}),html=`<!doctype html><html><head><meta charset="utf-8"><title>Export Cardoria</title></head><body><h1>Cardoria — Export ${type}</h1><table><thead><tr>${headers.map((k)=>`<th>${k}</th>`).join("")}</tr></thead><tbody>${data.map((r)=>`<tr>${headers.map((k)=>`<td>${String(r[k]??"")}</td>`).join("")}</tr>`).join("")}</tbody></table><p>Généré le ${new Date().toLocaleString("fr-FR")}</p></body></html>`;res.setHeader("Content-Type","text/html; charset=utf-8");res.setHeader("Content-Disposition",`attachment; filename="cardoria-${type}-${Date.now()}.html"`);return res.send(html);}res.status(400).json({ok:false,error:"Format non supporté"});});
+router.get("/accounting/export",EXPORT_ADMIN,(req,res)=>{
+  const format=req.query.format||"csv",type=req.query.type||"sales";
+  const data=type==="purchases"?readJson("purchases",DEFAULT_PURCHASES):getAccountingSales().sales;
+  logAudit({type:"export",action:`export_${format}`,user:req.authUser?.email||"admin",detail:`${type} — ${data.length} lignes`});
+  if(format==="csv"||format==="excel"){
+    const headers=Object.keys(data[0]||{id:"",date:"",amount:""}),rows=[headers.join(";"),...data.map((row)=>headers.map((h)=>csvEscape(row[h])).join(";"))];
+    res.setHeader("Content-Type","text/csv; charset=utf-8");res.setHeader("Content-Disposition",`attachment; filename="cardoria-${type}-${Date.now()}.csv"`);return res.send("\uFEFF"+rows.join("\n"));
+  }
+  if(format==="pdf"){
+    const headers=Object.keys(data[0]||{}),html=`<!doctype html><html><head><meta charset="utf-8"><title>Export Cardoria</title></head><body><h1>Cardoria — Export ${type}</h1><table><thead><tr>${headers.map((k)=>`<th>${k}</th>`).join("")}</tr></thead><tbody>${data.map((r)=>`<tr>${headers.map((k)=>`<td>${String(r[k]??"")}</td>`).join("")}</tr>`).join("")}</tbody></table><p>Généré le ${new Date().toLocaleString("fr-FR")}</p></body></html>`;res.setHeader("Content-Type","text/html; charset=utf-8");res.setHeader("Content-Disposition",`attachment; filename="cardoria-${type}-${Date.now()}.html"`);return res.send(html);
+  }
+  res.status(400).json({ok:false,error:"Format non supporté"});
+});
 
 router.get("/users",USER_ADMIN,(req,res)=>res.json({ok:true,users:listUsers()}));
 router.post("/users",USER_ADMIN,(req,res)=>{try{const email=String(req.body?.email||"").trim().toLowerCase(),role=String(req.body?.role||"employee"),name=String(req.body?.name||"").trim().slice(0,120);if(!validEmail(email))return res.status(400).json({ok:false,error:"Email invalide"});if(!["employee","admin"].includes(role))return res.status(400).json({ok:false,error:"Créer ici uniquement un employé ou administrateur. Les clients s'inscrivent sur le site."});if(role==="admin"&&req.authUser?.role!=="super_admin")return res.status(403).json({ok:false,error:"Seul un super administrateur peut créer un administrateur."});if(getUserByEmail(email))return res.status(409).json({ok:false,error:"Un compte existe déjà pour cet email."});const password=crypto.randomBytes(48).toString("base64url")+"1A",user=createUser({email,password,role,name});logAudit({type:"users",action:"create",user:req.authUser?.email||"admin",detail:email});res.status(201).json({ok:true,user,loginMethod:"magic_link"});}catch(e){res.status(e.status||400).json({ok:false,error:e.message});}});

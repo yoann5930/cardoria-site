@@ -69,11 +69,15 @@ jobs:
           node --check lib/auth.js
           node --check lib/auth/migrate.js
           node --check lib/auth/magicLink.js
+          node --check lib/auth/session.js
           node --check lib/email.js
           node --check lib/engine/tcgdex-sync.js
           node --check lib/engine/market-schedule.js
           node --check lib/engine/sealed-products.js
+          node --check lib/market/ingest.js
+          node --check lib/market/record.js
           node --check ../script.js
+          node --check ../js/admin/admin-core.js
           node --check ../js/admin/admin-login-secure.js
           node --check ../js/admin/admin-email-login.js
           node --check ../js/admin/admin-lot-draft-store.js
@@ -81,10 +85,11 @@ jobs:
           node --check ../js/admin/admin-purchases-catalog-link.js
           node --check ../js/admin/admin-catalog-sealed-shortcuts.js
           node --check ../js/admin/admin-sealed-references.js
+          node --check ../js/admin/admin-stock.js
 
-      - name: Lot market and catalog regression tests
+      - name: Admin and stock regression tests
         working-directory: .
-        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs
+        run: node --test tests/admin-session-guard.test.mjs tests/admin-navigation.test.mjs tests/admin-stock-pricing.test.mjs tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs backend/tests/stock-sales.test.mjs
 
       - name: Reject client-side admin bypass
         working-directory: .
@@ -123,15 +128,17 @@ jobs:
           npm start > /tmp/cardoria-backend.log 2>&1 &
           echo $! > /tmp/cardoria-backend.pid
 
-      - name: Wait for health
+      - name: Wait for application readiness
         run: |
-          for i in {1..40}; do
-            if curl -fsS http://127.0.0.1:10000/api/health >/tmp/cardoria-health.json; then
-              cat /tmp/cardoria-health.json
+          for i in {1..60}; do
+            code=$(curl -sS -o /tmp/cardoria-startup.json -w "%{http_code}" http://127.0.0.1:10000/api/health/startup || true)
+            if [ "$code" = "200" ] && node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/cardoria-startup.json'));process.exit(d.ready===true?0:1)"; then
+              cat /tmp/cardoria-startup.json
               exit 0
             fi
             sleep 2
           done
+          cat /tmp/cardoria-startup.json || true
           cat /tmp/cardoria-backend.log
           exit 1
 
@@ -144,6 +151,22 @@ jobs:
           code=$(curl -sS -o /tmp/magic-link.json -w "%{http_code}" -X POST http://127.0.0.1:10000/api/auth/request-magic-link -H 'content-type: application/json' --data '{"email":"unknown@example.com"}')
           test "$code" = "200"
           grep -q '"ok":true' /tmp/magic-link.json
+
+      - name: Verify admin session lifecycle
+        run: |
+          code=$(curl -sS -o /tmp/admin-login.json -w "%{http_code}" -X POST http://127.0.0.1:10000/api/auth/login -H 'content-type: application/json' --data '{"email":"Cardoria59330@gmail.com","password":"Cardoria-CI-Temporary-Password-2026!"}')
+          test "$code" = "200"
+          token=$(node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/admin-login.json'));if(!d.expiresAt||!['super_admin','admin','employee'].includes(d.user?.role))process.exit(2);process.stdout.write(d.token||'')")
+          test -n "$token"
+          code=$(curl -sS -o /tmp/admin-me.json -w "%{http_code}" http://127.0.0.1:10000/api/auth/me -H "Authorization: Bearer $token")
+          test "$code" = "200"
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/admin-me.json'));if(!d.ok||!d.user?.expiresAt||Date.parse(d.user.expiresAt)<=Date.now()||!['super_admin','admin','employee'].includes(d.user?.role))process.exit(1)"
+          code=$(curl -sS -o /tmp/admin-protected.json -w "%{http_code}" http://127.0.0.1:10000/api/admin/engine/licenses -H "Authorization: Bearer $token")
+          test "$code" = "200"
+          code=$(curl -sS -o /tmp/admin-logout.json -w "%{http_code}" -X POST http://127.0.0.1:10000/api/auth/logout -H "Authorization: Bearer $token")
+          test "$code" = "200"
+          code=$(curl -sS -o /tmp/admin-me-after-logout.json -w "%{http_code}" http://127.0.0.1:10000/api/auth/me -H "Authorization: Bearer $token")
+          test "$code" = "401"
 
       - name: Verify SMTP missing is detected for authorized admin
         run: |

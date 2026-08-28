@@ -3,6 +3,11 @@
  */
 import { getDb } from "../engine/database.js";
 
+function ensureColumn(db, table, column, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name);
+  if (!columns.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
 export function migrateMarketData() {
   const db = getDb();
   db.exec(`
@@ -12,6 +17,7 @@ export function migrateMarketData() {
       transaction_type TEXT NOT NULL,
       sale_price REAL,
       buyback_price REAL,
+      quantity INTEGER NOT NULL DEFAULT 1,
       currency TEXT DEFAULT 'EUR',
       transaction_at TEXT NOT NULL,
       condition TEXT DEFAULT '',
@@ -54,6 +60,7 @@ export function migrateMarketData() {
     CREATE INDEX IF NOT EXISTS idx_market_tx_type ON market_transactions(transaction_type, transaction_at);
     CREATE INDEX IF NOT EXISTS idx_market_tx_date ON market_transactions(transaction_at);
   `);
+  ensureColumn(db, "market_transactions", "quantity", "INTEGER NOT NULL DEFAULT 1");
 }
 
 export function makeTransactionId(prefix = "MKT") {

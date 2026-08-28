@@ -1,39 +1,51 @@
 (function () {
   "use strict";
 
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
+  var BACKEND = (window.CARDORIA_SEO && window.CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
   var ADMIN_CODE_KEY = "cardoria_admin_code";
   var SESSION_KEY = "cardoria_session_token";
   var CSRF_KEY = "cardoria_csrf_token";
+  var EXPIRES_KEY = "cardoria_session_expires_at";
+  var ROLE_KEY = "cardoria_admin_role";
+  var ADMIN_ROLES = ["super_admin", "admin", "employee"];
+  var sessionValidationStarted = false;
+  var sessionValidationTimer = null;
 
   var NAV_GROUPS = [
-    {
-      label: "Pilotage",
-      icon: "◈",
-      items: [
-        { href: "admin.html", label: "Tableau de bord", page: "dashboard" },
-        { href: "admin-statistiques.html", label: "Statistiques site", page: "stats" }
-      ]
-    },
     {
       label: "Commerce & gestion",
       icon: "€",
       items: [
-        { href: "admin-comptabilite.html", label: "Comptabilité", page: "accounting" },
+        {
+          label: "Comptabilité",
+          page: "accounting-root",
+          children: [
+            { href: "admin-comptabilite.html", label: "Synthèse", page: "accounting-summary" },
+            { href: "admin-comptabilite-ventes.html", label: "Ventes", page: "accounting-sales" },
+            { href: "admin-comptabilite-achats.html", label: "Achats & coûts", page: "accounting-purchases" },
+            { href: "admin-comptabilite-analyses.html", label: "Analyses", page: "accounting-analysis" }
+          ]
+        },
         {
           label: "Achats",
           page: "purchases-root",
           children: [
-            { href: "admin-achats-cartes.html", label: "Carte Pokémon", page: "purchases-cards" },
+            { href: "admin-achats-cartes.html", label: "Cartes Pokémon", page: "purchases-cards" },
             { href: "admin-achats-consommables.html", label: "Consommables", page: "purchases-consumables" },
             { href: "admin-achats-materiel.html", label: "Matériel", page: "purchases-equipment" },
-            { href: "admin-achats-acheteurs.html", label: "Tableau par acheteur", page: "purchases-buyers" }
+            { href: "admin-achats-acheteurs.html", label: "Par acheteur", page: "purchases-buyers" }
+          ]
+        },
+        {
+          label: "Stock & prix",
+          page: "stock-root",
+          children: [
+            { href: "admin-stock.html", label: "Stock", page: "stock" },
+            { href: "admin-estimations.html", label: "Estimations", page: "estimations" }
           ]
         },
         { href: "admin-paiements.html", label: "Paiements SumUp", page: "payments" },
-        { href: "admin-commandes.html", label: "Commandes", page: "orders" },
-        { href: "admin-stock.html", label: "Stock", page: "stock" },
-        { href: "admin-estimations.html", label: "Estimations", page: "estimations" }
+        { href: "admin-commandes.html", label: "Commandes", page: "orders" }
       ]
     },
     {
@@ -45,17 +57,24 @@
       ]
     },
     {
-      label: "IA & marché",
+      label: "Analyse & marché",
       icon: "✦",
       items: [
-        { href: "admin-ia.html", label: "IA Premium", page: "ai" },
-        { href: "admin-scanner.html", label: "Scanner IA", page: "scanner" },
+        { href: "admin-statistiques.html", label: "Statistiques site", page: "stats" },
         { href: "admin-marche.html", label: "Données marché", page: "marche" },
-        { href: "admin-sante.html", label: "Santé & fiabilité", page: "sante" },
-        { href: "admin-performance-ia.html", label: "Performance IA", page: "performance" },
-        { href: "admin-ai-enterprise.html", label: "IA Enterprise", page: "ai-enterprise" },
-        { href: "admin-ultimate.html", label: "Ultimate Enterprise", page: "ultimate" },
-        { href: "admin-bigdata.html", label: "Big Data Engine", page: "bigdata" }
+        {
+          label: "Outils IA",
+          page: "ai-root",
+          children: [
+            { href: "admin-scanner.html", label: "Scanner IA", page: "scanner" },
+            { href: "admin-ia.html", label: "IA Premium", page: "ai" },
+            { href: "admin-performance-ia.html", label: "Performance IA", page: "performance" },
+            { href: "admin-sante.html", label: "Santé & fiabilité", page: "sante" },
+            { href: "admin-ai-enterprise.html", label: "IA Enterprise", page: "ai-enterprise" },
+            { href: "admin-ultimate.html", label: "Ultimate Enterprise", page: "ultimate" },
+            { href: "admin-bigdata.html", label: "Big Data Engine", page: "bigdata" }
+          ]
+        }
       ]
     },
     {
@@ -72,29 +91,157 @@
 
   function qs(sel, root) { return (root || document).querySelector(sel); }
   function euro(n) { return Number(n || 0).toFixed(2).replace(".", ",") + " €"; }
-
   function getCode() { return sessionStorage.getItem(ADMIN_CODE_KEY) || ""; }
   function getSessionToken() { return sessionStorage.getItem(SESSION_KEY) || ""; }
+  function getAdminRole() { return sessionStorage.getItem(ROLE_KEY) || ""; }
+  function isAdminRole(role) { return ADMIN_ROLES.indexOf(String(role || "")) >= 0; }
+
+  function getExpiryMs() {
+    var raw = sessionStorage.getItem(EXPIRES_KEY) || "";
+    var ms = Date.parse(raw);
+    return Number.isFinite(ms) ? ms : 0;
+  }
+
+  function hasLocallyValidSession() {
+    return !!getSessionToken() && isAdminRole(getAdminRole()) && getExpiryMs() > Date.now();
+  }
+
+  function hideAdmin() {
+    if (document && document.documentElement) document.documentElement.style.visibility = "hidden";
+  }
+
+  function revealAdmin() {
+    if (document && document.documentElement) document.documentElement.style.visibility = "";
+  }
+
+  function clearAdminSession() {
+    sessionStorage.removeItem("cardoria_admin_connected");
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(CSRF_KEY);
+    sessionStorage.removeItem(ADMIN_CODE_KEY);
+    sessionStorage.removeItem("cardoria_admin_email");
+    sessionStorage.removeItem(EXPIRES_KEY);
+    sessionStorage.removeItem(ROLE_KEY);
+  }
+
+  function goToLogin() {
+    if (!/admin-login\.html$/i.test(location.pathname)) location.replace("admin-login.html");
+  }
+
+  function rejectAdminSession() {
+    clearAdminSession();
+    goToLogin();
+    return false;
+  }
+
+  function acceptVerifiedSession(user) {
+    if (!user || !isAdminRole(user.role)) return rejectAdminSession();
+    var expiresAt = String(user.expiresAt || sessionStorage.getItem(EXPIRES_KEY) || "");
+    var expiresMs = Date.parse(expiresAt);
+    if (!Number.isFinite(expiresMs) || expiresMs <= Date.now()) return rejectAdminSession();
+    sessionStorage.setItem("cardoria_admin_connected", "yes");
+    sessionStorage.setItem(ROLE_KEY, user.role);
+    sessionStorage.setItem(EXPIRES_KEY, expiresAt);
+    if (user.email) sessionStorage.setItem("cardoria_admin_email", user.email);
+    revealAdmin();
+    return true;
+  }
+
+  function validateAdminSession() {
+    if (!hasLocallyValidSession()) return Promise.resolve(rejectAdminSession());
+    var token = getSessionToken();
+    var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, 8000) : null;
+    return fetch(BACKEND + "/api/auth/me", {
+      method: "GET",
+      cache: "no-store",
+      headers: { Authorization: "Bearer " + token },
+      signal: controller ? controller.signal : undefined
+    }).then(function (response) {
+      if (response.status === 401) return rejectAdminSession();
+      if (!response.ok) {
+        if (hasLocallyValidSession()) { revealAdmin(); return true; }
+        return rejectAdminSession();
+      }
+      return response.json().then(function (data) {
+        if (!data || !data.ok || !data.user) return rejectAdminSession();
+        return acceptVerifiedSession(data.user);
+      }).catch(function () {
+        if (hasLocallyValidSession()) { revealAdmin(); return true; }
+        return rejectAdminSession();
+      });
+    }).catch(function () {
+      if (hasLocallyValidSession()) { revealAdmin(); return true; }
+      return rejectAdminSession();
+    }).finally(function () {
+      if (timer) clearTimeout(timer);
+    });
+  }
 
   function protectAdmin() {
-    if (sessionStorage.getItem("cardoria_admin_connected") !== "yes") {
-      location.href = "admin-login.html";
-      return false;
+    hideAdmin();
+    if (!hasLocallyValidSession()) return rejectAdminSession();
+    if (!sessionValidationStarted) {
+      sessionValidationStarted = true;
+      validateAdminSession();
+      sessionValidationTimer = setInterval(validateAdminSession, 120000);
     }
     return true;
   }
 
+  function wait(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+
   function adminFetch(path, opts) {
     opts = opts || {};
-    opts.headers = opts.headers || {};
-    var token = getSessionToken();
-    if (token) opts.headers.Authorization = "Bearer " + token;
-    var csrf = sessionStorage.getItem(CSRF_KEY);
-    if (csrf) opts.headers["x-csrf-token"] = csrf;
-    var code = getCode();
-    if (code) opts.headers["x-cardoria-admin-code"] = code;
-    opts.headers["Content-Type"] = opts.headers["Content-Type"] || "application/json";
-    return fetch(BACKEND + path, opts).then(function (r) { return r.json(); });
+    var method = String(opts.method || "GET").toUpperCase();
+    var maxAttempts = method === "GET" ? 2 : 1;
+
+    function attempt(index) {
+      if (!hasLocallyValidSession()) return Promise.resolve({ ok: false, error: "Session expirée.", status: 401 });
+      var headers = Object.assign({}, opts.headers || {});
+      var token = getSessionToken();
+      if (token) headers.Authorization = "Bearer " + token;
+      var csrf = sessionStorage.getItem(CSRF_KEY);
+      if (csrf) headers["x-csrf-token"] = csrf;
+      var code = getCode();
+      if (code) headers["x-cardoria-admin-code"] = code;
+      if (!(typeof FormData !== "undefined" && opts.body instanceof FormData)) headers["Content-Type"] = headers["Content-Type"] || "application/json";
+
+      var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+      var timer = controller ? setTimeout(function () { controller.abort(); }, 12000) : null;
+      var requestOptions = Object.assign({}, opts, {
+        method: method,
+        headers: headers,
+        cache: method === "GET" ? "no-store" : opts.cache,
+        signal: controller ? controller.signal : opts.signal
+      });
+
+      return fetch(BACKEND + path, requestOptions).then(function (response) {
+        if (response.status === 401) {
+          rejectAdminSession();
+          return { ok: false, error: "Session expirée.", status: 401 };
+        }
+        if ([502, 503, 504].indexOf(response.status) >= 0 && index + 1 < maxAttempts) {
+          return wait(650).then(function () { return attempt(index + 1); });
+        }
+        return response.text().then(function (text) {
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; }
+          catch (e) { data = { ok: response.ok, error: response.ok ? "Réponse serveur invalide." : "Erreur serveur." }; }
+          if (typeof data.ok === "undefined") data.ok = response.ok;
+          if (!response.ok && !data.error) data.error = response.status === 403 ? "Droits insuffisants." : "Erreur serveur (" + response.status + ").";
+          data.status = response.status;
+          return data;
+        });
+      }).catch(function (error) {
+        if (index + 1 < maxAttempts) return wait(650).then(function () { return attempt(index + 1); });
+        return { ok: false, error: error && error.name === "AbortError" ? "Le serveur Cardoria met trop de temps à répondre." : "Connexion au serveur Cardoria impossible.", networkError: true };
+      }).finally(function () {
+        if (timer) clearTimeout(timer);
+      });
+    }
+
+    return attempt(0);
   }
 
   function itemActive(item, activePage) {
@@ -168,18 +315,16 @@
       });
     });
 
-    qs("#adminLogoutBtn").addEventListener("click", adminLogout);
+    var logout = qs("#adminLogoutBtn");
+    if (logout) logout.addEventListener("click", adminLogout);
   }
 
   function adminLogout() {
-    var token = sessionStorage.getItem(SESSION_KEY);
+    var token = getSessionToken();
+    if (sessionValidationTimer) clearInterval(sessionValidationTimer);
+    clearAdminSession();
     if (token) fetch(BACKEND + "/api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + token } }).catch(function () {});
-    sessionStorage.removeItem("cardoria_admin_connected");
-    sessionStorage.removeItem(SESSION_KEY);
-    sessionStorage.removeItem(CSRF_KEY);
-    sessionStorage.removeItem(ADMIN_CODE_KEY);
-    sessionStorage.removeItem("cardoria_admin_email");
-    location.href = "admin-login.html";
+    location.replace("admin-login.html");
   }
 
   function drawChart(canvasId, labels, values) {
@@ -205,7 +350,7 @@
   function fmtEv(e) { if (!e) return "—"; var sign = e.percent > 0 ? "+" : ""; return sign + (e.percent ?? 0) + " %"; }
 
   function formatMarketIndex(idx, rec) {
-    if (!idx || !idx.cardoriaMarketScore && idx.cardoriaMarketScore !== 0) return "";
+    if (!idx || (!idx.cardoriaMarketScore && idx.cardoriaMarketScore !== 0)) return "";
     var ev = idx.evolution || {}, recHtml = "";
     if (rec && rec.primary) {
       recHtml = "<tr><th>Recommandation</th><td><span class='admin-badge admin-badge--gold'>" + rec.primary.label + "</span>" + (rec.maxBuyPrice != null ? " — max " + euro(rec.maxBuyPrice) : "") + "<br><span style='font-size:12px;color:#baaf97'>" + (rec.primary.detail || "") + "</span></td></tr>";
@@ -234,5 +379,20 @@
     return "<tr><th colspan='2' style='color:#ffe18a;padding-top:12px'>Données marché Cardoria (moteur collecte)</th></tr><tr><th>Volume ventes</th><td>" + (ms.volume || 0) + "</td></tr><tr><th>Prix médian</th><td>" + euro(ms.medianPrice) + "</td></tr><tr><th>Rachat moyen</th><td>" + euro(ms.buybackAvg) + "</td></tr><tr><th>Évol. 7 j</th><td>" + (ev.days7 ?? 0) + " %</td></tr><tr><th>Évol. 30 j</th><td>" + (ev.days30 ?? 0) + " %</td></tr><tr><th>Évol. 90 j</th><td>" + (ev.days90 ?? 0) + " %</td></tr><tr><th>Évol. 1 an</th><td>" + (ev.days1y ?? 0) + " %</td></tr><tr><th>Indice liquidité</th><td>" + (ms.indices?.liquidity ?? "—") + " / 100</td></tr><tr><th>Indice demande</th><td>" + (ms.indices?.demand ?? "—") + " / 100</td></tr><tr><th>Indice rareté</th><td>" + (ms.indices?.rarity ?? "—") + " / 100</td></tr>";
   }
 
-  window.CardoriaAdmin = { BACKEND: BACKEND, protectAdmin: protectAdmin, adminFetch: adminFetch, renderShell: renderShell, adminLogout: adminLogout, drawChart: drawChart, periodButtons: periodButtons, euro: euro, qs: qs, formatAdminPricing: formatAdminPricing, formatCardoriaIntelligence: formatCardoriaIntelligence, formatMarketStatsBlock: formatMarketStatsBlock, formatMarketIndex: formatMarketIndex };
+  window.CardoriaAdmin = {
+    BACKEND: BACKEND,
+    protectAdmin: protectAdmin,
+    validateAdminSession: validateAdminSession,
+    adminFetch: adminFetch,
+    renderShell: renderShell,
+    adminLogout: adminLogout,
+    drawChart: drawChart,
+    periodButtons: periodButtons,
+    euro: euro,
+    qs: qs,
+    formatAdminPricing: formatAdminPricing,
+    formatCardoriaIntelligence: formatCardoriaIntelligence,
+    formatMarketStatsBlock: formatMarketStatsBlock,
+    formatMarketIndex: formatMarketIndex
+  };
 })();

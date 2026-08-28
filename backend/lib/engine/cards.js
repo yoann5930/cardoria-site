@@ -3,7 +3,7 @@
  */
 import { getDb, normalizeText, slugify, makeCardId, rowToCard, syncFts } from "./database.js";
 import { getLicense } from "./licenses.js";
-import { setPriceSources, recalculateCardPrices, getSalesHistory } from "./pricing.js";
+import { setPriceSources, recalculateCardPrices, getSalesHistory, getSalesStats } from "./pricing.js";
 
 const CARD_LANGUAGES = new Set(["fr", "en", "ja", "ko"]);
 function normalizeLanguage(value, fallback = "fr") {
@@ -31,10 +31,7 @@ function parseSearchQuery(q = "", explicitLanguage = "") {
     }
     terms.push(token);
   }
-  return {
-    language: explicitLanguage ? normalizeLanguage(explicitLanguage) : hintedLanguage,
-    terms
-  };
+  return { language: explicitLanguage ? normalizeLanguage(explicitLanguage) : hintedLanguage, terms };
 }
 
 export function searchCards({ q = "", license = "", language = "", extension = "", rarity = "", hitFamily = "", variant = "", page = 1, limit = 24, sort = "name", activeOnly = true, maxLimit = 100 } = {}) {
@@ -110,7 +107,12 @@ export function getCardById(id, { trackView = false } = {}) {
   if (!row) return null;
   if (trackView) { db.prepare("UPDATE cards SET views = views + 1 WHERE id = ?").run(id); row.views += 1; }
   const license = getLicense(row.license_slug);
-  return rowToCard(row, { licenseName: license?.name, salesHistory: getSalesHistory(id, 30), priceSources: db.prepare("SELECT source, price, fetched_at AS fetchedAt FROM price_sources WHERE card_id = ?").all(id) });
+  return rowToCard(row, {
+    licenseName: license?.name,
+    salesHistory: getSalesHistory(id, 30),
+    salesStats: getSalesStats(id),
+    priceSources: db.prepare("SELECT source, price, currency, fetched_at AS fetchedAt FROM price_sources WHERE card_id = ? ORDER BY fetched_at DESC").all(id)
+  });
 }
 
 export function getCardBySlug(licenseSlug, slug, opts) {

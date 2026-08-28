@@ -1,0 +1,24 @@
+name: Cardoria Admin Navigation CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "admin*.html"
+      - "js/admin/**"
+      - "css/admin.css"
+      - "tests/admin-navigation.test.mjs"
+      - ".github/workflows/admin-navigation-ci.yml"
+
+jobs:
+  navigation-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+      - name: Check navigation structure
+        run: node --test tests/admin-navigation.test.mjs

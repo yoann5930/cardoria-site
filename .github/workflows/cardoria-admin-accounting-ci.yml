@@ -1,0 +1,40 @@
+name: Cardoria Admin Accounting CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/lib/accounting/**"
+      - "backend/routes/admin.js"
+      - "backend/tests/accounting-*.test.mjs"
+      - "js/admin/admin-accounting.js"
+      - ".github/workflows/cardoria-admin-accounting-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/lib/accounting/**"
+      - "backend/routes/admin.js"
+      - "backend/tests/accounting-*.test.mjs"
+      - "js/admin/admin-accounting.js"
+      - ".github/workflows/cardoria-admin-accounting-ci.yml"
+
+jobs:
+  accounting-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Syntax checks
+        run: |
+          node --check backend/lib/accounting/purchase-stats.js
+          node --check backend/lib/accounting/sales-stats.js
+          node --check backend/routes/admin.js
+          node --check js/admin/admin-accounting.js
+      - name: Paid accounting regressions
+        run: node --test backend/tests/accounting-purchase-stats.test.mjs backend/tests/accounting-sales-stats.test.mjs

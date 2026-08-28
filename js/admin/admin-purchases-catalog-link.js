@@ -65,6 +65,7 @@
     if(qs("pPackaging"))qs("pPackaging").value=data.packaging||"carte_unite";
     if(qs("pQty"))qs("pQty").value=String(data.quantity||1);
     if(qs("pNotes")&&data.notes)qs("pNotes").value=data.notes;
+    if(qs("pAmount")&&data.amount!=null&&Number(data.amount)>0)qs("pAmount").value=Number(data.amount).toFixed(2);
     updateLotLabels();
     var form=qs("purchaseForm");if(form)form.scrollIntoView({behavior:"smooth",block:"start"});
   }
@@ -78,6 +79,14 @@
       if(source==="card"&&id){
         var response=await A.adminFetch("/api/admin/engine/cards/"+encodeURIComponent(id));
         if(response.ok&&response.card){var c=response.card,packaging=requestedPackaging==="lot_cartes"?"lot_cartes":"carte_unite";fillCommon({description:(c.name||"Carte Pokémon")+(c.extension?" — "+c.extension:"")+(c.number?" #"+c.number:""),reference:"catalog-card:"+c.id,packaging:packaging,quantity:1,notes:packaging==="lot_cartes"?"Lot créé depuis le catalogue de référence Cardoria.":"Ajouté depuis le catalogue de référence Cardoria."});}
+        return;
+      }
+      if(source==="engine-sealed"&&id){
+        var sealedResponse=await A.adminFetch("/api/admin/engine/sealed/"+encodeURIComponent(id));
+        if(sealedResponse.ok&&sealedResponse.reference){
+          var s=sealedResponse.reference;
+          fillCommon({description:(s.name||"Produit Pokémon scellé")+(s.extension?" — "+s.extension:""),reference:"sealed-product:"+s.id,packaging:s.packaging||"other",quantity:1,amount:0,notes:"Ajouté depuis le catalogue scellé Cardoria. Prix marché indicatif : "+(Number(s.marketPrice||0)>0?A.euro(s.marketPrice):"indisponible")+". Source : "+(s.priceSource||s.source||"non renseignée")+"."});
+        }
         return;
       }
       if(!source&&d.active){restoreDraftForm(d.form);activateLot(d.targetQty||d.cards.length||1);}
