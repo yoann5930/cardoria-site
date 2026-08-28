@@ -9,6 +9,7 @@ import { readJson, writeJson } from "../lib/storage.js";
 const router = Router();
 const WRITE_ADMIN = requireAuth({ action: "write" });
 const BOUTIQUE_STATUSES = ["À préparer", "En préparation", "Expédiée", "Livrée", "Annulée"];
+const BOUTIQUE_CARRIERS = ["La Poste", "Mondial Relay", "Relais Colis"];
 
 function clean(value, max = 500) {
   return String(value == null ? "" : value).trim().slice(0, max);
@@ -35,7 +36,7 @@ router.get("/", (req, res) => res.json({
 
 router.get("/boutique-orders", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  res.json({ ok: true, orders: readJson("orders", []) });
+  res.json({ ok: true, carriers: BOUTIQUE_CARRIERS, orders: readJson("orders", []) });
 });
 
 router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
@@ -46,6 +47,7 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
   const current = orders[index];
   const body = req.body || {};
   const nextStatus = clean(body.status, 80) || current.status;
+  const nextCarrier = clean(body.carrier, 120);
 
   if (!BOUTIQUE_STATUSES.includes(nextStatus) && nextStatus !== current.status) {
     return res.status(400).json({ ok: false, error: "Statut de commande non autorisé." });
@@ -53,12 +55,15 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
   if (!canProcessPaidOrder(current, nextStatus)) {
     return res.status(409).json({ ok: false, error: "Le paiement SumUp doit être confirmé avant de préparer ou expédier la commande." });
   }
+  if (nextCarrier && !BOUTIQUE_CARRIERS.includes(nextCarrier) && nextCarrier !== clean(current.carrier, 120)) {
+    return res.status(400).json({ ok: false, error: "Transporteur non autorisé. Choisissez La Poste, Mondial Relay ou Relais Colis." });
+  }
 
   const now = new Date().toISOString();
   const previousStatus = current.status;
   current.status = nextStatus;
   current.shipping = clean(body.shipping, 120) || current.shipping || "Standard";
-  current.carrier = clean(body.carrier, 120);
+  current.carrier = nextCarrier;
   current.tracking = clean(body.tracking, 180);
   current.address = clean(body.address, 600);
   current.internalNote = clean(body.internalNote, 2000);
