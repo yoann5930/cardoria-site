@@ -5,7 +5,13 @@ import { getDb, normalizeText, slugify, makeCardId, rowToCard, syncFts } from ".
 import { getLicense } from "./licenses.js";
 import { setPriceSources, recalculateCardPrices, getSalesHistory } from "./pricing.js";
 
-export function searchCards({ q = "", license = "", extension = "", rarity = "", hitFamily = "", variant = "", page = 1, limit = 24, sort = "name", activeOnly = true } = {}) {
+const CARD_LANGUAGES = new Set(["fr", "en", "ja", "ko"]);
+function normalizeLanguage(value, fallback = "fr") {
+  const language = String(value || fallback).trim().toLowerCase();
+  return CARD_LANGUAGES.has(language) ? language : fallback;
+}
+
+export function searchCards({ q = "", license = "", language = "", extension = "", rarity = "", hitFamily = "", variant = "", page = 1, limit = 24, sort = "name", activeOnly = true } = {}) {
   const db = getDb();
   const safeLimit = Math.min(Math.max(Number(limit) || 24, 1), 100);
   const safePage = Math.max(Number(page) || 1, 1);
@@ -14,6 +20,7 @@ export function searchCards({ q = "", license = "", extension = "", rarity = "",
   const params = [];
   if (activeOnly) conditions.push("c.active = 1");
   if (license) { conditions.push("c.license_slug = ?"); params.push(license); }
+  if (language) { conditions.push("c.language = ?"); params.push(normalizeLanguage(language)); }
   if (extension) { conditions.push("c.extension LIKE ?"); params.push(`%${extension}%`); }
   if (rarity) { conditions.push("c.rarity = ?"); params.push(rarity); }
   if (hitFamily) { conditions.push("c.hit_family = ?"); params.push(hitFamily); }
@@ -52,17 +59,21 @@ function sortOrder(sort) {
   return map[sort] || map.name;
 }
 
-export function getCatalogFacets({ license = "pokemon" } = {}) {
+export function getCatalogFacets({ license = "pokemon", language = "" } = {}) {
   const db = getDb();
-  const rarityRows = db.prepare("SELECT rarity, COUNT(*) AS count FROM cards WHERE license_slug = ? AND active = 1 AND rarity <> '' GROUP BY rarity ORDER BY count DESC, rarity ASC").all(license);
-  const hitRows = db.prepare("SELECT hit_family AS value, COUNT(*) AS count FROM cards WHERE license_slug = ? AND active = 1 AND hit_family <> '' GROUP BY hit_family ORDER BY count DESC, hit_family ASC").all(license);
-  const extensionRows = db.prepare("SELECT extension AS value, COUNT(*) AS count FROM cards WHERE license_slug = ? AND active = 1 AND extension <> '' GROUP BY extension ORDER BY extension DESC LIMIT 300").all(license);
-  return { rarities: rarityRows.map((r) => ({ value: r.rarity, count: r.count })), hitFamilies: hitRows, extensions: extensionRows };
+  const selectedLanguage = language ? normalizeLanguage(language) : "";
+  const langClause = selectedLanguage ? " AND language = ?" : "";
+  const args = selectedLanguage ? [license, selectedLanguage] : [license];
+  const rarityRows = db.prepare(`SELECT rarity, COUNT(*) AS count FROM cards WHERE license_slug = ? AND active = 1${langClause} AND rarity <> '' GROUP BY rarity ORDER BY count DESC, rarity ASC`).all(...args);
+  const hitRows = db.prepare(`SELECT hit_family AS value, COUNT(*) AS count FROM cards WHERE license_slug = ? AND active = 1${langClause} AND hit_family <> '' GROUP BY hit_family ORDER BY count DESC, hit_family ASC`).all(...args);
+  const extensionRows = db.prepare(`SELECT extension AS value, COUNT(*) AS count FROM cards WHERE license_slug = ? AND active = 1${langClause} AND extension <> '' GROUP BY extension ORDER BY extension DESC LIMIT 300`).all(...args);
+  const languageRows = db.prepare("SELECT language AS value, COUNT(*) AS count FROM cards WHERE license_slug = ? AND active = 1 GROUP BY language ORDER BY language ASC").all(license);
+  return { rarities: rarityRows.map((r) => ({ value: r.rarity, count: r.count })), hitFamilies: hitRows, extensions: extensionRows, languages: languageRows };
 }
 
 export function autocomplete(q, limit = 10) {
   if (!q || q.length < 2) return [];
-  return searchCards({ q, limit: Math.min(limit, 20), page: 1 }).cards.map((c) => ({ id: c.id, name: c.name, license: c.license, slug: c.slug, extension: c.extension, number: c.number, imageThumb: c.imageThumb, price: c.prices.recommended }));
+  return searchCards({ q, limit: Math.min(limit, 20), page: 1 }).cards.map((c) => ({ id: c.id, name: c.name, license: c.license, language: c.language, slug: c.slug, extension: c.extension, number: c.number, imageThumb: c.imageThumb, price: c.prices.recommended }));
 }
 
 export function getCardById(id, { trackView = false } = {}) {
@@ -83,11 +94,12 @@ export function createCard(data) {
   const db = getDb();
   if (!getLicense(data.license || data.licenseSlug)) throw new Error("Licence inconnue : " + (data.license || data.licenseSlug));
   const licenseSlug = data.license || data.licenseSlug;
-  const slug = data.slug || slugify(`${data.name}-${data.extension}-${data.number}`);
+  const language = normalizeLanguage(data.language);
+  const slug = data.slug || slugify(`${language === "fr" ? "" : language + "-"}${data.name}-${data.extension}-${data.number}`);
   const id = data.id || makeCardId(licenseSlug, slug);
   const now = new Date().toISOString();
-  const card = { id, license_slug: licenseSlug, slug, name: data.name, name_normalized: normalizeText(data.name), extension: data.extension || "", extension_code: data.extensionCode || "", number: data.number || "", rarity: data.rarity || "", hit_family: data.hitFamily || "", variants_json: JSON.stringify(data.variants || {}), illustration: data.illustration || "", image_hd: data.imageHd || data.image_hd || "", image_thumb: data.imageThumb || data.image_thumb || data.imageHd || "", condition_note: data.condition || "NM", meta_title: data.metaTitle || `${data.name} — ${data.extension} | Cardoria`, meta_description: data.metaDescription || `Prix et fiche ${data.name} (${data.extension}). Estimation et achat Cardoria.`, created_at: now, updated_at: now };
-  db.prepare(`INSERT INTO cards (id,license_slug,slug,name,name_normalized,extension,extension_code,number,rarity,hit_family,variants_json,illustration,image_hd,image_thumb,condition_note,meta_title,meta_description,active,created_at,updated_at) VALUES (@id,@license_slug,@slug,@name,@name_normalized,@extension,@extension_code,@number,@rarity,@hit_family,@variants_json,@illustration,@image_hd,@image_thumb,@condition_note,@meta_title,@meta_description,1,@created_at,@updated_at)`).run(card);
+  const card = { id, license_slug: licenseSlug, language, slug, name: data.name, name_normalized: normalizeText(data.name), extension: data.extension || "", extension_code: data.extensionCode || "", number: data.number || "", rarity: data.rarity || "", hit_family: data.hitFamily || "", variants_json: JSON.stringify(data.variants || {}), illustration: data.illustration || "", image_hd: data.imageHd || data.image_hd || "", image_thumb: data.imageThumb || data.image_thumb || data.imageHd || "", condition_note: data.condition || "NM", meta_title: data.metaTitle || `${data.name} — ${data.extension} | Cardoria`, meta_description: data.metaDescription || `Prix et fiche ${data.name} (${data.extension}). Estimation et achat Cardoria.`, created_at: now, updated_at: now };
+  db.prepare(`INSERT INTO cards (id,license_slug,language,slug,name,name_normalized,extension,extension_code,number,rarity,hit_family,variants_json,illustration,image_hd,image_thumb,condition_note,meta_title,meta_description,active,created_at,updated_at) VALUES (@id,@license_slug,@language,@slug,@name,@name_normalized,@extension,@extension_code,@number,@rarity,@hit_family,@variants_json,@illustration,@image_hd,@image_thumb,@condition_note,@meta_title,@meta_description,1,@created_at,@updated_at)`).run(card);
   const rowid = db.prepare("SELECT rowid FROM cards WHERE id = ?").get(id)?.rowid; syncFts(rowid, card);
   if (data.priceSources?.length) setPriceSources(id, data.priceSources); else if (data.avgPrice != null) setPriceSources(id, [{ source: "cardoria", price: data.avgPrice }]); else recalculateCardPrices(id);
   return getCardById(id);
@@ -97,7 +109,8 @@ export function updateCard(id, data) {
   const db = getDb();
   const existing = db.prepare("SELECT * FROM cards WHERE id = ?").get(id); if (!existing) return null;
   const now = new Date().toISOString(); const name = data.name ?? existing.name;
-  db.prepare(`UPDATE cards SET name=?,name_normalized=?,extension=?,extension_code=?,number=?,rarity=?,hit_family=?,variants_json=?,illustration=?,image_hd=?,image_thumb=?,condition_note=?,meta_title=?,meta_description=?,active=?,updated_at=? WHERE id=?`).run(name, normalizeText(name), data.extension ?? existing.extension, data.extensionCode ?? existing.extension_code, data.number ?? existing.number, data.rarity ?? existing.rarity, data.hitFamily ?? existing.hit_family, data.variants ? JSON.stringify(data.variants) : existing.variants_json, data.illustration ?? existing.illustration, data.imageHd ?? data.image_hd ?? existing.image_hd, data.imageThumb ?? data.image_thumb ?? existing.image_thumb, data.condition ?? existing.condition_note, data.metaTitle ?? existing.meta_title, data.metaDescription ?? existing.meta_description, data.active != null ? (data.active ? 1 : 0) : existing.active, now, id);
+  const language = data.language !== undefined ? normalizeLanguage(data.language, existing.language || "fr") : (existing.language || "fr");
+  db.prepare(`UPDATE cards SET language=?,name=?,name_normalized=?,extension=?,extension_code=?,number=?,rarity=?,hit_family=?,variants_json=?,illustration=?,image_hd=?,image_thumb=?,condition_note=?,meta_title=?,meta_description=?,active=?,updated_at=? WHERE id=?`).run(language, name, normalizeText(name), data.extension ?? existing.extension, data.extensionCode ?? existing.extension_code, data.number ?? existing.number, data.rarity ?? existing.rarity, data.hitFamily ?? existing.hit_family, data.variants ? JSON.stringify(data.variants) : existing.variants_json, data.illustration ?? existing.illustration, data.imageHd ?? data.image_hd ?? existing.image_hd, data.imageThumb ?? data.image_thumb ?? existing.image_thumb, data.condition ?? existing.condition_note, data.metaTitle ?? existing.meta_title, data.metaDescription ?? existing.meta_description, data.active != null ? (data.active ? 1 : 0) : existing.active, now, id);
   const row = db.prepare("SELECT rowid, * FROM cards WHERE id = ?").get(id); if (row) syncFts(row.rowid, row);
   if (data.priceSources) setPriceSources(id, data.priceSources);
   if (data.prices) setPriceSources(id, [{ source: "cardoria", price: data.prices.recommended || data.prices.avg || 0 }]);
@@ -110,5 +123,5 @@ export function deleteCard(id) {
   db.prepare("DELETE FROM cards WHERE id = ?").run(id); return true;
 }
 
-export function getSitemapCards(limit = 5000, offset = 0) { return getDb().prepare("SELECT id,license_slug,slug,updated_at FROM cards WHERE active=1 ORDER BY views DESC,sales_count DESC LIMIT ? OFFSET ?").all(limit, offset); }
+export function getSitemapCards(limit = 5000, offset = 0) { return getDb().prepare("SELECT id,license_slug,language,slug,updated_at FROM cards WHERE active=1 ORDER BY views DESC,sales_count DESC LIMIT ? OFFSET ?").all(limit, offset); }
 export function getCardCount() { return getDb().prepare("SELECT COUNT(*) AS c FROM cards WHERE active=1").get()?.c ?? 0; }
