@@ -1,6 +1,11 @@
 import { Router } from "express";
-import { readJson, writeJson } from "../lib/storage.js";
+import { readJson } from "../lib/storage.js";
 import { sendEmail } from "../lib/email.js";
+import {
+  createRachatProposal,
+  getPublicRachatOffer,
+  decideRachatOffer
+} from "../lib/rachat/workflow.js";
 
 const router = Router();
 
@@ -33,7 +38,6 @@ function recentMatchingEstimate({ customerEmail, cardName, cardId }) {
 router.post("/propositions", async (req, res) => {
   const body = req.body || {};
 
-  // Champ honeypot : un utilisateur normal ne le remplit jamais.
   if (clean(body.website, 100)) {
     return res.status(400).json({ ok: false, error: "Requête invalide." });
   }
@@ -57,46 +61,67 @@ router.post("/propositions", async (req, res) => {
     return res.status(403).json({ ok: false, error: "Estimation Cardoria récente introuvable. Relancez l’estimation avant de proposer la carte." });
   }
 
-  const proposal = {
-    id: `buy_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-    createdAt: new Date().toISOString(),
-    status: "Proposition reçue",
-    source: "estimation",
-    estimationId: verifiedEstimate.id,
-    customerName: verifiedEstimate.customerName || customerName,
-    customerEmail: verifiedEstimate.customerEmail || customerEmail,
-    cardName: verifiedEstimate.cardName || cardName,
-    cardGame: verifiedEstimate.cardGame || clean(body.cardGame, 100),
-    cardId: verifiedEstimate.cardId || cardId,
-    condition: verifiedEstimate.condition || clean(body.condition, 100),
-    detection: verifiedEstimate.detection || null,
-    estimationResult: verifiedEstimate.result || "",
-    message
-  };
+  try {
+    const proposal = createRachatProposal({
+      estimate: verifiedEstimate,
+      customerName,
+      customerEmail,
+      cardName,
+      cardGame: clean(body.cardGame, 100),
+      cardId,
+      condition: clean(body.condition, 100),
+      message
+    });
 
-  const purchases = readJson("purchases", []);
-  purchases.unshift(proposal);
-  writeJson("purchases", purchases.slice(0, 500));
+    await sendEmail({
+      subject: `[Cardoria] Proposition de vente — ${proposal.cardName}`,
+      text: [
+        "Nouvelle proposition de vente Cardoria",
+        "",
+        `Référence : ${proposal.id}`,
+        `Estimation : ${proposal.estimationId}`,
+        `Client : ${proposal.customerName || "—"}`,
+        `Email : ${proposal.customerEmail}`,
+        `Carte : ${proposal.cardName}`,
+        `Licence : ${proposal.cardGame || "—"}`,
+        `État : ${proposal.condition || "—"}`,
+        `Message : ${proposal.message || "Aucun"}`,
+        "",
+        "Cette proposition provient d’une estimation Cardoria vérifiée des dernières 24 h."
+      ].join("\n")
+    });
 
-  await sendEmail({
-    subject: `[Cardoria] Proposition de vente — ${proposal.cardName}`,
-    text: [
-      "Nouvelle proposition de vente Cardoria",
-      "",
-      `Référence : ${proposal.id}`,
-      `Estimation : ${proposal.estimationId}`,
-      `Client : ${proposal.customerName || "—"}`,
-      `Email : ${proposal.customerEmail}`,
-      `Carte : ${proposal.cardName}`,
-      `Licence : ${proposal.cardGame || "—"}`,
-      `État : ${proposal.condition || "—"}`,
-      `Message : ${proposal.message || "Aucun"}`,
-      "",
-      "Cette proposition provient d’une estimation Cardoria vérifiée des dernières 24 h."
-    ].join("\n")
-  });
+    res.status(201).json({ ok: true, id: proposal.id, message: "Votre proposition a bien été transmise à Cardoria." });
+  } catch (error) {
+    res.status(error.status || 500).json({ ok: false, error: error.message });
+  }
+});
 
-  res.status(201).json({ ok: true, id: proposal.id, message: "Votre proposition a bien été transmise à Cardoria." });
+router.get("/offres/:id", (req, res) => {
+  try {
+    const offer = getPublicRachatOffer(req.params.id, req.query.token);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, offer });
+  } catch (error) {
+    res.status(error.status || 500).json({ ok: false, error: error.message });
+  }
+});
+
+router.post("/offres/:id/decision", (req, res) => {
+  try {
+    const proposal = decideRachatOffer(req.params.id, {
+      token: req.body?.token,
+      decision: req.body?.decision,
+      user: "client"
+    });
+    res.json({
+      ok: true,
+      status: proposal.status,
+      decision: proposal.customerDecision?.decision || ""
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ ok: false, error: error.message });
+  }
 });
 
 export default router;
