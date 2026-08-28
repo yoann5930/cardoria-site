@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Tableau de bord — Cardoria Enterprise</title>
-<link rel="stylesheet" href="/style.css">
-<link rel="stylesheet" href="/css/admin.css">
+<title>Administration — Cardoria Enterprise</title>
 <link rel="icon" href="/assets/logo/cardoria-premium.png">
-<script src="/js/seo-config.js"></script>
+<script>
+(function(){
+  var token=sessionStorage.getItem("cardoria_session_token")||"";
+  location.replace(token?"admin-stock.html":"admin-login.html");
+})();
+</script>
 </head>
-<body>
-<script src="/js/admin/admin-core.js"></script>
-<script src="/js/admin/admin-dashboard.js"></script>
-</body>
+<body></body>
 </html>
