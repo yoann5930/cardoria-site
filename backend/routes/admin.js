@@ -8,6 +8,7 @@ import { getEstimations } from "../routes/estimation.js";
 import { listAnalyses } from "../lib/ai/training.js";
 import { getWitnotStats } from "../lib/attribution/witnot.js";
 import { listUsers, createUser, getUserByEmail, updateUserAdmin } from "../lib/auth/users.js";
+import { buildPurchaseAccountingStats } from "../lib/accounting/purchase-stats.js";
 
 const router = Router();
 const USER_ADMIN = requireAuth({ roles: ["super_admin", "admin"], action: "users" });
@@ -105,11 +106,12 @@ router.put("/accounting/purchases/:id",WRITE_ADMIN,(req,res)=>{try{const purchas
 router.delete("/accounting/purchases/:id",DELETE_ADMIN,(req,res)=>{const purchases=readJson("purchases",DEFAULT_PURCHASES),i=purchases.findIndex((p)=>p.id===req.params.id);if(i<0)return res.status(404).json({ok:false,error:"Achat introuvable."});const [removed]=purchases.splice(i,1);writeJson("purchases",purchases);logAudit({type:"accounting",action:"purchase_delete",user:req.authUser?.email||"admin",detail:removed.id});res.json({ok:true,deletedId:removed.id});});
 
 router.get("/accounting/stats",(req,res)=>{
-  const sales=readJson("analytics",DEFAULT_ANALYTICS).sales||[],purchases=readJson("purchases",DEFAULT_PURCHASES),byLicense={},bySeller={},purchaseByLicense={},purchaseBySeller={},purchaseByCategory={},purchaseByBuyer={yoann:0,valentin:0,non_attribue:0},purchaseByType={};
+  const sales=readJson("analytics",DEFAULT_ANALYTICS).sales||[];
+  const purchaseStats=buildPurchaseAccountingStats(readJson("purchases",DEFAULT_PURCHASES),{normalizeBuyer:normalizedBuyer,normalizeType:normalizedPurchaseType});
+  const byLicense={},bySeller={};
   sales.forEach((s)=>{byLicense[s.license]=(byLicense[s.license]||0)+Number(s.amount||0);bySeller[s.seller]=(bySeller[s.seller]||0)+Number(s.amount||0);});
-  purchases.forEach((p)=>{const license=p.license||"sans licence",seller=p.seller||"inconnu",category=p.category||"autre",buyer=normalizedBuyer(p.buyer),type=normalizedPurchaseType(p.purchaseType),amount=Number(p.amount||0);purchaseByLicense[license]=(purchaseByLicense[license]||0)+amount;purchaseBySeller[seller]=(purchaseBySeller[seller]||0)+amount;purchaseByCategory[category]=(purchaseByCategory[category]||0)+amount;purchaseByBuyer[buyer]=(purchaseByBuyer[buyer]||0)+amount;purchaseByType[type]=(purchaseByType[type]||0)+amount;});
-  const totalSales=sales.reduce((a,s)=>a+Number(s.amount||0),0),totalPurchases=purchases.reduce((a,p)=>a+Number(p.amount||0),0);
-  res.json({ok:true,byLicense,bySeller,purchaseByLicense,purchaseBySeller,purchaseByCategory,purchaseByBuyer,purchaseByType,buyers:BUYERS,packagingTypes:PACKAGING_TYPES,totalSales,totalPurchases,cardoriaPurchaseTotal:totalPurchases,netResult:totalSales-totalPurchases,purchaseCount:purchases.length});
+  const totalSales=sales.reduce((a,s)=>a+Number(s.amount||0),0),totalPurchases=purchaseStats.total;
+  res.json({ok:true,byLicense,bySeller,purchaseByLicense:purchaseStats.byLicense,purchaseBySeller:purchaseStats.bySeller,purchaseByCategory:purchaseStats.byCategory,purchaseByBuyer:purchaseStats.byBuyer,purchaseByType:purchaseStats.byType,buyers:BUYERS,packagingTypes:PACKAGING_TYPES,totalSales,totalPurchases,cardoriaPurchaseTotal:totalPurchases,netResult:totalSales-totalPurchases,purchaseCount:purchaseStats.count});
 });
 
 router.get("/catalog/sealed-references",(req,res)=>{const q=String(req.query.q||"").toLowerCase(),packaging=cleanText(req.query.packaging,80);let references=readJson("sealed-references",DEFAULT_SEALED_REFERENCES);if(packaging)references=references.filter((r)=>r.packaging===packaging);if(q)references=references.filter((r)=>JSON.stringify(r).toLowerCase().includes(q));res.json({ok:true,references,packagingTypes:PACKAGING_TYPES});});
