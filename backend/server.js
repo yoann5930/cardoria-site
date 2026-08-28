@@ -7,6 +7,7 @@ import estimationRoutes from "./routes/estimation.js";
 import rachatRoutes from "./routes/rachat.js";
 import rachatAdminRoutes from "./routes/rachat-admin.js";
 import adminRoutes from "./routes/admin.js";
+import adminUsersRoutes from "./routes/admin-users.js";
 import adminDashboardRoutes from "./routes/admin-dashboard.js";
 import adminFinanceRoutes from "./routes/admin-finance.js";
 import emailAdminRoutes from "./routes/email-admin.js";
@@ -173,6 +174,7 @@ app.use("/api/rachat", marketplacePersistenceMiddleware, apiRateLimit, rachatRou
 app.use("/api/admin", adminDashboardRoutes);
 app.use("/api/admin/accounting", adminFinanceRoutes);
 app.use("/api/admin/rachat", marketplacePersistenceMiddleware, rachatAdminRoutes);
+app.use("/api/admin", adminUsersRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/email", emailAdminRoutes);
 app.use("/api/admin/development", developmentRoutes);
