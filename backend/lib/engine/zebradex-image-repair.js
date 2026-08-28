@@ -1,4 +1,5 @@
 import { getDb, normalizeText } from "./database.js";
+import { scheduleEngineSnapshot } from "../marketplace/persistence.js";
 
 const BASE = "https://zebradex.fr";
 const MEDIA = "https://media-service.zebradex.fr";
@@ -53,8 +54,12 @@ async function imageExists(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
-    const response = await fetch(url, { method: "HEAD", headers: { "User-Agent": "Cardoria/6.0" }, signal: controller.signal });
-    return response.ok && String(response.headers.get("content-type") || "").toLowerCase().startsWith("image/");
+    let response = await fetch(url, { method: "HEAD", headers: { "User-Agent": "Cardoria/6.0" }, signal: controller.signal });
+    if (response.ok && String(response.headers.get("content-type") || "").toLowerCase().startsWith("image/")) return true;
+    // Some media/CDN endpoints do not implement HEAD reliably. A tiny ranged GET
+    // is still a strict image check and avoids rejecting a valid ZebraDex scan.
+    response = await fetch(url, { method: "GET", headers: { Range: "bytes=0-128", "User-Agent": "Cardoria/6.0" }, signal: controller.signal });
+    return (response.ok || response.status === 206) && String(response.headers.get("content-type") || "").toLowerCase().startsWith("image/");
   } catch {
     return false;
   } finally {
@@ -96,13 +101,13 @@ async function loadSeriesIndex() {
 }
 
 function chooseSeries(card, rows) {
-  const zebraLanguage = card.language === "ja" ? "ja" : card.language === "en" ? "fr" : "";
+  const zebraLanguage = card.language === "ja" ? "ja" : (card.language === "fr" || card.language === "en") ? "fr" : "";
   if (!zebraLanguage) return null;
   const candidates = rows.filter((row) => row.language === zebraLanguage);
   if (!candidates.length) return null;
 
   const extensionCode = String(card.extension_code || "").toLowerCase();
-  if (zebraLanguage === "ja" && extensionCode) {
+  if (extensionCode) {
     const exactCode = candidates.filter((row) => String(row.setCode || "").toLowerCase() === extensionCode);
     if (exactCode.length === 1) return exactCode[0];
     if (exactCode.length > 1) {
@@ -112,7 +117,8 @@ function chooseSeries(card, rows) {
     }
   }
 
-  const names = [card.extension, card.source_extension].map(slug).filter(Boolean).filter((value) => !value.startsWith("extension-anglaise-") && !value.startsWith("extension-japonaise-"));
+  const names = [card.extension, card.source_extension].map(slug).filter(Boolean)
+    .filter((value) => !value.startsWith("extension-anglaise-") && !value.startsWith("extension-japonaise-"));
   for (const name of names) {
     const matched = candidates.filter((row) => row.seriesSlug === name || slug(row.title) === name);
     if (matched.length === 1) return matched[0];
@@ -176,22 +182,30 @@ export function getZebraDexRepairStatus() {
   const db = ensureColumn(getDb());
   const retryBefore = new Date(Date.now() - RETRY_AFTER_MS).toISOString();
   const row = db.prepare(`SELECT COUNT(*) AS missing,
-    SUM(CASE WHEN language IN ('en','ja') AND (COALESCE(zebradex_checked_at,'')='' OR zebradex_checked_at<?) THEN 1 ELSE 0 END) AS pending
-    FROM cards WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
+    SUM(CASE WHEN language IN ('fr','en','ja') AND (COALESCE(zebradex_checked_at,'')='' OR zebradex_checked_at<?) THEN 1 ELSE 0 END) AS pending
+    FROM cards WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1
       AND (COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='')`).get(retryBefore);
-  return { missing: Number(row?.missing || 0), pending: Number(row?.pending || 0) };
+  const byLanguage = db.prepare(`SELECT language,COUNT(*) AS missing,
+    SUM(CASE WHEN language IN ('fr','en','ja') AND (COALESCE(zebradex_checked_at,'')='' OR zebradex_checked_at<?) THEN 1 ELSE 0 END) AS pending
+    FROM cards WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1
+      AND (COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='') GROUP BY language`).all(retryBefore);
+  return {
+    missing: Number(row?.missing || 0),
+    pending: Number(row?.pending || 0),
+    languages: Object.fromEntries(byLanguage.map((item) => [item.language, { missing: Number(item.missing || 0), pending: Number(item.pending || 0) }]))
+  };
 }
 
 export async function repairImagesWithZebraDex({ limit = 100 } = {}) {
   const db = ensureColumn(getDb());
-  const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 300);
+  const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
   const retryBefore = new Date(Date.now() - RETRY_AFTER_MS).toISOString();
   const targets = db.prepare(`SELECT id,language,name,source_name,extension,source_extension,extension_code,number
-    FROM cards WHERE license_slug='pokemon' AND language IN ('en','ja') AND active=1
+    FROM cards WHERE license_slug='pokemon' AND language IN ('fr','en','ja') AND active=1
       AND (COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='')
-      AND COALESCE(image_repair_checked_at,'')<>''
+      AND (language='fr' OR COALESCE(image_repair_checked_at,'')<>'')
       AND (COALESCE(zebradex_checked_at,'')='' OR zebradex_checked_at<?)
-    ORDER BY CASE language WHEN 'ja' THEN 0 ELSE 1 END, id LIMIT ?`).all(retryBefore, safeLimit);
+    ORDER BY CASE language WHEN 'fr' THEN 0 WHEN 'ja' THEN 1 ELSE 2 END, id LIMIT ?`).all(retryBefore, safeLimit);
   if (!targets.length) return { ok: true, requested: 0, repaired: 0, unresolved: 0, ...getZebraDexRepairStatus() };
 
   const seriesIndex = await loadSeriesIndex();
@@ -200,7 +214,6 @@ export async function repairImagesWithZebraDex({ limit = 100 } = {}) {
   const now = new Date().toISOString();
   const resolved = [];
   const unresolved = [];
-  // Deliberately sequential: ZebraDex is only a fallback and should be queried politely.
   for (const card of targets) {
     const image = await resolveZebraDex(card, seriesIndex);
     if (image) resolved.push({ card, image }); else unresolved.push(card);
@@ -212,7 +225,9 @@ export async function repairImagesWithZebraDex({ limit = 100 } = {}) {
     for (const { card, image } of resolved) update.run(image.imageUrl, image.imageUrl, image.zebraLanguage, now, now, card.id);
     for (const card of unresolved) mark.run(now, card.id);
   })();
+  const repairedFr = resolved.filter(({ card }) => card.language === "fr").length;
+  if (repairedFr > 0) scheduleEngineSnapshot("zebradex-fr-image-repair", 30000);
   const status = getZebraDexRepairStatus();
-  console.log(`[zebradex-image-repair] requested=${targets.length} repaired=${resolved.length} unresolved=${unresolved.length} remaining=${status.missing} pending=${status.pending}`);
-  return { ok: true, requested: targets.length, repaired: resolved.length, unresolved: unresolved.length, ...status };
+  console.log(`[zebradex-image-repair] requested=${targets.length} repaired=${resolved.length} repaired-fr=${repairedFr} unresolved=${unresolved.length} remaining=${status.missing} pending=${status.pending}`);
+  return { ok: true, requested: targets.length, repaired: resolved.length, repairedFr, unresolved: unresolved.length, ...status };
 }
