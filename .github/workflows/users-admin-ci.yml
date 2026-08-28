@@ -1,0 +1,75 @@
+name: Cardoria Admin Users CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  admin-users:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Install backend
+        run: npm install --omit=dev
+      - name: Users syntax checks
+        run: |
+          node --check server.js
+          node --check routes/admin-users.js
+          node --check lib/auth/users.js
+          node --check lib/auth/session.js
+          node --check lib/auth/2faChallenge.js
+          node --check scripts/users-admin-e2e.mjs
+          node --check ../js/admin/admin-users.js
+      - name: Users architecture guards
+        working-directory: .
+        run: |
+          grep -q 'adminUsersRoutes' backend/server.js
+          grep -q 'app.use("/api/admin", adminUsersRoutes)' backend/server.js
+          grep -q '/users/:id/revoke-sessions' backend/routes/admin-users.js
+          grep -q '/users/:id/reset-2fa' backend/routes/admin-users.js
+          grep -q 'revokeAllUserSessions' backend/routes/admin-users.js
+          grep -q 'revokeUser2faChallenges' backend/routes/admin-users.js
+          grep -q 'Impossible de désactiver ou rétrograder le dernier super administrateur' backend/lib/auth/users.js
+          grep -q 'data-toggle-active' js/admin/admin-users.js
+          grep -q 'data-revoke' js/admin/admin-users.js
+          grep -q 'data-reset2fa' js/admin/admin-users.js
+      - name: Start backend
+        run: |
+          node server.js > /tmp/cardoria-users.log 2>&1 &
+          echo $! > /tmp/cardoria-users.pid
+      - name: Wait for backend
+        run: |
+          ready=false
+          for i in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-users-startup.json; then
+              if grep -q '"ready":true' /tmp/cardoria-users-startup.json; then ready=true; break; fi
+            fi
+            sleep 1
+          done
+          test "$ready" = "true"
+      - name: Complete Admin Users E2E
+        run: node scripts/users-admin-e2e.mjs
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-users.pid ]; then kill $(cat /tmp/cardoria-users.pid) || true; fi
+          cat /tmp/cardoria-users.log || true
