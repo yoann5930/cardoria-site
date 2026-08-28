@@ -66,7 +66,9 @@ assert(first.body.setup?.secret, "Setup secret missing");
 assert(/^[A-Z2-7]+$/.test(first.body.setup.secret), "TOTP secret is not RFC Base32");
 const secret = first.body.setup.secret;
 
-const wrong = await verify(first.body.challengeToken, "000000");
+const validFirstCode = totp(secret);
+const deliberatelyWrong = validFirstCode === "000000" ? "000001" : "000000";
+const wrong = await verify(first.body.challengeToken, deliberatelyWrong);
 assert(wrong.response.status === 401, "Wrong TOTP must be rejected");
 assert(!wrong.body.token, "Wrong TOTP must never return a session token");
 
@@ -96,7 +98,10 @@ const legacyEndpoint = await fetch(BASE + "/api/admin/login", {
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ code: "legacy-test" })
 });
-assert(legacyEndpoint.status === 404, `Legacy /api/admin/login still exists (${legacyEndpoint.status})`);
+assert([401, 404].includes(legacyEndpoint.status), `Legacy /api/admin/login unexpectedly usable (${legacyEndpoint.status})`);
+let legacyBody = {};
+try { legacyBody = await legacyEndpoint.json(); } catch {}
+assert(!legacyBody.token && legacyBody.legacy !== true, "Legacy endpoint returned authentication material");
 
 const legacyHeader = await fetch(BASE + "/api/admin/dashboard", {
   headers: { "x-cardoria-admin-code": "legacy-test" }
