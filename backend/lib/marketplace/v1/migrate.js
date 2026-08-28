@@ -38,19 +38,40 @@ export function migrateMarketplaceV1() {
       buyer_email TEXT DEFAULT '',
       seller_id TEXT DEFAULT '',
       status TEXT DEFAULT 'open',
+      priority TEXT DEFAULT 'normal',
       reason TEXT DEFAULT '',
       resolution TEXT DEFAULT '',
+      resolution_code TEXT DEFAULT '',
+      admin_note TEXT DEFAULT '',
+      resolved_by TEXT DEFAULT '',
+      resolved_at TEXT DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS mk_dispute_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dispute_id TEXT NOT NULL,
+      actor TEXT DEFAULT '',
+      action TEXT DEFAULT '',
+      from_status TEXT DEFAULT '',
+      to_status TEXT DEFAULT '',
+      note TEXT DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (dispute_id) REFERENCES mk_disputes(id) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_mk_listings_slug ON mk_listings(slug);
     CREATE INDEX IF NOT EXISTS idx_mk_cart_user ON mk_cart_items(user_id);
     CREATE INDEX IF NOT EXISTS idx_mk_disputes_order ON mk_disputes(order_id, status);
+    CREATE INDEX IF NOT EXISTS idx_mk_disputes_status_priority ON mk_disputes(status, priority, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_mk_dispute_events_dispute ON mk_dispute_events(dispute_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_mk_invoices_order ON mk_invoices(order_id);
     CREATE INDEX IF NOT EXISTS idx_mk_sellers_paypal ON mk_sellers(paypal_merchant_id, paypal_onboarding_status);
     CREATE INDEX IF NOT EXISTS idx_mk_orders_paypal ON mk_orders(paypal_order_id, paypal_capture_id);
   `);
+
+  migrateDisputeColumns(db);
 }
 
 function addColumnIfMissing(db, table, cols, name, type) {
@@ -78,6 +99,10 @@ function migrateListingColumns(db) {
   addColumnIfMissing(db, "mk_listings", cols, "slug", "TEXT DEFAULT ''");
   addColumnIfMissing(db, "mk_listings", cols, "seo_title", "TEXT DEFAULT ''");
   addColumnIfMissing(db, "mk_listings", cols, "seo_description", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_listings", cols, "moderation_locked", "INTEGER DEFAULT 0");
+  addColumnIfMissing(db, "mk_listings", cols, "moderation_reason", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_listings", cols, "moderated_by", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_listings", cols, "moderated_at", "TEXT DEFAULT ''");
 }
 
 function migrateOrderColumns(db) {
@@ -92,4 +117,13 @@ function migrateOrderColumns(db) {
   addColumnIfMissing(db, "mk_orders", cols, "paypal_capture_id", "TEXT DEFAULT ''");
   addColumnIfMissing(db, "mk_orders", cols, "platform_fee", "REAL DEFAULT 0");
   addColumnIfMissing(db, "mk_orders", cols, "seller_amount_after_platform_fee", "REAL DEFAULT 0");
+}
+
+function migrateDisputeColumns(db) {
+  const cols = db.prepare("PRAGMA table_info(mk_disputes)").all().map((c) => c.name);
+  addColumnIfMissing(db, "mk_disputes", cols, "priority", "TEXT DEFAULT 'normal'");
+  addColumnIfMissing(db, "mk_disputes", cols, "resolution_code", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_disputes", cols, "admin_note", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_disputes", cols, "resolved_by", "TEXT DEFAULT ''");
+  addColumnIfMissing(db, "mk_disputes", cols, "resolved_at", "TEXT DEFAULT ''");
 }
