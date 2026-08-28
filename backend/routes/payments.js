@@ -4,11 +4,11 @@
 import { Router } from "express";
 import {
   isSumUpConfigured,
-  createBoutiqueCheckout,
   syncPaymentFromCheckout,
   handleSumUpReturnCallback
 } from "../lib/payments/sumup.js";
 import { listBoutiqueProducts } from "../lib/boutique/stock.js";
+import { createLiveBoutiqueCheckout } from "../lib/boutique/checkout.js";
 
 const router = Router();
 
@@ -28,7 +28,7 @@ router.post("/boutique/checkout", async (req, res) => {
       return res.status(503).json({ ok: false, error: "Paiement SumUp non configuré. Définir SUMUP_API_KEY et SUMUP_MERCHANT_CODE." });
     }
     const body = req.body || {};
-    const result = await createBoutiqueCheckout({
+    const result = await createLiveBoutiqueCheckout({
       customerName: body.customerName,
       customerEmail: body.customerEmail,
       items: body.items,
