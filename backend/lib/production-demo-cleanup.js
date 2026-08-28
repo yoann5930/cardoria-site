@@ -19,6 +19,13 @@ function safeRun(db, sql, params = []) {
 function rows(db, sql, params = []) {
   try { return db.prepare(sql).all(...params); } catch { return []; }
 }
+function deleteOrderDependencies(db, orderIds, report) {
+  if (!orderIds.length) return;
+  const p = placeholders(orderIds.length);
+  report.relatedRows += safeRun(db, `DELETE FROM mk_reviews WHERE order_id IN (${p})`, orderIds);
+  report.relatedRows += safeRun(db, `DELETE FROM mk_invoices WHERE order_id IN (${p})`, orderIds);
+  report.relatedRows += safeRun(db, `DELETE FROM mk_disputes WHERE order_id IN (${p})`, orderIds);
+}
 
 export function cleanupProductionDemoData() {
   const db = getDb();
@@ -55,16 +62,19 @@ export function cleanupProductionDemoData() {
       report.relatedRows += safeRun(db, `DELETE FROM mk_favorites WHERE listing_id IN (${p})`, demoListingIds);
       report.relatedRows += safeRun(db, `DELETE FROM mk_wishlist WHERE listing_id IN (${p})`, demoListingIds);
       report.relatedRows += safeRun(db, `DELETE FROM mk_price_alerts WHERE listing_id IN (${p})`, demoListingIds);
-      const orderRows = rows(db, `SELECT id FROM mk_orders WHERE listing_id IN (${p})`, demoListingIds);
-      const orderIds = orderRows.map((r) => r.id).filter(Boolean);
-      if (orderIds.length) report.relatedRows += safeRun(db, `DELETE FROM mk_reviews WHERE order_id IN (${placeholders(orderIds.length)})`, orderIds);
+      report.relatedRows += safeRun(db, `DELETE FROM mk_cart_items WHERE listing_id IN (${p})`, demoListingIds);
+      const orderIds = rows(db, `SELECT id FROM mk_orders WHERE listing_id IN (${p})`, demoListingIds).map((r) => r.id).filter(Boolean);
+      deleteOrderDependencies(db, orderIds, report);
       report.relatedRows += safeRun(db, `DELETE FROM mk_orders WHERE listing_id IN (${p})`, demoListingIds);
       report.demoListings += safeRun(db, `DELETE FROM mk_listings WHERE id IN (${p})`, demoListingIds);
     }
 
     if (demoSellerIds.length) {
       const p = placeholders(demoSellerIds.length);
+      const orderIds = rows(db, `SELECT id FROM mk_orders WHERE seller_id IN (${p})`, demoSellerIds).map((r) => r.id).filter(Boolean);
+      deleteOrderDependencies(db, orderIds, report);
       report.relatedRows += safeRun(db, `DELETE FROM mk_reviews WHERE seller_id IN (${p})`, demoSellerIds);
+      report.relatedRows += safeRun(db, `DELETE FROM mk_disputes WHERE seller_id IN (${p})`, demoSellerIds);
       report.relatedRows += safeRun(db, `DELETE FROM mk_orders WHERE seller_id IN (${p})`, demoSellerIds);
       report.demoSellers += safeRun(db, `DELETE FROM mk_sellers WHERE id IN (${p})`, demoSellerIds);
     }
@@ -77,10 +87,15 @@ export function cleanupProductionDemoData() {
       report.relatedRows += safeRun(db, `DELETE FROM mk_favorites WHERE user_id IN (${p})`, demoUserIds);
       report.relatedRows += safeRun(db, `DELETE FROM mk_wishlist WHERE user_id IN (${p})`, demoUserIds);
       report.relatedRows += safeRun(db, `DELETE FROM mk_price_alerts WHERE user_id IN (${p})`, demoUserIds);
+      report.relatedRows += safeRun(db, `DELETE FROM mk_cart_items WHERE user_id IN (${p})`, demoUserIds);
       report.demoUsers += safeRun(db, `DELETE FROM auth_users WHERE id IN (${p})`, demoUserIds);
     }
     if (demoEmails.length) {
       const p = placeholders(demoEmails.length);
+      const orderIds = rows(db, `SELECT id FROM mk_orders WHERE lower(buyer_email) IN (${p})`, demoEmails).map((r) => r.id).filter(Boolean);
+      deleteOrderDependencies(db, orderIds, report);
+      report.relatedRows += safeRun(db, `DELETE FROM mk_disputes WHERE lower(buyer_email) IN (${p})`, demoEmails);
+      report.relatedRows += safeRun(db, `DELETE FROM mk_invoices WHERE lower(buyer_email) IN (${p})`, demoEmails);
       report.relatedRows += safeRun(db, `DELETE FROM mk_orders WHERE lower(buyer_email) IN (${p})`, demoEmails);
       report.relatedRows += safeRun(db, `DELETE FROM mk_reviews WHERE lower(buyer_email) IN (${p})`, demoEmails);
       report.relatedRows += safeRun(db, `DELETE FROM mk_price_alerts WHERE lower(user_email) IN (${p})`, demoEmails);
