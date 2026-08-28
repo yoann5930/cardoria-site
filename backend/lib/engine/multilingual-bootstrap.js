@@ -2,6 +2,7 @@ import { restoreMultilingualCards, persistMultilingualCards, closeMultilingualCa
 import { ensureCatalogFrenchLocalizationSchema, localizeMultilingualCatalogToFrench } from "./catalog-french-localization.js";
 import { getMultilingualImageRepairStatus, repairMultilingualImages } from "./multilingual-image-repair.js";
 import { getZebraDexRepairStatus, repairImagesWithZebraDex } from "./zebradex-image-repair.js";
+import { backfillKoreanOfficialCards, verifyKoreanTauros } from "./korean-official-backfill.js";
 import { getDb } from "./database.js";
 
 const READY_MINIMUMS = { en: 23000, ja: 12000, ko: 200 };
@@ -18,6 +19,7 @@ let localized = false;
 let imageRepairRunning = false;
 let zebraRepairRunning = false;
 let dirtyImages = false;
+let koreanBackfillDone = false;
 
 function languageCounts() {
   const db = getDb();
@@ -50,6 +52,24 @@ async function checkpoint(reason) {
   }
 }
 
+async function ensureKoreanOfficialBackfill() {
+  if (koreanBackfillDone || busy) return { ok: true, skipped: true };
+  busy = true;
+  try {
+    const result = await backfillKoreanOfficialCards({ limit: 160, discover: true });
+    koreanBackfillDone = true;
+    if (result.added > 0 || result.updated > 0) dirtyImages = true;
+    const tauros = verifyKoreanTauros();
+    console.log(`[catalog-audit] Tauros KO sv9a 053 ${tauros ? `OK image=${tauros.image_hd ? 'yes' : 'no'} price=${Number(tauros.recommended_price || 0).toFixed(2)}` : 'MISSING'}`);
+    return result;
+  } catch (error) {
+    console.error("[pokemon-korea-official] backfill failed", error?.message || String(error));
+    return { ok: false, error: error?.message || String(error) };
+  } finally {
+    busy = false;
+  }
+}
+
 export async function localizeAndCheckpointMultilingualCatalog(reason = "catalog-localization") {
   if (busy) return { ok: false, skipped: true, reason: "busy" };
   const state = catalogReady();
@@ -57,6 +77,10 @@ export async function localizeAndCheckpointMultilingualCatalog(reason = "catalog
     console.log(`[multilingual-bootstrap] waiting catalog EN=${state.counts.en} JA=${state.counts.ja} KO=${state.counts.ko}`);
     return { ok: true, skipped: true, reason: "catalog_not_ready", counts: state.counts };
   }
+
+  const ko = await ensureKoreanOfficialBackfill();
+  if (ko?.ok === false) return ko;
+
   busy = true;
   try {
     const localization = localizeMultilingualCatalogToFrench();
