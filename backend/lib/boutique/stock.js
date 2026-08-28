@@ -3,8 +3,8 @@ import { getCardById } from "../engine/cards.js";
 
 const DEFAULT_PURCHASES = [];
 const DEFAULT_ORDERS = [];
-const PENDING_RESERVATION_MS = 30 * 60 * 1000;
-const STOCK_PREFS_TAG = "[STOCK_PREFS]";
+export const PENDING_RESERVATION_MS = 30 * 60 * 1000;
+export const STOCK_PREFS_TAG = "[STOCK_PREFS]";
 
 function money(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
@@ -107,6 +107,11 @@ function recommendedPrice(card) {
   return Number.isFinite(value) && value > 0 ? money(value) : 0;
 }
 
+function addPurchaseId(line, purchaseId) {
+  const id = String(purchaseId || "").trim();
+  if (id && !line.purchaseIds.includes(id)) line.purchaseIds.push(id);
+}
+
 function addLine(map, item) {
   const qty = Math.max(1, Math.trunc(Number(item.stock) || 1));
   const unitCost = Math.max(0, Number(item.unitCost) || 0);
@@ -129,14 +134,17 @@ function addLine(map, item) {
       image: item.card?.imageThumb || item.card?.imageHd || "",
       baseStock: qty,
       totalCost: unitCost * qty,
-      latestPurchaseAt: item.latestPurchaseAt || ""
+      latestPurchaseAt: item.latestPurchaseAt || "",
+      purchaseIds: []
     };
+    addPurchaseId(map[item.key], item.purchaseId);
     return;
   }
 
   const current = map[item.key];
   current.baseStock += qty;
   current.totalCost += unitCost * qty;
+  addPurchaseId(current, item.purchaseId);
   if (String(item.latestPurchaseAt || "") > String(current.latestPurchaseAt || "")) current.latestPurchaseAt = item.latestPurchaseAt;
   if (!current.preferenceApplied && pref.explicit) {
     current.condition = pref.condition || current.condition;
@@ -181,7 +189,8 @@ function buildBaseStock() {
             preference: readLinePreference(purchase, key),
             unitCost,
             stock: 1,
-            latestPurchaseAt: purchaseDate
+            latestPurchaseAt: purchaseDate,
+            purchaseId: purchase.id
           });
         }
       } else {
@@ -195,7 +204,8 @@ function buildBaseStock() {
           preference: readLinePreference(purchase, key),
           unitCost,
           stock: qty,
-          latestPurchaseAt: purchaseDate
+          latestPurchaseAt: purchaseDate,
+          purchaseId: purchase.id
         });
       }
       continue;
@@ -219,7 +229,8 @@ function buildBaseStock() {
         preference: readLinePreference(purchase, key),
         unitCost,
         stock: qty,
-        latestPurchaseAt: purchaseDate
+        latestPurchaseAt: purchaseDate,
+        purchaseId: purchase.id
       });
       continue;
     }
@@ -233,62 +244,115 @@ function buildBaseStock() {
       preference: readLinePreference(purchase, key),
       unitCost,
       stock: qty,
-      latestPurchaseAt: purchaseDate
+      latestPurchaseAt: purchaseDate,
+      purchaseId: purchase.id
     });
   }
 
   return Object.values(map);
 }
 
-function reservedQty(productId, orders) {
+function orderItemQty(order, productId) {
+  return (order?.items || [])
+    .filter((item) => String(item.ref || item.id) === String(productId))
+    .reduce((subtotal, item) => subtotal + Math.max(1, Math.trunc(Number(item.qty) || 1)), 0);
+}
+
+function allocationStats(productId, orders) {
   const now = Date.now();
-  return (orders || []).reduce((sum, order) => {
-    const paymentStatus = String(order?.paymentStatus || "");
-    if (["failed", "refunded", "cancelled", "canceled"].includes(paymentStatus)) return sum;
-    const paid = paymentStatus === "paid" || ["À préparer", "Expédiée", "Livrée"].includes(order?.status);
+  const stats = { pendingStock: 0, soldStock: 0, refundHoldStock: 0 };
+
+  for (const order of orders || []) {
+    const qty = orderItemQty(order, productId);
+    if (!qty) continue;
+
+    const paymentStatus = String(order?.paymentStatus || "").toLowerCase();
+    const orderStatus = String(order?.status || "");
+    if (["failed", "refunded", "cancelled", "canceled"].includes(paymentStatus)) continue;
+
+    if (orderStatus === "Annulée") {
+      if (paymentStatus === "paid") stats.refundHoldStock += qty;
+      continue;
+    }
+
+    const legacyPaidStatus = ["À préparer", "En préparation", "Expédiée", "Livrée"].includes(orderStatus);
+    if (paymentStatus === "paid" || legacyPaidStatus) {
+      stats.soldStock += qty;
+      continue;
+    }
+
     const createdAt = Date.parse(order?.createdAt || "");
     const pendingFresh = paymentStatus === "pending" && (!Number.isFinite(createdAt) || now - createdAt < PENDING_RESERVATION_MS);
-    if (!paid && !pendingFresh) return sum;
-    return sum + (order.items || [])
-      .filter((item) => String(item.ref || item.id) === String(productId))
-      .reduce((subtotal, item) => subtotal + Math.max(1, Number(item.qty) || 1), 0);
-  }, 0);
+    if (pendingFresh) stats.pendingStock += qty;
+  }
+
+  return stats;
+}
+
+function buildInventoryLine(line, orders, includeAdminDetails) {
+  const allocation = allocationStats(line.key, orders);
+  const committedStock = allocation.pendingStock + allocation.soldStock + allocation.refundHoldStock;
+  const stock = Math.max(0, line.baseStock - committedStock);
+  const oversoldStock = Math.max(0, committedStock - line.baseStock);
+  const price = line.boutiquePrice || line.catalogPrice || 0;
+  const priceSource = line.boutiquePrice ? "admin" : (line.catalogPrice ? "cardoria_market" : "missing");
+  const publicProduct = {
+    id: line.key,
+    cardId: line.cardId,
+    category: "pokemon",
+    name: line.name,
+    extension: line.extension,
+    number: line.number,
+    rarity: line.rarity,
+    categoryLabel: line.categoryLabel,
+    packaging: line.packaging,
+    condition: conditionLabel(line.condition, line.packaging),
+    conditionCode: normalizeCondition(line.condition),
+    stock,
+    price: money(price),
+    priceSource,
+    image: line.image,
+    boutiqueEnabled: line.boutiqueEnabled !== false,
+    purchasable: line.boutiqueEnabled !== false && stock > 0 && price > 0 && oversoldStock === 0
+  };
+
+  if (!includeAdminDetails) return publicProduct;
+  return {
+    ...publicProduct,
+    key: line.key,
+    baseStock: line.baseStock,
+    pendingStock: allocation.pendingStock,
+    soldStock: allocation.soldStock,
+    refundHoldStock: allocation.refundHoldStock,
+    reservedStock: allocation.pendingStock + allocation.refundHoldStock,
+    committedStock,
+    oversoldStock,
+    averagePurchaseCost: line.baseStock ? money(line.totalCost / line.baseStock) : 0,
+    totalPurchaseCost: money(line.totalCost),
+    purchaseIds: line.purchaseIds.slice(),
+    catalogPrice: line.catalogPrice,
+    boutiquePrice: line.boutiquePrice,
+    latestPurchaseAt: line.latestPurchaseAt,
+    inventoryStatus: oversoldStock > 0 ? "oversold" : stock <= 0 ? "out_of_stock" : allocation.pendingStock > 0 ? "reserved" : "available"
+  };
 }
 
 export function listBoutiqueProducts({ includeDisabled = false } = {}) {
   const orders = readJson("orders", DEFAULT_ORDERS);
   return buildBaseStock()
-    .map((line) => {
-      const reserved = reservedQty(line.key, orders);
-      const stock = Math.max(0, line.baseStock - reserved);
-      const price = line.boutiquePrice || line.catalogPrice || 0;
-      const priceSource = line.boutiquePrice ? "admin" : (line.catalogPrice ? "cardoria_market" : "missing");
-      return {
-        id: line.key,
-        cardId: line.cardId,
-        category: "pokemon",
-        name: line.name,
-        extension: line.extension,
-        number: line.number,
-        rarity: line.rarity,
-        categoryLabel: line.categoryLabel,
-        packaging: line.packaging,
-        condition: conditionLabel(line.condition, line.packaging),
-        conditionCode: normalizeCondition(line.condition),
-        stock,
-        price: money(price),
-        priceSource,
-        image: line.image,
-        boutiqueEnabled: line.boutiqueEnabled !== false,
-        purchasable: line.boutiqueEnabled !== false && stock > 0 && price > 0
-      };
-    })
+    .map((line) => buildInventoryLine(line, orders, false))
     .filter((product) => includeDisabled || product.boutiqueEnabled)
     .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "fr"));
+}
+
+export function listBoutiqueInventory({ includeDisabled = true } = {}) {
+  const orders = readJson("orders", DEFAULT_ORDERS);
+  return buildBaseStock()
+    .map((line) => buildInventoryLine(line, orders, true))
+    .filter((product) => includeDisabled || product.boutiqueEnabled)
+    .sort((a, b) => String(b.latestPurchaseAt || "").localeCompare(String(a.latestPurchaseAt || "")) || String(a.name || "").localeCompare(String(b.name || ""), "fr"));
 }
 
 export function getBoutiqueProduct(productId) {
   return listBoutiqueProducts({ includeDisabled: false }).find((product) => String(product.id) === String(productId)) || null;
 }
-
-export { STOCK_PREFS_TAG };
