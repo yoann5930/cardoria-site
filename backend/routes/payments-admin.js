@@ -6,10 +6,12 @@ import { listPayments, getPayment, PAYMENT_STATUSES } from "../lib/payments/ledg
 import { isSumUpConfigured, syncPaymentFromCheckout } from "../lib/payments/sumup.js";
 import { refundSumUpTransaction } from "../lib/payments/sumup-refund.js";
 import { listBoutiqueInventory } from "../lib/boutique/stock.js";
+import { getOrder as getMarketplaceOrder } from "../lib/marketplace/orders.js";
 import { readJson, writeJson } from "../lib/storage.js";
 
 const router = Router();
-const WRITE_ADMIN = requireAuth({ action: "write" });
+const WRITE_ADMIN = requireAuth({ roles: ["super_admin", "admin", "employee"], action: "write" });
+const FINANCE_ADMIN = requireAuth({ roles: ["super_admin", "admin"], action: "finance" });
 const BOUTIQUE_STATUSES = ["À préparer", "En préparation", "Expédiée", "Livrée", "Annulée"];
 const BOUTIQUE_CARRIERS = ["La Poste", "Mondial Relay", "Relais Colis"];
 
@@ -17,8 +19,32 @@ function clean(value, max = 500) {
   return String(value == null ? "" : value).trim().slice(0, max);
 }
 
+function money(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
 function findBoutiqueOrder(id) {
   return readJson("orders", []).find((order) => String(order.id) === String(id)) || null;
+}
+
+function paymentOrder(payment) {
+  if (!payment) return null;
+  if (payment.source === "boutique" || String(payment.orderId || "").startsWith("CMD-")) return findBoutiqueOrder(payment.orderId);
+  try { return getMarketplaceOrder(payment.orderId); } catch { return null; }
+}
+
+function orderPaymentStatus(order) {
+  return String(order?.paymentStatus || "").toLowerCase();
+}
+
+function paymentReconciliation(payment) {
+  const order = paymentOrder(payment);
+  if (!order) return { state: "orphan", label: "Commande introuvable", order: null };
+  const ledgerStatus = String(payment.status || "").toLowerCase();
+  const currentOrderStatus = orderPaymentStatus(order);
+  if (!currentOrderStatus) return { state: "unknown", label: "Statut commande absent", order };
+  if (ledgerStatus === currentOrderStatus) return { state: "ok", label: "Rapproché", order };
+  return { state: "mismatch", label: `${ledgerStatus || "—"} / ${currentOrderStatus || "—"}`, order };
 }
 
 function canProcessPaidOrder(order, nextStatus) {
@@ -26,23 +52,118 @@ function canProcessPaidOrder(order, nextStatus) {
   return order.paymentStatus === "paid";
 }
 
-router.use(requireAdmin);
+function paymentsSummary(payments) {
+  const summary = {
+    total: payments.length,
+    pending: 0,
+    paid: 0,
+    failed: 0,
+    refunded: 0,
+    paidAmount: 0,
+    refundedAmount: 0,
+    pendingAmount: 0,
+    mismatches: 0,
+    orphans: 0
+  };
+  for (const payment of payments) {
+    const status = String(payment.status || "pending").toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(summary, status)) summary[status] += 1;
+    if (status === "paid") summary.paidAmount += Number(payment.amount || 0);
+    if (status === "refunded") summary.refundedAmount += Number(payment.amount || 0);
+    if (status === "pending") summary.pendingAmount += Number(payment.amount || 0);
+    const reconciliation = paymentReconciliation(payment);
+    if (reconciliation.state === "mismatch") summary.mismatches += 1;
+    if (reconciliation.state === "orphan") summary.orphans += 1;
+  }
+  summary.paidAmount = money(summary.paidAmount);
+  summary.refundedAmount = money(summary.refundedAmount);
+  summary.pendingAmount = money(summary.pendingAmount);
+  return summary;
+}
 
-router.get("/", (req, res) => res.json({
-  ok: true,
-  provider: "sumup",
-  configured: isSumUpConfigured(),
-  statuses: PAYMENT_STATUSES,
-  payments: listPayments({ status: req.query.status, source: req.query.source, limit: req.query.limit })
-}));
+router.use(requireAdmin);
+router.use((req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); });
+
+router.get("/", (req, res) => {
+  const payments = listPayments({ status: req.query.status, source: req.query.source, limit: req.query.limit || 500 });
+  const enriched = payments.map((payment) => {
+    const reconciliation = paymentReconciliation(payment);
+    return {
+      ...payment,
+      reconciliation: { state: reconciliation.state, label: reconciliation.label },
+      orderStatus: reconciliation.order?.status || "",
+      orderPaymentStatus: reconciliation.order?.paymentStatus || "",
+      canSync: !!payment.sumupCheckoutId,
+      canRefund: payment.status === "paid" && !!(payment.sumupTransactionId || payment.sumupCheckoutId)
+    };
+  });
+  res.json({
+    ok: true,
+    provider: "sumup",
+    configured: isSumUpConfigured(),
+    statuses: PAYMENT_STATUSES,
+    summary: paymentsSummary(payments),
+    payments: enriched
+  });
+});
+
+router.get("/summary", (req, res) => {
+  const payments = listPayments({ limit: 5000 });
+  res.json({ ok: true, configured: isSumUpConfigured(), summary: paymentsSummary(payments) });
+});
+
+router.post("/:id/sync", WRITE_ADMIN, async (req, res) => {
+  const payment = getPayment(req.params.id);
+  if (!payment) return res.status(404).json({ ok: false, error: "Paiement introuvable." });
+  if (!payment.sumupCheckoutId) return res.status(409).json({ ok: false, error: "Checkout SumUp introuvable pour ce paiement." });
+  try {
+    const result = await syncPaymentFromCheckout(payment.sumupCheckoutId);
+    const refreshed = getPayment(payment.id);
+    const reconciliation = paymentReconciliation(refreshed);
+    logAudit({ type: "payment", action: "sumup_admin_sync", user: req.authUser?.email || "admin", detail: `${payment.id} — ${payment.sumupCheckoutId} → ${result.status}` });
+    res.json({ ok: true, status: result.status, payment: refreshed, reconciliation: { state: reconciliation.state, label: reconciliation.label }, order: reconciliation.order });
+  } catch (e) {
+    res.status(e.status || 502).json({ ok: false, error: e.message });
+  }
+});
+
+router.post("/:id/refund", FINANCE_ADMIN, async (req, res) => {
+  let payment = getPayment(req.params.id);
+  if (!payment) return res.status(404).json({ ok: false, error: "Paiement introuvable." });
+  if (payment.status !== "paid") return res.status(409).json({ ok: false, error: "Seul un paiement SumUp payé peut être remboursé." });
+  if (!isSumUpConfigured()) return res.status(503).json({ ok: false, error: "SumUp n'est pas configuré." });
+
+  try {
+    if (!payment.sumupTransactionId && payment.sumupCheckoutId) {
+      await syncPaymentFromCheckout(payment.sumupCheckoutId);
+      payment = getPayment(payment.id);
+    }
+    if (!payment?.sumupTransactionId) return res.status(409).json({ ok: false, error: "Transaction SumUp introuvable après synchronisation." });
+
+    const requestedAmount = req.body?.amount == null || req.body?.amount === "" ? null : Number(req.body.amount);
+    if (requestedAmount != null && (!Number.isFinite(requestedAmount) || requestedAmount <= 0 || requestedAmount > Number(payment.amount || 0))) {
+      return res.status(400).json({ ok: false, error: "Montant de remboursement invalide." });
+    }
+
+    await refundSumUpTransaction(payment.sumupTransactionId, { amount: requestedAmount, orderId: payment.orderId, user: req.authUser?.email || "admin" });
+    let sync = null;
+    if (payment.sumupCheckoutId) {
+      try { sync = await syncPaymentFromCheckout(payment.sumupCheckoutId); } catch {}
+    }
+    const refreshed = getPayment(payment.id);
+    const reconciliation = paymentReconciliation(refreshed);
+    logAudit({ type: "payment", action: "sumup_admin_refund", user: req.authUser?.email || "admin", detail: `${payment.id} — ${requestedAmount == null ? "total" : `${requestedAmount} EUR`}` });
+    res.json({ ok: true, refundRequested: true, status: sync?.status || refreshed?.status || "pending", payment: refreshed, reconciliation: { state: reconciliation.state, label: reconciliation.label }, order: reconciliation.order });
+  } catch (e) {
+    res.status(e.status || 502).json({ ok: false, error: e.message });
+  }
+});
 
 router.get("/boutique-orders", (req, res) => {
-  res.setHeader("Cache-Control", "no-store");
   res.json({ ok: true, carriers: BOUTIQUE_CARRIERS, orders: readJson("orders", []) });
 });
 
 router.get("/boutique-inventory", (req, res) => {
-  res.setHeader("Cache-Control", "no-store");
   const inventory = listBoutiqueInventory({ includeDisabled: true });
   const totals = inventory.reduce((acc, item) => {
     acc.baseStock += Number(item.baseStock || 0);
@@ -102,13 +223,7 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
   orders[index] = current;
   writeJson("orders", orders);
 
-  logAudit({
-    type: "boutique_order",
-    action: "update",
-    user: req.authUser?.email || "admin",
-    detail: `${current.id} — ${previousStatus || "—"} -> ${current.status}`
-  });
-
+  logAudit({ type: "boutique_order", action: "update", user: req.authUser?.email || "admin", detail: `${current.id} — ${previousStatus || "—"} -> ${current.status}` });
   res.json({ ok: true, order: current });
 });
 
@@ -132,11 +247,11 @@ router.post("/boutique-orders/:id/sync-sumup", WRITE_ADMIN, async (req, res) => 
     logAudit({ type: "boutique_order", action: "sumup_sync", user: req.authUser?.email || "admin", detail: `${order.id} — ${result.status}` });
     res.json({ ok: true, status: result.status, payment: result.payment, order: findBoutiqueOrder(order.id) });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
+    res.status(e.status || 500).json({ ok: false, error: e.message });
   }
 });
 
-router.post("/boutique-orders/:id/refund", WRITE_ADMIN, async (req, res) => {
+router.post("/boutique-orders/:id/refund", FINANCE_ADMIN, async (req, res) => {
   let order = findBoutiqueOrder(req.params.id);
   if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
   if (order.paymentStatus !== "paid") return res.status(409).json({ ok: false, error: "Seule une commande SumUp payée peut être remboursée." });
@@ -172,14 +287,15 @@ router.post("/boutique-orders/:id/refund", WRITE_ADMIN, async (req, res) => {
 router.get("/:id", (req, res) => {
   const payment = getPayment(req.params.id);
   if (!payment) return res.status(404).json({ ok: false, error: "Paiement introuvable" });
-  res.json({ ok: true, payment });
+  const reconciliation = paymentReconciliation(payment);
+  res.json({ ok: true, payment: { ...payment, reconciliation: { state: reconciliation.state, label: reconciliation.label }, orderStatus: reconciliation.order?.status || "", orderPaymentStatus: reconciliation.order?.paymentStatus || "" } });
 });
 
-router.post("/sync/:checkoutId", async (req, res) => {
+router.post("/sync/:checkoutId", WRITE_ADMIN, async (req, res) => {
   try {
     res.json({ ok: true, ...(await syncPaymentFromCheckout(req.params.checkoutId)) });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
+    res.status(e.status || 500).json({ ok: false, error: e.message });
   }
 });
 
