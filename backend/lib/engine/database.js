@@ -51,6 +51,7 @@ function migrate(database) {
     CREATE TABLE IF NOT EXISTS cards (
       id TEXT PRIMARY KEY,
       license_slug TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'fr',
       slug TEXT NOT NULL,
       name TEXT NOT NULL,
       name_normalized TEXT NOT NULL,
@@ -165,6 +166,7 @@ function migrate(database) {
     CREATE INDEX IF NOT EXISTS idx_sealed_cardmarket ON sealed_products(cardmarket_id);
   `);
 
+  ensureColumn(database, "cards", "language", "TEXT NOT NULL DEFAULT 'fr'");
   ensureColumn(database, "cards", "hit_family", "TEXT DEFAULT ''");
   ensureColumn(database, "cards", "variants_json", "TEXT DEFAULT '{}'");
   ensureColumn(database, "cards", "market_avg1", "REAL DEFAULT 0");
@@ -173,6 +175,8 @@ function migrate(database) {
   ensureColumn(database, "cards", "market_source", "TEXT DEFAULT ''");
   ensureColumn(database, "cards", "market_updated_at", "TEXT DEFAULT ''");
   ensureColumn(database, "cards", "market_checked_at", "TEXT DEFAULT ''");
+  database.exec("UPDATE cards SET language='fr' WHERE language IS NULL OR language=''");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_cards_language ON cards(license_slug, language, active)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_cards_rarity_hit ON cards(rarity, hit_family, active)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_cards_market_update ON cards(license_slug, market_checked_at, active)");
 
@@ -234,6 +238,7 @@ export function rowToCard(row, extras = {}) {
   return {
     id: row.id,
     license: row.license_slug,
+    language: row.language || "fr",
     slug: row.slug,
     name: row.name,
     extension: row.extension,
