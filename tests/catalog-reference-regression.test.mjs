@@ -58,7 +58,7 @@ test('sealed catalog has a real persistent database, product images and market p
 test('sealed data and manual selling prices survive restarts', () => {
   assert.match(persistence, /ENGINE_TABLES = \[[^\]]*"sealed_products"/s);
   assert.match(persistence, /ENGINE_CHILD_FIRST = \[[^\]]*"sealed_products"/s);
-  assert.match(persistence, /version: 3/);
+  assert.match(persistence, /function enginePayload\(\)[\s\S]*return \{ version: 4, tables, capturedAt:/);
   assert.match(persistence, /engineSyncPromise = null/);
   assert.match(persistence, /engineSyncTimer\.unref/);
   assert.match(sealedEngine, /sale_price_manual/);
