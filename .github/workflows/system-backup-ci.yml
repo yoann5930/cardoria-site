@@ -1,0 +1,85 @@
+name: Cardoria System Backup CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  system-backups:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      BACKUP_INTERVAL_HOURS: '0'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Install backend
+        run: npm install --omit=dev
+      - name: System backup syntax checks
+        run: |
+          node --check server.js
+          node --check routes/system.js
+          node --check lib/backup/full.js
+          node --check lib/backup/durable.js
+          node --check lib/monitoring/errors.js
+          node --check scripts/system-backup-e2e.mjs
+          node --check ../js/admin/admin-system.js
+      - name: System backup architecture guards
+        working-directory: .
+        run: |
+          grep -q 'VACUUM INTO' backend/lib/backup/full.js
+          grep -q 'SECURITY_EPHEMERAL_TABLES' backend/lib/backup/full.js
+          grep -q 'cardoria_backups' backend/lib/backup/durable.js
+          grep -q 'canonicalStringify' backend/lib/backup/durable.js
+          grep -q '/backups/:id/validate' backend/routes/system.js
+          grep -q '/backups/:id/restore' backend/routes/system.js
+          grep -q 'roles: \["super_admin"\], action: "restore"' backend/routes/system.js
+          grep -q 'Confirmation requise' backend/routes/system.js
+          grep -q 'safeError' backend/routes/system.js
+          grep -q 'sanitized: true' backend/routes/system.js
+          grep -q 'Vérifier / restaurer' js/admin/admin-system.js
+          grep -q 'sessions ont été révoquées' js/admin/admin-system.js
+          grep -q 'system-backups-100' admin-system.html
+      - name: Isolated local backup restore E2E
+        run: node scripts/system-backup-e2e.mjs
+      - name: Start backend
+        run: |
+          node server.js > /tmp/cardoria-system.log 2>&1 &
+          echo $! > /tmp/cardoria-system.pid
+      - name: Wait for backend
+        run: |
+          ready=false
+          for i in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-system-startup.json; then
+              if grep -q '"ready":true' /tmp/cardoria-system-startup.json; then ready=true; break; fi
+            fi
+            sleep 1
+          done
+          test "$ready" = "true"
+      - name: System API authorization guards
+        run: |
+          code=$(curl --silent --output /tmp/backups-anon.json --write-out '%{http_code}' http://127.0.0.1:10000/api/system/backups)
+          test "$code" = "401"
+          code=$(curl --silent --output /tmp/restore-anon.json --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:10000/api/system/backups/not-a-backup/restore)
+          test "$code" = "401"
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-system.pid ]; then kill $(cat /tmp/cardoria-system.pid) || true; fi
+          cat /tmp/cardoria-system.log || true
