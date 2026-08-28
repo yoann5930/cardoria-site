@@ -224,6 +224,11 @@ export function listSealedProducts({ q = "", packaging = "", limit = 10000, acti
   return rows.map(rowToReference);
 }
 
+export function getSealedProduct(id) {
+  const row = ensureSealedSchema().prepare("SELECT * FROM sealed_products WHERE id=?").get(String(id || ""));
+  return row ? rowToReference(row) : null;
+}
+
 function normalizedManual(data = {}, existing = null) {
   const name = cleanText(data.name ?? existing?.name, 180);
   if (!name) throw Object.assign(new Error("Le nom du produit est obligatoire."), { status: 400 });
