@@ -6,7 +6,9 @@ const MARKERS = ["demo", "test", "sample", "fake", "mock"];
 function text(value) { return String(value ?? "").trim().toLowerCase(); }
 function marked(value) {
   const v = text(value);
-  return MARKERS.some((marker) => v.includes(marker));
+  if (!v) return false;
+  const tokens = v.split(/[^a-z0-9]+/).filter(Boolean);
+  return MARKERS.some((marker) => tokens.includes(marker));
 }
 function prefixed(value) {
   const v = text(value);
@@ -30,14 +32,7 @@ function deleteOrderDependencies(db, orderIds, report) {
 export function cleanupProductionDemoData() {
   const db = getDb();
   const configuredAdmin = text(process.env.ADMIN_EMAIL || "Cardoria59330@gmail.com");
-  const report = {
-    demoUsers: 0,
-    demoSellers: 0,
-    demoListings: 0,
-    demoCards: 0,
-    demoPurchases: 0,
-    relatedRows: 0
-  };
+  const report = { demoUsers: 0, demoSellers: 0, demoListings: 0, demoCards: 0, demoPurchases: 0, relatedRows: 0 };
 
   db.pragma("foreign_keys = OFF");
   const tx = db.transaction(() => {
@@ -101,7 +96,6 @@ export function cleanupProductionDemoData() {
       report.relatedRows += safeRun(db, `DELETE FROM mk_price_alerts WHERE lower(user_email) IN (${p})`, demoEmails);
     }
 
-    // Delete only explicitly demo/test engine rows. Never infer from ordinary card names.
     const demoCards = rows(db, "SELECT id,market_source FROM cards").filter((c) => prefixed(c.id) || MARKERS.includes(text(c.market_source)));
     const demoCardIds = demoCards.map((c) => c.id).filter(Boolean);
     if (demoCardIds.length) {
@@ -114,12 +108,8 @@ export function cleanupProductionDemoData() {
       report.demoCards += safeRun(db, `DELETE FROM cards WHERE id IN (${p})`, demoCardIds);
     }
 
-    try {
-      db.exec("DELETE FROM mk_listings_fts; INSERT INTO mk_listings_fts(rowid,title,description,license_slug,card_condition) SELECT rowid,title,description,license_slug,card_condition FROM mk_listings;");
-    } catch {}
-    try {
-      db.exec("DELETE FROM cards_fts; INSERT INTO cards_fts(rowid,name,extension,number,rarity,license_slug) SELECT rowid,name,extension,number,rarity,license_slug FROM cards;");
-    } catch {}
+    try { db.exec("DELETE FROM mk_listings_fts; INSERT INTO mk_listings_fts(rowid,title,description,license_slug,card_condition) SELECT rowid,title,description,license_slug,card_condition FROM mk_listings;"); } catch {}
+    try { db.exec("DELETE FROM cards_fts; INSERT INTO cards_fts(rowid,name,extension,number,rarity,license_slug) SELECT rowid,name,extension,number,rarity,license_slug FROM cards;"); } catch {}
   });
 
   try { tx(); } finally { db.pragma("foreign_keys = ON"); }
