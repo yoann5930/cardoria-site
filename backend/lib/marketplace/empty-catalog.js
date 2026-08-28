@@ -7,9 +7,7 @@ import { flushMarketplacePersistence, flushEnginePersistence } from "./persisten
 const { Pool } = pg;
 const MIGRATION_ID = "empty-public-catalog-v1";
 
-function databaseUrl() {
-  return String(process.env.MARKETPLACE_DATABASE_URL || "").trim();
-}
+function databaseUrl() { return String(process.env.MARKETPLACE_DATABASE_URL || "").trim(); }
 
 /**
  * Vide une seule fois toutes les annonces Marketplace déjà présentes en production,
@@ -28,7 +26,6 @@ export async function emptyPublicCatalogOnce() {
     await client.query(`CREATE TABLE IF NOT EXISTS cardoria_maintenance_migrations (id TEXT PRIMARY KEY,applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
     const existing = await client.query("SELECT id FROM cardoria_maintenance_migrations WHERE id = $1 LIMIT 1", [MIGRATION_ID]);
     alreadyApplied = Boolean(existing.rowCount);
-
     if (!alreadyApplied) {
       await client.query("BEGIN");
       await client.query("UPDATE mk_listings SET status = 'removed', stock = 0");
@@ -51,12 +48,15 @@ export async function emptyPublicCatalogOnce() {
   }
 
   const cleanup = cleanupProductionDemoData();
-  const [purchasesSaved, marketplaceSaved, engineSaved] = await Promise.all([
-    flushPurchasePersistence("production-demo-cleanup"),
-    flushMarketplacePersistence("production-demo-cleanup"),
-    flushEnginePersistence("production-demo-cleanup")
-  ]);
-  const persistenceOk = purchasesSaved.ok !== false && marketplaceSaved.ok !== false && engineSaved.ok !== false;
+  const changedMarketplace = applied || cleanup.demoUsers > 0 || cleanup.demoSellers > 0 || cleanup.demoListings > 0 || cleanup.relatedRows > 0;
+  const changedEngine = cleanup.demoCards > 0;
+  const changedPurchases = cleanup.demoPurchases > 0;
+
+  const results = [];
+  if (changedPurchases) results.push(await flushPurchasePersistence("production-demo-cleanup"));
+  if (changedMarketplace) results.push(await flushMarketplacePersistence("production-demo-cleanup"));
+  if (changedEngine) results.push(await flushEnginePersistence("production-demo-cleanup"));
+  const persistenceOk = results.every((result) => result?.ok !== false);
   if (!persistenceOk) throw new Error("Nettoyage demo effectué mais persistance incomplète.");
 
   console.log(`[startup] production-demo-cleanup: ok users=${cleanup.demoUsers} sellers=${cleanup.demoSellers} listings=${cleanup.demoListings} cards=${cleanup.demoCards} purchases=${cleanup.demoPurchases}`);
