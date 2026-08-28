@@ -7,7 +7,7 @@
     "node": ">=22 <23"
   },
   "scripts": {
-    "start": "node --import ./lib/purchase-persistence-bootstrap.js server.js",
+    "start": "node --import ./lib/purchase-persistence-bootstrap.js --import ./lib/engine/multilingual-bootstrap.js server.js",
     "audit": "node ../scripts/audit-launch.mjs",
     "sitemap": "node ../scripts/generate-launch-sitemap.mjs"
   },
