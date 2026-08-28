@@ -11,7 +11,8 @@ const FILES = {
   audit: "audit-log.json",
   analytics: "site-analytics.json",
   settings: "settings.json",
-  "witnot-attribution": "witnot-attribution.json"
+  "witnot-attribution": "witnot-attribution.json",
+  "rachat-proposals": "rachat-proposals.json"
 };
 
 function ensureDir() {
