@@ -1,0 +1,83 @@
+name: Cardoria Admin Security CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  admin-security:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Install backend
+        run: npm install --omit=dev
+      - name: Security syntax checks
+        run: |
+          node --check server.js
+          node --check routes/auth.js
+          node --check lib/auth.js
+          node --check lib/auth/session.js
+          node --check lib/auth/totp.js
+          node --check lib/auth/2faChallenge.js
+          node --check scripts/security-2fa-e2e.mjs
+          node --check ../js/admin/admin-login-secure.js
+          node --check ../js/admin/admin-email-login.js
+          node --check ../js/admin/admin-core.js
+      - name: Security architecture guards
+        working-directory: .
+        run: |
+          grep -q 'requires2fa: true' backend/routes/auth.js
+          grep -q '/2fa/login/verify' backend/routes/auth.js
+          grep -q 'create2faChallenge' backend/routes/auth.js
+          grep -q 'ADMIN_ROLES.includes(row.role) && !row.totp_enabled' backend/lib/auth/session.js
+          grep -q 'base32Encode' backend/lib/auth/totp.js
+          grep -q 'cardoria_2fa_challenge' js/admin/admin-login-secure.js
+          grep -q 'magic2faForm' js/admin/admin-email-login.js
+          if grep -R -n 'legacyAdminOk\|x-cardoria-admin-code\|ADMIN_CODE_KEY' backend/lib/auth.js js/admin/admin-core.js; then
+            echo 'Legacy admin authentication still present'
+            exit 1
+          fi
+          if grep -n 'app.post("/api/admin/login"' backend/server.js; then
+            echo 'Legacy /api/admin/login endpoint still present'
+            exit 1
+          fi
+      - name: Start backend
+        run: |
+          node server.js > /tmp/cardoria-security.log 2>&1 &
+          echo $! > /tmp/cardoria-security.pid
+      - name: Wait for backend
+        run: |
+          ready=false
+          for i in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-security-startup.json; then
+              if grep -q '"ready":true' /tmp/cardoria-security-startup.json; then ready=true; break; fi
+            fi
+            sleep 1
+          done
+          test "$ready" = "true"
+      - name: Mandatory Admin 2FA E2E
+        run: node scripts/security-2fa-e2e.mjs
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-security.pid ]; then kill $(cat /tmp/cardoria-security.pid) || true; fi
+          cat /tmp/cardoria-security.log || true
