@@ -2,7 +2,6 @@
   "use strict";
 
   var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
-  var ADMIN_CODE_KEY = "cardoria_admin_code";
   var SESSION_KEY = "cardoria_session_token";
   var CSRF_KEY = "cardoria_csrf_token";
 
@@ -33,7 +32,8 @@
         { href: "admin-paiements.html", label: "Paiements SumUp", page: "payments" },
         { href: "admin-commandes.html", label: "Commandes", page: "orders" },
         { href: "admin-stock.html", label: "Stock", page: "stock" },
-        { href: "admin-estimations.html", label: "Estimations", page: "estimations" }
+        { href: "admin-estimations.html", label: "Estimations", page: "estimations" },
+        { href: "admin-rachat.html", label: "Rachat cartes", page: "rachat" }
       ]
     },
     {
@@ -72,15 +72,30 @@
 
   function qs(sel, root) { return (root || document).querySelector(sel); }
   function euro(n) { return Number(n || 0).toFixed(2).replace(".", ",") + " €"; }
-
-  function getCode() { return sessionStorage.getItem(ADMIN_CODE_KEY) || ""; }
   function getSessionToken() { return sessionStorage.getItem(SESSION_KEY) || ""; }
 
+  function clearAdminSession() {
+    sessionStorage.removeItem("cardoria_admin_connected");
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(CSRF_KEY);
+    sessionStorage.removeItem("cardoria_admin_email");
+    sessionStorage.removeItem("cardoria_admin_code");
+    sessionStorage.removeItem("cardoria_2fa_challenge");
+  }
+
   function protectAdmin() {
-    if (sessionStorage.getItem("cardoria_admin_connected") !== "yes") {
+    var token = getSessionToken();
+    if (sessionStorage.getItem("cardoria_admin_connected") !== "yes" || !token) {
+      clearAdminSession();
       location.href = "admin-login.html";
       return false;
     }
+    fetch(BACKEND + "/api/auth/me", { headers: { Authorization: "Bearer " + token }, cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("invalid_session"); return r.json(); })
+      .then(function (d) {
+        if (!d.ok || !d.user || ["super_admin", "admin", "employee"].indexOf(d.user.role) === -1 || d.user.totpEnabled !== true) throw new Error("invalid_admin_session");
+      })
+      .catch(function () { clearAdminSession(); location.replace("admin-login.html"); });
     return true;
   }
 
@@ -88,13 +103,23 @@
     opts = opts || {};
     opts.headers = opts.headers || {};
     var token = getSessionToken();
-    if (token) opts.headers.Authorization = "Bearer " + token;
+    if (!token) {
+      clearAdminSession();
+      location.replace("admin-login.html");
+      return Promise.resolve({ ok: false, error: "Session administrateur requise." });
+    }
+    opts.headers.Authorization = "Bearer " + token;
     var csrf = sessionStorage.getItem(CSRF_KEY);
     if (csrf) opts.headers["x-csrf-token"] = csrf;
-    var code = getCode();
-    if (code) opts.headers["x-cardoria-admin-code"] = code;
     opts.headers["Content-Type"] = opts.headers["Content-Type"] || "application/json";
-    return fetch(BACKEND + path, opts).then(function (r) { return r.json(); });
+    return fetch(BACKEND + path, opts).then(function (r) {
+      if (r.status === 401) {
+        clearAdminSession();
+        location.replace("admin-login.html");
+        return { ok: false, error: "Session expirée." };
+      }
+      return r.json();
+    });
   }
 
   function itemActive(item, activePage) {
@@ -172,13 +197,9 @@
   }
 
   function adminLogout() {
-    var token = sessionStorage.getItem(SESSION_KEY);
+    var token = getSessionToken();
     if (token) fetch(BACKEND + "/api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + token } }).catch(function () {});
-    sessionStorage.removeItem("cardoria_admin_connected");
-    sessionStorage.removeItem(SESSION_KEY);
-    sessionStorage.removeItem(CSRF_KEY);
-    sessionStorage.removeItem(ADMIN_CODE_KEY);
-    sessionStorage.removeItem("cardoria_admin_email");
+    clearAdminSession();
     location.href = "admin-login.html";
   }
 
