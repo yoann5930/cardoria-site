@@ -36,7 +36,7 @@
   }
 
   A.renderShell("estimations", "Estimations Cardoria", "Indice marché, rachat, revente et recommandations — admin uniquement",
-    '<div class="admin-filters"><button class="btn btn-primary" type="button" id="reloadEst">Actualiser</button></div>' +
+    '<div class="admin-filters"><button class="btn btn-primary" type="button" id="reloadEst">Actualiser</button><a class="btn btn-secondary" href="admin-rachat.html">Gérer les rachats cartes</a></div>' +
     '<div id="estimationsList"></div>');
 
   A.qs("#reloadEst").onclick = loadEstimations;
