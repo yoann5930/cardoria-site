@@ -12,10 +12,7 @@ const router = Router();
 router.get("/licenses", (req, res) => {
   const key = "licenses:all";
   let licenses = cacheGet(key);
-  if (!licenses) {
-    licenses = listLicenses();
-    cacheSet(key, licenses, 120_000);
-  }
+  if (!licenses) { licenses = listLicenses(); cacheSet(key, licenses, 120_000); }
   res.setHeader("Cache-Control", "public, max-age=120");
   res.json({ ok: true, licenses });
 });
@@ -27,27 +24,15 @@ router.get("/licenses/:slug", (req, res) => {
 });
 
 router.get("/cards", (req, res) => {
-  const result = searchCards({
-    q: req.query.q,
-    license: req.query.license,
-    extension: req.query.extension,
-    rarity: req.query.rarity,
-    page: req.query.page,
-    limit: req.query.limit,
-    sort: req.query.sort
-  });
+  const result = searchCards({ q: req.query.q, license: req.query.license, language: req.query.language, extension: req.query.extension, rarity: req.query.rarity, page: req.query.page, limit: req.query.limit, sort: req.query.sort });
   res.json({ ok: true, ...result });
 });
 
-router.get("/cards/search", (req, res) => {
-  res.json({ ok: true, results: autocomplete(req.query.q, req.query.limit) });
-});
+router.get("/cards/search", (req, res) => res.json({ ok: true, results: autocomplete(req.query.q, req.query.limit) }));
 
 router.get("/cards/:id", (req, res) => {
   if (req.params.id.includes("-") && req.query.bySlug !== "1") {
-    const parts = req.params.id.split("-");
-    const license = parts[0];
-    const slug = parts.slice(1).join("-");
+    const parts = req.params.id.split("-"), license = parts[0], slug = parts.slice(1).join("-");
     const bySlug = getCardBySlug(license, slug, { trackView: true });
     if (bySlug) return res.json({ ok: true, card: bySlug });
   }
@@ -71,21 +56,9 @@ router.post("/estimate-price", (req, res) => {
 });
 
 router.get("/sitemap", (req, res) => {
-  const page = Math.max(Number(req.query.page) || 1, 1);
-  const limit = Math.min(Number(req.query.limit) || 500, 5000);
-  const offset = (page - 1) * limit;
-  const cards = getSitemapCards(limit, offset);
-  const total = getCardCount();
-  res.json({
-    ok: true,
-    cards: cards.map((c) => ({
-      url: `/carte.html?license=${c.license_slug}&slug=${c.slug}`,
-      license: c.license_slug,
-      slug: c.slug,
-      updatedAt: c.updated_at
-    })),
-    pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 }
-  });
+  const page = Math.max(Number(req.query.page) || 1, 1), limit = Math.min(Number(req.query.limit) || 500, 5000), offset = (page - 1) * limit;
+  const cards = getSitemapCards(limit, offset), total = getCardCount();
+  res.json({ ok: true, cards: cards.map((c) => ({ url: `/carte.html?license=${c.license_slug}&slug=${c.slug}`, license: c.license_slug, language: c.language || "fr", slug: c.slug, updatedAt: c.updated_at })), pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 } });
 });
 
 export default router;
