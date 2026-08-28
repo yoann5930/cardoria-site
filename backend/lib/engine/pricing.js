@@ -74,9 +74,7 @@ export function setPriceSources(cardId, sources) {
 export function recalculateCardPrices(cardId) {
   const db = getDb();
   const sources = db.prepare("SELECT source, price, weight FROM price_sources WHERE card_id = ?").all(cardId);
-
   let avg = 0, low = 0, high = 0, recommended = 0;
-
   if (sources.length) {
     const prices = sources.map((s) => s.price);
     avg = prices.reduce((a, b) => a + b, 0) / prices.length;
@@ -85,37 +83,26 @@ export function recalculateCardPrices(cardId) {
     const totalWeight = sources.reduce((s, x) => s + (x.weight || SOURCE_WEIGHTS[x.source] || 0.2), 0);
     recommended = sources.reduce((s, x) => s + x.price * (x.weight || SOURCE_WEIGHTS[x.source] || 0.2), 0) / (totalWeight || 1);
   }
-
   const trend = computeMarketTrend(cardId, recommended || avg);
   const now = new Date().toISOString();
-
   db.prepare(`
     UPDATE cards SET avg_price = ?, low_price = ?, high_price = ?, recommended_price = ?,
       market_trend = ?, trend_percent = ?, updated_at = ?
     WHERE id = ?
-  `).run(
-    round2(avg), round2(low), round2(high), round2(recommended),
-    trend.trend, trend.percent, now, cardId
-  );
-
+  `).run(round2(avg), round2(low), round2(high), round2(recommended), trend.trend, trend.percent, now, cardId);
   return { avg: round2(avg), low: round2(low), high: round2(high), recommended: round2(recommended), ...trend };
 }
 
 function computeMarketTrend(cardId, currentPrice) {
   const db = getDb();
-  const sales = db.prepare(
-    "SELECT price, sold_at FROM sales_history WHERE card_id = ? ORDER BY sold_at DESC LIMIT 60"
-  ).all(cardId);
-
+  const sales = db.prepare("SELECT price, sold_at FROM sales_history WHERE card_id = ? ORDER BY sold_at DESC LIMIT 60").all(cardId);
   if (sales.length < 2 || !currentPrice) return { trend: "stable", percent: 0 };
-
   const mid = Math.floor(sales.length / 2);
   const recent = sales.slice(0, mid);
   const older = sales.slice(mid);
   const avgRecent = recent.reduce((s, x) => s + x.price, 0) / recent.length;
   const avgOlder = older.reduce((s, x) => s + x.price, 0) / older.length;
   const percent = avgOlder ? round2(((avgRecent - avgOlder) / avgOlder) * 100) : 0;
-
   let trend = "stable";
   if (percent > 5) trend = "up";
   else if (percent < -5) trend = "down";
@@ -126,7 +113,6 @@ export function estimatePrice(cardId, condition = "nm", { marketOnly = false } =
   const db = getDb();
   const card = db.prepare("SELECT recommended_price, avg_price, low_price, high_price, market_trend, trend_percent FROM cards WHERE id = ?").get(cardId);
   if (!card) return null;
-
   const mult = CONDITION_MULTIPLIERS[normalizeCondition(condition)] ?? 1;
   const external = marketOnly ? getExternalMarketPrice(cardId) : null;
   const base = marketOnly ? external.price : (card.recommended_price || card.avg_price);
@@ -135,7 +121,6 @@ export function estimatePrice(cardId, condition = "nm", { marketOnly = false } =
   const lowBase = marketOnly ? external.low : card.low_price;
   const highBase = marketOnly ? external.high : card.high_price;
   const variation = card.trend_percent || 0;
-
   return {
     cardId,
     condition: normalizeCondition(condition),
@@ -156,38 +141,12 @@ export function estimatePrice(cardId, condition = "nm", { marketOnly = false } =
 }
 
 export function addSaleRecord(cardId, { price, condition, channel, soldAt, quantity = 1 }) {
-  ingestAdminManualSale(cardId, {
-    type: "admin_sale",
-    salePrice: price,
-    quantity,
-    condition,
-    channel,
-    transactionAt: soldAt
-  });
+  ingestAdminManualSale(cardId, { type: "admin_sale", salePrice: price, quantity, condition, channel, transactionAt: soldAt });
   return getSalesHistory(cardId, 20);
 }
 
 export function getSalesHistory(cardId, limit = 50) {
-  return getDb().prepare(
-    "SELECT sold_at AS date, price, condition, channel FROM sales_history WHERE card_id = ? ORDER BY sold_at DESC LIMIT ?"
-  ).all(cardId, limit);
-}
-
-export function getSalesStats(cardId) {
-  const row = getDb().prepare(`
-    SELECT COUNT(*) AS count,
-           COALESCE(SUM(price), 0) AS revenue,
-           COALESCE(AVG(price), 0) AS average_price,
-           MAX(sold_at) AS last_sold_at
-    FROM sales_history
-    WHERE card_id = ?
-  `).get(cardId) || {};
-  return {
-    count: Number(row.count || 0),
-    revenue: round2(row.revenue),
-    averagePrice: round2(row.average_price),
-    lastSoldAt: row.last_sold_at || ""
-  };
+  return getDb().prepare("SELECT sold_at AS date, price, condition, channel FROM sales_history WHERE card_id = ? ORDER BY sold_at DESC LIMIT ?").all(cardId, limit);
 }
 
 export function getInventorySalesStats(cardId) {
@@ -204,14 +163,31 @@ export function getInventorySalesStats(cardId) {
           OR (transaction_type = 'sale' AND notes = 'Revente réelle admin')
         )
     `).get(cardId) || {};
-    return {
-      units: Number(row.units || 0),
-      revenue: round2(row.revenue),
-      lastSoldAt: row.last_sold_at || ""
-    };
+    return { units: Number(row.units || 0), revenue: round2(row.revenue), lastSoldAt: row.last_sold_at || "" };
   } catch {
     return { units: 0, revenue: 0, lastSoldAt: "" };
   }
+}
+
+export function getSalesStats(cardId) {
+  const row = getDb().prepare(`
+    SELECT COUNT(*) AS count,
+           COALESCE(SUM(price), 0) AS revenue,
+           COALESCE(AVG(price), 0) AS average_price,
+           MAX(sold_at) AS last_sold_at
+    FROM sales_history
+    WHERE card_id = ?
+  `).get(cardId) || {};
+  const inventory = getInventorySalesStats(cardId);
+  return {
+    count: Number(row.count || 0),
+    revenue: round2(row.revenue),
+    averagePrice: round2(row.average_price),
+    lastSoldAt: row.last_sold_at || "",
+    inventoryUnits: inventory.units,
+    inventoryRevenue: inventory.revenue,
+    inventoryLastSoldAt: inventory.lastSoldAt
+  };
 }
 
 function normalizeCondition(c) {
