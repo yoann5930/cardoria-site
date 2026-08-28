@@ -1,2 +1,2 @@
-cardoria-frontend-release=2026-08-28-stock-market-condition-1
-Includes: add persistent stock card-condition selector and explicit Market yes/no control per stock line.
+cardoria-frontend-release=2026-08-28-stock-boutique-1
+Includes: connect paid-purchase stock to Boutique, replace Market controls with Boutique yes/no plus Boutique sale price, and keep SumUp checkout on live inventory.
