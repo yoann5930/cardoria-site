@@ -26,10 +26,33 @@ const CONDITION_MULTIPLIERS = {
   dmg: 0.2
 };
 
+function isExternalMarketSource(source) {
+  const value = String(source || "").trim().toLowerCase();
+  if (!value) return false;
+  return value !== "cardoria" && value !== "manual" && !value.startsWith("cardoria-");
+}
+
 export function getPriceSources(cardId) {
   return getDb().prepare(
-    "SELECT source, price, currency, fetched_at AS fetchedAt FROM price_sources WHERE card_id = ? ORDER BY fetched_at DESC"
+    "SELECT source, price, currency, weight, fetched_at AS fetchedAt FROM price_sources WHERE card_id = ? ORDER BY fetched_at DESC"
   ).all(cardId);
+}
+
+export function getExternalMarketPrice(cardId) {
+  const sources = getPriceSources(cardId).filter((source) => isExternalMarketSource(source.source) && Number(source.price) > 0);
+  if (!sources.length) return { price: 0, low: 0, high: 0, sources: [] };
+  const totalWeight = sources.reduce((sum, source) => sum + Math.max(0.01, Number(source.weight) || SOURCE_WEIGHTS[String(source.source || "").toLowerCase()] || 0.2), 0);
+  const price = sources.reduce((sum, source) => {
+    const weight = Math.max(0.01, Number(source.weight) || SOURCE_WEIGHTS[String(source.source || "").toLowerCase()] || 0.2);
+    return sum + Number(source.price) * weight;
+  }, 0) / totalWeight;
+  const values = sources.map((source) => Number(source.price));
+  return {
+    price: round2(price),
+    low: round2(Math.min(...values)),
+    high: round2(Math.max(...values)),
+    sources: sources.map((source) => ({ source: source.source, price: Number(source.price), currency: source.currency || "EUR", fetchedAt: source.fetchedAt || "" }))
+  };
 }
 
 export function setPriceSources(cardId, sources) {
@@ -43,7 +66,7 @@ export function setPriceSources(cardId, sources) {
   (sources || []).forEach((s) => {
     if (!s.source || s.price == null) return;
     del.run(cardId, s.source);
-    ins.run(cardId, s.source, Number(s.price), SOURCE_WEIGHTS[s.source] || 0.2, now);
+    ins.run(cardId, Number(s.price), SOURCE_WEIGHTS[s.source] || 0.2, now);
   });
   return recalculateCardPrices(cardId);
 }
@@ -84,9 +107,7 @@ function computeMarketTrend(cardId, currentPrice) {
     "SELECT price, sold_at FROM sales_history WHERE card_id = ? ORDER BY sold_at DESC LIMIT 60"
   ).all(cardId);
 
-  if (sales.length < 2 || !currentPrice) {
-    return { trend: "stable", percent: 0 };
-  }
+  if (sales.length < 2 || !currentPrice) return { trend: "stable", percent: 0 };
 
   const mid = Math.floor(sales.length / 2);
   const recent = sales.slice(0, mid);
@@ -98,30 +119,33 @@ function computeMarketTrend(cardId, currentPrice) {
   let trend = "stable";
   if (percent > 5) trend = "up";
   else if (percent < -5) trend = "down";
-
   return { trend, percent };
 }
 
-export function estimatePrice(cardId, condition = "nm") {
+export function estimatePrice(cardId, condition = "nm", { marketOnly = false } = {}) {
   const db = getDb();
   const card = db.prepare("SELECT recommended_price, avg_price, low_price, high_price, market_trend, trend_percent FROM cards WHERE id = ?").get(cardId);
   if (!card) return null;
 
   const mult = CONDITION_MULTIPLIERS[normalizeCondition(condition)] ?? 1;
-  const base = card.recommended_price || card.avg_price;
+  const external = marketOnly ? getExternalMarketPrice(cardId) : null;
+  const base = marketOnly ? external.price : (card.recommended_price || card.avg_price);
   const adjusted = round2(base * mult);
-
-  const sources = getPriceSources(cardId);
+  const sources = marketOnly ? external.sources : getPriceSources(cardId);
+  const lowBase = marketOnly ? external.low : card.low_price;
+  const highBase = marketOnly ? external.high : card.high_price;
   const variation = card.trend_percent || 0;
 
   return {
     cardId,
     condition: normalizeCondition(condition),
     conditionMultiplier: mult,
+    marketOnly,
+    baseMarketPrice: round2(base),
     recommended: adjusted,
     range: {
-      low: round2((card.low_price || adjusted * 0.85) * mult),
-      high: round2((card.high_price || adjusted * 1.15) * mult)
+      low: round2((lowBase || adjusted * 0.85) * mult),
+      high: round2((highBase || adjusted * 1.15) * mult)
     },
     marketTrend: card.market_trend,
     trendPercent: card.trend_percent,
@@ -131,10 +155,11 @@ export function estimatePrice(cardId, condition = "nm") {
   };
 }
 
-export function addSaleRecord(cardId, { price, condition, channel, soldAt }) {
+export function addSaleRecord(cardId, { price, condition, channel, soldAt, quantity = 1 }) {
   ingestAdminManualSale(cardId, {
     type: "admin_sale",
     salePrice: price,
+    quantity,
     condition,
     channel,
     transactionAt: soldAt
@@ -163,6 +188,30 @@ export function getSalesStats(cardId) {
     averagePrice: round2(row.average_price),
     lastSoldAt: row.last_sold_at || ""
   };
+}
+
+export function getInventorySalesStats(cardId) {
+  try {
+    const row = getDb().prepare(`
+      SELECT COALESCE(SUM(CASE WHEN quantity IS NULL OR quantity < 1 THEN 1 ELSE quantity END), 0) AS units,
+             COALESCE(SUM(CASE WHEN quantity IS NULL OR quantity < 1 THEN sale_price ELSE sale_price * quantity END), 0) AS revenue,
+             MAX(transaction_at) AS last_sold_at
+      FROM market_transactions
+      WHERE card_id = ?
+        AND sale_price > 0
+        AND (
+          transaction_type IN ('admin_sale', 'boutique_sale')
+          OR (transaction_type = 'sale' AND notes = 'Revente réelle admin')
+        )
+    `).get(cardId) || {};
+    return {
+      units: Number(row.units || 0),
+      revenue: round2(row.revenue),
+      lastSoldAt: row.last_sold_at || ""
+    };
+  } catch {
+    return { units: 0, revenue: 0, lastSoldAt: "" };
+  }
 }
 
 function normalizeCondition(c) {
