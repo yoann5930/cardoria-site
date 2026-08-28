@@ -1,11 +1,12 @@
 /**
- * Authentification Cardoria — comptes clients/admin, sessions et 2FA.
+ * Authentification Cardoria — comptes clients/admin, sessions et 2FA obligatoire Admin.
  */
 import crypto from "crypto";
 import { Router } from "express";
 import { getUserById, getUserByEmail, createUser, authenticateUser, setTotpSecret, getTotpSecret, ADMIN_ROLES } from "../lib/auth/users.js";
 import { createSession, revokeSession, validateSession } from "../lib/auth/session.js";
 import { generateTotpSecret, verifyTotp, getTotpUri } from "../lib/auth/totp.js";
+import { create2faChallenge, get2faChallenge, record2faFailure, consume2faChallenge, revokeUser2faChallenges } from "../lib/auth/2faChallenge.js";
 import { requestPasswordReset, confirmPasswordReset } from "../lib/auth/passwordReset.js";
 import { requestMagicLogin, consumeMagicLogin } from "../lib/auth/magicLink.js";
 import { validateBody, SCHEMAS } from "../lib/security/validate.js";
@@ -30,6 +31,10 @@ function secureStringEqual(a, b) {
   return crypto.timingSafeEqual(left, right);
 }
 
+function publicUser(user) {
+  return { id: user.id, email: user.email, role: user.role, name: user.name, totpEnabled: !!user.totpEnabled };
+}
+
 function authenticateConfiguredAdmin(email, password) {
   const adminEmail = normalizedEmail(process.env.ADMIN_EMAIL || "Cardoria59330@gmail.com");
   const adminPassword = String(process.env.ADMIN_LOGIN_PASSWORD || "");
@@ -44,6 +49,40 @@ function authenticateConfiguredAdmin(email, password) {
   return user;
 }
 
+function completeSession(user, req) {
+  const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"] });
+  return {
+    ok: true,
+    token: session.token,
+    expiresAt: session.expiresAt,
+    user: publicUser(user),
+    csrfToken: generateCsrfToken(user.id)
+  };
+}
+
+function beginAdmin2fa(user, req, origin = "password") {
+  const totp = getTotpSecret(user.id);
+  const enabled = !!totp?.enabled && !!totp?.secret;
+  const setupSecret = enabled ? "" : generateTotpSecret();
+  const challenge = create2faChallenge({
+    userId: user.id,
+    mode: enabled ? "login" : "setup",
+    setupSecret,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"]
+  });
+  logAudit({ type: "auth", action: enabled ? "2fa_challenge_required" : "2fa_setup_required", user: user.email, detail: `${user.role}:${origin}` });
+  return {
+    ok: true,
+    requires2fa: true,
+    challengeToken: challenge.token,
+    challengeExpiresAt: challenge.expiresAt,
+    mode: challenge.mode,
+    user: publicUser(user),
+    setup: challenge.mode === "setup" ? { secret: setupSecret, uri: getTotpUri(setupSecret, user.email) } : undefined
+  };
+}
+
 router.post("/register", authRateLimit, (req, res) => {
   try {
     const email = normalizedEmail(req.body?.email);
@@ -55,7 +94,7 @@ router.post("/register", authRateLimit, (req, res) => {
     const user = createUser({ email, password, role: "client", name });
     const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"] });
     logAudit({ type: "auth", action: "client_register", user: email, detail: "marketplace" });
-    res.status(201).json({ ok: true, token: session.token, expiresAt: session.expiresAt, user: { id: user.id, email: user.email, role: user.role, name: user.name } });
+    res.status(201).json({ ok: true, token: session.token, expiresAt: session.expiresAt, user: publicUser(user) });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.message });
   }
@@ -66,10 +105,48 @@ router.post("/login", authRateLimit, (req, res) => {
     const email = normalizedEmail(req.body?.email);
     const password = String(req.body?.password || "");
     const user = authenticateConfiguredAdmin(email, password) || authenticateUser(email, password);
-    if (!user) return res.status(401).json({ ok: false, error: "Email ou mot de passe incorrect." });
-    const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"] });
+    if (!user) {
+      logAudit({ type: "auth", action: "login_failed", user: email || req.ip || "unknown", detail: "invalid_credentials" });
+      return res.status(401).json({ ok: false, error: "Email ou mot de passe incorrect." });
+    }
+    if (ADMIN_ROLES.includes(user.role)) return res.json(beginAdmin2fa(user, req, "password"));
     logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });
-    res.json({ ok: true, token: session.token, expiresAt: session.expiresAt, user: { id: user.id, email: user.email, role: user.role, name: user.name }, csrfToken: generateCsrfToken(user.id) });
+    res.json(completeSession(user, req));
+  } catch (e) {
+    logAudit({ type: "auth", action: "login_failed", user: normalizedEmail(req.body?.email) || req.ip || "unknown", detail: e.message });
+    res.status(e.status || 500).json({ ok: false, error: e.message });
+  }
+});
+
+router.post("/2fa/login/verify", authRateLimit, (req, res) => {
+  try {
+    const challengeToken = String(req.body?.challengeToken || "");
+    const code = String(req.body?.totpCode || "").replace(/\s/g, "");
+    const challenge = get2faChallenge(challengeToken);
+    if (!challenge) return res.status(401).json({ ok: false, error: "Challenge 2FA expiré ou invalide." });
+    const user = getUserById(challenge.userId);
+    if (!user || !user.active || !ADMIN_ROLES.includes(user.role)) {
+      consume2faChallenge(challengeToken);
+      return res.status(403).json({ ok: false, error: "Compte administrateur indisponible." });
+    }
+
+    const totp = getTotpSecret(user.id);
+    const secret = challenge.mode === "setup" ? challenge.setupSecret : totp?.secret;
+    if (!secret || !verifyTotp(secret, code)) {
+      const failure = record2faFailure(challengeToken);
+      logAudit({ type: "security", action: "2fa_failed", user: user.email, detail: `remaining:${failure.attemptsRemaining}` });
+      return res.status(401).json({ ok: false, error: failure.attemptsRemaining ? `Code 2FA invalide. ${failure.attemptsRemaining} tentative(s) restante(s).` : "Challenge 2FA bloqué après trop d’échecs." });
+    }
+
+    consume2faChallenge(challengeToken);
+    if (challenge.mode === "setup") {
+      setTotpSecret(user.id, challenge.setupSecret, true);
+      user.totpEnabled = true;
+      logAudit({ type: "security", action: "2fa_enabled", user: user.email, detail: user.role });
+    }
+    revokeUser2faChallenges(user.id);
+    logAudit({ type: "auth", action: "login_success_2fa", user: user.email, detail: user.role });
+    res.json(completeSession(user, req));
   } catch (e) {
     res.status(e.status || 500).json({ ok: false, error: e.message });
   }
@@ -88,9 +165,9 @@ router.post("/request-magic-link", authRateLimit, handleMagicLinkRequest);
 router.post("/email/confirm", authRateLimit, (req, res) => {
   try {
     const user = consumeMagicLogin(String(req.body?.token || ""));
-    const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"] });
+    if (ADMIN_ROLES.includes(user.role)) return res.json(beginAdmin2fa(user, req, "magic_link"));
     logAudit({ type: "auth", action: "email_login_success", user: user.email, detail: user.role });
-    res.json({ ok: true, token: session.token, expiresAt: session.expiresAt, user: { id: user.id, email: user.email, role: user.role, name: user.name }, csrfToken: generateCsrfToken(user.id) });
+    res.json(completeSession(user, req));
   } catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
 });
 
@@ -123,7 +200,7 @@ router.post("/password/confirm", authRateLimit, (req, res) => {
 router.post("/2fa/setup", (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
   const user = validateSession(token);
-  if (!user || !ADMIN_ROLES.includes(user.role)) return res.status(401).json({ ok: false, error: "Session requise." });
+  if (!user || !ADMIN_ROLES.includes(user.role)) return res.status(401).json({ ok: false, error: "Session Admin requise." });
   const secret = generateTotpSecret();
   setTotpSecret(user.id, secret, false);
   res.json({ ok: true, secret, uri: getTotpUri(secret, user.email), enabled: false });
@@ -132,10 +209,11 @@ router.post("/2fa/setup", (req, res) => {
 router.post("/2fa/enable", (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
   const user = validateSession(token);
-  if (!user) return res.status(401).json({ ok: false, error: "Session requise." });
+  if (!user || !ADMIN_ROLES.includes(user.role)) return res.status(401).json({ ok: false, error: "Session Admin requise." });
   const totp = getTotpSecret(user.id);
   if (!totp?.secret || !verifyTotp(totp.secret, req.body?.totpCode)) return res.status(400).json({ ok: false, error: "Code 2FA invalide." });
   setTotpSecret(user.id, totp.secret, true);
+  logAudit({ type: "security", action: "2fa_enabled", user: user.email, detail: "session_rotation" });
   res.json({ ok: true, enabled: true });
 });
 
