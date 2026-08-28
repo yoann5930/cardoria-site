@@ -31,8 +31,12 @@ router.post("/boutique/checkout", async (req, res) => {
     const result = await createLiveBoutiqueCheckout({
       customerName: body.customerName,
       customerEmail: body.customerEmail,
+      customerPhone: body.customerPhone,
+      address: body.address,
+      postalCode: body.postalCode,
+      city: body.city,
+      country: body.country,
       items: body.items,
-      shippingCost: body.shippingCost,
       shipping: body.shipping,
       successUrl: body.successUrl,
       trafficSource: body.trafficSource,
