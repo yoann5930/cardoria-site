@@ -14,7 +14,12 @@ function getPool() {
   pool = new Pool({ connectionString: url, max: 2, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000 });
   return pool;
 }
+async function configureClient(client) {
+  try { await client.query("SET statement_timeout TO '30000ms'"); } catch {}
+  try { await client.query("SET lock_timeout TO '5000ms'"); } catch {}
+}
 async function ensureSchema(client) {
+  await configureClient(client);
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_multilingual_cards (
     id TEXT PRIMARY KEY,
     language TEXT NOT NULL,
@@ -49,15 +54,17 @@ export async function persistMultilingualCards(reason = "catalog-sync") {
   try {
     await ensureSchema(client);
     for (const language of LANGUAGES) {
+      const startedAt = new Date().toISOString();
       const rows = sqlite.prepare("SELECT * FROM cards WHERE license_slug='pokemon' AND language=? AND active=1 ORDER BY id").all(language);
-      await client.query("BEGIN");
+      for (const batch of chunks(rows)) await writeBatch(client, batch);
+      // Remove obsolete rows only after all current rows were safely upserted.
+      // No long transaction is held, so overlapping Render instances cannot block
+      // each other for several minutes during deployment.
       try {
-        await client.query("DELETE FROM cardoria_multilingual_cards WHERE language=$1", [language]);
-        for (const batch of chunks(rows)) await writeBatch(client, batch);
-        await client.query("COMMIT");
+        await client.query("DELETE FROM cardoria_multilingual_cards WHERE language=$1 AND updated_at < $2::timestamptz", [language, startedAt]);
       } catch (error) {
-        try { await client.query("ROLLBACK"); } catch {}
-        throw error;
+        if (!/lock timeout|statement timeout/i.test(String(error?.message || ""))) throw error;
+        console.warn(`[multilingual-persistence] stale-row cleanup skipped for ${language}: timeout`);
       }
       counts[language] = rows.length;
     }
