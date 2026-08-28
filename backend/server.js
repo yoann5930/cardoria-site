@@ -59,7 +59,7 @@ const PUBLIC_ROOT = path.resolve(__dirname, "..");
 const BLOCKED_PUBLIC_ROOTS = new Set(["backend", ".git", ".github", "node_modules", "database", "scripts", "logs", "backups"]);
 const PUBLIC_EXTENSIONS = new Set([".html", ".css", ".js", ".json", ".xml", ".txt", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".map"]);
 const app = express();
-const startup = { ok: true, degraded: [], startedAt: new Date().toISOString() };
+const startup = { ok: true, ready: false, degraded: [], startedAt: new Date().toISOString() };
 
 function safeInit(name, fn) {
   try { fn(); console.log(`[startup] ${name}: ok`); }
@@ -71,12 +71,21 @@ process.on("uncaughtException", (error) => console.error("[process] uncaughtExce
 applySecurityMiddleware(app);
 app.use("/api/marketplace/webhooks", marketplacePersistenceMiddleware, webhookRouter);
 app.use(express.json({ limit: process.env.BODY_LIMIT || "15mb" }));
-app.get("/api", (req, res) => res.json({ ok: true, service: "Cardoria API", version: "6.0.0" }));
-app.get("/api/health/startup", (req, res) => res.status(startup.ok ? 200 : 503).json({ ok: startup.ok, status: startup.ok ? "healthy" : "degraded", startedAt: startup.startedAt, degraded: startup.degraded.map((item) => item.name) }));
+app.get("/api", (req, res) => res.json({ ok: true, service: "Cardoria API", version: "6.0.0", ready: startup.ready }));
+app.get("/api/health/startup", (req, res) => res.status(200).json({ ok: startup.ok, ready: startup.ready, status: startup.ready ? (startup.ok ? "healthy" : "degraded") : "starting", startedAt: startup.startedAt, degraded: startup.degraded.map((item) => item.name) }));
 app.use(maintenanceMiddleware);
 app.use(connectionJournalMiddleware());
 app.use("/api/health", healthRoutes);
 app.use("/api/system", systemRoutes);
+
+// Bind immediately so Render can detect the service while heavy catalog and
+// persistence initialization continues. Express accepts routes added after
+// listen(), so the full API becomes available progressively during startup.
+const port = process.env.PORT || 10000;
+const server = app.listen(port, "0.0.0.0", () => {
+  console.log(`Cardoria V6 port ${port} bound — initialization in progress`);
+  console.log(`[startup] public root: ${PUBLIC_ROOT}`);
+});
 
 safeInit("auth-migration", migrateAuth);
 safeInit("ai", initAi);
@@ -221,8 +230,9 @@ function sendPublicFile(req, res, next) {
 app.get("*", sendPublicFile);
 app.use(errorHandler);
 
-const port = process.env.PORT || 10000;
-const server = app.listen(port, "0.0.0.0", () => { console.log(`Cardoria V6 single-host ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`); console.log(`[startup] public root: ${PUBLIC_ROOT}`); });
+startup.ready = true;
+console.log(`Cardoria V6 single-host ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`);
+
 function shutdown(signal) {
   console.log(`[process] ${signal} received, closing HTTP server`);
   clearTimeout(firstMarketRefresh);
