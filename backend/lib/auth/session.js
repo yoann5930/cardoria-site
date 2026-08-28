@@ -39,6 +39,7 @@ export function validateSession(token) {
 
   return {
     sessionId: row.sessionId,
+    expiresAt: row.expires_at,
     id: row.id,
     email: row.email,
     role: row.role,
