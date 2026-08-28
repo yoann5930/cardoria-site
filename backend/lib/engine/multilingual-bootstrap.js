@@ -1,6 +1,7 @@
 import { restoreMultilingualCards, persistMultilingualCards, closeMultilingualCardPersistence } from "./multilingual-card-persistence.js";
 import { ensureCatalogFrenchLocalizationSchema, localizeMultilingualCatalogToFrench } from "./catalog-french-localization.js";
 import { getMultilingualImageRepairStatus, repairMultilingualImages } from "./multilingual-image-repair.js";
+import { getZebraDexRepairStatus, repairImagesWithZebraDex } from "./zebradex-image-repair.js";
 import { getDb } from "./database.js";
 
 const READY_MINIMUMS = { en: 23000, ja: 12000, ko: 200 };
@@ -15,6 +16,8 @@ try {
 let busy = false;
 let localized = false;
 let imageRepairRunning = false;
+let zebraRepairRunning = false;
+let dirtyImages = false;
 
 function languageCounts() {
   const db = getDb();
@@ -35,12 +38,16 @@ function catalogReady() {
 async function checkpoint(reason) {
   if (busy) return { ok: false, skipped: true, reason: "busy" };
   busy = true;
-  try { return await persistMultilingualCards(reason); }
-  catch (error) {
+  try {
+    const result = await persistMultilingualCards(reason);
+    if (result?.ok) dirtyImages = false;
+    return result;
+  } catch (error) {
     console.error("[multilingual-bootstrap] checkpoint failed", error?.message || String(error));
     return { ok: false, error: error?.message || String(error) };
+  } finally {
+    busy = false;
   }
-  finally { busy = false; }
 }
 
 export async function localizeAndCheckpointMultilingualCatalog(reason = "catalog-localization") {
@@ -55,6 +62,7 @@ export async function localizeAndCheckpointMultilingualCatalog(reason = "catalog
     const localization = localizeMultilingualCatalogToFrench();
     const persistence = await persistMultilingualCards(reason);
     localized = persistence?.ok !== false;
+    dirtyImages = false;
     return { ok: localized, localization, persistence };
   } catch (error) {
     console.error("[multilingual-bootstrap] localization failed", error?.message || String(error));
@@ -64,16 +72,39 @@ export async function localizeAndCheckpointMultilingualCatalog(reason = "catalog
   }
 }
 
+async function runZebraRepairPass() {
+  if (!localized || busy || imageRepairRunning || zebraRepairRunning) return;
+  const tcgStatus = getMultilingualImageRepairStatus();
+  if (tcgStatus.totalPending > 0) return;
+  const zebraStatus = getZebraDexRepairStatus();
+  if (!zebraStatus.pending) {
+    if (dirtyImages) await checkpoint("image-fallbacks-complete");
+    return;
+  }
+  zebraRepairRunning = true;
+  try {
+    const result = await repairImagesWithZebraDex({ limit: 60 });
+    if (result.repaired > 0) dirtyImages = true;
+    if (result.pending === 0 && dirtyImages) await checkpoint("zebradex-repair-complete");
+  } catch (error) {
+    console.error("[zebradex-image-repair] pass failed", error?.message || String(error));
+  } finally {
+    zebraRepairRunning = false;
+  }
+}
+
 async function runImageRepairPass() {
-  if (!localized || busy || imageRepairRunning) return;
+  if (!localized || busy || imageRepairRunning || zebraRepairRunning) return;
   const before = getMultilingualImageRepairStatus();
-  if (!before.totalPending) return;
+  if (!before.totalPending) {
+    await runZebraRepairPass();
+    return;
+  }
   imageRepairRunning = true;
   try {
     const result = await repairMultilingualImages({ limit: 500 });
-    if (result.repaired > 0 && result.totalPending === 0) {
-      await checkpoint("image-repair-pass-complete");
-    }
+    if (result.repaired > 0) dirtyImages = true;
+    if (result.totalPending === 0) setTimeout(() => runZebraRepairPass(), 5000).unref?.();
   } catch (error) {
     console.error("[multilingual-image-repair] pass failed", error?.message || String(error));
   } finally {
@@ -100,20 +131,23 @@ readinessTimer.unref?.();
 
 const imageRepairTimer = setInterval(() => runImageRepairPass(), 45000);
 imageRepairTimer.unref?.();
+const zebraRepairTimer = setInterval(() => runZebraRepairPass(), 120000);
+zebraRepairTimer.unref?.();
 
 const checkpointTimer = setInterval(async () => {
-  if (!localized || imageRepairRunning) return;
-  await checkpoint("periodic-checkpoint");
+  if (!localized || imageRepairRunning || zebraRepairRunning || !dirtyImages) return;
+  await checkpoint("periodic-image-checkpoint");
 }, 15 * 60 * 1000);
 checkpointTimer.unref?.();
 
 async function close() {
   clearInterval(readinessTimer);
   clearInterval(imageRepairTimer);
+  clearInterval(zebraRepairTimer);
   clearInterval(checkpointTimer);
   try {
     const state = catalogReady();
-    if (state.ready && !imageRepairRunning) await localizeAndCheckpointMultilingualCatalog("shutdown-checkpoint");
+    if (state.ready && !imageRepairRunning && !zebraRepairRunning) await checkpoint("shutdown-checkpoint");
     else await checkpoint("shutdown-raw-checkpoint");
   } catch {}
   try { await closeMultilingualCardPersistence(); } catch {}
