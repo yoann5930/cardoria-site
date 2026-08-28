@@ -53,25 +53,44 @@
     } catch (_) { return {}; }
   }
 
+  function normalizedSoldOverride(value) {
+    if (value === null || value === undefined || value === "") return null;
+    var number = Math.trunc(Number(value));
+    return Number.isFinite(number) && number >= 0 ? number : null;
+  }
+
   function readLinePreference(purchase, key) {
     var pref = parseStockPrefs(purchase && purchase.notes)[key];
     if (!pref || typeof pref !== "object") return null;
-    return { condition: normalizeCondition(pref.condition), marketEnabled: pref.market === true };
+    return {
+      condition: normalizeCondition(pref.condition),
+      marketEnabled: pref.market === true,
+      soldOverride: normalizedSoldOverride(pref.sold)
+    };
   }
 
   function writeLinePreference(notes, key, preference) {
     var current = String(notes || "");
     var prefs = parseStockPrefs(current);
-    prefs[key] = { condition: normalizeCondition(preference.condition), market: preference.marketEnabled === true };
+    var previous = prefs[key] && typeof prefs[key] === "object" ? prefs[key] : {};
+    var next = {
+      condition: normalizeCondition(preference.condition !== undefined ? preference.condition : previous.condition),
+      market: preference.marketEnabled !== undefined ? preference.marketEnabled === true : previous.market === true
+    };
+    var sold = preference.soldOverride !== undefined ? normalizedSoldOverride(preference.soldOverride) : normalizedSoldOverride(previous.sold);
+    if (sold !== null) next.sold = sold;
+    prefs[key] = next;
     var base = current.replace(/\n?\[STOCK_PREFS\]\s*\{[^\n\r]*\}/g, "").replace(/\s+$/, "");
     var line = STOCK_PREFS_TAG + " " + JSON.stringify(prefs);
     return base ? base + "\n" + line : line;
   }
 
-  function catalogCardId(reference) {
+  function referenceId(reference, prefix) {
     var value = String(reference || "").trim();
-    return value.indexOf("catalog-card:") === 0 ? value.slice("catalog-card:".length) : "";
+    return value.indexOf(prefix) === 0 ? value.slice(prefix.length) : "";
   }
+  function catalogCardId(reference) { return referenceId(reference, "catalog-card:"); }
+  function catalogSealedId(reference) { return referenceId(reference, "sealed-product:"); }
 
   function lotCardIds(purchase) {
     if (Array.isArray(purchase.lotCards) && purchase.lotCards.length) return purchase.lotCards.filter(Boolean);
@@ -92,6 +111,11 @@
     var response = await A.adminFetch("/api/admin/engine/cards/" + encodeURIComponent(id));
     return response && response.ok ? response.card : null;
   }
+  async function resolveSealed(id) {
+    if (!id) return null;
+    var response = await A.adminFetch("/api/admin/engine/sealed/" + encodeURIComponent(id));
+    return response && response.ok ? response.reference : null;
+  }
 
   function isExternalSource(source) {
     var name = String(source || "").trim().toLowerCase();
@@ -111,7 +135,7 @@
     return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   }
 
-  function baseMarketPrice(card) {
+  function cardMarketPrice(card) {
     if (!card) return 0;
     var sources = externalSources(card);
     if (sources.length) return round2(median(sources.map(function (source) { return Number(source.price); })));
@@ -121,8 +145,8 @@
     return 0;
   }
 
-  function marketSourceLabel(card) {
-    if (!card) return "Référence non reliée";
+  function cardMarketSourceLabel(card) {
+    if (!card) return "Référence carte non reliée";
     var names = [];
     externalSources(card).forEach(function (source) {
       if (source.source && names.indexOf(source.source) < 0) names.push(source.source);
@@ -130,6 +154,18 @@
     if (names.length) return names.slice(0, 3).join(" + ") + (names.length > 3 ? " +…" : "");
     if (card.market && isExternalSource(card.market.source) && card.market.source) return card.market.source;
     return "Aucune source marché externe fiable";
+  }
+
+  function sealedMarketPrice(reference) {
+    if (!reference) return 0;
+    var source = reference.priceSource || reference.source || "";
+    return isExternalSource(source) ? positive(reference.marketPrice) : 0;
+  }
+
+  function sealedMarketSourceLabel(reference) {
+    if (!reference) return "Référence scellée non reliée";
+    var source = reference.priceSource || reference.source || "";
+    return isExternalSource(source) && source ? source : "Aucune source marché externe fiable";
   }
 
   function add(map, item) {
@@ -143,12 +179,15 @@
         id: item.id,
         cardId: item.cardId || "",
         card: item.card || null,
+        sealedId: item.sealedId || "",
+        sealedRef: item.sealedRef || null,
         name: item.name || "Achat Pokémon",
         extension: item.extension || "",
         number: item.number || "",
         category: item.category || "Carte Pokémon",
         condition: preference ? preference.condition : normalizeCondition(item.condition),
         marketEnabled: preference ? preference.marketEnabled : false,
+        soldOverride: preference ? preference.soldOverride : null,
         preferenceApplied: !!preference,
         packaging: item.packaging || "carte_unite",
         purchasePrice: round2(unitCost),
@@ -160,7 +199,9 @@
         marketPrice: 0,
         salePrice: 0,
         salePriceSource: "",
+        salePriceNote: "",
         sold: 0,
+        soldAutomatic: 0,
         remainingQuantity: qty
       };
       return;
@@ -171,24 +212,40 @@
     current.purchasePrice = current.quantityPurchased ? round2(current.totalCost / current.quantityPurchased) : 0;
     current.linked = current.linked || !!item.linked;
     if (!current.card && item.card) current.card = item.card;
+    if (!current.sealedRef && item.sealedRef) current.sealedRef = item.sealedRef;
+    if (!current.sealedId && item.sealedId) current.sealedId = item.sealedId;
     if (item.purchaseId && current.purchaseIds.indexOf(item.purchaseId) < 0) current.purchaseIds.push(item.purchaseId);
     if (!current.preferenceApplied && preference) {
       current.condition = preference.condition;
       current.marketEnabled = preference.marketEnabled;
+      current.soldOverride = preference.soldOverride;
       current.preferenceApplied = true;
     }
     if (String(item.latestPurchaseAt || "") > String(current.latestPurchaseAt || "")) current.latestPurchaseAt = item.latestPurchaseAt;
   }
 
   function enrichProduct(product) {
-    product.marketPrice = baseMarketPrice(product.card);
-    product.salePriceSource = marketSourceLabel(product.card);
-    product.sold = Math.max(0, Math.trunc(Number(product.card && product.card.salesStats && product.card.salesStats.inventoryUnits || 0)));
+    if (product.sealedRef) {
+      product.marketPrice = sealedMarketPrice(product.sealedRef);
+      product.salePriceSource = sealedMarketSourceLabel(product.sealedRef);
+    } else {
+      product.marketPrice = cardMarketPrice(product.card);
+      product.salePriceSource = cardMarketSourceLabel(product.card);
+    }
+
+    product.soldAutomatic = Math.max(0, Math.trunc(Number(product.card && product.card.salesStats && product.card.salesStats.inventoryUnits || 0)));
+    product.sold = product.soldOverride !== null && product.soldOverride !== undefined ? Math.max(0, Math.trunc(Number(product.soldOverride) || 0)) : product.soldAutomatic;
     product.remainingQuantity = Math.max(0, Number(product.quantityPurchased || 0) - product.sold);
+
     var condition = normalizeCondition(product.condition);
     if (!product.marketPrice) {
       product.salePrice = 0;
       product.salePriceNote = "À vérifier — aucune source marché externe fiable";
+      return product;
+    }
+    if (product.sealedRef) {
+      product.salePrice = product.marketPrice;
+      product.salePriceNote = "Prix marché scellé — aucun ajustement d'état appliqué";
       return product;
     }
     if (!condition) {
@@ -205,21 +262,28 @@
     var map = Object.create(null);
     var paid = (purchases || []).filter(isStockPurchase);
     var cardIds = [];
+    var sealedIds = [];
     purchasesById = Object.create(null);
     (purchases || []).forEach(function (purchase) { if (purchase && purchase.id) purchasesById[purchase.id] = purchase; });
 
     paid.forEach(function (purchase) {
       if (String(purchase.packaging || "carte_unite") === "lot_cartes") {
         lotCardIds(purchase).forEach(function (id) { if (id && cardIds.indexOf(id) < 0) cardIds.push(id); });
-      } else {
-        var id = catalogCardId(purchase.reference);
-        if (id && cardIds.indexOf(id) < 0) cardIds.push(id);
+        return;
       }
+      var cardId = catalogCardId(purchase.reference);
+      var sealedId = catalogSealedId(purchase.reference);
+      if (cardId && cardIds.indexOf(cardId) < 0) cardIds.push(cardId);
+      if (sealedId && sealedIds.indexOf(sealedId) < 0) sealedIds.push(sealedId);
     });
 
-    var resolvedPairs = await Promise.all(cardIds.map(async function (id) { return [id, await resolveCard(id)]; }));
-    var cards = Object.create(null);
-    resolvedPairs.forEach(function (pair) { cards[pair[0]] = pair[1]; });
+    var resolved = await Promise.all([
+      Promise.all(cardIds.map(async function (id) { return [id, await resolveCard(id)]; })),
+      Promise.all(sealedIds.map(async function (id) { return [id, await resolveSealed(id)]; }))
+    ]);
+    var cards = Object.create(null), sealed = Object.create(null);
+    resolved[0].forEach(function (pair) { cards[pair[0]] = pair[1]; });
+    resolved[1].forEach(function (pair) { sealed[pair[0]] = pair[1]; });
 
     paid.forEach(function (purchase) {
       var qty = Math.max(1, Math.trunc(Number(purchase.quantity) || 1));
@@ -268,10 +332,26 @@
         return;
       }
 
-      var sealedKey = "purchase:" + purchase.id + ":sealed";
-      add(map, { key: sealedKey, id: purchase.id, name: purchase.description || "Produit Pokémon scellé", category: "Produit scellé",
-        condition: "", preference: readLinePreference(purchase, sealedKey), packaging: packaging, price: unitCost, quantity: qty,
-        linked: false, latestPurchaseAt: purchaseDate, purchaseId: purchase.id });
+      var sealedId = catalogSealedId(purchase.reference);
+      var sealedRef = sealed[sealedId] || null;
+      var sealedKey = sealedId ? "sealed:" + sealedId : "purchase:" + purchase.id + ":sealed";
+      add(map, {
+        key: sealedKey,
+        id: sealedId || purchase.id,
+        sealedId: sealedId,
+        sealedRef: sealedRef,
+        name: sealedRef && sealedRef.name ? sealedRef.name : (purchase.description || "Produit Pokémon scellé"),
+        extension: sealedRef && sealedRef.extension || "",
+        category: "Produit scellé",
+        condition: "",
+        preference: readLinePreference(purchase, sealedKey),
+        packaging: packaging,
+        price: unitCost,
+        quantity: qty,
+        linked: !!sealedRef,
+        latestPurchaseAt: purchaseDate,
+        purchaseId: purchase.id
+      });
     });
 
     return Object.keys(map).map(function (key) { return enrichProduct(map[key]); }).sort(function (a, b) {
@@ -294,13 +374,14 @@
       '</select><br><small data-stock-save="' + esc(product.key) + '" style="color:#baaf97">Enregistré</small>';
   }
 
-  function selectorValue(name, key) {
-    var node = document.querySelector('[data-' + name + '="' + CSS.escape(key) + '"]');
-    return node ? node.value : "";
+  function soldControl(product) {
+    var source = product.soldOverride !== null && product.soldOverride !== undefined ? "ajustement manuel" : (product.cardId && product.card ? "ventes Cardoria automatiques" : "à renseigner si vendu");
+    return '<input data-stock-sold="' + esc(product.key) + '" type="number" min="0" step="1" value="' + esc(product.sold) + '" style="width:82px">' +
+      '<br><small>' + esc(source) + '</small>';
   }
 
   function setRowBusy(key, busy) {
-    ["stock-condition", "stock-market"].forEach(function (name) {
+    ["stock-condition", "stock-market", "stock-sold"].forEach(function (name) {
       var node = document.querySelector('[data-' + name + '="' + CSS.escape(key) + '"]');
       if (node) node.disabled = !!busy;
     });
@@ -328,8 +409,9 @@
         if (!response || !response.ok) throw new Error(response && response.error || "Enregistrement impossible.");
         purchasesById[id] = response.purchase || body;
       }
-      product.condition = normalizeCondition(preference.condition);
-      product.marketEnabled = preference.marketEnabled === true;
+      if (preference.condition !== undefined) product.condition = normalizeCondition(preference.condition);
+      if (preference.marketEnabled !== undefined) product.marketEnabled = preference.marketEnabled === true;
+      if (preference.soldOverride !== undefined) product.soldOverride = normalizedSoldOverride(preference.soldOverride);
       product.preferenceApplied = true;
       enrichProduct(product);
       renderStock(currentProducts, true);
@@ -346,7 +428,7 @@
         var product = productsByKey[key];
         if (!product) return;
         var previous = product.condition;
-        saveRowPreference(product, { condition: select.value, marketEnabled: product.marketEnabled }).catch(function (error) {
+        saveRowPreference(product, { condition: select.value, marketEnabled: product.marketEnabled, soldOverride: product.soldOverride }).catch(function (error) {
           product.condition = previous;
           enrichProduct(product);
           renderStock(currentProducts, true);
@@ -360,8 +442,23 @@
         var product = productsByKey[key];
         if (!product) return;
         var previous = product.marketEnabled;
-        saveRowPreference(product, { condition: product.condition, marketEnabled: select.value === "yes" }).catch(function (error) {
+        saveRowPreference(product, { condition: product.condition, marketEnabled: select.value === "yes", soldOverride: product.soldOverride }).catch(function (error) {
           product.marketEnabled = previous;
+          renderStock(currentProducts, true);
+          alert(error.message || "Enregistrement impossible.");
+        });
+      });
+    });
+    document.querySelectorAll("[data-stock-sold]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var key = input.getAttribute("data-stock-sold");
+        var product = productsByKey[key];
+        if (!product) return;
+        var previous = product.soldOverride;
+        var requested = Math.max(0, Math.trunc(Number(input.value) || 0));
+        saveRowPreference(product, { condition: product.condition, marketEnabled: product.marketEnabled, soldOverride: requested }).catch(function (error) {
+          product.soldOverride = previous;
+          enrichProduct(product);
           renderStock(currentProducts, true);
           alert(error.message || "Enregistrement impossible.");
         });
@@ -412,26 +509,27 @@
         "<td><strong>" + esc(remaining) + "</strong>" + quantityNote + "</td>" +
         "<td>" + totalStock + "</td>" +
         "<td>" + marginValue + "</td>" +
-        "<td><strong>" + esc(product.sold) + "</strong></td>" +
+        "<td>" + soldControl(product) + "</td>" +
         "<td>" + marketSelect(product) + "</td>" +
         "</tr>";
     }).join("") || "<tr><td colspan='10'>Aucun achat Pokémon payé à mettre en stock.</td></tr>";
     bindStockControls();
   }
 
-  A.renderShell("stock", "Stock & prix", "Stock Cardoria restant, valeur marché externe, prix conseillé, marge potentielle et ventes internes prouvées",
+  A.renderShell("stock", "Stock & prix", "Stock Cardoria restant, valeur marché externe, prix conseillé, marge potentielle et sorties de stock prouvées",
     '<div class="admin-kpi-grid">' +
       '<div class="admin-kpi"><label>Références en stock</label><strong id="stockRefs">0</strong><small>lignes avec quantité restante</small></div>' +
       '<div class="admin-kpi"><label>Unités en stock</label><strong id="stockUnits">0</strong><small>achetées - vendues Cardoria</small></div>' +
       '<div class="admin-kpi"><label>Valeur achat stock</label><strong id="stockBuyValue">0,00 €</strong><small>coût Cardoria du stock restant</small></div>' +
       '<div class="admin-kpi"><label>Valeur vente connue</label><strong id="stockSaleValue">0,00 €</strong><small id="stockSaleValueNote">prix fiables uniquement</small></div>' +
       '<div class="admin-kpi"><label>Marge potentielle</label><strong id="stockMargin">0,00 €</strong><small>stock restant, avant frais de vente</small></div>' +
-      '<div class="admin-kpi"><label>Vendu</label><strong id="stockSold">0</strong><small>sorties de stock Cardoria prouvées</small></div>' +
+      '<div class="admin-kpi"><label>Vendu</label><strong id="stockSold">0</strong><small>ventes cartes prouvées + ajustements enregistrés</small></div>' +
     '</div>' +
     '<div class="admin-panel">' +
-      '<p class="small"><strong>Montant marché</strong> : médiane des sources marché externes enregistrées pour la carte. Les sources internes <code>cardoria</code> et <code>manual</code> sont exclues. Sans source externe positive, le prix reste « À vérifier ».</p>' +
-      '<p class="small"><strong>Prix vente conseillé</strong> : montant marché ajusté selon l’état. <strong>Quantité</strong> : achats payés moins sorties de stock Cardoria réellement enregistrées. Les ventes Marketplace de vendeurs tiers et les simples estimations ne retirent pas de stock Cardoria.</p>' +
-      '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Carte Pokémon</th><th>État</th><th>Montant achat Cardoria</th><th>Montant marché</th><th>Prix vente conseillé</th><th>Quantité en stock</th><th>Total stock</th><th>Marge</th><th>Vendu</th><th>Market</th></tr></thead><tbody id="stockRows"></tbody></table></div>' +
+      '<p class="small"><strong>Montant marché</strong> : médiane des sources marché externes enregistrées pour une carte, ou prix marché externe de la référence scellée liée. Les sources internes <code>cardoria</code> et <code>manual</code> sont exclues. Sans source externe positive, le prix reste « À vérifier ».</p>' +
+      '<p class="small"><strong>Prix vente conseillé</strong> : montant marché ajusté selon l’état pour une carte ; prix marché sans ajustement d’état pour un produit scellé. <strong>Quantité</strong> : achats payés moins sorties de stock Cardoria enregistrées. Les ventes Marketplace de vendeurs tiers et les simples estimations ne retirent pas de stock Cardoria.</p>' +
+      '<p class="small"><strong>Vendu</strong> : les cartes liées utilisent automatiquement les ventes Cardoria prouvées. Pour un scellé ou une référence non reliée, saisis explicitement le nombre vendu ; cet ajustement est enregistré dans l’achat et n’est jamais deviné.</p>' +
+      '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Carte / produit Pokémon</th><th>État</th><th>Montant achat Cardoria</th><th>Montant marché</th><th>Prix vente conseillé</th><th>Quantité en stock</th><th>Total stock</th><th>Marge</th><th>Vendu</th><th>Market</th></tr></thead><tbody id="stockRows"></tbody></table></div>' +
     '</div>');
 
   A.adminFetch("/api/admin/accounting/purchases")
