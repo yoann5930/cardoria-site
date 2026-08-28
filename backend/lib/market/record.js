@@ -15,6 +15,7 @@ export function recordMarketTransaction(data) {
 
   const id = data.id || makeTransactionId("TX");
   const transactionAt = (data.transactionAt || data.soldAt || now).slice(0, 10);
+  const quantity = Math.max(1, Math.trunc(Number(data.quantity || data.qty) || 1));
 
   if (data.sourceRef && data.type) {
     const dup = db.prepare(`
@@ -25,16 +26,17 @@ export function recordMarketTransaction(data) {
 
   db.prepare(`
     INSERT INTO market_transactions (
-      id, card_id, transaction_type, sale_price, buyback_price, currency, transaction_at,
+      id, card_id, transaction_type, sale_price, buyback_price, quantity, currency, transaction_at,
       condition, language, license_slug, extension, card_number, seller, buyer,
       days_to_sell, channel, source_ref, notes, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     cardId,
     data.type || "sale",
     data.salePrice != null ? Number(data.salePrice) : null,
     data.buybackPrice != null ? Number(data.buybackPrice) : null,
+    quantity,
     data.currency || "EUR",
     transactionAt,
     data.condition || card?.condition || "",
@@ -56,13 +58,12 @@ export function recordMarketTransaction(data) {
       price: data.salePrice,
       condition: data.condition,
       channel: data.channel,
-      soldAt: transactionAt
+      soldAt: transactionAt,
+      quantity
     });
   }
 
-  if (cardId) {
-    recomputeCardStats(cardId);
-  }
+  if (cardId) recomputeCardStats(cardId);
 
   if (cardId && data.salePrice > 0 && ["sale", "listing_sale", "admin_sale", "boutique_sale"].includes(data.type)) {
     try {
@@ -75,21 +76,22 @@ export function recordMarketTransaction(data) {
     } catch { /* ignore */ }
   }
 
-  return { id, cardId, transactionAt, skipped: false };
+  return { id, cardId, transactionAt, quantity, skipped: false };
 }
 
-function syncLegacySaleHistory(cardId, { price, condition, channel, soldAt }) {
+function syncLegacySaleHistory(cardId, { price, condition, channel, soldAt, quantity = 1 }) {
   const db = getDb();
-  const exists = db.prepare(`
-    SELECT id FROM sales_history WHERE card_id = ? AND sold_at = ? AND price = ? LIMIT 1
-  `).get(cardId, soldAt, Number(price));
-
-  if (exists) return;
-
-  db.prepare(`
-    INSERT INTO sales_history (card_id, sold_at, price, condition, channel)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(cardId, soldAt, Number(price), condition || "NM", channel || "Cardoria");
+  const count = Math.max(1, Math.trunc(Number(quantity) || 1));
+  for (let i = 0; i < count; i += 1) {
+    const occurrence = db.prepare(`
+      SELECT COUNT(*) AS count FROM sales_history WHERE card_id = ? AND sold_at = ? AND price = ?
+    `).get(cardId, soldAt, Number(price))?.count || 0;
+    if (occurrence > i) continue;
+    db.prepare(`
+      INSERT INTO sales_history (card_id, sold_at, price, condition, channel)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(cardId, soldAt, Number(price), condition || "NM", channel || "Cardoria");
+  }
 }
 
 export function importLegacySalesHistory() {
@@ -113,6 +115,7 @@ export function importLegacySalesHistory() {
       cardId: row.card_id,
       type: "admin_sale",
       salePrice: row.price,
+      quantity: 1,
       condition: row.condition,
       channel: row.channel,
       transactionAt: row.sold_at,
