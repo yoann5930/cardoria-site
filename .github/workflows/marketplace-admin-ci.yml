@@ -36,6 +36,8 @@ jobs:
           node --check routes/marketplace-admin.js
           node --check routes/marketplace-moderation-admin.js
           node --check routes/marketplace-v1.js
+          node --check lib/marketplace/moderation-remote-schema.js
+          node --check lib/marketplace/v1/index.js
           node --check lib/marketplace/v1/listings.js
           node --check lib/marketplace/v1/disputes.js
           node --check lib/marketplace/v1/migrate.js
@@ -49,6 +51,9 @@ jobs:
           grep -q '/disputes/:id/manage' backend/routes/marketplace-moderation-admin.js
           grep -q 'moderation_locked' backend/lib/marketplace/v1/listings.js
           grep -q 'history_json' backend/lib/marketplace/v1/disputes.js
+          grep -q 'ALTER TABLE IF EXISTS mk_listings ADD COLUMN IF NOT EXISTS moderation_locked' backend/lib/marketplace/moderation-remote-schema.js
+          grep -q 'ALTER TABLE IF EXISTS mk_disputes ADD COLUMN IF NOT EXISTS history_json' backend/lib/marketplace/moderation-remote-schema.js
+          grep -q "status NOT IN ('resolved','rejected','closed')" backend/lib/marketplace/v1/index.js
           grep -q 'publicListingOrNull' backend/routes/marketplace-v1.js
           grep -q 'data-mod' js/admin/admin-marketplace.js
           grep -q 'data-dstatus' js/admin/admin-marketplace.js
