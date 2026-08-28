@@ -1,5 +1,5 @@
 /**
- * 2FA TOTP — optionnel pour administrateurs (RFC 6238, sans dépendance externe).
+ * 2FA TOTP Cardoria — RFC 6238, sans dépendance externe.
  */
 import crypto from "crypto";
 
@@ -14,10 +14,19 @@ function base32Decode(input) {
     bits += val.toString(2).padStart(5, "0");
   }
   const bytes = [];
-  for (let i = 0; i + 8 <= bits.length; i += 8) {
-    bytes.push(parseInt(bits.slice(i, i + 8), 2));
-  }
+  for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
   return Buffer.from(bytes);
+}
+
+function base32Encode(buffer) {
+  let bits = "";
+  for (const byte of buffer) bits += byte.toString(2).padStart(8, "0");
+  let output = "";
+  for (let i = 0; i < bits.length; i += 5) {
+    const chunk = bits.slice(i, i + 5).padEnd(5, "0");
+    output += BASE32[parseInt(chunk, 2)];
+  }
+  return output;
 }
 
 function generateTotp(secret, counter) {
@@ -31,7 +40,7 @@ function generateTotp(secret, counter) {
 }
 
 export function generateTotpSecret() {
-  return crypto.randomBytes(20).toString("base64").replace(/[+/=]/g, "").slice(0, 32).toUpperCase();
+  return base32Encode(crypto.randomBytes(20));
 }
 
 export function verifyTotp(secret, token, window = 1) {
@@ -47,5 +56,5 @@ export function verifyTotp(secret, token, window = 1) {
 
 export function getTotpUri(secret, email) {
   const label = encodeURIComponent("Cardoria:" + email);
-  return `otpauth://totp/${label}?secret=${secret}&issuer=Cardoria&digits=6&period=30`;
+  return `otpauth://totp/${label}?secret=${encodeURIComponent(secret)}&issuer=Cardoria&algorithm=SHA1&digits=6&period=30`;
 }
