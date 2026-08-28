@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import estimationRoutes from "./routes/estimation.js";
 import rachatRoutes from "./routes/rachat.js";
+import rachatAdminRoutes from "./routes/rachat-admin.js";
 import adminRoutes from "./routes/admin.js";
 import adminDashboardRoutes from "./routes/admin-dashboard.js";
 import adminFinanceRoutes from "./routes/admin-finance.js";
@@ -173,6 +174,7 @@ app.use("/api/estimation-carte", (req, res, next) => { if (req.method === "POST"
 app.use("/api/rachat", apiRateLimit, rachatRoutes);
 app.use("/api/admin", adminDashboardRoutes);
 app.use("/api/admin/accounting", adminFinanceRoutes);
+app.use("/api/admin/rachat", rachatAdminRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/email", emailAdminRoutes);
 app.use("/api/admin/development", developmentRoutes);
