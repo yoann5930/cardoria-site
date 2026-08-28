@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import estimationRoutes from "./routes/estimation.js";
 import rachatRoutes from "./routes/rachat.js";
 import adminRoutes from "./routes/admin.js";
+import adminDashboardRoutes from "./routes/admin-dashboard.js";
 import emailAdminRoutes from "./routes/email-admin.js";
 import developmentRoutes from "./routes/development.js";
 import analyticsRoutes from "./routes/analytics.js";
@@ -169,6 +170,7 @@ app.use("/api/seo", apiRateLimit, seoRoutes);
 
 app.use("/api/estimation-carte", (req, res, next) => { if (req.method === "POST") return aiRateLimit(req, res, next); next(); }, estimationRoutes);
 app.use("/api/rachat", apiRateLimit, rachatRoutes);
+app.use("/api/admin", adminDashboardRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/email", emailAdminRoutes);
 app.use("/api/admin/development", developmentRoutes);
