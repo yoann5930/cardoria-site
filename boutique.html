@@ -20,215 +20,55 @@
   <header class="shop-header">
     <div class="shop-topline">Le Royaume des Collectionneurs</div>
     <div class="shop-shell shop-nav">
-      <a class="shop-brand" href="/" aria-label="Cardoria — Accueil">
-        <img src="/assets/logo/cardoria-premium.png" alt="Logo Cardoria" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
-        <span><strong>CARDORIA</strong><small>Trading Cards • Collectibles</small></span>
-      </a>
+      <a class="shop-brand" href="/" aria-label="Cardoria — Accueil"><img src="/assets/logo/cardoria-premium.png" alt="Logo Cardoria" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'"><span><strong>CARDORIA</strong><small>Trading Cards • Collectibles</small></span></a>
       <button class="shop-menu-btn" id="shopMenuButton" type="button" aria-label="Ouvrir le menu">Menu</button>
-      <nav class="shop-menu" id="menu" aria-label="Navigation principale">
-        <a href="/">Accueil</a>
-        <a class="is-active" href="/boutique.html">Boutique</a>
-        <a href="/marketplace.html">Marketplace</a>
-        <a href="/estimation.html">Estimation</a>
-        <a href="/rachat-cartes.html">Rachat</a>
-        <a href="/pages/licences/">Licences</a>
-        <a href="/contact.html">Contact</a>
-      </nav>
+      <nav class="shop-menu" id="menu" aria-label="Navigation principale"><a href="/">Accueil</a><a class="is-active" href="/boutique.html">Boutique</a><a href="/marketplace.html">Marketplace</a><a href="/estimation.html">Estimation</a><a href="/rachat-cartes.html">Rachat</a><a href="/pages/licences/">Licences</a><a href="/contact.html">Contact</a></nav>
       <a class="shop-nav-action" href="/estimation.html">Estimer une carte</a>
     </div>
   </header>
 
   <main>
-    <section class="shop-hero">
-      <div class="shop-shell shop-hero-content">
-        <p class="shop-kicker">Sélection Cardoria</p>
-        <h1>La <span>Boutique</span></h1>
-        <p>Choisissez un univers. Les gammes Cardoria sont ouvertes progressivement, sans mélanger directement toutes les cartes sur la page principale.</p>
-      </div>
-    </section>
+    <section class="shop-hero"><div class="shop-shell shop-hero-content"><p class="shop-kicker">Sélection Cardoria</p><h1>La <span>Boutique</span></h1><p>Choisissez un univers. Les gammes Cardoria sont ouvertes progressivement.</p></div></section>
 
-    <section class="shop-main" id="shopRangeView">
-      <div class="shop-shell">
-        <div class="shop-catalog-head">
-          <div>
-            <p class="shop-kicker">Gammes</p>
-            <h2>Choisissez votre univers</h2>
+    <section class="shop-main" id="shopRangeView"><div class="shop-shell"><div class="shop-catalog-head"><div><p class="shop-kicker">Gammes</p><h2>Choisissez votre univers</h2></div></div><div class="shop-range-grid" aria-label="Gammes de la boutique Cardoria">
+      <a class="shop-range-card shop-range-pokemon is-available" href="/boutique.html?gamme=pokemon"><div class="shop-range-status is-open">Disponible</div><div class="shop-range-visual"><img src="https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg" alt="Logo Pokémon"></div><div class="shop-range-copy"><p class="shop-kicker">Gamme active</p><h3>Pokémon</h3><p>Consultez les produits Pokémon réellement disponibles.</p><span>Découvrir la gamme →</span></div></a>
+      <article class="shop-range-card is-coming"><div class="shop-range-status">Bientôt disponible</div><div class="shop-range-copy"><h3>Yu-Gi-Oh!</h3></div></article>
+      <article class="shop-range-card is-coming"><div class="shop-range-status">Bientôt disponible</div><div class="shop-range-copy"><h3>One Piece</h3></div></article>
+      <article class="shop-range-card is-coming"><div class="shop-range-status">Bientôt disponible</div><div class="shop-range-copy"><h3>Lorcana</h3></div></article>
+      <article class="shop-range-card is-coming"><div class="shop-range-status">Bientôt disponible</div><div class="shop-range-copy"><h3>Magic</h3></div></article>
+      <article class="shop-range-card is-coming"><div class="shop-range-status">Bientôt disponible</div><div class="shop-range-copy"><h3>Dragon Ball</h3></div></article>
+      <article class="shop-range-card is-coming"><div class="shop-range-status">Bientôt disponible</div><div class="shop-range-copy"><h3>Sports</h3></div></article>
+    </div></div></section>
+
+    <section class="shop-main" id="shopProductView" hidden><div class="shop-shell">
+      <div class="shop-range-toolbar"><a class="shop-back-link" href="/boutique.html">← Retour aux gammes</a><div class="shop-range-title"><img src="https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg" alt="Pokémon"><span>Pokémon</span></div></div>
+      <div class="shop-search-card shop-product-search"><label class="shop-search-field" for="search"><span>⌕</span><input id="search" type="search" placeholder="Rechercher un produit Pokémon..." autocomplete="off"></label></div>
+      <div class="shop-layout shop-product-layout">
+        <div class="shop-catalog"><div class="shop-catalog-head"><div><p class="shop-kicker">Pokémon</p><h2>Produits disponibles</h2></div><p class="shop-catalog-note">Disponibilité synchronisée avec le stock Cardoria.</p></div><div class="products" id="products" aria-live="polite"></div></div>
+        <aside class="shop-cart" aria-label="Panier Cardoria">
+          <div class="shop-cart-head"><h2>Votre panier</h2><span>▣</span></div><ul id="cart"></ul>
+          <div class="shop-cart-total"><span>Total</span><strong id="cartTotal">0,00 €</strong></div>
+          <div class="shop-customer">
+            <input id="shopName" placeholder="Nom et prénom" autocomplete="name" required>
+            <input id="shopEmail" placeholder="Email" type="email" autocomplete="email" required>
+            <input id="shopPhone" placeholder="Téléphone" type="tel" autocomplete="tel" required>
+            <input id="shopAddress" placeholder="Adresse" autocomplete="street-address" required>
+            <input id="shopPostalCode" placeholder="Code postal" autocomplete="postal-code" required>
+            <input id="shopCity" placeholder="Ville" autocomplete="address-level2" required>
+            <input id="shopCountry" placeholder="Pays" autocomplete="country-name" value="France" required>
           </div>
-        </div>
-
-        <div class="shop-range-grid" aria-label="Gammes de la boutique Cardoria">
-          <a class="shop-range-card shop-range-pokemon is-available" href="/boutique.html?gamme=pokemon" aria-label="Ouvrir la gamme Pokémon">
-            <div class="shop-range-status is-open">Disponible</div>
-            <div class="shop-range-visual">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg" alt="Logo Pokémon" loading="eager" decoding="async">
-            </div>
-            <div class="shop-range-copy">
-              <p class="shop-kicker">Gamme active</p>
-              <h3>Pokémon</h3>
-              <p>Entrez dans l’univers Pokémon pour consulter uniquement les produits Pokémon disponibles.</p>
-              <span>Découvrir la gamme →</span>
-            </div>
-          </a>
-
-          <article class="shop-range-card is-coming" aria-disabled="true">
-            <div class="shop-range-status">Bientôt disponible</div>
-            <div class="shop-range-visual">
-              <img src="https://commons.wikimedia.org/wiki/Special:Redirect/file/Yu-Gi-Oh%21.png" alt="Logo Yu-Gi-Oh!" loading="lazy" decoding="async">
-            </div>
-            <div class="shop-range-copy">
-              <p class="shop-kicker">Prochainement</p>
-              <h3>Yu-Gi-Oh!</h3>
-              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
-              <span>Aucune action disponible</span>
-            </div>
-          </article>
-
-          <article class="shop-range-card is-coming" aria-disabled="true">
-            <div class="shop-range-status">Bientôt disponible</div>
-            <div class="shop-range-visual">
-              <img src="https://commons.wikimedia.org/wiki/Special:Redirect/file/One_piece_logo.svg" alt="Logo One Piece" loading="lazy" decoding="async">
-            </div>
-            <div class="shop-range-copy">
-              <p class="shop-kicker">Prochainement</p>
-              <h3>One Piece</h3>
-              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
-              <span>Aucune action disponible</span>
-            </div>
-          </article>
-
-          <article class="shop-range-card is-coming" aria-disabled="true">
-            <div class="shop-range-status">Bientôt disponible</div>
-            <div class="shop-range-visual">
-              <div class="shop-range-wordmark" aria-label="Disney Lorcana">Disney <strong>Lorcana</strong></div>
-            </div>
-            <div class="shop-range-copy">
-              <p class="shop-kicker">Prochainement</p>
-              <h3>Lorcana</h3>
-              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
-              <span>Aucune action disponible</span>
-            </div>
-          </article>
-
-          <article class="shop-range-card is-coming" aria-disabled="true">
-            <div class="shop-range-status">Bientôt disponible</div>
-            <div class="shop-range-visual">
-              <img src="https://commons.wikimedia.org/wiki/Special:Redirect/file/Magic_the_Gathering_2017.svg" alt="Logo Magic: The Gathering" loading="lazy" decoding="async">
-            </div>
-            <div class="shop-range-copy">
-              <p class="shop-kicker">Prochainement</p>
-              <h3>Magic</h3>
-              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
-              <span>Aucune action disponible</span>
-            </div>
-          </article>
-
-          <article class="shop-range-card is-coming" aria-disabled="true">
-            <div class="shop-range-status">Bientôt disponible</div>
-            <div class="shop-range-visual">
-              <img src="https://commons.wikimedia.org/wiki/Special:Redirect/file/Dragonball_Anime-Serie_Original-Logo.svg" alt="Logo Dragon Ball" loading="lazy" decoding="async">
-            </div>
-            <div class="shop-range-copy">
-              <p class="shop-kicker">Prochainement</p>
-              <h3>Dragon Ball</h3>
-              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
-              <span>Aucune action disponible</span>
-            </div>
-          </article>
-
-          <article class="shop-range-card is-coming" aria-disabled="true">
-            <div class="shop-range-status">Bientôt disponible</div>
-            <div class="shop-range-visual">
-              <div class="shop-range-wordmark shop-range-wordmark-sports" aria-label="Sports">SPORTS</div>
-            </div>
-            <div class="shop-range-copy">
-              <p class="shop-kicker">Prochainement</p>
-              <h3>Sports</h3>
-              <p>La gamme apparaîtra ici lorsqu’elle sera ouverte dans la Boutique Cardoria.</p>
-              <span>Aucune action disponible</span>
-            </div>
-          </article>
-        </div>
+          <button class="shop-pay" id="shopPayButton" type="button">Payer par carte — SumUp</button>
+          <p class="shop-pay-note">Le stock est revérifié côté serveur juste avant la création du paiement.</p><p id="shopPayMsg"></p>
+        </aside>
       </div>
-    </section>
+    </div></section>
 
-    <section class="shop-main" id="shopProductView" hidden>
-      <div class="shop-shell">
-        <div class="shop-range-toolbar">
-          <a class="shop-back-link" href="/boutique.html">← Retour aux gammes</a>
-          <div class="shop-range-title">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg" alt="Pokémon">
-            <span>Pokémon</span>
-          </div>
-        </div>
-
-        <div class="shop-search-card shop-product-search" aria-label="Recherche Pokémon">
-          <label class="shop-search-field" for="search">
-            <span>⌕</span>
-            <input id="search" type="search" placeholder="Rechercher un produit Pokémon..." autocomplete="off">
-          </label>
-        </div>
-
-        <div class="shop-layout shop-product-layout">
-          <div class="shop-catalog">
-            <div class="shop-catalog-head">
-              <div>
-                <p class="shop-kicker">Pokémon</p>
-                <h2>Produits disponibles</h2>
-              </div>
-              <p class="shop-catalog-note">Disponibilité synchronisée avec le stock Cardoria.</p>
-            </div>
-            <div class="products" id="products" aria-live="polite"></div>
-          </div>
-
-          <aside class="shop-cart" aria-label="Panier Cardoria">
-            <div class="shop-cart-head">
-              <h2>Votre panier</h2>
-              <span>▣</span>
-            </div>
-            <ul id="cart"></ul>
-            <div class="shop-cart-total">
-              <span>Total</span>
-              <strong id="cartTotal">0,00 €</strong>
-            </div>
-            <div class="shop-customer">
-              <input id="shopName" placeholder="Votre nom" autocomplete="name">
-              <input id="shopEmail" placeholder="Votre email" type="email" autocomplete="email">
-            </div>
-            <button class="shop-pay" id="shopPayButton" type="button">Payer par carte — SumUp</button>
-            <p class="shop-pay-note">Votre panier et le paiement utilisent le système Cardoria existant.</p>
-            <p id="shopPayMsg"></p>
-          </aside>
-        </div>
-      </div>
-    </section>
-
-    <section class="shop-reassurance">
-      <div class="shop-shell shop-reassurance-grid">
-        <article><strong>Gammes évolutives</strong><p>Chaque nouvel univers sera activé progressivement depuis cette page.</p></article>
-        <article><strong>Stock Cardoria</strong><p>Les produits restent liés à l’inventaire existant, sans suppression ni modification du stock.</p></article>
-        <article><strong>Paiement sécurisé</strong><p>Le parcours de paiement SumUp existant est conservé dans les gammes actives.</p></article>
-      </div>
-    </section>
+    <section class="shop-reassurance"><div class="shop-shell shop-reassurance-grid"><article><strong>Stock réel</strong><p>Les commandes et réservations sont déduites automatiquement.</p></article><article><strong>Suivi</strong><p>Transporteurs pris en charge : La Poste, Mondial Relay et Relais Colis.</p></article><article><strong>Paiement sécurisé</strong><p>Paiement Boutique via SumUp.</p></article></div></section>
   </main>
 
-  <footer class="shop-footer">
-    <div class="shop-shell shop-footer-grid">
-      <div class="shop-footer-brand">
-        <img src="/assets/logo/cardoria-premium.png" alt="Cardoria" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
-        <strong>CARDORIA</strong>
-        <p>Le Royaume des Collectionneurs.</p>
-      </div>
-      <div><h3>Boutique</h3><a href="/boutique.html">Gammes</a><a href="/boutique.html?gamme=pokemon">Pokémon</a><a href="/marketplace.html">Marketplace</a></div>
-      <div><h3>Services</h3><a href="/estimation.html">Estimation</a><a href="/rachat-cartes.html">Rachat</a><a href="/scanner.html">Scanner</a></div>
-      <div><h3>Cardoria</h3><a href="/">Accueil</a><a href="/contact.html">Contact</a><a href="/admin-login.html">Admin</a></div>
-    </div>
-    <div class="shop-shell shop-footer-bottom">
-      <span>© Cardoria</span>
-      <span>Trading Cards • Collectibles • Premium</span>
-    </div>
-  </footer>
+  <footer class="shop-footer"><div class="shop-shell shop-footer-grid"><div class="shop-footer-brand"><img src="/assets/logo/cardoria-premium.png" alt="Cardoria" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'"><strong>CARDORIA</strong><p>Le Royaume des Collectionneurs.</p></div><div><h3>Boutique</h3><a href="/boutique.html">Gammes</a><a href="/boutique.html?gamme=pokemon">Pokémon</a><a href="/marketplace.html">Marketplace</a></div><div><h3>Services</h3><a href="/estimation.html">Estimation</a><a href="/rachat-cartes.html">Rachat</a><a href="/scanner.html">Scanner</a></div><div><h3>Cardoria</h3><a href="/">Accueil</a><a href="/contact.html">Contact</a><a href="/admin-login.html">Admin</a></div></div><div class="shop-shell shop-footer-bottom"><span>© Cardoria</span><span>Trading Cards • Collectibles • Premium</span></div></footer>
 
   <script src="/js/attribution.js"></script>
-  <script src="/js/boutique.js?v=2"></script>
+  <script src="/js/boutique.js?v=20260828-stock-orders-100"></script>
 </body>
 </html>
