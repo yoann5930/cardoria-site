@@ -1,5 +1,5 @@
 /**
- * Litiges marketplace — cycle de vie contrôlé et historique Admin.
+ * Litiges marketplace — cycle de vie contrôlé et historique Admin durable.
  */
 import { getDb } from "../../engine/database.js";
 import { makeMarketId } from "../migrate.js";
@@ -33,9 +33,23 @@ function cleanResolutionCode(value) {
   if (!RESOLUTION_CODES.has(code)) throw Object.assign(new Error("Code de résolution invalide"), { status: 400 });
   return code;
 }
-function addEvent(db, disputeId, { actor = "", action = "update", fromStatus = "", toStatus = "", note = "" } = {}) {
-  db.prepare(`INSERT INTO mk_dispute_events (dispute_id,actor,action,from_status,to_status,note,created_at) VALUES (?,?,?,?,?,?,?)`)
-    .run(disputeId, String(actor || "").slice(0, 200), String(action || "update").slice(0, 80), fromStatus, toStatus, String(note || "").slice(0, 2000), new Date().toISOString());
+function parseHistory(raw) {
+  try {
+    const value = JSON.parse(raw || "[]");
+    return Array.isArray(value) ? value.slice(-200) : [];
+  } catch { return []; }
+}
+function appendEvent(db, disputeId, currentHistory, { actor = "", action = "update", fromStatus = "", toStatus = "", note = "" } = {}) {
+  const history = [...(currentHistory || []), {
+    actor: String(actor || "").slice(0, 200),
+    action: String(action || "update").slice(0, 80),
+    fromStatus,
+    toStatus,
+    note: String(note || "").slice(0, 2000),
+    createdAt: new Date().toISOString()
+  }].slice(-200);
+  db.prepare("UPDATE mk_disputes SET history_json=? WHERE id=?").run(JSON.stringify(history), disputeId);
+  return history;
 }
 
 export function createDispute({ orderId, buyerEmail, reason }) {
@@ -49,17 +63,17 @@ export function createDispute({ orderId, buyerEmail, reason }) {
   const id = makeMarketId("DSP");
   const now = new Date().toISOString();
   db.prepare(`
-    INSERT INTO mk_disputes (id, order_id, buyer_email, seller_id, status, priority, reason, created_at, updated_at)
-    VALUES (?, ?, ?, ?, 'open', 'normal', ?, ?, ?)
+    INSERT INTO mk_disputes (id, order_id, buyer_email, seller_id, status, priority, reason, history_json, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'open', 'normal', ?, '[]', ?, ?)
   `).run(id, orderId, buyerEmail, order.sellerId, String(reason || "").trim().slice(0, 2000), now, now);
   db.prepare("UPDATE mk_orders SET dispute_status = 'open' WHERE id = ?").run(orderId);
-  addEvent(db, id, { actor: buyerEmail, action: "created", toStatus: "open", note: reason || "" });
+  appendEvent(db, id, [], { actor: buyerEmail, action: "created", toStatus: "open", note: reason || "" });
   return getDispute(id, { includeHistory: true });
 }
 
 export function updateDisputeAdmin(id, patch = {}, actor = "admin") {
   const db = getDb();
-  const current = getDispute(id);
+  const current = getDispute(id, { includeHistory: true });
   if (!current) throw Object.assign(new Error("Litige introuvable"), { status: 404 });
   const nextStatus = patch.status ? cleanStatus(patch.status, current.status) : current.status;
   const priority = patch.priority ? cleanPriority(patch.priority, current.priority) : current.priority;
@@ -84,7 +98,7 @@ export function updateDisputeAdmin(id, patch = {}, actor = "admin") {
       resolved_by=?, resolved_at=?, updated_at=? WHERE id=?
   `).run(nextStatus, priority, resolution, resolutionCode, adminNote, terminal ? String(actor || "admin").slice(0, 200) : "", terminal ? now : "", now, id);
   db.prepare("UPDATE mk_orders SET dispute_status=? WHERE id=?").run(nextStatus, current.orderId);
-  addEvent(db, id, {
+  appendEvent(db, id, current.history, {
     actor,
     action: nextStatus !== current.status ? "status_change" : "admin_update",
     fromStatus: current.status,
@@ -115,12 +129,13 @@ export function getDispute(id, { includeHistory = false } = {}) {
   const row = getDb().prepare("SELECT * FROM mk_disputes WHERE id = ?").get(id);
   if (!row) return null;
   const dispute = mapDispute(row);
-  if (includeHistory) dispute.history = listDisputeEvents(id);
+  if (includeHistory) dispute.history = parseHistory(row.history_json);
   return dispute;
 }
 
 export function listDisputeEvents(id) {
-  return getDb().prepare(`SELECT id,actor,action,from_status AS fromStatus,to_status AS toStatus,note,created_at AS createdAt FROM mk_dispute_events WHERE dispute_id=? ORDER BY id ASC`).all(id);
+  const row = getDb().prepare("SELECT history_json FROM mk_disputes WHERE id=?").get(id);
+  return row ? parseHistory(row.history_json) : [];
 }
 
 function mapDispute(r) {
