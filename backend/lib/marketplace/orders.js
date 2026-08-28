@@ -10,6 +10,22 @@ let _notifyHook = null;
 export function setOrderNotificationHook(fn) { _notifyHook = fn; }
 const STATUS_FLOW = ["pending", "paid", "preparing", "shipped", "delivered", "cancelled", "refunded"];
 const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"];
+const STATUS_TRANSITIONS = {
+  pending: new Set(["paid", "cancelled"]),
+  paid: new Set(["preparing", "refunded"]),
+  preparing: new Set(["shipped", "refunded"]),
+  shipped: new Set(["delivered", "refunded"]),
+  delivered: new Set(["refunded"]),
+  cancelled: new Set(),
+  refunded: new Set()
+};
+
+export function canTransitionOrderStatus(from, to) {
+  const current = String(from || "pending");
+  const next = String(to || "");
+  if (current === next) return true;
+  return STATUS_TRANSITIONS[current]?.has(next) === true;
+}
 
 export function createOrder({ listingId, items = null, buyerEmail, buyerName, buyerId, qty, shippingCarrier, shippingCost, shippingAddress }) {
   const db = getDb();
@@ -60,17 +76,29 @@ function applyPaidSideEffectsOnce(order, previousStatus) {
   updateSellerStats(order.sellerId);
   try { ingestMarketplaceOrder(order); } catch (e) { console.warn("[Market] ingest order:", e.message); }
 }
+function coherentPaymentStatus(status, previousPaymentStatus, requestedPaymentStatus) {
+  if (status === "paid") return "paid";
+  if (status === "refunded") return "refunded";
+  return requestedPaymentStatus ?? previousPaymentStatus ?? "pending";
+}
+
 export function updateOrderStatus(id, status, extra = {}) {
   if (!STATUS_FLOW.includes(status)) throw new Error("Statut invalide");
   const prev = getOrder(id); if (!prev) throw new Error("Commande introuvable");
+  if (!canTransitionOrderStatus(prev.status, status)) {
+    throw Object.assign(new Error(`Transition de commande interdite : ${prev.status} → ${status}`), { status: 409 });
+  }
   const db = getDb(); const now = new Date().toISOString();
+  const paymentStatus = coherentPaymentStatus(status, prev.paymentStatus, extra.paymentStatus);
   const tx = db.transaction(() => {
     if (status === "cancelled" && prev.status === "pending") releaseReservedStock(prev);
-    db.prepare(`UPDATE mk_orders SET status=?,shipping_tracking=COALESCE(?,shipping_tracking),shipping_label_url=COALESCE(?,shipping_label_url),sumup_checkout_id=COALESCE(?,sumup_checkout_id),sumup_transaction_id=COALESCE(?,sumup_transaction_id),stripe_session_id=COALESCE(?,stripe_session_id),stripe_payment_intent=COALESCE(?,stripe_payment_intent),payment_status=COALESCE(?,payment_status),payment_method=COALESCE(?,payment_method),updated_at=? WHERE id=?`).run(status, extra.tracking ?? null, extra.labelUrl ?? null, extra.sumupCheckoutId ?? extra.stripeSessionId ?? null, extra.sumupTransactionId ?? extra.paymentIntent ?? null, extra.stripeSessionId ?? null, extra.paymentIntent ?? null, extra.paymentStatus ?? null, extra.paymentMethod ?? null, now, id);
+    if (status === "refunded" && ["paid", "preparing"].includes(prev.status)) releaseReservedStock(prev);
+    db.prepare(`UPDATE mk_orders SET status=?,shipping_tracking=COALESCE(?,shipping_tracking),shipping_label_url=COALESCE(?,shipping_label_url),sumup_checkout_id=COALESCE(?,sumup_checkout_id),sumup_transaction_id=COALESCE(?,sumup_transaction_id),stripe_session_id=COALESCE(?,stripe_session_id),stripe_payment_intent=COALESCE(?,stripe_payment_intent),payment_status=?,payment_method=COALESCE(?,payment_method),updated_at=? WHERE id=?`).run(status, extra.tracking ?? null, extra.labelUrl ?? null, extra.sumupCheckoutId ?? extra.stripeSessionId ?? null, extra.sumupTransactionId ?? extra.paymentIntent ?? null, extra.stripeSessionId ?? null, extra.paymentIntent ?? null, paymentStatus, extra.paymentMethod ?? null, now, id);
   });
   tx();
   const updated = getOrder(id);
   if (status === "paid" && updated) applyPaidSideEffectsOnce(updated, prev.status);
+  if (status === "refunded" && updated) updateSellerStats(updated.sellerId);
   if (_notifyHook && updated) _notifyHook(updated, status, prev.status).catch?.(() => {});
   return updated;
 }
