@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Offre de rachat — Cardoria</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="/assets/logo/cardoria-premium.png">
+<style>
+body{background:#07090d;color:#f5f2e9;min-height:100vh}.wrap{width:min(760px,calc(100% - 32px));margin:0 auto;padding:50px 0}.brand{display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none;margin-bottom:36px}.brand img{width:54px;height:54px;object-fit:contain}.brand strong{letter-spacing:.14em}.card{border:1px solid rgba(217,185,108,.28);background:linear-gradient(145deg,rgba(22,27,36,.96),rgba(10,13,18,.98));border-radius:24px;padding:clamp(24px,6vw,48px);box-shadow:0 24px 80px rgba(0,0,0,.35)}.kicker{color:#d9b96c;text-transform:uppercase;letter-spacing:.18em;font-size:.78rem;font-weight:700}.amount{font-size:clamp(2.7rem,9vw,5rem);font-weight:900;color:#ffe18a;margin:18px 0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:24px 0}.grid div{padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.035)}.grid small{display:block;color:#8f98a7;margin-bottom:4px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}.actions button{border:0;border-radius:999px;padding:14px 22px;font-weight:800;cursor:pointer}.accept{background:#d9b96c;color:#11151c}.refuse{background:#232a35;color:#fff;border:1px solid rgba(255,255,255,.14)!important}.actions button:disabled{opacity:.5;cursor:not-allowed}.status{margin-top:18px;min-height:24px;color:#b8bec8}.status.ok{color:#8ee6a7}.status.error{color:#ff9d9d}@media(max-width:620px){.grid{grid-template-columns:1fr}.actions button{width:100%}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<a class="brand" href="/"><img src="/assets/logo/cardoria-premium.png" alt="Cardoria"><strong>CARDORIA</strong></a>
+<section class="card">
+<p class="kicker">Offre de rachat</p>
+<div id="content"><h1>Chargement de votre offre…</h1></div>
+<div class="status" id="status" role="status" aria-live="polite"></div>
+</section>
+</main>
+<script>
+(function(){
+  "use strict";
+  var params=new URLSearchParams(location.search),id=params.get("id")||"",token=params.get("token")||"";
+  var content=document.getElementById("content"),status=document.getElementById("status");
+  function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+  function euro(v){return Number(v||0).toFixed(2).replace(".",",")+" €"}
+  function date(v){try{return new Date(v).toLocaleDateString("fr-FR")}catch(e){return v||"—"}}
+  function render(o){
+    var decided=o.customerDecision&&o.customerDecision.decision;
+    content.innerHTML='<h1>'+esc(o.cardName||"Votre carte")+'</h1><p>Cardoria vous propose :</p><div class="amount">'+euro(o.offer&&o.offer.amount)+'</div><div class="grid"><div><small>Carte</small><strong>'+esc(o.cardName||"—")+'</strong></div><div><small>Licence</small><strong>'+esc(o.cardGame||"—")+'</strong></div><div><small>État</small><strong>'+esc(o.condition||"—")+'</strong></div><div><small>Offre valable jusqu’au</small><strong>'+esc(date(o.offer&&o.offer.expiresAt))+'</strong></div></div>'+(o.offer&&o.offer.note?'<p><strong>Message Cardoria :</strong><br>'+esc(o.offer.note)+'</p>':'')+(decided?'<p><strong>Votre réponse a déjà été enregistrée : '+(decided==='accepted'?'offre acceptée':'offre refusée')+'.</strong></p>':'<div class="actions"><button class="accept" id="acceptBtn">Accepter l’offre</button><button class="refuse" id="refuseBtn">Refuser l’offre</button></div>');
+    if(!decided){document.getElementById("acceptBtn").onclick=function(){decide("accepted")};document.getElementById("refuseBtn").onclick=function(){decide("refused")};}
+  }
+  async function load(){
+    if(!id||!token){content.innerHTML='<h1>Lien invalide</h1><p>Cette offre ne peut pas être affichée.</p>';return;}
+    try{var r=await fetch('/api/rachat/offres/'+encodeURIComponent(id)+'?token='+encodeURIComponent(token),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'Offre introuvable.');render(d.offer)}catch(e){content.innerHTML='<h1>Offre indisponible</h1><p>'+esc(e.message||'Impossible de charger cette offre.')+'</p>'}
+  }
+  async function decide(decision){
+    var label=decision==='accepted'?'accepter':'refuser';if(!confirm('Confirmer : '+label+' cette offre ?'))return;
+    document.querySelectorAll('.actions button').forEach(function(b){b.disabled=true});status.className='status';status.textContent='Enregistrement…';
+    try{var r=await fetch('/api/rachat/offres/'+encodeURIComponent(id)+'/decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,decision:decision})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'Réponse impossible.');status.className='status ok';status.textContent=decision==='accepted'?'Votre acceptation est enregistrée. Cardoria attend maintenant la carte.':'Votre refus est enregistré.';await load()}catch(e){status.className='status error';status.textContent=e.message||'Réponse impossible.';document.querySelectorAll('.actions button').forEach(function(b){b.disabled=false})}
+  }
+  load();
+})();
+</script>
+</body>
+</html>
