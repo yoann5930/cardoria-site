@@ -1,2 +1,2 @@
-cardoria-frontend-release=2026-08-28-stock-boutique-1
-Includes: connect paid-purchase stock to Boutique, replace Market controls with Boutique yes/no plus Boutique sale price, and keep SumUp checkout on live inventory.
+cardoria-frontend-release=2026-08-28-boutique-orders-admin-1
+Includes: Admin Boutique order workflow with paid-order protection, preparation/shipping/delivery statuses, carrier and tracking, address and internal notes, cancellation review flag, SumUp resync, KPIs and cache-busted admin assets.
