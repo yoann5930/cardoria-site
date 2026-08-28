@@ -40,12 +40,14 @@ jobs:
           node --check server.js
           node --check routes/auth.js
           node --check routes/admin.js
+          node --check routes/admin-dashboard.js
           node --check routes/marketplace-v1.js
           node --check routes/marketplace-paypal.js
           node --check routes/marketplace-admin.js
           node --check routes/payments.js
           node --check routes/payments-admin.js
           node --check routes/gdpr.js
+          node --check lib/admin/dashboard.js
           node --check lib/auth.js
           node --check lib/auth/migrate.js
           node --check lib/auth/magicLink.js
@@ -75,6 +77,8 @@ jobs:
           node --check ../js/marketplace-seller.js
           node --check ../js/marketplace-seller-dashboard.js
           node --check ../js/marketplace-my-listings.js
+          node --check ../js/admin/admin-dashboard.js
+          node --check ../js/admin/admin-audit.js
           node --check ../js/admin/admin-orders.js
           node --check ../js/admin/admin-stock.js
           node --check ../js/admin/admin-accounting.js
@@ -95,6 +99,24 @@ jobs:
           grep -q 'La Poste' backend/routes/payments-admin.js
           grep -q 'Mondial Relay' backend/routes/payments-admin.js
           grep -q 'Relais Colis' backend/routes/payments-admin.js
+      - name: Dashboard and audit wiring checks
+        working-directory: .
+        run: |
+          grep -q 'buildAdminDashboard' backend/routes/admin-dashboard.js
+          grep -q 'boutiqueRevenue' backend/lib/admin/dashboard.js
+          grep -q 'marketplaceCommission' backend/lib/admin/dashboard.js
+          grep -q 'isPaidPurchase' backend/lib/admin/dashboard.js
+          grep -q 'listBoutiqueInventory' backend/lib/admin/dashboard.js
+          grep -q 'audit/summary' backend/routes/admin-dashboard.js
+          grep -q 'audit/export.csv' backend/routes/admin-dashboard.js
+          grep -q 'kpiBoutiqueRevenue' js/admin/admin-dashboard.js
+          grep -q 'stockOversold' js/admin/admin-dashboard.js
+          grep -q 'auditDanger' js/admin/admin-audit.js
+          grep -q 'exportAudit' js/admin/admin-audit.js
+          if grep -q 'dayData.reduce.*revenue' js/admin/admin-dashboard.js; then
+            echo 'Dashboard frontend must not derive revenue from analytics days'
+            exit 1
+          fi
       - name: Reject security regressions
         working-directory: .
         run: |
@@ -189,6 +211,8 @@ jobs:
           test "$code" = "401"
           for path in \
             /api/admin/dashboard \
+            /api/admin/audit/summary \
+            /api/admin/audit/export.csv \
             /api/admin/users \
             /api/admin/payments/boutique-orders \
             /api/admin/payments/boutique-inventory \
