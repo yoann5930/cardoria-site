@@ -13,13 +13,14 @@
     if (qs("loginSuccess")) qs("loginSuccess").textContent = "";
   }
 
-  function reset2fa() {
+  function reset2fa(options) {
+    const preserveCredentials = !!options?.preserveCredentials;
     challengeToken = "";
     challengeMode = "";
     qs("admin2faBox")?.classList.remove("is-visible");
     if (qs("admin2faSetup")) qs("admin2faSetup").style.display = "none";
     if (qs("adminTotpCode")) qs("adminTotpCode").value = "";
-    if (qs("adminPassword")) qs("adminPassword").value = "";
+    if (!preserveCredentials && qs("adminPassword")) qs("adminPassword").value = "";
     qs("adminPasswordLoginForm")?.querySelectorAll("input,button").forEach(function (el) { el.disabled = false; });
   }
 
@@ -60,12 +61,12 @@
   async function loginWithPassword(event) {
     event?.preventDefault();
     clearMessages();
-    reset2fa();
     const err = qs("loginError");
     const email = qs("adminEmail")?.value?.trim();
     const password = qs("adminPassword")?.value || "";
-    const button = qs("adminPasswordLoginForm")?.querySelector("button[type='submit']");
     if (!email || !password) { if (err) err.textContent = "Indiquez votre e-mail et votre mot de passe."; return; }
+    reset2fa({ preserveCredentials: true });
+    const button = qs("adminPasswordLoginForm")?.querySelector("button[type='submit']");
     if (button) button.disabled = true;
     try {
       const response = await fetch(`${BACKEND}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
@@ -75,7 +76,7 @@
       if (data.requires2fa) return show2fa(data);
       throw new Error("La double authentification Admin n'a pas été demandée par le serveur.");
     } catch (error) {
-      reset2fa();
+      reset2fa({ preserveCredentials: true });
       if (err) err.textContent = error.message || "Connexion impossible.";
     } finally {
       if (button && !challengeToken) button.disabled = false;
