@@ -122,7 +122,7 @@ function buildTranslationMaps(db) {
       ON fr.id = 'pokemon-' || substr(f.id, length('pokemon-' || f.language || '-') + 1)
      AND fr.language='fr' AND fr.license_slug='pokemon'
     WHERE f.license_slug='pokemon' AND f.language IN ('en','ja','ko') AND f.active=1
-  `).iterate();
+  `).all();
   for (const row of matches) {
     addUnique(nameMap, `${row.language}\u0000${row.source_name}`, row.french_name);
     addUnique(extensionMap, `${row.language}\u0000${row.source_extension}`, row.french_extension);
@@ -164,11 +164,11 @@ export function localizeMultilingualCatalogToFrench() {
   };
   const siblingCache = new Map();
 
-  const tx = db.transaction(() => {
-    const rows = db.prepare(`SELECT id,language,number,extension_code,name,extension,rarity,hit_family,image_hd,image_thumb,
-      source_name,source_extension,source_rarity,source_image_hd,source_image_thumb
-      FROM cards WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1 ORDER BY language,id`).iterate();
+  const rows = db.prepare(`SELECT id,language,number,extension_code,name,extension,rarity,hit_family,image_hd,image_thumb,
+    source_name,source_extension,source_rarity,source_image_hd,source_image_thumb
+    FROM cards WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1 ORDER BY language,id`).all();
 
+  const tx = db.transaction(() => {
     for (const row of rows) {
       stats.total += 1;
       const sourceId = rawId(row);
