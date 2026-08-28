@@ -29,14 +29,13 @@ let engineLastSyncedAt = "";
 function databaseUrl() { return String(process.env.MARKETPLACE_DATABASE_URL || "").trim(); }
 export function marketplacePersistenceConfigured() { return Boolean(databaseUrl()); }
 function quoteIdent(name) { if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) throw new Error("Identifiant SQL invalide."); return `"${name}"`; }
-function getPool() {
-  if (pool) return pool;
-  const url = databaseUrl(); if (!url) throw new Error("MARKETPLACE_DATABASE_URL absente.");
-  pool = new Pool({ connectionString: url, max: Math.max(1, Number(process.env.MARKETPLACE_DB_POOL_MAX) || 3), idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000 });
-  pool.on("error", (error) => { lastError = error?.message || String(error); console.error("[cardoria-persistence] pool:", lastError); });
-  return pool;
+function sqliteRows(table) {
+  if (table === "cards") {
+    try { return getDb().prepare(`SELECT * FROM "cards" WHERE COALESCE(language,'fr')='fr'`).all(); }
+    catch { return getDb().prepare(`SELECT * FROM "cards"`).all(); }
+  }
+  return getDb().prepare(`SELECT * FROM ${quoteIdent(table)}`).all();
 }
-function sqliteRows(table) { return getDb().prepare(`SELECT * FROM ${quoteIdent(table)}`).all(); }
 async function ensureRemoteSchema(client) {
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_runtime_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_engine_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
@@ -51,7 +50,7 @@ function runtimePayload() {
 function enginePayload() {
   const tables = {};
   for (const table of ENGINE_TABLES) { try { tables[table] = sqliteRows(table); } catch { tables[table] = []; } }
-  return { version: 3, tables, capturedAt: new Date().toISOString() };
+  return { version: 4, tables, capturedAt: new Date().toISOString() };
 }
 async function writeRows(client, table, rows) {
   for (const row of rows) {
@@ -102,6 +101,13 @@ async function snapshotEngineNow(reason = "engine") {
   })();
   try { return await engineSyncPromise; }
   finally { engineSyncPromise = null; if (engineDirty) { engineDirty = false; scheduleEngineSnapshot("queued-engine-change", 150); } }
+}
+function getPool() {
+  if (pool) return pool;
+  const url = databaseUrl(); if (!url) throw new Error("MARKETPLACE_DATABASE_URL absente.");
+  pool = new Pool({ connectionString: url, max: Math.max(1, Number(process.env.MARKETPLACE_DB_POOL_MAX) || 3), idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000 });
+  pool.on("error", (error) => { lastError = error?.message || String(error); console.error("[cardoria-persistence] pool:", lastError); });
+  return pool;
 }
 function restoreRuntime(payload) {
   if (!payload || typeof payload !== "object") return;
