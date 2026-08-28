@@ -4,483 +4,102 @@
   if (!A || !A.protectAdmin()) return;
 
   var STOCK_PREFS_TAG = "[STOCK_PREFS]";
-  var CONDITION_OPTIONS = [
-    { value: "", label: "Non renseigné" },
-    { value: "M", label: "M — Mint" },
-    { value: "NM", label: "NM — Near Mint" },
-    { value: "EX", label: "EX — Excellent" },
-    { value: "GD", label: "GD — Good" },
-    { value: "LP", label: "LP — Light Played" },
-    { value: "PL", label: "PL — Played" },
-    { value: "PO", label: "PO — Poor" }
-  ];
   var purchasesById = Object.create(null);
-  var productsByKey = Object.create(null);
+  var inventoryByKey = Object.create(null);
+  var conditions = ["", "M", "NM", "EX", "GD", "LP", "PL", "PO"];
 
-  function esc(v) {
-    return String(v == null ? "" : v)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+  function esc(v) { return String(v == null ? "" : v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#039;"); }
+  function euro(v) { return Number(v || 0).toFixed(2).replace(".", ",") + " €"; }
+  function price(v) { var n = Number(String(v == null ? "" : v).replace(",", ".")); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; }
+  function normalizeCondition(v) { var u = String(v || "").trim().toUpperCase(); return conditions.indexOf(u) >= 0 ? u : ""; }
+
+  function parsePrefs(notes) {
+    var m = String(notes || "").match(/\[STOCK_PREFS\]\s*(\{[^\n\r]*\})/);
+    if (!m) return {};
+    try { var p = JSON.parse(m[1]); return p && typeof p === "object" && !Array.isArray(p) ? p : {}; } catch (_) { return {}; }
   }
 
-  function euro(n) {
-    return Number(n || 0).toFixed(2).replace(".", ",") + " €";
-  }
-
-  function round2(n) {
-    return Math.round((Number(n) || 0) * 100) / 100;
-  }
-
-  function positivePrice(value) {
-    var number = Number(String(value == null ? "" : value).replace(",", "."));
-    return Number.isFinite(number) && number > 0 ? round2(number) : null;
-  }
-
-  function normalizeCondition(value) {
-    var raw = String(value || "").trim();
-    if (!raw || /non renseign/i.test(raw)) return "";
-    var upper = raw.toUpperCase();
-    if (["M", "NM", "EX", "GD", "LP", "PL", "PO"].indexOf(upper) >= 0) return upper;
-    var lower = raw.toLowerCase();
-    if (lower === "mint") return "M";
-    if (lower === "near mint") return "NM";
-    if (lower === "excellent") return "EX";
-    if (lower === "good" || lower === "bon") return "GD";
-    if (lower === "light played" || lower === "lightly played") return "LP";
-    if (lower === "played" || lower === "joué" || lower === "joue") return "PL";
-    if (lower === "poor" || lower === "mauvais") return "PO";
-    return "";
-  }
-
-  function parseStockPrefs(notes) {
-    var match = String(notes || "").match(/\[STOCK_PREFS\]\s*(\{[^\n\r]*\})/);
-    if (!match) return {};
-    try {
-      var parsed = JSON.parse(match[1]);
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function readLinePreference(purchase, key) {
-    var prefs = parseStockPrefs(purchase && purchase.notes);
-    var pref = prefs[key];
-    if (!pref || typeof pref !== "object" || Array.isArray(pref)) return null;
-    return {
-      condition: normalizeCondition(pref.condition),
-      boutiqueEnabled: pref.boutique === false ? false : true,
-      boutiquePrice: positivePrice(pref.boutiquePrice)
-    };
-  }
-
-  function writeLinePreference(notes, key, preference) {
-    var current = String(notes || "");
-    var prefs = parseStockPrefs(current);
-    prefs[key] = {
-      condition: normalizeCondition(preference.condition),
-      boutique: preference.boutiqueEnabled !== false,
-      boutiquePrice: positivePrice(preference.boutiquePrice)
-    };
+  function writePrefs(notes, key, pref) {
+    var current = String(notes || ""), prefs = parsePrefs(current);
+    prefs[key] = { condition: normalizeCondition(pref.condition), boutique: pref.boutique !== false, boutiquePrice: price(pref.boutiquePrice) };
     var base = current.replace(/\n?\[STOCK_PREFS\]\s*\{[^\n\r]*\}/g, "").replace(/\s+$/, "");
     var line = STOCK_PREFS_TAG + " " + JSON.stringify(prefs);
     return base ? base + "\n" + line : line;
   }
 
-  function catalogCardId(reference) {
-    var value = String(reference || "").trim();
-    var prefix = "catalog-card:";
-    return value.indexOf(prefix) === 0 ? value.slice(prefix.length) : "";
+  function conditionOptions(item) {
+    if (item.packaging !== "carte_unite" && item.packaging !== "lot_cartes") return '<option value="">Scellé</option>';
+    var labels = { "":"Non renseigné", M:"Mint", NM:"Near Mint", EX:"Excellent", GD:"Good", LP:"Light Played", PL:"Played", PO:"Poor" };
+    return conditions.map(function (c) { return '<option value="'+c+'"'+(normalizeCondition(item.conditionCode)===c?' selected':'')+'>'+labels[c]+'</option>'; }).join("");
   }
 
-  function lotCardIds(purchase) {
-    if (Array.isArray(purchase.lotCards) && purchase.lotCards.length) return purchase.lotCards.filter(Boolean);
-    var match = String(purchase.notes || "").match(/\[LOT_CARDS\]\s*(\[[^\n\r]*\])/);
-    if (!match) return [];
+  function statusLabel(item) {
+    if (Number(item.oversoldStock || 0) > 0) return '<span class="admin-badge admin-badge--danger">SURVENTE</span>';
+    if (Number(item.refundHoldStock || 0) > 0) return '<span class="admin-badge admin-badge--warn">Remboursement</span>';
+    if (Number(item.pendingStock || 0) > 0) return '<span class="admin-badge admin-badge--gold">Réservé</span>';
+    if (Number(item.stock || 0) <= 0) return '<span class="admin-badge">Épuisé</span>';
+    return '<span class="admin-badge admin-badge--ok">Disponible</span>';
+  }
+
+  async function savePreference(item) {
+    var row = document.querySelector('[data-stock-row="' + CSS.escape(item.key) + '"]');
+    if (!row) return;
+    var condition = row.querySelector("[data-condition]")?.value || "";
+    var boutique = row.querySelector("[data-boutique]")?.value !== "no";
+    var boutiquePrice = row.querySelector("[data-price]")?.value || "";
+    var msg = row.querySelector("[data-save-status]");
+    if (msg) msg.textContent = "Enregistrement...";
     try {
-      var ids = JSON.parse(match[1]);
-      return Array.isArray(ids) ? ids.filter(Boolean) : [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function isStockPurchase(p) {
-    if (String(p.status || "paid") !== "paid") return false;
-    if (p.purchaseType === "pokemon_card") return true;
-    return String(p.license || "").toLowerCase() === "pokemon" && ["cartes", "lots", "boosters"].indexOf(String(p.category || "").toLowerCase()) >= 0;
-  }
-
-  async function resolveCard(id) {
-    if (!id) return null;
-    try {
-      var response = await A.adminFetch("/api/admin/engine/cards/" + encodeURIComponent(id));
-      return response && response.ok ? response.card : null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function cardRecommendedPrice(card) {
-    if (!card) return null;
-    return positivePrice(card.prices && (card.prices.recommended != null ? card.prices.recommended : card.prices.avg));
-  }
-
-  function add(map, item) {
-    var key = item.key;
-    var qty = Math.max(1, Math.trunc(Number(item.stock) || 1));
-    var unitCost = Math.max(0, Number(item.price) || 0);
-    var preference = item.preference || null;
-    if (!map[key]) {
-      map[key] = {
-        key: key,
-        id: item.id,
-        name: item.name || "Achat Pokémon",
-        extension: item.extension || "",
-        number: item.number || "",
-        category: item.category || "Carte Pokémon",
-        condition: preference ? preference.condition : normalizeCondition(item.condition),
-        boutiqueEnabled: preference ? preference.boutiqueEnabled !== false : true,
-        boutiquePrice: preference ? positivePrice(preference.boutiquePrice) : null,
-        catalogPrice: positivePrice(item.catalogPrice),
-        preferenceApplied: !!preference,
-        packaging: item.packaging || "carte_unite",
-        price: round2(unitCost),
-        stock: qty,
-        linked: !!item.linked,
-        source: "Achats",
-        latestPurchaseAt: item.latestPurchaseAt || "",
-        totalCost: unitCost * qty,
-        purchaseIds: item.purchaseId ? [item.purchaseId] : []
-      };
-      return;
-    }
-    var current = map[key];
-    current.stock += qty;
-    current.totalCost += unitCost * qty;
-    current.price = current.stock ? round2(current.totalCost / current.stock) : 0;
-    current.linked = current.linked || !!item.linked;
-    if (!current.catalogPrice && item.catalogPrice) current.catalogPrice = positivePrice(item.catalogPrice);
-    if (item.purchaseId && current.purchaseIds.indexOf(item.purchaseId) < 0) current.purchaseIds.push(item.purchaseId);
-    if (!current.preferenceApplied && preference) {
-      current.condition = preference.condition;
-      current.boutiqueEnabled = preference.boutiqueEnabled !== false;
-      current.boutiquePrice = positivePrice(preference.boutiquePrice);
-      current.preferenceApplied = true;
-    }
-    if (String(item.latestPurchaseAt || "") > String(current.latestPurchaseAt || "")) current.latestPurchaseAt = item.latestPurchaseAt;
-  }
-
-  async function buildStock(purchases) {
-    var map = Object.create(null);
-    var paid = (purchases || []).filter(isStockPurchase);
-    var cardIds = [];
-
-    purchasesById = Object.create(null);
-    (purchases || []).forEach(function (purchase) {
-      if (purchase && purchase.id) purchasesById[purchase.id] = purchase;
-    });
-
-    paid.forEach(function (p) {
-      if (String(p.packaging || "carte_unite") === "lot_cartes") {
-        lotCardIds(p).forEach(function (id) { if (id && cardIds.indexOf(id) < 0) cardIds.push(id); });
-      } else {
-        var id = catalogCardId(p.reference);
-        if (id && cardIds.indexOf(id) < 0) cardIds.push(id);
-      }
-    });
-
-    var resolvedPairs = await Promise.all(cardIds.map(async function (id) {
-      return [id, await resolveCard(id)];
-    }));
-    var cards = Object.create(null);
-    resolvedPairs.forEach(function (pair) { cards[pair[0]] = pair[1]; });
-
-    paid.forEach(function (p) {
-      var qty = Math.max(1, Math.trunc(Number(p.quantity) || 1));
-      var amount = Math.max(0, Number(p.amount) || 0);
-      var unitCost = qty ? amount / qty : amount;
-      var packaging = String(p.packaging || "carte_unite");
-      var purchaseDate = p.date || p.createdAt || "";
-
-      if (packaging === "lot_cartes") {
-        var ids = lotCardIds(p);
-        if (ids.length) {
-          for (var i = 0; i < qty; i += 1) {
-            var lotId = ids[i] || "";
-            var lotCard = cards[lotId] || null;
-            var lotKey = lotId ? "card:" + lotId : "purchase:" + p.id + ":" + i;
-            add(map, {
-              key: lotKey,
-              id: lotId || p.id + ":" + (i + 1),
-              name: lotCard && lotCard.name ? lotCard.name : (p.description || "Carte Pokémon du lot"),
-              extension: lotCard && lotCard.extension || "",
-              number: lotCard && lotCard.number || "",
-              category: lotCard && (lotCard.hitFamily || lotCard.rarity) || "Carte Pokémon",
-              condition: p.condition || p.cardCondition || "",
-              preference: readLinePreference(p, lotKey),
-              catalogPrice: cardRecommendedPrice(lotCard),
-              packaging: packaging,
-              price: unitCost,
-              stock: 1,
-              linked: !!lotCard,
-              latestPurchaseAt: purchaseDate,
-              purchaseId: p.id
-            });
-          }
-        } else {
-          var lotFallbackKey = "purchase:" + p.id + ":lot";
-          add(map, {
-            key: lotFallbackKey,
-            id: p.id,
-            name: p.description || "Lot de cartes Pokémon",
-            category: "Lot de cartes",
-            condition: p.condition || p.cardCondition || "",
-            preference: readLinePreference(p, lotFallbackKey),
-            packaging: packaging,
-            price: unitCost,
-            stock: qty,
-            linked: false,
-            latestPurchaseAt: purchaseDate,
-            purchaseId: p.id
-          });
-        }
-        return;
-      }
-
-      if (packaging === "carte_unite" || !p.packaging) {
-        var cardId = catalogCardId(p.reference);
-        var card = cards[cardId] || null;
-        var cardKey = cardId ? "card:" + cardId : "purchase:" + p.id;
-        add(map, {
-          key: cardKey,
-          id: cardId || p.id,
-          name: card && card.name ? card.name : (p.description || "Carte Pokémon"),
-          extension: card && card.extension || "",
-          number: card && card.number || "",
-          category: card && (card.hitFamily || card.rarity) || "Carte Pokémon",
-          condition: p.condition || p.cardCondition || "",
-          preference: readLinePreference(p, cardKey),
-          catalogPrice: cardRecommendedPrice(card),
-          packaging: packaging,
-          price: unitCost,
-          stock: qty,
-          linked: !!card,
-          latestPurchaseAt: purchaseDate,
-          purchaseId: p.id
-        });
-        return;
-      }
-
-      var sealedKey = "purchase:" + p.id + ":sealed";
-      add(map, {
-        key: sealedKey,
-        id: p.id,
-        name: p.description || "Produit Pokémon scellé",
-        category: "Produit scellé",
-        condition: "",
-        preference: readLinePreference(p, sealedKey),
-        packaging: packaging,
-        price: unitCost,
-        stock: qty,
-        linked: false,
-        latestPurchaseAt: purchaseDate,
-        purchaseId: p.id
-      });
-    });
-
-    return Object.keys(map).map(function (key) { return map[key]; }).sort(function (a, b) {
-      return String(b.latestPurchaseAt || "").localeCompare(String(a.latestPurchaseAt || "")) || String(a.name || "").localeCompare(String(b.name || ""), "fr");
-    });
-  }
-
-  function conditionSelect(p) {
-    var isCard = p.packaging === "carte_unite" || p.packaging === "lot_cartes";
-    if (!isCard) return '<select disabled aria-label="État du produit"><option>Scellé</option></select>';
-    return '<select data-stock-condition="' + esc(p.key) + '" aria-label="État de ' + esc(p.name) + '">' + CONDITION_OPTIONS.map(function (option) {
-      return '<option value="' + esc(option.value) + '"' + (option.value === normalizeCondition(p.condition) ? ' selected' : '') + '>' + esc(option.label) + '</option>';
-    }).join('') + '</select>';
-  }
-
-  function boutiqueSelect(p) {
-    return '<select data-stock-boutique="' + esc(p.key) + '" aria-label="Mise en Boutique de ' + esc(p.name) + '">' +
-      '<option value="yes"' + (p.boutiqueEnabled ? ' selected' : '') + '>Oui</option>' +
-      '<option value="no"' + (!p.boutiqueEnabled ? ' selected' : '') + '>Non</option>' +
-      '</select>';
-  }
-
-  function boutiquePriceInput(p) {
-    var saved = positivePrice(p.boutiquePrice);
-    var autoPrice = positivePrice(p.catalogPrice);
-    var placeholder = autoPrice ? String(autoPrice.toFixed(2)).replace(".", ",") : "Prix requis";
-    var note = saved ? "Prix Boutique enregistré" : (autoPrice ? "Auto Cardoria : " + euro(autoPrice) : "Renseigne un prix pour vendre");
-    return '<input type="number" min="0" step="0.01" inputmode="decimal" data-stock-price="' + esc(p.key) + '" value="' + (saved ? esc(saved.toFixed(2)) : '') + '" placeholder="' + esc(placeholder) + '" style="width:110px" aria-label="Prix Boutique de ' + esc(p.name) + '"><br>' +
-      '<small data-stock-price-note="' + esc(p.key) + '" style="color:#baaf97">' + esc(note) + '</small>';
-  }
-
-  function setRowBusy(key, busy) {
-    var condition = document.querySelector('[data-stock-condition="' + CSS.escape(key) + '"]');
-    var boutique = document.querySelector('[data-stock-boutique="' + CSS.escape(key) + '"]');
-    var price = document.querySelector('[data-stock-price="' + CSS.escape(key) + '"]');
-    if (condition) condition.disabled = !!busy;
-    if (boutique) boutique.disabled = !!busy;
-    if (price) price.disabled = !!busy;
-  }
-
-  function setSaveStatus(key, text, isError) {
-    var el = document.querySelector('[data-stock-save="' + CSS.escape(key) + '"]');
-    if (!el) return;
-    el.textContent = text;
-    el.style.color = isError ? "#ff7373" : "#baaf97";
-  }
-
-  function refreshPriceNote(product) {
-    var el = document.querySelector('[data-stock-price-note="' + CSS.escape(product.key) + '"]');
-    if (!el) return;
-    if (positivePrice(product.boutiquePrice)) el.textContent = "Prix Boutique enregistré";
-    else if (positivePrice(product.catalogPrice)) el.textContent = "Auto Cardoria : " + euro(product.catalogPrice);
-    else el.textContent = "Renseigne un prix pour vendre";
-  }
-
-  async function saveRowPreference(product, nextPreference) {
-    var ids = (product.purchaseIds || []).slice();
-    if (!ids.length) throw new Error("Aucun achat lié à cette ligne de stock.");
-    setRowBusy(product.key, true);
-    setSaveStatus(product.key, "Enregistrement…", false);
-    try {
-      for (var i = 0; i < ids.length; i += 1) {
-        var id = ids[i];
-        var purchase = purchasesById[id];
+      for (var i = 0; i < (item.purchaseIds || []).length; i++) {
+        var id = item.purchaseIds[i], purchase = purchasesById[id];
         if (!purchase) continue;
-        var body = Object.assign({}, purchase, {
-          notes: writeLinePreference(purchase.notes, product.key, nextPreference)
-        });
-        var response = await A.adminFetch("/api/admin/accounting/purchases/" + encodeURIComponent(id), {
-          method: "PUT",
-          body: JSON.stringify(body)
-        });
-        if (!response || !response.ok) throw new Error(response && response.error || "Enregistrement impossible.");
-        purchasesById[id] = response.purchase || body;
+        var body = Object.assign({}, purchase, { notes: writePrefs(purchase.notes, item.key, { condition: condition, boutique: boutique, boutiquePrice: boutiquePrice }) });
+        var d = await A.adminFetch("/api/admin/accounting/purchases/" + encodeURIComponent(id), { method: "PUT", body: JSON.stringify(body) });
+        if (!d || !d.ok) throw new Error(d && d.error || "Enregistrement impossible");
+        purchasesById[id] = d.purchase || body;
       }
-      product.condition = normalizeCondition(nextPreference.condition);
-      product.boutiqueEnabled = nextPreference.boutiqueEnabled !== false;
-      product.boutiquePrice = positivePrice(nextPreference.boutiquePrice);
-      product.preferenceApplied = true;
-      refreshPriceNote(product);
-      setSaveStatus(product.key, "Enregistré ✓", false);
-    } catch (error) {
-      setSaveStatus(product.key, "Erreur d’enregistrement", true);
-      throw error;
-    } finally {
-      setRowBusy(product.key, false);
-    }
+      if (msg) msg.textContent = "Enregistré";
+      await load();
+    } catch (e) { if (msg) msg.textContent = e.message || "Erreur"; }
   }
 
-  function bindStockControls() {
-    document.querySelectorAll("[data-stock-condition]").forEach(function (select) {
-      select.addEventListener("change", function () {
-        var product = productsByKey[select.getAttribute("data-stock-condition")];
-        if (!product) return;
-        var previous = normalizeCondition(product.condition);
-        saveRowPreference(product, {
-          condition: select.value,
-          boutiqueEnabled: product.boutiqueEnabled,
-          boutiquePrice: product.boutiquePrice
-        }).catch(function () {
-          select.value = previous;
-        });
-      });
-    });
+  function render(inventory, totals) {
+    inventoryByKey = Object.create(null);
+    inventory.forEach(function (i) { inventoryByKey[i.key] = i; });
+    A.qs("#stockUnits").textContent = String(totals.availableStock || 0);
+    A.qs("#stockValue").textContent = euro(inventory.reduce(function (s, i) { return s + Number(i.stock || 0) * Number(i.averagePurchaseCost || 0); }, 0));
+    A.qs("#stockLinked").textContent = String(inventory.filter(function (i) { return !!i.cardId; }).length) + " / " + inventory.length;
+    A.qs("#stockBoutique").textContent = String(inventory.filter(function (i) { return i.boutiqueEnabled; }).length) + " / " + inventory.length;
 
-    document.querySelectorAll("[data-stock-boutique]").forEach(function (select) {
-      select.addEventListener("change", function () {
-        var product = productsByKey[select.getAttribute("data-stock-boutique")];
-        if (!product) return;
-        var previous = product.boutiqueEnabled ? "yes" : "no";
-        saveRowPreference(product, {
-          condition: product.condition,
-          boutiqueEnabled: select.value === "yes",
-          boutiquePrice: product.boutiquePrice
-        }).catch(function () {
-          select.value = previous;
-        });
-      });
-    });
+    var summary = A.qs("#stockSummary");
+    if (summary) summary.innerHTML = "Acheté : <strong>" + Number(totals.baseStock || 0) + "</strong> · Disponible : <strong>" + Number(totals.availableStock || 0) + "</strong> · Réservé paiement : <strong>" + Number(totals.pendingStock || 0) + "</strong> · Vendu/payé : <strong>" + Number(totals.soldStock || 0) + "</strong> · En remboursement : <strong>" + Number(totals.refundHoldStock || 0) + "</strong>" + (Number(totals.oversoldStock || 0) ? " · <strong style='color:#ff8f8f'>Survente : " + Number(totals.oversoldStock) + "</strong>" : "");
 
-    document.querySelectorAll("[data-stock-price]").forEach(function (input) {
-      input.addEventListener("change", function () {
-        var product = productsByKey[input.getAttribute("data-stock-price")];
-        if (!product) return;
-        var previous = positivePrice(product.boutiquePrice);
-        var nextPrice = positivePrice(input.value);
-        saveRowPreference(product, {
-          condition: product.condition,
-          boutiqueEnabled: product.boutiqueEnabled,
-          boutiquePrice: nextPrice
-        }).then(function () {
-          input.value = nextPrice ? nextPrice.toFixed(2) : "";
-        }).catch(function () {
-          input.value = previous ? previous.toFixed(2) : "";
-        });
-      });
+    A.qs("#stockRows").innerHTML = inventory.map(function (i) {
+      return '<tr data-stock-row="'+esc(i.key)+'"><td><small>'+esc(i.cardId || i.key)+'</small></td><td><strong>'+esc(i.name)+'</strong><br><small>'+esc([i.extension,i.number?"#"+i.number:""].filter(Boolean).join(" · "))+'</small></td><td>'+esc(i.categoryLabel || i.packaging)+'</td><td><select data-condition '+((i.packaging!=="carte_unite"&&i.packaging!=="lot_cartes")?'disabled':'')+'>'+conditionOptions(i)+'</select></td><td>'+euro(i.averagePurchaseCost)+'</td><td><input data-price type="number" min="0" step="0.01" value="'+(i.boutiquePrice ? Number(i.boutiquePrice).toFixed(2) : '')+'" placeholder="'+(i.catalogPrice ? Number(i.catalogPrice).toFixed(2) : 'Prix requis')+'"><br><small>'+(i.boutiquePrice?'Prix Admin':i.catalogPrice?'Auto Cardoria '+euro(i.catalogPrice):'Prix requis')+'</small></td><td><strong>'+Number(i.stock||0)+'</strong> dispo<br><small>'+Number(i.pendingStock||0)+' réservé · '+Number(i.soldStock||0)+' vendu'+(Number(i.refundHoldStock||0)?' · '+Number(i.refundHoldStock)+' remboursement':'')+'</small><br>'+statusLabel(i)+'</td><td><select data-boutique><option value="yes"'+(i.boutiqueEnabled?' selected':'')+'>Oui</option><option value="no"'+(!i.boutiqueEnabled?' selected':'')+'>Non</option></select></td><td>Achats payés<br><small data-save-status></small></td></tr>';
+    }).join("") || '<tr><td colspan="9">Aucun stock Boutique.</td></tr>';
+
+    A.qs("#stockRows").querySelectorAll("tr[data-stock-row]").forEach(function (row) {
+      var item = inventoryByKey[row.getAttribute("data-stock-row")];
+      row.querySelectorAll("select,input").forEach(function (control) { control.addEventListener("change", function () { savePreference(item); }); });
     });
   }
 
-  function renderStock(products) {
-    var refs = products.length;
-    var units = products.reduce(function (sum, p) { return sum + Number(p.stock || 0); }, 0);
-    var value = products.reduce(function (sum, p) { return sum + Number(p.price || 0) * Number(p.stock || 0); }, 0);
-    var linked = products.filter(function (p) { return p.linked; }).length;
-    var boutiqueCount = products.filter(function (p) { return p.boutiqueEnabled; }).length;
-    A.qs("#stockRefs").textContent = refs;
-    A.qs("#stockUnits").textContent = units;
-    A.qs("#stockValue").textContent = euro(value);
-    A.qs("#stockLinked").textContent = linked + " / " + refs;
-    A.qs("#stockBoutique").textContent = boutiqueCount + " / " + refs;
-
-    productsByKey = Object.create(null);
-    products.forEach(function (product) { productsByKey[product.key] = product; });
-
-    A.qs("#stockRows").innerHTML = products.map(function (p) {
-      var cardMeta = [p.extension, p.number ? "#" + p.number : ""].filter(Boolean).join(" · ");
-      return "<tr>" +
-        "<td><small>" + esc(p.id) + "</small></td>" +
-        "<td><strong>" + esc(p.name) + "</strong>" + (cardMeta ? "<br><small>" + esc(cardMeta) + "</small>" : "") + "</td>" +
-        "<td>" + esc(p.category) + "</td>" +
-        "<td>" + conditionSelect(p) + "</td>" +
-        "<td>" + euro(p.price) + "</td>" +
-        "<td>" + boutiquePriceInput(p) + "</td>" +
-        "<td><strong>" + esc(p.stock) + "</strong></td>" +
-        "<td>" + boutiqueSelect(p) + '<br><small data-stock-save="' + esc(p.key) + '" style="color:#baaf97">Enregistré</small></td>' +
-        "<td>" + (p.linked ? "Catalogue lié" : "Achat enregistré") + "</td>" +
-        "</tr>";
-    }).join("") || "<tr><td colspan='9'>Aucun achat Pokémon payé à mettre en stock.</td></tr>";
-    bindStockControls();
+  async function load() {
+    var results = await Promise.all([
+      A.adminFetch("/api/admin/accounting/purchases", { cache: "no-store" }),
+      A.adminFetch("/api/admin/payments/boutique-inventory", { cache: "no-store" })
+    ]);
+    var p = results[0], inv = results[1];
+    if (!p.ok) throw new Error(p.error || "Achats indisponibles");
+    if (!inv.ok) throw new Error(inv.error || "Stock Boutique indisponible");
+    purchasesById = Object.create(null);
+    (p.purchases || []).forEach(function (purchase) { purchasesById[purchase.id] = purchase; });
+    render(inv.inventory || [], inv.totals || {});
   }
 
-  A.renderShell("stock", "Stock", "Inventaire des achats Cardoria relié directement à la Boutique",
-    '<div class="admin-kpi-grid">' +
-      '<div class="admin-kpi"><label>Références</label><strong id="stockRefs">0</strong><small>lignes de stock</small></div>' +
-      '<div class="admin-kpi"><label>Unités en stock</label><strong id="stockUnits">0</strong><small>cartes et produits</small></div>' +
-      '<div class="admin-kpi"><label>Valeur d\'achat</label><strong id="stockValue">0,00 €</strong><small>coût d\'acquisition</small></div>' +
-      '<div class="admin-kpi"><label>Liées au catalogue</label><strong id="stockLinked">0 / 0</strong><small>identification exacte</small></div>' +
-      '<div class="admin-kpi"><label>Dans la Boutique</label><strong id="stockBoutique">0 / 0</strong><small>références autorisées</small></div>' +
-    '</div>' +
-    '<div class="admin-panel"><p class="small">Le stock se met à jour automatiquement depuis les achats Pokémon payés. Un achat annulé, remboursé ou supprimé est retiré au prochain chargement.</p>' +
-      '<p class="small"><strong>État</strong> : état réel de la carte. <strong>Prix Boutique</strong> : prix de vente public ; si le champ est vide et que la carte est liée au catalogue, Cardoria utilise son prix recommandé. <strong>Boutique</strong> : Oui pour afficher et vendre la ligne sur la Boutique Cardoria, Non pour la garder uniquement en stock interne.</p>' +
-      '<p class="small"><strong>Important :</strong> le Market/Marketplace est désormais séparé de ce stock. Cette page pilote uniquement le stock Cardoria et la Boutique.</p>' +
-      '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Réf.</th><th>Nom</th><th>Catégorie</th><th>État</th><th>Prix achat moy.</th><th>Prix Boutique</th><th>Stock</th><th>Boutique</th><th>Source</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
+  A.renderShell("stock", "Stock Boutique", "Source unique : achats Pokémon payés moins réservations, ventes et remboursements",
+    '<div class="admin-kpi-grid" style="margin-bottom:16px"><div class="admin-kpi"><label>Stock disponible</label><strong id="stockUnits">0</strong></div><div class="admin-kpi"><label>Valeur achat disponible</label><strong id="stockValue">0,00 €</strong></div><div class="admin-kpi"><label>Lié catalogue</label><strong id="stockLinked">0 / 0</strong></div><div class="admin-kpi"><label>Dans Boutique</label><strong id="stockBoutique">0 / 0</strong></div></div>' +
+    '<div class="admin-panel"><p id="stockSummary" class="small">Chargement...</p><p class="small">Une commande en attente réserve le stock pendant 30 minutes. Une commande payée retire le stock disponible. Une commande payée annulée garde le stock bloqué jusqu’au remboursement SumUp confirmé, puis le stock revient automatiquement.</p><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Réf.</th><th>Nom</th><th>Catégorie</th><th>État</th><th>Prix achat moy.</th><th>Prix Boutique</th><th>Stock réel</th><th>Boutique</th><th>Source</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
 
-  A.adminFetch("/api/admin/accounting/purchases")
-    .then(function (data) {
-      if (!data || !data.ok) throw new Error(data && data.error || "Impossible de charger les achats.");
-      return buildStock(data.purchases || []);
-    })
-    .then(renderStock)
-    .catch(function (error) {
-      A.qs("#stockRows").innerHTML = "<tr><td colspan='9'>Erreur de chargement du stock : " + esc(error.message || error) + "</td></tr>";
-    });
+  load().catch(function (e) { A.qs("#stockRows").innerHTML = '<tr><td colspan="9">'+esc(e.message || "Chargement impossible")+'</td></tr>'; });
 })();
