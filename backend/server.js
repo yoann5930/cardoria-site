@@ -78,9 +78,6 @@ app.use(connectionJournalMiddleware());
 app.use("/api/health", healthRoutes);
 app.use("/api/system", systemRoutes);
 
-// Bind immediately so Render can detect the service while heavy catalog and
-// persistence initialization continues. Express accepts routes added after
-// listen(), so the full API becomes available progressively during startup.
 const port = process.env.PORT || 10000;
 const server = app.listen(port, "0.0.0.0", () => {
   console.log(`Cardoria V6 port ${port} bound — initialization in progress`);
@@ -216,9 +213,6 @@ function sendPublicFile(req, res, next) {
   if (!relativePath || relativePath.includes("..")) return next();
   const firstSegment = relativePath.split("/")[0];
   if (BLOCKED_PUBLIC_ROOTS.has(firstSegment)) return res.status(404).send("Not found");
-
-  // Les URLs publiques /pages/.../ correspondent à des dossiers réels avec index.html.
-  // Elles étaient auparavant ignorées car elles n'avaient pas d'extension.
   if (requestPath.endsWith("/")) relativePath = path.posix.join(relativePath, "index.html");
 
   const extension = path.extname(relativePath).toLowerCase();
@@ -232,10 +226,17 @@ app.use(errorHandler);
 
 startup.ready = true;
 console.log(`Cardoria V6 single-host ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`);
+const multilingualBootstrapTimer = setTimeout(() => {
+  import("./lib/engine/multilingual-bootstrap.js")
+    .then(() => console.log("[startup] multilingual-catalog: background repair started"))
+    .catch((error) => console.error("[startup] multilingual-catalog: background repair failed", error?.message || String(error)));
+}, 1000);
+multilingualBootstrapTimer.unref?.();
 
 function shutdown(signal) {
   console.log(`[process] ${signal} received, closing HTTP server`);
   clearTimeout(firstMarketRefresh);
+  clearTimeout(multilingualBootstrapTimer);
   clearInterval(marketRefreshTimer);
   const forceExit = setTimeout(() => process.exit(1), 10000); forceExit.unref();
   server.close(async () => {
