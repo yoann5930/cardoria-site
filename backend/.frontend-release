@@ -1,2 +1,2 @@
-cardoria-frontend-release=2026-08-28-buyers-dashboard-1
-Includes: remove the unassigned buyer KPI and row from the buyers dashboard while keeping historical purchase data intact.
+cardoria-frontend-release=2026-08-28-stock-market-condition-1
+Includes: add persistent stock card-condition selector and explicit Market yes/no control per stock line.
