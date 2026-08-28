@@ -16,7 +16,7 @@ const VERIFIED_KOREAN_CARDS = [
     rarity: "Commune",
     sourceRarity: "C",
     illustration: "yuu",
-    officialDetail: "https://pokemoncard.co.kr/cards/detail/BS2025005053",
+    officialDetail: "https://pokemoncard.co.kr/cards",
     officialImage: "https://cards.image.pokemonkorea.co.kr/data/wmimages/SV/SV9a/SV9a_053.png?w=512"
   }
 ];
@@ -40,6 +40,7 @@ function ensureColumns(db) {
 function normalizeSetCode(value) {
   const raw = String(value || "").trim();
   if (/^sv/i.test(raw)) return `SV${raw.slice(2)}`;
+  if (/^s\d/i.test(raw)) return `S${raw.slice(1)}`;
   return raw;
 }
 
@@ -64,19 +65,25 @@ function imageCandidates(extensionCode, number) {
   const code = normalizeSetCode(extensionCode);
   const num = normalizedNumber(number);
   if (!code || !num) return [];
+  const rawNumber = String(number || "").trim();
 
-  // Pokémon Korea exposes modern Scarlet & Violet scans with a stable public
-  // pattern. Only probe patterns we can verify rather than inventing cards.
   if (/^SV/i.test(code)) {
     return [
       `${IMAGE_ROOT}/SV/${code}/${code}_${num}.png?w=512`,
-      `${IMAGE_ROOT}/SV/${code}/${code}_${String(number || "").trim()}.png?w=512`
+      `${IMAGE_ROOT}/SV/${code}/${code}_${rawNumber}.png?w=512`
+    ].filter((value, index, array) => value && array.indexOf(value) === index);
+  }
+  if (/^S\d/i.test(code)) {
+    return [
+      `${IMAGE_ROOT}/S/${code}/${code}_${num}.png?w=512`,
+      `${IMAGE_ROOT}/S/${code}/${code}_${rawNumber}.png?w=512`
     ].filter((value, index, array) => value && array.indexOf(value) === index);
   }
   return [];
 }
 
 async function probeImage(url) {
+  if (!url) return false;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -168,8 +175,8 @@ function insertKoreanFromReference(db, ja, verified, imageUrl, now) {
     source_image_hd: imageUrl,
     source_image_thumb: imageUrl,
     translation_source: "pokemon-korea-official+reference-fr",
-    image_language: "ko",
-    image_source: "pokemon-korea-official",
+    image_language: imageUrl ? "ko" : "",
+    image_source: imageUrl ? "pokemon-korea-official" : "",
     catalog_source: "pokemon-korea-official",
     catalog_source_url: verified.officialDetail || "https://pokemoncard.co.kr/cards",
     price_source_note: marketSource ? "Référence Cardmarket du produit multilingue; prix coréen à confirmer si marché spécifique disponible." : "",
@@ -193,8 +200,12 @@ function insertKoreanFromReference(db, ja, verified, imageUrl, now) {
       number=excluded.number,rarity=CASE WHEN excluded.rarity<>'' THEN excluded.rarity ELSE cards.rarity END,
       hit_family=CASE WHEN excluded.hit_family<>'' THEN excluded.hit_family ELSE cards.hit_family END,
       illustration=CASE WHEN excluded.illustration<>'' THEN excluded.illustration ELSE cards.illustration END,
-      image_hd=excluded.image_hd,image_thumb=excluded.image_thumb,image_language='ko',image_source='pokemon-korea-official',
-      source_image_hd=excluded.source_image_hd,source_image_thumb=excluded.source_image_thumb,
+      image_hd=CASE WHEN excluded.image_hd<>'' THEN excluded.image_hd ELSE cards.image_hd END,
+      image_thumb=CASE WHEN excluded.image_thumb<>'' THEN excluded.image_thumb ELSE cards.image_thumb END,
+      image_language=CASE WHEN excluded.image_hd<>'' THEN 'ko' ELSE cards.image_language END,
+      image_source=CASE WHEN excluded.image_hd<>'' THEN 'pokemon-korea-official' ELSE cards.image_source END,
+      source_image_hd=CASE WHEN excluded.source_image_hd<>'' THEN excluded.source_image_hd ELSE cards.source_image_hd END,
+      source_image_thumb=CASE WHEN excluded.source_image_thumb<>'' THEN excluded.source_image_thumb ELSE cards.source_image_thumb END,
       source_name=CASE WHEN excluded.source_name<>'' THEN excluded.source_name ELSE cards.source_name END,
       source_extension=CASE WHEN excluded.source_extension<>'' THEN excluded.source_extension ELSE cards.source_extension END,
       source_rarity=CASE WHEN excluded.source_rarity<>'' THEN excluded.source_rarity ELSE cards.source_rarity END,
@@ -258,11 +269,12 @@ export function getKoreanOfficialBackfillStatus() {
   const official = Number(db.prepare("SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND language='ko' AND active=1 AND catalog_source='pokemon-korea-official'").get()?.c || 0);
   const missingImages = Number(db.prepare("SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND language='ko' AND active=1 AND (COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='')").get()?.c || 0);
   const missingPrices = Number(db.prepare("SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND language='ko' AND active=1 AND recommended_price<=0").get()?.c || 0);
-  const pendingSv = Number(db.prepare(`SELECT COUNT(*) AS c FROM cards j
-    WHERE j.license_slug='pokemon' AND j.language='ja' AND j.active=1 AND lower(j.extension_code) LIKE 'sv%'
+  const pendingOfficial = Number(db.prepare(`SELECT COUNT(*) AS c FROM cards j
+    WHERE j.license_slug='pokemon' AND j.language='ja' AND j.active=1
+      AND (lower(j.extension_code) LIKE 'sv%' OR lower(j.extension_code) GLOB 's[0-9]*')
       AND NOT EXISTS (SELECT 1 FROM cards k WHERE k.id='pokemon-ko-' || substr(j.id,length('pokemon-ja-')+1) AND k.active=1)
       AND (COALESCE(j.korea_official_checked_at,'')='' OR j.korea_official_checked_at<?)`).get(retryBefore)?.c || 0);
-  return { ko, official, missingImages, missingPrices, pendingSv };
+  return { ko, official, missingImages, missingPrices, pendingOfficial };
 }
 
 export function verifyKoreanTauros() {
@@ -280,20 +292,25 @@ export async function backfillKoreanOfficialCards({ limit = 120, discover = true
 
   for (const verified of VERIFIED_KOREAN_CARDS) {
     const ja = japaneseCardFor(db, verified.extensionCode, verified.number);
-    const result = insertKoreanFromReference(db, ja, verified, verified.officialImage, now);
+    let imageUrl = "";
+    if (verified.officialImage && await probeImage(verified.officialImage)) imageUrl = verified.officialImage;
+    if (!imageUrl) imageUrl = await firstExistingImage(verified.extensionCode, verified.number);
+    const result = insertKoreanFromReference(db, ja, verified, imageUrl, now);
     added += result.inserted || 0;
     updated += result.updated || 0;
+    if (imageUrl) found += 1;
   }
 
   if (discover) {
     const retryBefore = new Date(Date.now() - CHECK_RETRY_MS).toISOString();
     const safeLimit = Math.min(Math.max(Number(limit) || 120, 1), 400);
     const targets = db.prepare(`SELECT j.* FROM cards j
-      WHERE j.license_slug='pokemon' AND j.language='ja' AND j.active=1 AND lower(j.extension_code) LIKE 'sv%'
+      WHERE j.license_slug='pokemon' AND j.language='ja' AND j.active=1
+        AND (lower(j.extension_code) LIKE 'sv%' OR lower(j.extension_code) GLOB 's[0-9]*')
         AND COALESCE(j.number,'')<>''
         AND NOT EXISTS (SELECT 1 FROM cards k WHERE k.id='pokemon-ko-' || substr(j.id,length('pokemon-ja-')+1) AND k.active=1)
         AND (COALESCE(j.korea_official_checked_at,'')='' OR j.korea_official_checked_at<?)
-      ORDER BY CASE WHEN lower(j.extension_code)='sv9a' THEN 0 ELSE 1 END,
+      ORDER BY CASE WHEN lower(j.extension_code)='sv9a' THEN 0 WHEN lower(j.extension_code) LIKE 'sv%' THEN 1 ELSE 2 END,
         CASE WHEN COALESCE(j.korea_official_checked_at,'')='' THEN 0 ELSE 1 END,
         j.extension_code DESC,j.id LIMIT ?`).all(retryBefore, safeLimit);
 
@@ -319,7 +336,7 @@ export async function backfillKoreanOfficialCards({ limit = 120, discover = true
   try { db.exec("DELETE FROM cards_fts; INSERT INTO cards_fts(rowid,name,extension,number,rarity,license_slug) SELECT rowid,name,extension,number,rarity,license_slug FROM cards;"); } catch {}
   const status = getKoreanOfficialBackfillStatus();
   const tauros = verifyKoreanTauros();
-  console.log(`[pokemon-korea-official] checked=${checked} found=${found} added=${added} updated=${updated} KO=${status.ko} official=${status.official} missing-images=${status.missingImages} missing-prices=${status.missingPrices} pending-sv=${status.pendingSv}`);
+  console.log(`[pokemon-korea-official] checked=${checked} found=${found} added=${added} updated=${updated} KO=${status.ko} official=${status.official} missing-images=${status.missingImages} missing-prices=${status.missingPrices} pending-official=${status.pendingOfficial}`);
   console.log(`[catalog-audit] Tauros KO sv9a 053 ${tauros ? `present image=${tauros.image_hd ? 'yes' : 'no'} price=${Number(tauros.recommended_price || 0).toFixed(2)} source=${tauros.catalog_source || 'unknown'}` : 'MISSING'}`);
   return { ok: true, added, updated, checked, found, status, tauros };
 }
