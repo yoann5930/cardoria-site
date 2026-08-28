@@ -14,16 +14,15 @@
     { value: "PL", label: "PL — Played" },
     { value: "PO", label: "PO — Poor" }
   ];
+  var CONDITION_MULTIPLIERS = { M: 1.15, NM: 1, EX: 0.85, GD: 0.65, LP: 0.75, PL: 0.55, PO: 0.2 };
   var purchasesById = Object.create(null);
   var productsByKey = Object.create(null);
+  var currentProducts = [];
 
   function esc(v) {
     return String(v == null ? "" : v)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
   }
   function euro(n) { return Number(n || 0).toFixed(2).replace(".", ",") + " €"; }
   function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
@@ -40,8 +39,8 @@
     if (lower === "excellent") return "EX";
     if (lower === "good" || lower === "bon") return "GD";
     if (lower === "light played" || lower === "lightly played") return "LP";
-    if (lower === "played" || lower === "joué" || lower === "joue") return "PL";
-    if (lower === "poor" || lower === "mauvais") return "PO";
+    if (lower === "played" || lower === "joué" || lower === "joue" || lower === "mp") return "PL";
+    if (lower === "poor" || lower === "mauvais" || lower === "dmg") return "PO";
     return "";
   }
 
@@ -51,12 +50,11 @@
     try {
       var parsed = JSON.parse(match[1]);
       return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-    } catch (e) { return {}; }
+    } catch (_) { return {}; }
   }
 
   function readLinePreference(purchase, key) {
-    var prefs = parseStockPrefs(purchase && purchase.notes);
-    var pref = prefs[key];
+    var pref = parseStockPrefs(purchase && purchase.notes)[key];
     if (!pref || typeof pref !== "object") return null;
     return { condition: normalizeCondition(pref.condition), marketEnabled: pref.market === true };
   }
@@ -71,8 +69,8 @@
   }
 
   function catalogCardId(reference) {
-    var value = String(reference || "").trim(), prefix = "catalog-card:";
-    return value.indexOf(prefix) === 0 ? value.slice(prefix.length) : "";
+    var value = String(reference || "").trim();
+    return value.indexOf("catalog-card:") === 0 ? value.slice("catalog-card:".length) : "";
   }
 
   function lotCardIds(purchase) {
@@ -80,7 +78,7 @@
     var match = String(purchase.notes || "").match(/\[LOT_CARDS\]\s*(\[[^\n\r]*\])/);
     if (!match) return [];
     try { var ids = JSON.parse(match[1]); return Array.isArray(ids) ? ids.filter(Boolean) : []; }
-    catch (e) { return []; }
+    catch (_) { return []; }
   }
 
   function isStockPurchase(p) {
@@ -95,23 +93,43 @@
     return response && response.ok ? response.card : null;
   }
 
+  function isExternalSource(source) {
+    var name = String(source || "").trim().toLowerCase();
+    return !!name && name !== "cardoria" && name !== "manual" && name.indexOf("cardoria-") !== 0;
+  }
+
+  function externalSources(card) {
+    return ((card && card.priceSources) || []).filter(function (source) {
+      return isExternalSource(source.source) && positive(source.price);
+    });
+  }
+
+  function median(values) {
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    if (!sorted.length) return 0;
+    var mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
   function baseMarketPrice(card) {
     if (!card) return 0;
-    return positive(card.prices && card.prices.recommended) ||
-      positive(card.market && card.market.avg7) ||
-      positive(card.market && card.market.avg30) ||
-      positive(card.prices && card.prices.avg) || 0;
+    var sources = externalSources(card);
+    if (sources.length) return round2(median(sources.map(function (source) { return Number(source.price); })));
+    if (card.market && isExternalSource(card.market.source)) {
+      return positive(card.market.avg7) || positive(card.market.avg30) || positive(card.market.avg1) || 0;
+    }
+    return 0;
   }
 
   function marketSourceLabel(card) {
-    if (!card) return "Non relié";
-    var sources = (card.priceSources || []).filter(function (s) { return positive(s.price); });
-    if (sources.length) {
-      var names = [];
-      sources.forEach(function (s) { if (s.source && names.indexOf(s.source) < 0) names.push(s.source); });
-      return names.slice(0, 3).join(" + ") + (names.length > 3 ? " +…" : "");
-    }
-    return card.market && card.market.source ? card.market.source : "Prix indisponible";
+    if (!card) return "Référence non reliée";
+    var names = [];
+    externalSources(card).forEach(function (source) {
+      if (source.source && names.indexOf(source.source) < 0) names.push(source.source);
+    });
+    if (names.length) return names.slice(0, 3).join(" + ") + (names.length > 3 ? " +…" : "");
+    if (card.market && isExternalSource(card.market.source) && card.market.source) return card.market.source;
+    return "Aucune source marché externe fiable";
   }
 
   function add(map, item) {
@@ -134,22 +152,23 @@
         preferenceApplied: !!preference,
         packaging: item.packaging || "carte_unite",
         purchasePrice: round2(unitCost),
-        quantity: qty,
+        quantityPurchased: qty,
         linked: !!item.linked,
         latestPurchaseAt: item.latestPurchaseAt || "",
         totalCost: unitCost * qty,
         purchaseIds: item.purchaseId ? [item.purchaseId] : [],
-        marketPrice: baseMarketPrice(item.card),
+        marketPrice: 0,
         salePrice: 0,
-        salePriceSource: marketSourceLabel(item.card),
-        sold: Number(item.card && item.card.salesStats && item.card.salesStats.count || 0)
+        salePriceSource: "",
+        sold: 0,
+        remainingQuantity: qty
       };
       return;
     }
     var current = map[key];
-    current.quantity += qty;
+    current.quantityPurchased += qty;
     current.totalCost += unitCost * qty;
-    current.purchasePrice = current.quantity ? round2(current.totalCost / current.quantity) : 0;
+    current.purchasePrice = current.quantityPurchased ? round2(current.totalCost / current.quantityPurchased) : 0;
     current.linked = current.linked || !!item.linked;
     if (!current.card && item.card) current.card = item.card;
     if (item.purchaseId && current.purchaseIds.indexOf(item.purchaseId) < 0) current.purchaseIds.push(item.purchaseId);
@@ -161,53 +180,39 @@
     if (String(item.latestPurchaseAt || "") > String(current.latestPurchaseAt || "")) current.latestPurchaseAt = item.latestPurchaseAt;
   }
 
-  async function enrichSalePrice(product) {
-    if (!product.cardId || !product.card) {
-      product.marketPrice = 0;
+  function enrichProduct(product) {
+    product.marketPrice = baseMarketPrice(product.card);
+    product.salePriceSource = marketSourceLabel(product.card);
+    product.sold = Math.max(0, Math.trunc(Number(product.card && product.card.salesStats && product.card.salesStats.inventoryUnits || 0)));
+    product.remainingQuantity = Math.max(0, Number(product.quantityPurchased || 0) - product.sold);
+    var condition = normalizeCondition(product.condition);
+    if (!product.marketPrice) {
       product.salePrice = 0;
-      product.salePriceSource = "Référence marché non reliée";
+      product.salePriceNote = "À vérifier — aucune source marché externe fiable";
       return product;
     }
-    product.marketPrice = baseMarketPrice(product.card);
-    product.sold = Number(product.card.salesStats && product.card.salesStats.count || 0);
-    product.salePriceSource = marketSourceLabel(product.card);
-
-    var condition = normalizeCondition(product.condition);
     if (!condition) {
       product.salePrice = product.marketPrice;
-      product.salePriceNote = product.marketPrice ? "Prix marché non ajusté — renseigner l'état" : "Prix marché indisponible";
+      product.salePriceNote = "Prix marché non ajusté — renseigner l'état";
       return product;
     }
-
-    var result = await A.adminFetch("/api/admin/engine/estimate-price", {
-      method: "POST",
-      body: JSON.stringify({ cardId: product.cardId, condition: condition })
-    });
-    if (result && result.ok && result.estimate && positive(result.estimate.recommended)) {
-      product.salePrice = positive(result.estimate.recommended);
-      product.salePriceNote = "Ajusté selon l'état " + condition;
-      if (Array.isArray(result.estimate.sources) && result.estimate.sources.length) {
-        var src = [];
-        result.estimate.sources.forEach(function (s) { if (s.source && src.indexOf(s.source) < 0) src.push(s.source); });
-        if (src.length) product.salePriceSource = src.slice(0, 3).join(" + ") + (src.length > 3 ? " +…" : "");
-      }
-    } else {
-      product.salePrice = product.marketPrice;
-      product.salePriceNote = product.marketPrice ? "Prix marché de référence" : "Prix marché indisponible";
-    }
+    product.salePrice = round2(product.marketPrice * (CONDITION_MULTIPLIERS[condition] || 1));
+    product.salePriceNote = "Marché ajusté selon l'état " + condition;
     return product;
   }
 
   async function buildStock(purchases) {
-    var map = Object.create(null), paid = (purchases || []).filter(isStockPurchase), cardIds = [];
+    var map = Object.create(null);
+    var paid = (purchases || []).filter(isStockPurchase);
+    var cardIds = [];
     purchasesById = Object.create(null);
     (purchases || []).forEach(function (purchase) { if (purchase && purchase.id) purchasesById[purchase.id] = purchase; });
 
-    paid.forEach(function (p) {
-      if (String(p.packaging || "carte_unite") === "lot_cartes") {
-        lotCardIds(p).forEach(function (id) { if (id && cardIds.indexOf(id) < 0) cardIds.push(id); });
+    paid.forEach(function (purchase) {
+      if (String(purchase.packaging || "carte_unite") === "lot_cartes") {
+        lotCardIds(purchase).forEach(function (id) { if (id && cardIds.indexOf(id) < 0) cardIds.push(id); });
       } else {
-        var id = catalogCardId(p.reference);
+        var id = catalogCardId(purchase.reference);
         if (id && cardIds.indexOf(id) < 0) cardIds.push(id);
       }
     });
@@ -216,178 +221,218 @@
     var cards = Object.create(null);
     resolvedPairs.forEach(function (pair) { cards[pair[0]] = pair[1]; });
 
-    paid.forEach(function (p) {
-      var qty = Math.max(1, Math.trunc(Number(p.quantity) || 1));
-      var amount = Math.max(0, Number(p.amount) || 0);
+    paid.forEach(function (purchase) {
+      var qty = Math.max(1, Math.trunc(Number(purchase.quantity) || 1));
+      var amount = Math.max(0, Number(purchase.amount) || 0);
       var unitCost = qty ? amount / qty : amount;
-      var packaging = String(p.packaging || "carte_unite"), purchaseDate = p.date || p.createdAt || "";
+      var packaging = String(purchase.packaging || "carte_unite");
+      var purchaseDate = purchase.date || purchase.createdAt || "";
 
       if (packaging === "lot_cartes") {
-        var ids = lotCardIds(p);
+        var ids = lotCardIds(purchase);
         if (ids.length) {
           for (var i = 0; i < qty; i += 1) {
-            var lotId = ids[i] || "", lotCard = cards[lotId] || null;
-            var lotKey = lotId ? "card:" + lotId : "purchase:" + p.id + ":" + i;
-            add(map, { key: lotKey, id: lotId || p.id + ":" + (i + 1), cardId: lotId, card: lotCard,
-              name: lotCard && lotCard.name ? lotCard.name : (p.description || "Carte Pokémon du lot"),
-              extension: lotCard && lotCard.extension || "", number: lotCard && lotCard.number || "",
-              category: lotCard && (lotCard.hitFamily || lotCard.rarity) || "Carte Pokémon",
-              condition: p.condition || p.cardCondition || "", preference: readLinePreference(p, lotKey), packaging: packaging,
-              price: unitCost, quantity: 1, linked: !!lotCard, latestPurchaseAt: purchaseDate, purchaseId: p.id });
+            var lotId = ids[i] || "";
+            var card = cards[lotId] || null;
+            var key = lotId ? "card:" + lotId : "purchase:" + purchase.id + ":" + i;
+            add(map, {
+              key: key, id: lotId || purchase.id + ":" + (i + 1), cardId: lotId, card: card,
+              name: card && card.name ? card.name : (purchase.description || "Carte Pokémon du lot"),
+              extension: card && card.extension || "", number: card && card.number || "",
+              category: card && (card.hitFamily || card.rarity) || "Carte Pokémon",
+              condition: purchase.condition || purchase.cardCondition || "", preference: readLinePreference(purchase, key),
+              packaging: packaging, price: unitCost, quantity: 1, linked: !!card, latestPurchaseAt: purchaseDate, purchaseId: purchase.id
+            });
           }
         } else {
-          var fallbackKey = "purchase:" + p.id + ":lot";
-          add(map, { key: fallbackKey, id: p.id, name: p.description || "Lot de cartes Pokémon", category: "Lot de cartes",
-            condition: p.condition || p.cardCondition || "", preference: readLinePreference(p, fallbackKey), packaging: packaging,
-            price: unitCost, quantity: qty, linked: false, latestPurchaseAt: purchaseDate, purchaseId: p.id });
+          var fallbackKey = "purchase:" + purchase.id + ":lot";
+          add(map, { key: fallbackKey, id: purchase.id, name: purchase.description || "Lot de cartes Pokémon", category: "Lot de cartes",
+            condition: purchase.condition || purchase.cardCondition || "", preference: readLinePreference(purchase, fallbackKey), packaging: packaging,
+            price: unitCost, quantity: qty, linked: false, latestPurchaseAt: purchaseDate, purchaseId: purchase.id });
         }
         return;
       }
 
-      if (packaging === "carte_unite" || !p.packaging) {
-        var cardId = catalogCardId(p.reference), card = cards[cardId] || null;
-        var cardKey = cardId ? "card:" + cardId : "purchase:" + p.id;
-        add(map, { key: cardKey, id: cardId || p.id, cardId: cardId, card: card,
-          name: card && card.name ? card.name : (p.description || "Carte Pokémon"), extension: card && card.extension || "", number: card && card.number || "",
-          category: card && (card.hitFamily || card.rarity) || "Carte Pokémon", condition: p.condition || p.cardCondition || "",
-          preference: readLinePreference(p, cardKey), packaging: packaging, price: unitCost, quantity: qty, linked: !!card,
-          latestPurchaseAt: purchaseDate, purchaseId: p.id });
+      if (packaging === "carte_unite" || !purchase.packaging) {
+        var cardId = catalogCardId(purchase.reference);
+        var singleCard = cards[cardId] || null;
+        var cardKey = cardId ? "card:" + cardId : "purchase:" + purchase.id;
+        add(map, {
+          key: cardKey, id: cardId || purchase.id, cardId: cardId, card: singleCard,
+          name: singleCard && singleCard.name ? singleCard.name : (purchase.description || "Carte Pokémon"),
+          extension: singleCard && singleCard.extension || "", number: singleCard && singleCard.number || "",
+          category: singleCard && (singleCard.hitFamily || singleCard.rarity) || "Carte Pokémon",
+          condition: purchase.condition || purchase.cardCondition || "", preference: readLinePreference(purchase, cardKey),
+          packaging: packaging, price: unitCost, quantity: qty, linked: !!singleCard, latestPurchaseAt: purchaseDate, purchaseId: purchase.id
+        });
         return;
       }
 
-      var sealedKey = "purchase:" + p.id + ":sealed";
-      add(map, { key: sealedKey, id: p.id, name: p.description || "Produit Pokémon scellé", category: "Produit scellé",
-        condition: "", preference: readLinePreference(p, sealedKey), packaging: packaging, price: unitCost, quantity: qty,
-        linked: false, latestPurchaseAt: purchaseDate, purchaseId: p.id });
+      var sealedKey = "purchase:" + purchase.id + ":sealed";
+      add(map, { key: sealedKey, id: purchase.id, name: purchase.description || "Produit Pokémon scellé", category: "Produit scellé",
+        condition: "", preference: readLinePreference(purchase, sealedKey), packaging: packaging, price: unitCost, quantity: qty,
+        linked: false, latestPurchaseAt: purchaseDate, purchaseId: purchase.id });
     });
 
-    var products = Object.keys(map).map(function (key) { return map[key]; });
-    await Promise.all(products.map(enrichSalePrice));
-    return products.sort(function (a, b) {
+    return Object.keys(map).map(function (key) { return enrichProduct(map[key]); }).sort(function (a, b) {
       return String(b.latestPurchaseAt || "").localeCompare(String(a.latestPurchaseAt || "")) || String(a.name || "").localeCompare(String(b.name || ""), "fr");
     });
   }
 
-  function conditionSelect(p) {
-    var isCard = p.packaging === "carte_unite" || p.packaging === "lot_cartes";
+  function conditionSelect(product) {
+    var isCard = product.packaging === "carte_unite" || product.packaging === "lot_cartes";
     if (!isCard) return '<select disabled><option>Scellé</option></select>';
-    return '<select data-stock-condition="' + esc(p.key) + '">' + CONDITION_OPTIONS.map(function (option) {
-      return '<option value="' + esc(option.value) + '"' + (option.value === normalizeCondition(p.condition) ? ' selected' : '') + '>' + esc(option.label) + '</option>';
-    }).join('') + '</select>';
+    return '<select data-stock-condition="' + esc(product.key) + '">' + CONDITION_OPTIONS.map(function (option) {
+      return '<option value="' + esc(option.value) + '"' + (option.value === normalizeCondition(product.condition) ? ' selected' : '') + '>' + esc(option.label) + '</option>';
+    }).join("") + '</select>';
   }
 
-  function marketSelect(p) {
-    return '<select data-stock-market="' + esc(p.key) + '">' +
-      '<option value="no"' + (!p.marketEnabled ? ' selected' : '') + '>Non</option>' +
-      '<option value="yes"' + (p.marketEnabled ? ' selected' : '') + '>Oui</option>' +
-      '</select><br><small data-stock-save="' + esc(p.key) + '" style="color:#baaf97">Enregistré</small>';
+  function marketSelect(product) {
+    return '<select data-stock-market="' + esc(product.key) + '">' +
+      '<option value="no"' + (!product.marketEnabled ? ' selected' : '') + '>Non</option>' +
+      '<option value="yes"' + (product.marketEnabled ? ' selected' : '') + '>Oui</option>' +
+      '</select><br><small data-stock-save="' + esc(product.key) + '" style="color:#baaf97">Enregistré</small>';
+  }
+
+  function selectorValue(name, key) {
+    var node = document.querySelector('[data-' + name + '="' + CSS.escape(key) + '"]');
+    return node ? node.value : "";
   }
 
   function setRowBusy(key, busy) {
-    var condition = document.querySelector('[data-stock-condition="' + CSS.escape(key) + '"]');
-    var market = document.querySelector('[data-stock-market="' + CSS.escape(key) + '"]');
-    if (condition) condition.disabled = !!busy;
-    if (market) market.disabled = !!busy;
-  }
-  function setSaveStatus(key, text, isError) {
-    var el = document.querySelector('[data-stock-save="' + CSS.escape(key) + '"]');
-    if (!el) return;
-    el.textContent = text; el.style.color = isError ? "#ff7373" : "#baaf97";
+    ["stock-condition", "stock-market"].forEach(function (name) {
+      var node = document.querySelector('[data-' + name + '="' + CSS.escape(key) + '"]');
+      if (node) node.disabled = !!busy;
+    });
   }
 
-  async function saveRowPreference(product, nextPreference) {
+  function setSaveStatus(key, text, error) {
+    var node = document.querySelector('[data-stock-save="' + CSS.escape(key) + '"]');
+    if (!node) return;
+    node.textContent = text;
+    node.style.color = error ? "#ff7373" : "#baaf97";
+  }
+
+  async function saveRowPreference(product, preference) {
     var ids = (product.purchaseIds || []).slice();
     if (!ids.length) throw new Error("Aucun achat lié à cette ligne de stock.");
-    setRowBusy(product.key, true); setSaveStatus(product.key, "Enregistrement…", false);
+    setRowBusy(product.key, true);
+    setSaveStatus(product.key, "Enregistrement…", false);
     try {
       for (var i = 0; i < ids.length; i += 1) {
-        var id = ids[i], purchase = purchasesById[id];
+        var id = ids[i];
+        var purchase = purchasesById[id];
         if (!purchase) continue;
-        var body = Object.assign({}, purchase, { notes: writeLinePreference(purchase.notes, product.key, nextPreference) });
+        var body = Object.assign({}, purchase, { notes: writeLinePreference(purchase.notes, product.key, preference) });
         var response = await A.adminFetch("/api/admin/accounting/purchases/" + encodeURIComponent(id), { method: "PUT", body: JSON.stringify(body) });
         if (!response || !response.ok) throw new Error(response && response.error || "Enregistrement impossible.");
         purchasesById[id] = response.purchase || body;
       }
-      product.condition = normalizeCondition(nextPreference.condition);
-      product.marketEnabled = nextPreference.marketEnabled === true;
+      product.condition = normalizeCondition(preference.condition);
+      product.marketEnabled = preference.marketEnabled === true;
       product.preferenceApplied = true;
-      await enrichSalePrice(product);
-      renderStock(Object.keys(productsByKey).map(function (key) { return productsByKey[key]; }), true);
-    } catch (error) {
-      setSaveStatus(product.key, "Erreur d’enregistrement", true); throw error;
-    } finally { setRowBusy(product.key, false); }
+      enrichProduct(product);
+      renderStock(currentProducts, true);
+      setSaveStatus(product.key, "Enregistré ✓", false);
+    } finally {
+      setRowBusy(product.key, false);
+    }
   }
 
   function bindStockControls() {
     document.querySelectorAll("[data-stock-condition]").forEach(function (select) {
       select.addEventListener("change", function () {
-        var product = productsByKey[select.getAttribute("data-stock-condition")];
+        var key = select.getAttribute("data-stock-condition");
+        var product = productsByKey[key];
         if (!product) return;
-        var previous = normalizeCondition(product.condition);
-        saveRowPreference(product, { condition: select.value, marketEnabled: product.marketEnabled }).catch(function () { select.value = previous; });
+        var previous = product.condition;
+        saveRowPreference(product, { condition: select.value, marketEnabled: product.marketEnabled }).catch(function (error) {
+          product.condition = previous;
+          enrichProduct(product);
+          renderStock(currentProducts, true);
+          alert(error.message || "Enregistrement impossible.");
+        });
       });
     });
     document.querySelectorAll("[data-stock-market]").forEach(function (select) {
       select.addEventListener("change", function () {
-        var product = productsByKey[select.getAttribute("data-stock-market")];
+        var key = select.getAttribute("data-stock-market");
+        var product = productsByKey[key];
         if (!product) return;
-        var previous = product.marketEnabled ? "yes" : "no";
-        saveRowPreference(product, { condition: product.condition, marketEnabled: select.value === "yes" }).catch(function () { select.value = previous; });
+        var previous = product.marketEnabled;
+        saveRowPreference(product, { condition: product.condition, marketEnabled: select.value === "yes" }).catch(function (error) {
+          product.marketEnabled = previous;
+          renderStock(currentProducts, true);
+          alert(error.message || "Enregistrement impossible.");
+        });
       });
     });
   }
 
   function renderStock(products, preserveMap) {
+    currentProducts = products;
     if (!preserveMap) {
       productsByKey = Object.create(null);
-      products.forEach(function (p) { productsByKey[p.key] = p; });
+      products.forEach(function (product) { productsByKey[product.key] = product; });
     }
-    var refs = products.length;
-    var units = products.reduce(function (sum, p) { return sum + Number(p.quantity || 0); }, 0);
-    var acquisition = products.reduce(function (sum, p) { return sum + Number(p.purchasePrice || 0) * Number(p.quantity || 0); }, 0);
-    var saleValue = products.reduce(function (sum, p) { return sum + Number(p.salePrice || 0) * Number(p.quantity || 0); }, 0);
-    var margin = saleValue - acquisition;
-    var sold = products.reduce(function (sum, p) { return sum + Number(p.sold || 0); }, 0);
+
+    var active = products.filter(function (product) { return Number(product.remainingQuantity || 0) > 0; });
+    var refs = active.length;
+    var units = active.reduce(function (sum, product) { return sum + Number(product.remainingQuantity || 0); }, 0);
+    var acquisition = active.reduce(function (sum, product) { return sum + Number(product.purchasePrice || 0) * Number(product.remainingQuantity || 0); }, 0);
+    var priced = active.filter(function (product) { return positive(product.salePrice); });
+    var saleValue = priced.reduce(function (sum, product) { return sum + Number(product.salePrice || 0) * Number(product.remainingQuantity || 0); }, 0);
+    var margin = priced.reduce(function (sum, product) { return sum + (Number(product.salePrice || 0) - Number(product.purchasePrice || 0)) * Number(product.remainingQuantity || 0); }, 0);
+    var sold = products.reduce(function (sum, product) { return sum + Number(product.sold || 0); }, 0);
+    var withoutPrice = active.length - priced.length;
+
     A.qs("#stockRefs").textContent = refs;
     A.qs("#stockUnits").textContent = units;
     A.qs("#stockBuyValue").textContent = euro(acquisition);
     A.qs("#stockSaleValue").textContent = euro(saleValue);
+    A.qs("#stockSaleValueNote").textContent = withoutPrice ? withoutPrice + " ligne(s) à vérifier — non incluses" : "toutes les lignes en stock sont tarifées";
     A.qs("#stockMargin").textContent = euro(margin);
     A.qs("#stockSold").textContent = sold;
 
-    A.qs("#stockRows").innerHTML = products.map(function (p) {
-      var meta = [p.extension, p.number ? "#" + p.number : ""].filter(Boolean).join(" · ");
-      var unitMargin = p.salePrice > 0 ? round2(p.salePrice - p.purchasePrice) : 0;
-      var totalMargin = p.salePrice > 0 ? round2(unitMargin * p.quantity) : 0;
-      var totalStock = p.salePrice > 0 ? round2(p.salePrice * p.quantity) : 0;
+    A.qs("#stockRows").innerHTML = products.map(function (product) {
+      var meta = [product.extension, product.number ? "#" + product.number : ""].filter(Boolean).join(" · ");
+      var remaining = Number(product.remainingQuantity || 0);
+      var totalStock = positive(product.salePrice) ? euro(product.salePrice * remaining) : "<strong>À vérifier</strong>";
+      var marginValue = positive(product.salePrice) ? euro((product.salePrice - product.purchasePrice) * remaining) : "<strong>À vérifier</strong>";
+      var marketPrice = positive(product.marketPrice) ? euro(product.marketPrice) : "<strong>À vérifier</strong>";
+      var salePrice = positive(product.salePrice) ? euro(product.salePrice) : "<strong>À vérifier</strong>";
+      var quantityNote = product.sold ? "<br><small>Achetées : " + esc(product.quantityPurchased) + "</small>" : "";
+      var warning = product.sold > product.quantityPurchased ? "<br><small style='color:#ff9b9b'>Ventes enregistrées supérieures aux achats disponibles</small>" : "";
       return "<tr>" +
-        "<td><strong>" + esc(p.name) + "</strong>" + (meta ? "<br><small>" + esc(meta) + "</small>" : "") + "</td>" +
-        "<td>" + conditionSelect(p) + "</td>" +
-        "<td><strong>" + euro(p.purchasePrice) + "</strong></td>" +
-        "<td>" + (p.marketPrice > 0 ? "<strong>" + euro(p.marketPrice) + "</strong>" : "<span style='color:#baaf97'>Indisponible</span>") + "<br><small>" + esc(p.salePriceSource) + "</small></td>" +
-        "<td>" + (p.salePrice > 0 ? "<strong>" + euro(p.salePrice) + "</strong>" : "<span style='color:#ffb3b3'>À vérifier</span>") + "<br><small>" + esc(p.salePriceNote || "") + "</small></td>" +
-        "<td><strong>" + esc(p.quantity) + "</strong></td>" +
-        "<td><strong>" + (p.salePrice > 0 ? euro(totalStock) : "—") + "</strong></td>" +
-        "<td>" + (p.salePrice > 0 ? "<strong>" + euro(unitMargin) + "</strong><br><small>Total " + euro(totalMargin) + "</small>" : "—") + "</td>" +
-        "<td><strong>" + esc(p.sold) + "</strong><br><small>ventes Cardoria enregistrées</small></td>" +
-        "<td>" + marketSelect(p) + "</td>" +
+        "<td><strong>" + esc(product.name) + "</strong>" + (meta ? "<br><small>" + esc(meta) + "</small>" : "") + warning + "</td>" +
+        "<td>" + conditionSelect(product) + "</td>" +
+        "<td>" + euro(product.purchasePrice) + "</td>" +
+        "<td>" + marketPrice + "<br><small>" + esc(product.salePriceSource) + "</small></td>" +
+        "<td>" + salePrice + "<br><small>" + esc(product.salePriceNote || "") + "</small></td>" +
+        "<td><strong>" + esc(remaining) + "</strong>" + quantityNote + "</td>" +
+        "<td>" + totalStock + "</td>" +
+        "<td>" + marginValue + "</td>" +
+        "<td><strong>" + esc(product.sold) + "</strong></td>" +
+        "<td>" + marketSelect(product) + "</td>" +
         "</tr>";
     }).join("") || "<tr><td colspan='10'>Aucun achat Pokémon payé à mettre en stock.</td></tr>";
     bindStockControls();
   }
 
-  A.renderShell("stock", "Stock & prix de vente", "Coût Cardoria, valeur marché, prix conseillé, marge et ventes enregistrées",
+  A.renderShell("stock", "Stock & prix", "Stock Cardoria restant, valeur marché externe, prix conseillé, marge potentielle et ventes internes prouvées",
     '<div class="admin-kpi-grid">' +
-      '<div class="admin-kpi"><label>Références</label><strong id="stockRefs">0</strong><small>lignes</small></div>' +
-      '<div class="admin-kpi"><label>Quantité</label><strong id="stockUnits">0</strong><small>unités achetées</small></div>' +
-      '<div class="admin-kpi"><label>Valeur achat</label><strong id="stockBuyValue">0,00 €</strong><small>coût Cardoria</small></div>' +
-      '<div class="admin-kpi"><label>Valeur de vente stock</label><strong id="stockSaleValue">0,00 €</strong><small>prix conseillé × quantité</small></div>' +
-      '<div class="admin-kpi"><label>Marge potentielle</label><strong id="stockMargin">0,00 €</strong><small>avant frais de vente</small></div>' +
-      '<div class="admin-kpi"><label>Vendu</label><strong id="stockSold">0</strong><small>ventes internes enregistrées</small></div>' +
+      '<div class="admin-kpi"><label>Références en stock</label><strong id="stockRefs">0</strong><small>lignes avec quantité restante</small></div>' +
+      '<div class="admin-kpi"><label>Unités en stock</label><strong id="stockUnits">0</strong><small>achetées - vendues Cardoria</small></div>' +
+      '<div class="admin-kpi"><label>Valeur achat stock</label><strong id="stockBuyValue">0,00 €</strong><small>coût Cardoria du stock restant</small></div>' +
+      '<div class="admin-kpi"><label>Valeur vente connue</label><strong id="stockSaleValue">0,00 €</strong><small id="stockSaleValueNote">prix fiables uniquement</small></div>' +
+      '<div class="admin-kpi"><label>Marge potentielle</label><strong id="stockMargin">0,00 €</strong><small>stock restant, avant frais de vente</small></div>' +
+      '<div class="admin-kpi"><label>Vendu</label><strong id="stockSold">0</strong><small>sorties de stock Cardoria prouvées</small></div>' +
     '</div>' +
-    '<div class="admin-panel"><p class="small"><strong>Prix marché</strong> = référence disponible dans le moteur Cardoria. <strong>Prix vente conseillé</strong> = prix agrégé multi-sources ajusté selon l’état lorsque celui-ci est renseigné. Si aucune source fiable n’existe, Cardoria affiche « À vérifier » et ne fabrique pas de prix.</p>' +
-      '<p class="small">Sources actuellement exploitables selon les cartes : Cardmarket/TCGdex, TCGplayer/TCGCSV, ZebraDex et autres sources enregistrées. eBay n’est utilisé que lorsqu’une source eBay valide est effectivement présente. Les annonces Leboncoin ne sont pas assimilées à des ventes réalisées.</p>' +
-      '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Carte Pokémon</th><th>État</th><th>Montant achat Cardoria</th><th>Montant marché</th><th>Prix vente conseillé</th><th>Quantité</th><th>Total stock</th><th>Marge</th><th>Vendu</th><th>Market</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
+    '<div class="admin-panel">' +
+      '<p class="small"><strong>Montant marché</strong> : médiane des sources marché externes enregistrées pour la carte. Les sources internes <code>cardoria</code> et <code>manual</code> sont exclues. Sans source externe positive, le prix reste « À vérifier ».</p>' +
+      '<p class="small"><strong>Prix vente conseillé</strong> : montant marché ajusté selon l’état. <strong>Quantité</strong> : achats payés moins sorties de stock Cardoria réellement enregistrées. Les ventes Marketplace de vendeurs tiers et les simples estimations ne retirent pas de stock Cardoria.</p>' +
+      '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Carte Pokémon</th><th>État</th><th>Montant achat Cardoria</th><th>Montant marché</th><th>Prix vente conseillé</th><th>Quantité en stock</th><th>Total stock</th><th>Marge</th><th>Vendu</th><th>Market</th></tr></thead><tbody id="stockRows"></tbody></table></div>' +
+    '</div>');
 
   A.adminFetch("/api/admin/accounting/purchases")
     .then(function (data) {
