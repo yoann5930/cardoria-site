@@ -3,7 +3,7 @@
  */
 import crypto from "crypto";
 import { getDb } from "../engine/database.js";
-import { hashToken, makeId } from "./migrate.js";
+import { hashToken, makeId, ADMIN_ROLES } from "./migrate.js";
 
 const SESSION_HOURS = Number(process.env.SESSION_HOURS || 12);
 
@@ -36,6 +36,10 @@ export function validateSession(token) {
   `).get(hashToken(token), new Date().toISOString());
 
   if (!row || !row.active) return null;
+  if (ADMIN_ROLES.includes(row.role) && !row.totp_enabled) {
+    db.prepare("DELETE FROM auth_sessions WHERE id = ?").run(row.sessionId);
+    return null;
+  }
 
   return {
     sessionId: row.sessionId,
