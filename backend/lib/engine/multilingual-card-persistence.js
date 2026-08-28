@@ -57,9 +57,6 @@ export async function persistMultilingualCards(reason = "catalog-sync") {
       const startedAt = new Date().toISOString();
       const rows = sqlite.prepare("SELECT * FROM cards WHERE license_slug='pokemon' AND language=? AND active=1 ORDER BY id").all(language);
       for (const batch of chunks(rows)) await writeBatch(client, batch);
-      // Remove obsolete rows only after all current rows were safely upserted.
-      // No long transaction is held, so overlapping Render instances cannot block
-      // each other for several minutes during deployment.
       try {
         await client.query("DELETE FROM cardoria_multilingual_cards WHERE language=$1 AND updated_at < $2::timestamptz", [language, startedAt]);
       } catch (error) {
@@ -81,13 +78,17 @@ export async function persistMultilingualCards(reason = "catalog-sync") {
 function insertRows(sqlite, rows) {
   if (!rows.length) return 0;
   let inserted = 0;
+  const knownColumns = new Set(sqlite.prepare("PRAGMA table_info(cards)").all().map((row) => String(row.name || "")));
   sqlite.pragma("foreign_keys = OFF");
   try {
     const tx = sqlite.transaction(() => {
       for (const row of rows) {
         if (!row || typeof row !== "object" || !row.id) continue;
-        const columns = Object.keys(row).filter((name) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name));
-        if (!columns.length) continue;
+        // Snapshots may contain fields introduced by a newer catalog provider.
+        // Restore every field the current SQLite schema knows instead of
+        // rejecting the whole card because one optional column is not migrated yet.
+        const columns = Object.keys(row).filter((name) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name) && knownColumns.has(name));
+        if (!columns.includes("id") || !columns.length) continue;
         const quoted = columns.map((name) => `"${name}"`).join(",");
         const placeholders = columns.map(() => "?").join(",");
         sqlite.prepare(`INSERT OR REPLACE INTO cards (${quoted}) VALUES (${placeholders})`).run(...columns.map((name) => row[name]));
