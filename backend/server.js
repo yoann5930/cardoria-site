@@ -46,12 +46,10 @@ import ultimateRoutes from "./routes/ultimate.js";
 import ultimateAdminRoutes from "./routes/ultimate-admin.js";
 import bigdataAnalyticsRoutes from "./routes/bigdata-analytics.js";
 import bigdataAdminRoutes from "./routes/bigdata-admin.js";
-import { logAudit } from "./lib/audit.js";
 import { applySecurityMiddleware, errorHandler } from "./lib/security/index.js";
-import { apiRateLimit, aiRateLimit, authRateLimit } from "./lib/security/rateLimit.js";
+import { apiRateLimit, aiRateLimit } from "./lib/security/rateLimit.js";
 import { migrateAuth } from "./lib/auth/migrate.js";
 import { scheduleAutoBackup } from "./lib/backup/full.js";
-import { validateBody, SCHEMAS } from "./lib/security/validate.js";
 import { initLaunch, connectionJournalMiddleware, maintenanceMiddleware } from "./lib/launch/index.js";
 import systemRoutes from "./routes/system.js";
 
@@ -189,22 +187,12 @@ app.use("/api/admin/ai-enterprise", aiEnterpriseAdminRoutes);
 app.use("/api/admin/ultimate", ultimateAdminRoutes);
 app.use("/api/admin/bigdata", bigdataAdminRoutes);
 
-app.post("/api/admin/login", authRateLimit, (req, res) => {
-  const v = validateBody(SCHEMAS.legacyAdminLogin, req.body || {});
-  if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
-  const expected = process.env.ADMIN_CODE;
-  if (!expected || process.env.LEGACY_ADMIN_CODE === "false") return res.status(503).json({ ok: false, error: "Connexion legacy desactivee — utiliser /api/auth/login." });
-  if (v.data.code !== expected) { logAudit({ type: "auth", action: "login_failed", user: "unknown", detail: "Code incorrect" }); return res.status(401).json({ ok: false, error: "Code incorrect" }); }
-  logAudit({ type: "auth", action: "login_success", user: "admin", detail: "Legacy code" });
-  res.json({ ok: true, token: expected, legacy: true });
-});
-
 app.get(["/boutique", "/boutique/", "/pages/boutique", "/pages/boutique/"], (req, res) => res.redirect(308, "/boutique.html"));
 app.get("/script.js", (req, res, next) => {
   try {
     const scriptPath = path.join(PUBLIC_ROOT, "script.js");
     let source = fs.readFileSync(scriptPath, "utf8");
-    source = source.replace('const BACKEND_URL="https://cardoria-site-2.onrender.com";', 'const BACKEND_URL=window.location.origin;').replace('const ADMIN_CODE_LOCAL="CARDORIA59330";', 'const ADMIN_CODE_LOCAL="";');
+    source = source.replace('const BACKEND_URL="https://cardoria-site-2.onrender.com";', 'const BACKEND_URL=window.location.origin;');
     res.type("application/javascript; charset=utf-8").send(source);
   } catch (error) { next(error); }
 });
