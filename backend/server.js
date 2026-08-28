@@ -171,10 +171,10 @@ app.use("/api/payments", marketplacePersistenceMiddleware, apiRateLimit, payment
 app.use("/api/seo", apiRateLimit, seoRoutes);
 
 app.use("/api/estimation-carte", (req, res, next) => { if (req.method === "POST") return aiRateLimit(req, res, next); next(); }, estimationRoutes);
-app.use("/api/rachat", apiRateLimit, rachatRoutes);
+app.use("/api/rachat", marketplacePersistenceMiddleware, apiRateLimit, rachatRoutes);
 app.use("/api/admin", adminDashboardRoutes);
 app.use("/api/admin/accounting", adminFinanceRoutes);
-app.use("/api/admin/rachat", rachatAdminRoutes);
+app.use("/api/admin/rachat", marketplacePersistenceMiddleware, rachatAdminRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/email", emailAdminRoutes);
 app.use("/api/admin/development", developmentRoutes);
