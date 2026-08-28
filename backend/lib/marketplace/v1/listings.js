@@ -19,6 +19,7 @@ const STATUS_MAP = {
   suspendue: "suspended",
   removed: "removed"
 };
+const ADMIN_MODERATION_STATUSES = new Set(["active", "suspended", "removed"]);
 
 function normalizeStatus(s) {
   if (!s) return "active";
@@ -34,6 +35,10 @@ function rowToListingV1(row) {
     number: row.card_number || "",
     language: row.language || "",
     slug: row.slug || "",
+    moderationLocked: !!row.moderation_locked,
+    moderationReason: row.moderation_reason || "",
+    moderatedBy: row.moderated_by || "",
+    moderatedAt: row.moderated_at || "",
     seo: buildListingSeoMeta(row),
     publicUrl: row.slug ? `annonce.html?slug=${encodeURIComponent(row.slug)}` : `annonce.html?id=${row.id}`,
     statusLabel: statusLabel(row.status)
@@ -79,6 +84,12 @@ export function updateListingV1(id, sellerId, data) {
   const db = getDb();
   assertOwnership(id, sellerId);
   const existing = db.prepare("SELECT * FROM mk_listings WHERE id = ?").get(id);
+  const requestedStatus = data.status ? normalizeStatus(data.status) : existing.status;
+  if (existing.moderation_locked && requestedStatus !== existing.status) {
+    const error = new Error("Cette annonce est verrouillée par la modération Cardoria.");
+    error.status = 409;
+    throw error;
+  }
   const now = new Date().toISOString();
   const title = data.title ?? existing.title;
   const slug = data.slug || existing.slug || ensureUniqueSlug(makeListingSlug(title, id), id);
@@ -91,7 +102,7 @@ export function updateListingV1(id, sellerId, data) {
     negotiable: data.negotiable,
     stock: data.stock,
     photos: data.photos,
-    status: data.status ? normalizeStatus(data.status) : existing.status
+    status: requestedStatus
   });
 
   db.prepare(`
@@ -110,6 +121,42 @@ export function updateListingV1(id, sellerId, data) {
   return getListingV1(id);
 }
 
+export function moderateListingAdmin(id, { status, reason, actor }) {
+  const db = getDb();
+  const existing = db.prepare("SELECT rowid, * FROM mk_listings WHERE id = ?").get(id);
+  if (!existing) {
+    const error = new Error("Annonce introuvable");
+    error.status = 404;
+    throw error;
+  }
+  if (existing.status === "sold") {
+    const error = new Error("Une annonce vendue ne peut pas être modérée comme une annonce active.");
+    error.status = 409;
+    throw error;
+  }
+  const nextStatus = normalizeStatus(status);
+  if (!ADMIN_MODERATION_STATUSES.has(nextStatus)) {
+    const error = new Error("Statut de modération invalide");
+    error.status = 400;
+    throw error;
+  }
+  const cleanReason = String(reason || "").trim().slice(0, 1000);
+  if ((nextStatus === "suspended" || nextStatus === "removed") && cleanReason.length < 3) {
+    const error = new Error("Un motif de modération est obligatoire pour suspendre ou retirer une annonce.");
+    error.status = 400;
+    throw error;
+  }
+  const now = new Date().toISOString();
+  const lock = nextStatus !== "active" ? 1 : 0;
+  db.prepare(`
+    UPDATE mk_listings SET status=?, moderation_locked=?, moderation_reason=?, moderated_by=?, moderated_at=?, updated_at=?
+    WHERE id=?
+  `).run(nextStatus, lock, nextStatus === "active" ? "" : cleanReason, String(actor || "admin").slice(0, 200), now, now, id);
+  const row = db.prepare("SELECT rowid, * FROM mk_listings WHERE id = ?").get(id);
+  syncListingFts(row.rowid, row);
+  return rowToListingV1(row);
+}
+
 export function getListingV1(id, opts) {
   const row = getDb().prepare("SELECT * FROM mk_listings WHERE id = ?").get(id);
   if (!row) return null;
@@ -125,6 +172,12 @@ export function getListingV1BySlug(slug, opts) {
 
 export function deleteListingV1(id, sellerId) {
   assertOwnership(id, sellerId);
+  const existing = getDb().prepare("SELECT moderation_locked FROM mk_listings WHERE id = ?").get(id);
+  if (existing?.moderation_locked) {
+    const error = new Error("Cette annonce est verrouillée par la modération Cardoria.");
+    error.status = 409;
+    throw error;
+  }
   return deleteListing(id, sellerId);
 }
 
@@ -134,8 +187,10 @@ export function listSellerListings(sellerId, { status, page = 1, limit = 50 } = 
   const params = [sellerId];
   if (status) { conds.push("status = ?"); params.push(normalizeStatus(status)); }
   const where = "WHERE " + conds.join(" AND ");
-  const offset = (Math.max(page, 1) - 1) * limit;
-  const rows = db.prepare(`SELECT * FROM mk_listings ${where} ORDER BY updated_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
+  const safePage = Math.max(Number(page) || 1, 1);
+  const offset = (safePage - 1) * safeLimit;
+  const rows = db.prepare(`SELECT * FROM mk_listings ${where} ORDER BY updated_at DESC LIMIT ? OFFSET ?`).all(...params, safeLimit, offset);
   return rows.map((r) => rowToListingV1(r));
 }
 
@@ -144,17 +199,19 @@ export function listAllListingsAdmin({ status, page = 1, limit = 100 } = {}) {
   const conds = ["1=1"];
   const params = [];
   if (status) { conds.push("status = ?"); params.push(normalizeStatus(status)); }
-  const offset = (Math.max(page, 1) - 1) * limit;
+  const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 200);
+  const safePage = Math.max(Number(page) || 1, 1);
+  const offset = (safePage - 1) * safeLimit;
   const rows = db.prepare(`
     SELECT * FROM mk_listings WHERE ${conds.join(" AND ")} ORDER BY created_at DESC LIMIT ? OFFSET ?
-  `).all(...params, limit, offset);
+  `).all(...params, safeLimit, offset);
   return rows.map((r) => rowToListingV1(r));
 }
 
 export function getListingsSitemapEntries(limit = 5000) {
   return getDb().prepare(`
     SELECT id, slug, title, updated_at, photos FROM mk_listings
-    WHERE status = 'active' AND stock > 0 AND slug != ''
+    WHERE status = 'active' AND stock > 0 AND slug != '' AND COALESCE(moderation_locked,0)=0
     ORDER BY updated_at DESC LIMIT ?
   `).all(limit).map((r) => ({
     id: r.id,
