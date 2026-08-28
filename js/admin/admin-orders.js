@@ -6,6 +6,7 @@
   var orders = [];
   var filter = "all";
   var STATUSES = ["À préparer", "En préparation", "Expédiée", "Livrée", "Annulée"];
+  var CARRIERS = ["La Poste", "Mondial Relay", "Relais Colis"];
 
   function esc(v) {
     return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
@@ -46,6 +47,16 @@
       return '<option value="' + esc(status) + '"' + (status === current ? " selected" : "") + '>' + esc(status) + '</option>';
     }).join("");
   }
+  function carrierOptions(current) {
+    var options = ['<option value="">Choisir le transporteur</option>'];
+    CARRIERS.forEach(function (carrier) {
+      options.push('<option value="' + esc(carrier) + '"' + (carrier === current ? " selected" : "") + '>' + esc(carrier) + '</option>');
+    });
+    if (current && CARRIERS.indexOf(current) === -1) {
+      options.push('<option value="' + esc(current) + '" selected>' + esc(current) + ' (ancien)</option>');
+    }
+    return options.join("");
+  }
 
   function renderOrders() {
     var search = A.qs("#orderSearch");
@@ -68,7 +79,7 @@
         '<div class="admin-form-grid" style="margin-top:14px">' +
           '<label>Statut<select data-field="status">' + statusOptions(o.status) + '</select></label>' +
           '<label>Mode de livraison<input data-field="shipping" value="' + esc(o.shipping || "Standard") + '" placeholder="Standard"></label>' +
-          '<label>Transporteur<input data-field="carrier" value="' + esc(o.carrier || "") + '" placeholder="La Poste, Mondial Relay..."></label>' +
+          '<label>Transporteur<select data-field="carrier">' + carrierOptions(o.carrier || "") + '</select></label>' +
           '<label>Numéro de suivi<input data-field="tracking" value="' + esc(o.tracking || "") + '" placeholder="Suivi colis"></label>' +
           '<label class="admin-form-wide">Adresse de livraison<textarea data-field="address" rows="2" placeholder="Adresse client">' + esc(o.address || "") + '</textarea></label>' +
           '<label class="admin-form-wide">Note interne<textarea data-field="internalNote" rows="3" placeholder="Visible uniquement dans l’admin">' + esc(o.internalNote || "") + '</textarea></label>' +
@@ -107,6 +118,7 @@
   function reloadOrders(messageForId, message) {
     return A.adminFetch("/api/admin/payments/boutique-orders", { cache: "no-store" }).then(function (d) {
       orders = d && d.ok ? (d.orders || []) : [];
+      if (d && Array.isArray(d.carriers) && d.carriers.length) CARRIERS = d.carriers;
       renderOrders();
       if (messageForId) {
         var card = cardFor(messageForId);
