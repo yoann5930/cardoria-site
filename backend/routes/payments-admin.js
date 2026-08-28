@@ -4,6 +4,8 @@ import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logAudit } from "../lib/audit.js";
 import { listPayments, getPayment, PAYMENT_STATUSES } from "../lib/payments/ledger.js";
 import { isSumUpConfigured, syncPaymentFromCheckout } from "../lib/payments/sumup.js";
+import { refundSumUpTransaction } from "../lib/payments/sumup-refund.js";
+import { listBoutiqueInventory } from "../lib/boutique/stock.js";
 import { readJson, writeJson } from "../lib/storage.js";
 
 const router = Router();
@@ -39,6 +41,21 @@ router.get("/boutique-orders", (req, res) => {
   res.json({ ok: true, carriers: BOUTIQUE_CARRIERS, orders: readJson("orders", []) });
 });
 
+router.get("/boutique-inventory", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const inventory = listBoutiqueInventory({ includeDisabled: true });
+  const totals = inventory.reduce((acc, item) => {
+    acc.baseStock += Number(item.baseStock || 0);
+    acc.availableStock += Number(item.stock || 0);
+    acc.pendingStock += Number(item.pendingStock || 0);
+    acc.soldStock += Number(item.soldStock || 0);
+    acc.refundHoldStock += Number(item.refundHoldStock || 0);
+    acc.oversoldStock += Number(item.oversoldStock || 0);
+    return acc;
+  }, { baseStock: 0, availableStock: 0, pendingStock: 0, soldStock: 0, refundHoldStock: 0, oversoldStock: 0 });
+  res.json({ ok: true, inventory, totals });
+});
+
 router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
   const orders = readJson("orders", []);
   const index = orders.findIndex((order) => String(order.id) === String(req.params.id));
@@ -58,6 +75,9 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
   if (nextCarrier && !BOUTIQUE_CARRIERS.includes(nextCarrier) && nextCarrier !== clean(current.carrier, 120)) {
     return res.status(400).json({ ok: false, error: "Transporteur non autorisé. Choisissez La Poste, Mondial Relay ou Relais Colis." });
   }
+  if (nextStatus === "Expédiée" && (!nextCarrier || !clean(body.tracking, 180))) {
+    return res.status(400).json({ ok: false, error: "Transporteur et numéro de suivi obligatoires pour expédier la commande." });
+  }
 
   const now = new Date().toISOString();
   const previousStatus = current.status;
@@ -66,6 +86,7 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
   current.carrier = nextCarrier;
   current.tracking = clean(body.tracking, 180);
   current.address = clean(body.address, 600);
+  current.phone = clean(body.phone, 40) || current.phone || "";
   current.internalNote = clean(body.internalNote, 2000);
   current.updatedAt = now;
 
@@ -112,6 +133,39 @@ router.post("/boutique-orders/:id/sync-sumup", WRITE_ADMIN, async (req, res) => 
     res.json({ ok: true, status: result.status, payment: result.payment, order: findBoutiqueOrder(order.id) });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+router.post("/boutique-orders/:id/refund", WRITE_ADMIN, async (req, res) => {
+  let order = findBoutiqueOrder(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  if (order.paymentStatus !== "paid") return res.status(409).json({ ok: false, error: "Seule une commande SumUp payée peut être remboursée." });
+
+  try {
+    if (!order.sumupTransactionId && order.sumupCheckoutId) {
+      await syncPaymentFromCheckout(order.sumupCheckoutId);
+      order = findBoutiqueOrder(order.id);
+    }
+    if (!order?.sumupTransactionId) return res.status(409).json({ ok: false, error: "Transaction SumUp introuvable après synchronisation." });
+
+    await refundSumUpTransaction(order.sumupTransactionId, { orderId: order.id, user: req.authUser?.email || "admin" });
+
+    const orders = readJson("orders", []);
+    const index = orders.findIndex((item) => String(item.id) === String(order.id));
+    if (index >= 0) {
+      orders[index].status = "Annulée";
+      orders[index].paymentReviewRequired = true;
+      orders[index].refundRequestedAt = new Date().toISOString();
+      orders[index].updatedAt = new Date().toISOString();
+      writeJson("orders", orders);
+    }
+
+    let sync = null;
+    try { sync = await syncPaymentFromCheckout(order.sumupCheckoutId); } catch {}
+    const refreshed = findBoutiqueOrder(order.id);
+    res.json({ ok: true, refundRequested: true, status: sync?.status || refreshed?.paymentStatus || "pending", order: refreshed });
+  } catch (e) {
+    res.status(e.status || 500).json({ ok: false, error: e.message });
   }
 });
 
