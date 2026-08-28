@@ -11,25 +11,53 @@ function normalizeLanguage(value, fallback = "fr") {
   return CARD_LANGUAGES.has(language) ? language : fallback;
 }
 
-export function searchCards({ q = "", license = "", language = "", extension = "", rarity = "", hitFamily = "", variant = "", page = 1, limit = 24, sort = "name", activeOnly = true } = {}) {
+const SEARCH_LANGUAGE_HINTS = new Map([
+  ["ko", "ko"], ["kr", "ko"], ["coreen", "ko"], ["coreenne", "ko"], ["korean", "ko"],
+  ["ja", "ja"], ["jp", "ja"], ["japonais", "ja"], ["japonaise", "ja"], ["japanese", "ja"],
+  ["anglais", "en"], ["anglaise", "en"], ["english", "en"],
+  ["francais", "fr"], ["francaise", "fr"], ["french", "fr"]
+]);
+
+function parseSearchQuery(q = "", explicitLanguage = "") {
+  const normalized = normalizeText(String(q || "").trim());
+  const tokens = normalized.split(/\s+/).map((token) => token.replace(/^#+/, "")).filter(Boolean);
+  const terms = [];
+  let hintedLanguage = "";
+  for (const token of tokens) {
+    const hint = SEARCH_LANGUAGE_HINTS.get(token);
+    if (hint) {
+      if (!hintedLanguage) hintedLanguage = hint;
+      continue;
+    }
+    terms.push(token);
+  }
+  return {
+    language: explicitLanguage ? normalizeLanguage(explicitLanguage) : hintedLanguage,
+    terms
+  };
+}
+
+export function searchCards({ q = "", license = "", language = "", extension = "", rarity = "", hitFamily = "", variant = "", page = 1, limit = 24, sort = "name", activeOnly = true, maxLimit = 100 } = {}) {
   const db = getDb();
-  const safeLimit = Math.min(Math.max(Number(limit) || 24, 1), 100);
+  const cap = Math.min(Math.max(Number(maxLimit) || 100, 1), 500);
+  const safeLimit = Math.min(Math.max(Number(limit) || 24, 1), cap);
   const safePage = Math.max(Number(page) || 1, 1);
   const offset = (safePage - 1) * safeLimit;
   const conditions = [];
   const params = [];
+  const parsedQuery = parseSearchQuery(q, language);
   if (activeOnly) conditions.push("c.active = 1");
   if (license) { conditions.push("c.license_slug = ?"); params.push(license); }
-  if (language) { conditions.push("c.language = ?"); params.push(normalizeLanguage(language)); }
+  if (parsedQuery.language) { conditions.push("c.language = ?"); params.push(parsedQuery.language); }
   if (extension) { conditions.push("c.extension LIKE ?"); params.push(`%${extension}%`); }
   if (rarity) { conditions.push("c.rarity = ?"); params.push(rarity); }
   if (hitFamily) { conditions.push("c.hit_family = ?"); params.push(hitFamily); }
   if (variant === "holo") conditions.push("c.variants_json LIKE '%\"holo\":true%'");
   if (variant === "reverse") conditions.push("c.variants_json LIKE '%\"reverse\":true%'");
-  if (q) {
-    conditions.push("(c.name_normalized LIKE ? OR c.number LIKE ? OR c.extension LIKE ? OR c.rarity LIKE ? OR c.hit_family LIKE ?)");
-    const like = `%${normalizeText(q)}%`;
-    params.push(like, like, like, `%${q}%`, `%${q}%`);
+  for (const term of parsedQuery.terms) {
+    const like = `%${term}%`;
+    conditions.push("(c.name_normalized LIKE ? OR LOWER(c.number) LIKE ? OR LOWER(c.extension) LIKE ? OR LOWER(c.extension_code) LIKE ? OR LOWER(c.rarity) LIKE ? OR LOWER(c.hit_family) LIKE ?)");
+    params.push(like, like, like, like, like, like);
   }
   const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
   const order = sortOrder(sort);
