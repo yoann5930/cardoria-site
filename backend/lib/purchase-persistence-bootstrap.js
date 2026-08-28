@@ -10,6 +10,16 @@ let pool = null;
 let timer = null;
 let writing = false;
 let queued = false;
+const status = {
+  configured: Boolean(url),
+  initialized: false,
+  restored: false,
+  remoteCount: null,
+  localCount: 0,
+  lastSavedCount: null,
+  lastSavedAt: "",
+  lastError: ""
+};
 
 function getPool() {
   if (!url) return null;
@@ -53,8 +63,14 @@ async function restore() {
     await ensureSchema(client);
     const remote = await client.query("SELECT payload, updated_at FROM cardoria_purchase_snapshot WHERE id='primary' LIMIT 1");
     if (remote.rows[0]?.payload && Array.isArray(remote.rows[0].payload.purchases)) {
-      writeLocal(remote.rows[0].payload.purchases);
-      console.log(`[purchase-persistence] restored ${remote.rows[0].payload.purchases.length} purchase(s) from PostgreSQL`);
+      const purchases = remote.rows[0].payload.purchases;
+      writeLocal(purchases);
+      status.initialized = true;
+      status.restored = true;
+      status.remoteCount = purchases.length;
+      status.localCount = purchases.length;
+      status.lastError = "";
+      console.log(`[purchase-persistence] restored ${purchases.length} purchase(s) from PostgreSQL`);
       return;
     }
     const purchases = localPurchases();
@@ -62,7 +78,17 @@ async function restore() {
       "INSERT INTO cardoria_purchase_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()",
       [JSON.stringify({ version: 1, purchases, capturedAt: new Date().toISOString() })]
     );
+    status.initialized = true;
+    status.restored = false;
+    status.remoteCount = purchases.length;
+    status.localCount = purchases.length;
+    status.lastSavedCount = purchases.length;
+    status.lastSavedAt = new Date().toISOString();
+    status.lastError = "";
     console.log(`[purchase-persistence] initialized PostgreSQL with ${purchases.length} local purchase(s)`);
+  } catch (error) {
+    status.lastError = error?.message || String(error);
+    throw error;
   } finally {
     client.release();
   }
@@ -81,9 +107,16 @@ async function persist(reason = "storage-write") {
       "INSERT INTO cardoria_purchase_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()",
       [JSON.stringify({ version: 1, purchases, capturedAt: new Date().toISOString(), reason })]
     );
+    status.initialized = true;
+    status.remoteCount = purchases.length;
+    status.localCount = purchases.length;
+    status.lastSavedCount = purchases.length;
+    status.lastSavedAt = new Date().toISOString();
+    status.lastError = "";
     console.log(`[purchase-persistence] saved ${purchases.length} purchase(s) (${reason})`);
   } catch (error) {
-    console.error("[purchase-persistence] save failed", error?.message || String(error));
+    status.lastError = error?.message || String(error);
+    console.error("[purchase-persistence] save failed", status.lastError);
   } finally {
     client.release();
     writing = false;
@@ -105,7 +138,24 @@ process.on("cardoria:storage-write", (key) => {
 try {
   await restore();
 } catch (error) {
-  console.error("[purchase-persistence] restore failed", error?.message || String(error));
+  status.lastError = error?.message || String(error);
+  console.error("[purchase-persistence] restore failed", status.lastError);
+}
+
+export function getPurchasePersistenceStatus() {
+  const localCount = localPurchases().length;
+  status.localCount = localCount;
+  return {
+    configured: status.configured,
+    initialized: status.initialized,
+    restored: status.restored,
+    remoteCount: status.remoteCount,
+    localCount,
+    countsMatch: status.remoteCount === null ? false : status.remoteCount === localCount,
+    lastSavedCount: status.lastSavedCount,
+    lastSavedAt: status.lastSavedAt,
+    lastError: status.lastError ? "persistence_error" : ""
+  };
 }
 
 async function close() {
