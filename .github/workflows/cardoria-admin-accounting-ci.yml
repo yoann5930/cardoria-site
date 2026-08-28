@@ -6,14 +6,16 @@ on:
     paths:
       - "backend/lib/accounting/**"
       - "backend/routes/admin.js"
-      - "backend/tests/accounting-purchase-stats.test.mjs"
+      - "backend/tests/accounting-*.test.mjs"
+      - "js/admin/admin-accounting.js"
       - ".github/workflows/cardoria-admin-accounting-ci.yml"
   push:
     branches: [main]
     paths:
       - "backend/lib/accounting/**"
       - "backend/routes/admin.js"
-      - "backend/tests/accounting-purchase-stats.test.mjs"
+      - "backend/tests/accounting-*.test.mjs"
+      - "js/admin/admin-accounting.js"
       - ".github/workflows/cardoria-admin-accounting-ci.yml"
 
 jobs:
@@ -28,6 +30,8 @@ jobs:
       - name: Syntax checks
         run: |
           node --check backend/lib/accounting/purchase-stats.js
+          node --check backend/lib/accounting/sales-stats.js
           node --check backend/routes/admin.js
-      - name: Paid purchase accounting regression
-        run: node --test backend/tests/accounting-purchase-stats.test.mjs
+          node --check js/admin/admin-accounting.js
+      - name: Paid accounting regressions
+        run: node --test backend/tests/accounting-purchase-stats.test.mjs backend/tests/accounting-sales-stats.test.mjs
