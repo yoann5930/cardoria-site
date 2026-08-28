@@ -1,6 +1,8 @@
 import { restoreMultilingualCards, persistMultilingualCards, closeMultilingualCardPersistence } from "./multilingual-card-persistence.js";
+import { ensureCatalogFrenchLocalizationSchema, localizeMultilingualCatalogToFrench } from "./catalog-french-localization.js";
 
 try {
+  ensureCatalogFrenchLocalizationSchema();
   await restoreMultilingualCards();
 } catch (error) {
   console.error("[multilingual-bootstrap] restore failed", error?.message || String(error));
@@ -8,22 +10,36 @@ try {
 
 let busy = false;
 async function checkpoint(reason) {
-  if (busy) return;
+  if (busy) return { ok: false, skipped: true, reason: "busy" };
   busy = true;
-  try { await persistMultilingualCards(reason); }
-  catch (error) { console.error("[multilingual-bootstrap] checkpoint failed", error?.message || String(error)); }
+  try { return await persistMultilingualCards(reason); }
+  catch (error) {
+    console.error("[multilingual-bootstrap] checkpoint failed", error?.message || String(error));
+    return { ok: false, error: error?.message || String(error) };
+  }
   finally { busy = false; }
 }
 
-const firstCheckpoint = setTimeout(() => checkpoint("startup-checkpoint"), 45000);
+export async function localizeAndCheckpointMultilingualCatalog(reason = "catalog-localization") {
+  try {
+    const localization = localizeMultilingualCatalogToFrench();
+    const persistence = await checkpoint(reason);
+    return { ok: persistence?.ok !== false, localization, persistence };
+  } catch (error) {
+    console.error("[multilingual-bootstrap] localization failed", error?.message || String(error));
+    return { ok: false, error: error?.message || String(error) };
+  }
+}
+
+const firstCheckpoint = setTimeout(() => localizeAndCheckpointMultilingualCatalog("startup-checkpoint"), 45000);
 firstCheckpoint.unref?.();
-const checkpointTimer = setInterval(() => checkpoint("periodic-checkpoint"), 15 * 60 * 1000);
+const checkpointTimer = setInterval(() => localizeAndCheckpointMultilingualCatalog("periodic-checkpoint"), 15 * 60 * 1000);
 checkpointTimer.unref?.();
 
 async function close() {
   clearTimeout(firstCheckpoint);
   clearInterval(checkpointTimer);
-  try { await checkpoint("shutdown-checkpoint"); } catch {}
+  try { await localizeAndCheckpointMultilingualCatalog("shutdown-checkpoint"); } catch {}
   try { await closeMultilingualCardPersistence(); } catch {}
 }
 
