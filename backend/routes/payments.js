@@ -8,11 +8,18 @@ import {
   syncPaymentFromCheckout,
   handleSumUpReturnCallback
 } from "../lib/payments/sumup.js";
+import { listBoutiqueProducts } from "../lib/boutique/stock.js";
 
 const router = Router();
 
 router.get("/status", (req, res) => {
   res.json({ ok: true, provider: "sumup", configured: isSumUpConfigured() });
+});
+
+router.get("/boutique/products", (req, res) => {
+  const products = listBoutiqueProducts({ includeDisabled: false });
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ok: true, products });
 });
 
 router.post("/boutique/checkout", async (req, res) => {
@@ -39,7 +46,7 @@ router.post("/boutique/checkout", async (req, res) => {
       paymentId: result.paymentId
     });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
+    res.status(e.status || 500).json({ ok: false, error: e.message });
   }
 });
 
