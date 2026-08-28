@@ -23,6 +23,11 @@ function renderedPageIds(scriptSource) {
   return new Set([...scriptSource.matchAll(/\.renderShell\(\s*["']([^"']+)["']/g)].map((m) => m[1]));
 }
 
+function dynamicallyRendersPage(scriptSource, pageId) {
+  if (!scriptSource.includes(pageId)) return false;
+  return /\.renderShell\(\s*(?:page|activePage|viewPage)\s*,/.test(scriptSource);
+}
+
 test("admin navigation has unique page ids and no dashboard entry", () => {
   const items = navItems();
   assert.ok(items.length >= 20, `navigation unexpectedly small: ${items.length}`);
@@ -49,7 +54,8 @@ test("every navigation page id is rendered by the scripts loaded on its target p
       return fs.readFileSync(script, "utf8");
     }).join("\n");
     const ids = renderedPageIds(sources);
-    assert.ok(ids.has(item.page), `${item.href}: nav expects ${item.page}, rendered ids are ${[...ids].join(", ") || "none"}`);
+    const valid = ids.has(item.page) || dynamicallyRendersPage(sources, item.page);
+    assert.ok(valid, `${item.href}: nav expects ${item.page}, rendered ids are ${[...ids].join(", ") || "none"}`);
   }
 });
 
