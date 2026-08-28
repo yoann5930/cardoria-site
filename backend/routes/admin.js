@@ -47,7 +47,7 @@ function extractLotCards(notes = "") {
   try {
     const ids = JSON.parse(match[1]);
     if (!Array.isArray(ids)) return null;
-    return ids.map((id) => cleanText(id, 120)).filter(Boolean);
+    return ids.map((id) => cleanText(id, 180)).filter(Boolean);
   } catch { return null; }
 }
 
@@ -74,7 +74,7 @@ function normalizePurchase(body = {}, existing = {}) {
   }
   const roundedAmount = Math.round(amount * 100) / 100;
   const unitPrice = purchaseUnitPrice({ purchaseType, packaging, amount: roundedAmount, quantity });
-  return { ...existing, date, seller, description, buyer, purchaseType, packaging, category: cleanText(body.category ?? existing.category, 80) || "autre", license: cleanText(body.license ?? existing.license, 80), quantity, amount: roundedAmount, unitPrice, lotCards: lotCards || [], paymentMethod: cleanText(body.paymentMethod ?? existing.paymentMethod, 80), reference: cleanText(body.reference ?? existing.reference, 120), status, notes };
+  return { ...existing, date, seller, description, buyer, purchaseType, packaging, category: cleanText(body.category ?? existing.category, 80) || "autre", license: cleanText(body.license ?? existing.license, 80), quantity, amount: roundedAmount, unitPrice, lotCards: lotCards || [], paymentMethod: cleanText(body.paymentMethod ?? existing.paymentMethod, 80), reference: cleanText(body.reference ?? existing.reference, 240), status, notes };
 }
 
 function normalizeSealedReference(body = {}, existing = {}) {
@@ -97,7 +97,7 @@ router.get("/accounting/sales", (req, res) => {
 
 router.get("/accounting/purchases", (req,res)=>{
   const q=(req.query.q||"").toLowerCase(),license=cleanText(req.query.license,80),category=cleanText(req.query.category,80),buyer=cleanText(req.query.buyer,40).toLowerCase(),purchaseType=cleanText(req.query.purchaseType,40),packaging=cleanText(req.query.packaging,80); let purchases=readJson("purchases",DEFAULT_PURCHASES);
-  if(license)purchases=purchases.filter((p)=>p.license===license); if(category)purchases=purchases.filter((p)=>p.category===category); if(buyer)purchases=purchases.filter((p)=>normalizedBuyer(p.buyer)===buyer); if(purchaseType)purchases=purchases.filter((p)=>normalizedPurchaseType(p.purchaseType)===purchaseType); if(packaging)purchases=purchases.filter((p)=>(p.packaging||"")===packaging); if(q)purchases=purchases.filter((p)=>JSON.stringify(p).toLowerCase().includes(q)); purchases=purchases.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||String(b.createdAt||"").localeCompare(String(a.createdAt||""))).map((p)=>({ ...p, unitPrice: purchaseUnitPrice(p) })); res.json({ok:true,purchases});
+  if(license)purchases=purchases.filter((p)=>p.license===license); if(category)purchases=purchases.filter((p)=>p.category===category); if(buyer)purchases=purchases.filter((p)=>normalizedBuyer(p.buyer)===buyer); if(purchaseType)purchases=purchases.filter((p)=>normalizedPurchaseType(p.purchaseType)===purchaseType); if(packaging)purchases=purchases.filter((p)=>(p.packaging||"")===packaging); if(q)purchases=purchases.filter((p)=>JSON.stringify(p).toLowerCase().includes(q)); purchases=purchases.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||String(b.createdAt||"").localeCompare(String(a.createdAt||"")).map((p)=>({ ...p, unitPrice: purchaseUnitPrice(p) })); res.json({ok:true,purchases});
 });
 
 router.post("/accounting/purchases",WRITE_ADMIN,(req,res)=>{try{const purchases=readJson("purchases",DEFAULT_PURCHASES),now=new Date().toISOString(),purchase=normalizePurchase(req.body||{},{id:`ach_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`,createdAt:now,updatedAt:now,createdBy:req.authUser?.email||"admin"}); purchases.unshift(purchase);writeJson("purchases",purchases);logAudit({type:"accounting",action:"purchase_create",user:req.authUser?.email||"admin",detail:`${purchase.id} — ${purchase.buyer} — ${purchase.seller} — ${purchase.amount} EUR`});res.status(201).json({ok:true,purchase});}catch(e){res.status(e.status||400).json({ok:false,error:e.message});}});
