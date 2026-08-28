@@ -41,6 +41,7 @@ jobs:
           node --check routes/auth.js
           node --check routes/admin.js
           node --check routes/admin-dashboard.js
+          node --check routes/admin-finance.js
           node --check routes/marketplace-v1.js
           node --check routes/marketplace-paypal.js
           node --check routes/marketplace-admin.js
@@ -48,6 +49,7 @@ jobs:
           node --check routes/payments-admin.js
           node --check routes/gdpr.js
           node --check lib/admin/dashboard.js
+          node --check lib/admin/finance.js
           node --check lib/auth.js
           node --check lib/auth/migrate.js
           node --check lib/auth/magicLink.js
@@ -81,6 +83,7 @@ jobs:
           node --check ../js/admin/admin-audit.js
           node --check ../js/admin/admin-orders.js
           node --check ../js/admin/admin-stock.js
+          node --check ../js/admin/admin-payments.js
           node --check ../js/admin/admin-accounting.js
           node --check ../js/admin/admin-marketplace.js
           node --check ../js/admin/admin-users.js
@@ -115,6 +118,33 @@ jobs:
           grep -q 'exportAudit' js/admin/admin-audit.js
           if grep -q 'dayData.reduce.*revenue' js/admin/admin-dashboard.js; then
             echo 'Dashboard frontend must not derive revenue from analytics days'
+            exit 1
+          fi
+      - name: SumUp and accounting wiring checks
+        working-directory: .
+        run: |
+          grep -q 'paymentReconciliation' backend/routes/payments-admin.js
+          grep -q 'sumup_admin_sync' backend/routes/payments-admin.js
+          grep -q 'sumup_admin_refund' backend/routes/payments-admin.js
+          grep -q 'FINANCE_ADMIN' backend/routes/payments-admin.js
+          grep -q 'getFinanceSummary' backend/routes/admin-finance.js
+          grep -q 'financeCsv' backend/routes/admin-finance.js
+          grep -q 'marketplaceGmv' backend/lib/admin/finance.js
+          grep -q 'marketplaceCommission' backend/lib/admin/finance.js
+          grep -q 'boutiqueCogs' backend/lib/admin/finance.js
+          grep -q 'cashCommercialBalance' backend/lib/admin/finance.js
+          grep -q '/api/admin/accounting", adminFinanceRoutes' backend/server.js
+          grep -q 'data-sync\|/sync' js/admin/admin-payments.js
+          grep -q '/refund' js/admin/admin-payments.js
+          grep -q 'finMarketplaceGmv' js/admin/admin-accounting.js
+          grep -q 'finMargin' js/admin/admin-accounting.js
+          grep -q 'exportSummary' js/admin/admin-accounting.js
+          if grep -q '/api/admin/accounting/stats' js/admin/admin-accounting.js; then
+            echo 'Accounting frontend still uses legacy stats route'
+            exit 1
+          fi
+          if grep -q 'analytics.sales' backend/lib/admin/finance.js; then
+            echo 'Authoritative accounting must not use analytics.sales'
             exit 1
           fi
       - name: Reject security regressions
@@ -214,10 +244,14 @@ jobs:
             /api/admin/audit/summary \
             /api/admin/audit/export.csv \
             /api/admin/users \
+            /api/admin/payments/summary \
             /api/admin/payments/boutique-orders \
             /api/admin/payments/boutique-inventory \
             /api/admin/marketplace/orders \
-            /api/admin/accounting/export?format=csv\&type=sales; do
+            /api/admin/accounting/summary \
+            /api/admin/accounting/sales \
+            /api/admin/accounting/purchases \
+            /api/admin/accounting/export.csv?type=sales; do
             code=$(curl -sS -o /tmp/admin-protected.json -w "%{http_code}" "http://127.0.0.1:10000${path}")
             test "$code" = "401"
           done
