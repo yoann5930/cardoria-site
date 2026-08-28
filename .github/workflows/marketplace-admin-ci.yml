@@ -1,0 +1,75 @@
+name: Cardoria Marketplace Admin CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  marketplace-admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Install backend
+        run: npm install --omit=dev
+      - name: Marketplace Admin syntax checks
+        run: |
+          node --check server.js
+          node --check routes/marketplace-admin.js
+          node --check routes/marketplace-moderation-admin.js
+          node --check routes/marketplace-v1.js
+          node --check lib/marketplace/v1/listings.js
+          node --check lib/marketplace/v1/disputes.js
+          node --check lib/marketplace/v1/migrate.js
+          node --check scripts/marketplace-admin-e2e.mjs
+          node --check ../js/admin/admin-marketplace.js
+      - name: Marketplace Admin architecture guards
+        working-directory: .
+        run: |
+          grep -q 'marketplaceModerationAdminRoutes' backend/server.js
+          grep -q '/listings/:id/moderation' backend/routes/marketplace-moderation-admin.js
+          grep -q '/disputes/:id/manage' backend/routes/marketplace-moderation-admin.js
+          grep -q 'moderation_locked' backend/lib/marketplace/v1/listings.js
+          grep -q 'history_json' backend/lib/marketplace/v1/disputes.js
+          grep -q 'publicListingOrNull' backend/routes/marketplace-v1.js
+          grep -q 'data-mod' js/admin/admin-marketplace.js
+          grep -q 'data-dstatus' js/admin/admin-marketplace.js
+      - name: Start backend
+        run: |
+          node server.js > /tmp/cardoria-marketplace-admin.log 2>&1 &
+          echo $! > /tmp/cardoria-marketplace-admin.pid
+      - name: Wait for backend
+        run: |
+          ready=false
+          for i in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-marketplace-startup.json; then
+              if grep -q '"ready":true' /tmp/cardoria-marketplace-startup.json; then ready=true; break; fi
+            fi
+            sleep 1
+          done
+          test "$ready" = "true"
+      - name: Complete Marketplace Admin E2E
+        run: node scripts/marketplace-admin-e2e.mjs
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-marketplace-admin.pid ]; then kill $(cat /tmp/cardoria-marketplace-admin.pid) || true; fi
+          cat /tmp/cardoria-marketplace-admin.log || true
