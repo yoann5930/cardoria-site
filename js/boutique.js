@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const BACKEND_URL = window.CARDORIA_BACKEND || "https://cardoria-site-2.onrender.com";
+  const BACKEND_URL = window.CARDORIA_BACKEND || window.location.origin;
   const POKEMON_LOGO = "https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg";
 
   let products = [];
@@ -15,19 +15,29 @@
     return Number(value || 0).toFixed(2).replace(".", ",") + " €";
   }
 
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   function toggleMenu() {
     qs("menu")?.classList.toggle("open");
   }
 
   async function loadProducts() {
     try {
-      const response = await fetch("/products.json", { cache: "no-store" });
-      if (!response.ok) throw new Error("Catalogue indisponible");
-      products = await response.json();
+      const response = await fetch(`${BACKEND_URL}/api/payments/boutique/products`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok || !Array.isArray(data.products)) throw new Error(data.error || "Stock Boutique indisponible");
+      products = data.products;
     } catch (error) {
       products = [];
       const box = qs("products");
-      if (box) box.innerHTML = '<p class="shop-empty">Le catalogue Pokémon est momentanément indisponible.</p>';
+      if (box) box.innerHTML = '<p class="shop-empty">Le stock Pokémon est momentanément indisponible.</p>';
     }
   }
 
@@ -36,7 +46,8 @@
     return products.filter((product) => {
       if (product.category !== "pokemon") return false;
       if (!query) return true;
-      return String(product.name || "").toLowerCase().includes(query);
+      const text = [product.name, product.extension, product.number, product.rarity, product.condition].join(" ").toLowerCase();
+      return text.includes(query);
     });
   }
 
@@ -50,26 +61,32 @@
       return;
     }
 
-    box.innerHTML = list.map((product) => `
-      <article class="product">
-        <div class="product-img pokemon-product-visual">
-          <img src="${POKEMON_LOGO}" alt="Pokémon" loading="lazy" decoding="async">
-        </div>
-        <h3>${product.name}</h3>
-        <p>${product.condition} • Stock : ${product.stock}</p>
-        <div class="price">${euro(product.price)}</div>
-        <button class="primary" type="button" data-add-product="${product.id}" ${product.stock <= 0 ? "disabled" : ""}>Ajouter au panier</button>
-      </article>
-    `).join("");
+    box.innerHTML = list.map((product) => {
+      const image = product.image || POKEMON_LOGO;
+      const meta = [product.extension, product.number ? `#${product.number}` : "", product.rarity].filter(Boolean).join(" · ");
+      const canBuy = !!product.purchasable && Number(product.stock || 0) > 0 && Number(product.price || 0) > 0;
+      return `
+        <article class="product">
+          <div class="product-img pokemon-product-visual">
+            <img src="${esc(image)}" alt="${esc(product.name || "Produit Pokémon")}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${POKEMON_LOGO}'">
+          </div>
+          <h3>${esc(product.name)}</h3>
+          ${meta ? `<p>${esc(meta)}</p>` : ""}
+          <p>${esc(product.condition || "Non renseigné")} • Stock : ${Number(product.stock || 0)}</p>
+          <div class="price">${Number(product.price || 0) > 0 ? euro(product.price) : "Prix à définir"}</div>
+          <button class="primary" type="button" data-add-product="${esc(product.id)}" ${canBuy ? "" : "disabled"}>${canBuy ? "Ajouter au panier" : "Indisponible"}</button>
+        </article>
+      `;
+    }).join("");
   }
 
   function addToCart(productId) {
-    const product = products.find((item) => item.id === productId);
-    if (!product || product.stock <= 0) return;
+    const product = products.find((item) => String(item.id) === String(productId));
+    if (!product || !product.purchasable || Number(product.stock || 0) <= 0) return;
 
-    const existing = cart.find((item) => item.id === productId);
+    const existing = cart.find((item) => String(item.id) === String(productId));
     if (existing) {
-      if (existing.qty < product.stock) existing.qty += 1;
+      if (existing.qty < Number(product.stock || 0)) existing.qty += 1;
     } else {
       cart.push({ ...product, qty: 1 });
     }
@@ -84,7 +101,7 @@
     if (!cart.length) {
       box.innerHTML = "<li>Panier vide</li>";
     } else {
-      box.innerHTML = cart.map((item) => `<li>${item.qty} × ${item.name} — ${euro(item.qty * item.price)}</li>`).join("");
+      box.innerHTML = cart.map((item) => `<li>${item.qty} × ${esc(item.name)} — ${euro(item.qty * item.price)}</li>`).join("");
     }
 
     total.textContent = euro(cart.reduce((sum, item) => sum + item.qty * item.price, 0));
@@ -103,7 +120,7 @@
       return;
     }
 
-    const items = cart.map((item) => ({ ref: item.id, name: item.name, qty: item.qty, price: item.price }));
+    const items = cart.map((item) => ({ ref: item.id, qty: item.qty }));
     const attribution = window.CardoriaAttribution ? window.CardoriaAttribution.getPayload() : {};
 
     try {
@@ -124,6 +141,8 @@
       const data = await response.json();
       if (!response.ok || !data.ok) {
         alert(data.error || "Paiement SumUp indisponible.");
+        await loadProducts();
+        renderProducts();
         return;
       }
 
