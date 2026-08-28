@@ -94,6 +94,12 @@ function syncLegacySaleHistory(cardId, { price, condition, channel, soldAt, quan
   }
 }
 
+function legacyTransactionType(channel) {
+  const normalized = String(channel || "").trim().toLowerCase();
+  if (normalized.includes("marketplace")) return "listing_sale";
+  return "admin_sale";
+}
+
 export function importLegacySalesHistory() {
   const db = getDb();
   const rows = db.prepare(`
@@ -113,7 +119,7 @@ export function importLegacySalesHistory() {
     recordMarketTransaction({
       id: makeTransactionId("LEG"),
       cardId: row.card_id,
-      type: "admin_sale",
+      type: legacyTransactionType(row.channel),
       salePrice: row.price,
       quantity: 1,
       condition: row.condition,
