@@ -37,6 +37,9 @@ export function writeJson(key, data) {
   const tmp = file + ".tmp";
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf8");
   fs.renameSync(tmp, file);
+  // Persistence adapters can subscribe without coupling this low-level module
+  // to PostgreSQL. This is especially important on Render's ephemeral runtime.
+  try { process.emit("cardoria:storage-write", String(key)); } catch {}
 }
 
 export function backupAll() {
