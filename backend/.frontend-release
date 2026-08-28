@@ -1,2 +1,2 @@
-cardoria-frontend-release=2026-08-28-purchase-stock-1
-Includes: admin stock now derives from paid Pokemon purchases, existing purchases are backfilled dynamically, lot/catalog references are resolved when available.
+cardoria-frontend-release=2026-08-28-buyers-dashboard-1
+Includes: remove the unassigned buyer KPI and row from the buyers dashboard while keeping historical purchase data intact.
