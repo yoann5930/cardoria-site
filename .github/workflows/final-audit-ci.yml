@@ -1,0 +1,305 @@
+name: Cardoria Final Audit CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cardoria-final-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-regression:
+    name: Core regression and production guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+      LEGACY_ADMIN_CODE: 'false'
+      ADMIN_AUTH_DISABLED: 'false'
+      BACKUP_INTERVAL_HOURS: '0'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Install backend
+        run: npm install --omit=dev
+      - name: Dependency security audit
+        run: npm audit --omit=dev --audit-level=low
+      - name: Critical syntax checks
+        run: |
+          node --check server.js
+          node --check routes/auth.js
+          node --check routes/admin-users.js
+          node --check routes/admin-dashboard.js
+          node --check routes/admin-finance.js
+          node --check routes/payments-admin.js
+          node --check routes/marketplace-v1.js
+          node --check routes/marketplace-admin.js
+          node --check routes/marketplace-moderation-admin.js
+          node --check routes/rachat-admin.js
+          node --check routes/system.js
+          node --check lib/admin/dashboard.js
+          node --check lib/admin/finance.js
+          node --check lib/boutique/stock.js
+          node --check lib/payments/sumup.js
+          node --check lib/marketplace/paypal.js
+          node --check lib/marketplace/v1/listings.js
+          node --check lib/marketplace/v1/disputes.js
+          node --check lib/rachat/workflow.js
+          node --check lib/backup/full.js
+          node --check lib/backup/durable.js
+      - name: Core regression tests
+        working-directory: .
+        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs
+      - name: Architecture separation guards
+        working-directory: .
+        run: |
+          grep -q 'listBoutiqueInventory' backend/routes/payments-admin.js
+          grep -q 'refundSumUpTransaction' backend/routes/payments-admin.js
+          grep -q 'marketplaceGmv' backend/lib/admin/finance.js
+          grep -q 'marketplaceCommission' backend/lib/admin/finance.js
+          grep -q 'paypal' backend/lib/marketplace/paypal.js
+          grep -q 'createPurchaseFromProposal' backend/lib/rachat/workflow.js
+          grep -q 'cardoria_backups' backend/lib/backup/durable.js
+          grep -q 'roles: \["super_admin"\], action: "restore"' backend/routes/system.js
+          if grep -n 'marketplaceRoutes' backend/server.js; then
+            echo 'Legacy marketplace router mounted'
+            exit 1
+          fi
+          if grep -R -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' script.js js *.html 2>/dev/null; then
+            echo 'Client-side admin bypass detected'
+            exit 1
+          fi
+          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend render.yaml 2>/dev/null; then
+            echo 'Admin bypass enabled'
+            exit 1
+          fi
+          if grep -A2 'MARKETPLACE_DEMO_MODE' render.yaml | grep -q 'true'; then
+            echo 'Marketplace demo mode enabled in production blueprint'
+            exit 1
+          fi
+      - name: Start backend
+        run: |
+          node server.js > /tmp/cardoria-final-core.log 2>&1 &
+          echo $! > /tmp/cardoria-final-core.pid
+      - name: Wait for complete startup
+        run: |
+          ready=false
+          for i in {1..90}; do
+            if curl -fsS http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-final-startup.json; then
+              if grep -q '"ready":true' /tmp/cardoria-final-startup.json; then ready=true; break; fi
+            fi
+            sleep 1
+          done
+          cat /tmp/cardoria-final-startup.json || true
+          test "$ready" = "true"
+      - name: Public smoke and authentication boundaries
+        run: |
+          curl -fsS http://127.0.0.1:10000/api/health/ | grep -q '"version":"6.0.0"'
+          curl -fsS http://127.0.0.1:10000/api/payments/boutique/products | grep -q '"ok":true'
+          curl -fsS 'http://127.0.0.1:10000/api/marketplace/v1/search?license=pokemon' | grep -q '"ok":true'
+          curl -fsS http://127.0.0.1:10000/admin-login.html | grep -q 'double authentification'
+          for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/accounting/summary /api/system/backups; do
+            code=$(curl -sS -o /tmp/cardoria-final-anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
+            test "$code" = "401"
+          done
+      - name: Security headers
+        run: |
+          curl -sSI http://127.0.0.1:10000/ > /tmp/cardoria-final-headers.txt
+          grep -qi '^content-security-policy:' /tmp/cardoria-final-headers.txt
+          grep -qi '^x-content-type-options: nosniff' /tmp/cardoria-final-headers.txt
+          grep -qi '^x-frame-options: DENY' /tmp/cardoria-final-headers.txt
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-final-core.pid ]; then kill $(cat /tmp/cardoria-final-core.pid) || true; fi
+          if [ "${{ job.status }}" != "success" ]; then cat /tmp/cardoria-final-core.log || true; fi
+
+  security-2fa:
+    name: Mandatory Admin 2FA E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - run: npm install --omit=dev
+      - name: Start backend
+        run: |
+          node server.js > /tmp/cardoria-final-security.log 2>&1 &
+          echo $! > /tmp/cardoria-final-security.pid
+      - name: Wait for backend
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:10000/api/health/startup | grep -q '"ready":true'; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Mandatory 2FA flow
+        run: node scripts/security-2fa-e2e.mjs
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-final-security.pid ]; then kill $(cat /tmp/cardoria-final-security.pid) || true; fi
+          if [ "${{ job.status }}" != "success" ]; then cat /tmp/cardoria-final-security.log || true; fi
+
+  admin-users:
+    name: Admin Users E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - run: npm install --omit=dev
+      - name: Start backend
+        run: |
+          node server.js > /tmp/cardoria-final-users.log 2>&1 &
+          echo $! > /tmp/cardoria-final-users.pid
+      - name: Wait for backend
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:10000/api/health/startup | grep -q '"ready":true'; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Complete users lifecycle
+        run: node scripts/users-admin-e2e.mjs
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-final-users.pid ]; then kill $(cat /tmp/cardoria-final-users.pid) || true; fi
+          if [ "${{ job.status }}" != "success" ]; then cat /tmp/cardoria-final-users.log || true; fi
+
+  marketplace-admin:
+    name: Marketplace moderation and disputes E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - run: npm install --omit=dev
+      - name: Start backend
+        run: |
+          node server.js > /tmp/cardoria-final-marketplace.log 2>&1 &
+          echo $! > /tmp/cardoria-final-marketplace.pid
+      - name: Wait for backend
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:10000/api/health/startup | grep -q '"ready":true'; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Complete Marketplace Admin lifecycle
+        run: node scripts/marketplace-admin-e2e.mjs
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-final-marketplace.pid ]; then kill $(cat /tmp/cardoria-final-marketplace.pid) || true; fi
+          if [ "${{ job.status }}" != "success" ]; then cat /tmp/cardoria-final-marketplace.log || true; fi
+
+  rachat:
+    name: Rachat to Boutique stock E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - run: npm install --omit=dev
+      - name: Full Rachat workflow
+        run: node tests/rachat-workflow.mjs
+
+  backup-restore:
+    name: Isolated backup restore E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+      BACKUP_INTERVAL_HOURS: '0'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - run: npm install --omit=dev
+      - name: Backup create validate restore isolation
+        run: node scripts/system-backup-e2e.mjs
