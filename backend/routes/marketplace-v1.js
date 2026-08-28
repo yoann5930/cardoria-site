@@ -22,6 +22,10 @@ function publicSeller(seller) {
   if (!seller) return null;
   return { id: seller.id, displayName: seller.displayName, sellerType: seller.sellerType, verified: seller.verified, avatar: seller.avatar || "", bio: seller.bio || "", ratingAvg: seller.ratingAvg, ratingCount: seller.ratingCount, salesCount: seller.salesCount, satisfactionRate: seller.satisfactionRate, createdAt: seller.createdAt };
 }
+function publicListingOrNull(listing) {
+  if (!listing || listing.status !== "active" || listing.moderationLocked || Number(listing.stock || 0) <= 0) return null;
+  return listing;
+}
 
 router.get("/v1/stats", (req, res) => res.json({ ok: true, stats: getMarketplaceStats() }));
 router.get("/v1/search", (req, res) => {
@@ -42,8 +46,16 @@ router.get("/v1/sitemap.xml", (req, res) => {
   const urls = entries.map((e) => `  <url><loc>${base}${e.url}</loc>${e.lastmod ? `<lastmod>${e.lastmod}</lastmod>` : ""}<changefreq>daily</changefreq><priority>0.7</priority></url>`).join("\n");
   res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`);
 });
-router.get("/v1/listings/slug/:slug", (req, res) => { const listing = getListingV1BySlug(req.params.slug, { trackView: true }); if (!listing) return res.status(404).json({ ok: false, error: "Annonce introuvable" }); res.json({ ok: true, listing }); });
-router.get("/v1/listings/:id", (req, res) => { const listing = getListingV1(req.params.id, { trackView: true }); if (!listing) return res.status(404).json({ ok: false, error: "Annonce introuvable" }); res.json({ ok: true, listing }); });
+router.get("/v1/listings/slug/:slug", (req, res) => {
+  const listing = publicListingOrNull(getListingV1BySlug(req.params.slug, { trackView: true }));
+  if (!listing) return res.status(404).json({ ok: false, error: "Annonce introuvable" });
+  res.json({ ok: true, listing });
+});
+router.get("/v1/listings/:id", (req, res) => {
+  const listing = publicListingOrNull(getListingV1(req.params.id, { trackView: true }));
+  if (!listing) return res.status(404).json({ ok: false, error: "Annonce introuvable" });
+  res.json({ ok: true, listing });
+});
 
 router.post("/v1/listings", (req, res) => {
   try {
