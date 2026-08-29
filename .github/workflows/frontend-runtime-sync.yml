@@ -1,0 +1,57 @@
+name: Cardoria Frontend Runtime Sync
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cardoria-frontend-runtime-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    if: ${{ !contains(github.event.head_commit.message, '[frontend-runtime-sync]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Mirror public frontend into backend runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf backend/public
+          mkdir -p backend/public
+
+          shopt -s nullglob
+          for file in ./*.html ./*.css ./*.js ./*.json ./*.xml ./*.txt ./*.ico ./*.png ./*.jpg ./*.jpeg ./*.webp ./*.svg ./*.webmanifest; do
+            [ -f "$file" ] && cp -a "$file" backend/public/
+          done
+
+          for dir in assets css js pages images img; do
+            if [ -d "$dir" ]; then
+              cp -a "$dir" backend/public/
+            fi
+          done
+
+          printf 'frontend-source-sha=%s\n' "$(git rev-parse HEAD)" > backend/.frontend-runtime-sha
+
+      - name: Commit runtime mirror when changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A backend/public backend/.frontend-runtime-sha
+          if git diff --cached --quiet; then
+            echo "Frontend runtime already synchronized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(frontend): sync Render runtime [frontend-runtime-sync]"
+          git push origin HEAD:main
