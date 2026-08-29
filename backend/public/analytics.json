@@ -1,0 +1,39 @@
+{
+  "days": [
+    {
+      "date": "2026-06-24",
+      "visitors": 12,
+      "views": 38
+    },
+    {
+      "date": "2026-06-25",
+      "visitors": 18,
+      "views": 52
+    },
+    {
+      "date": "2026-06-26",
+      "visitors": 27,
+      "views": 74
+    },
+    {
+      "date": "2026-06-27",
+      "visitors": 31,
+      "views": 96
+    },
+    {
+      "date": "2026-06-28",
+      "visitors": 44,
+      "views": 130
+    },
+    {
+      "date": "2026-06-29",
+      "visitors": 58,
+      "views": 171
+    },
+    {
+      "date": "2026-06-30",
+      "visitors": 73,
+      "views": 221
+    }
+  ]
+}

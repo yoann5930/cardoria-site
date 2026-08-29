@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Proposer ma carte à Cardoria</title>
+  <link rel="canonical" href="https://cardoria-site-2.onrender.com/estimation.html">
+  <link rel="stylesheet" href="/style.css?v=20260828-3">
+  <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
+  <style>
+    body{background:#07090d;color:#f5f2e9;min-height:100vh}.sale-shell{width:min(960px,calc(100% - 32px));margin:0 auto;padding:42px 0 70px}.sale-head{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:42px}.sale-brand{display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none}.sale-brand img{width:54px;height:54px;object-fit:contain}.sale-brand strong{letter-spacing:.14em}.sale-back{color:#d9b96c;text-decoration:none}.sale-card{border:1px solid rgba(217,185,108,.28);background:linear-gradient(145deg,rgba(22,27,36,.96),rgba(10,13,18,.98));border-radius:24px;padding:clamp(24px,5vw,48px);box-shadow:0 24px 80px rgba(0,0,0,.34)}.sale-kicker{color:#d9b96c;text-transform:uppercase;letter-spacing:.18em;font-size:.78rem;font-weight:700}.sale-card h1{font-size:clamp(2rem,5vw,3.5rem);line-height:1.02;margin:.6rem 0 1rem}.sale-lead{color:#b8bec8;max-width:700px;line-height:1.7}.sale-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:28px 0}.sale-summary div{padding:16px 18px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08)}.sale-summary small{display:block;color:#8f98a7;margin-bottom:5px}.sale-summary strong{word-break:break-word}.sale-form{display:grid;gap:15px;margin-top:28px}.sale-form label{font-weight:700}.sale-form textarea{min-height:120px;width:100%;resize:vertical;background:#0c1118;color:#fff;border:1px solid rgba(255,255,255,.13);border-radius:14px;padding:14px;font:inherit}.sale-form button{border:0;border-radius:999px;background:#d9b96c;color:#11151c;padding:14px 24px;font-weight:800;cursor:pointer}.sale-form button:disabled{opacity:.55;cursor:wait}.sale-status{min-height:26px;margin-top:12px}.sale-status.ok{color:#8ee6a7}.sale-status.error{color:#ff9d9d}.hp{position:absolute!important;left:-9999px!important;width:1px!important;height:1px!important;overflow:hidden!important}.sale-note{margin-top:20px;color:#8f98a7;font-size:.9rem;line-height:1.5}@media(max-width:650px){.sale-summary{grid-template-columns:1fr}.sale-head{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+  <main class="sale-shell">
+    <div class="sale-head">
+      <a class="sale-brand" href="/"><img src="/assets/logo/cardoria-premium.png" alt="Cardoria"><strong>CARDORIA</strong></a>
+      <a class="sale-back" href="/estimation.html">← Retour à l’estimation</a>
+    </div>
+
+    <section class="sale-card">
+      <p class="sale-kicker">Après estimation</p>
+      <h1>Proposer cette carte à Cardoria</h1>
+      <p class="sale-lead">Votre estimation a déjà été réalisée. Vérifiez les informations ci-dessous puis transmettez votre proposition à Cardoria. Aucun prix de rachat n’est inventé automatiquement : l’équipe étudiera la demande avant toute offre.</p>
+
+      <div class="sale-summary">
+        <div><small>Carte</small><strong id="summaryName">—</strong></div>
+        <div><small>Licence</small><strong id="summaryGame">—</strong></div>
+        <div><small>État</small><strong id="summaryCondition">—</strong></div>
+        <div><small>Client</small><strong id="summaryCustomer">—</strong></div>
+      </div>
+
+      <form class="sale-form" id="saleForm">
+        <label for="saleMessage">Message complémentaire <span style="font-weight:400;color:#8f98a7">(facultatif)</span></label>
+        <textarea id="saleMessage" maxlength="1200" placeholder="Ajoutez une précision sur la carte ou la vente si nécessaire."></textarea>
+        <div class="hp" aria-hidden="true"><label>Site web<input id="saleWebsite" tabindex="-1" autocomplete="off"></label></div>
+        <button id="saleSubmit" type="submit">Envoyer ma proposition à Cardoria</button>
+        <div class="sale-status" id="saleStatus" role="status" aria-live="polite"></div>
+      </form>
+
+      <p class="sale-note">Protection anti-bot : la demande est acceptée uniquement si elle correspond à une estimation Cardoria récente et valide.</p>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      "use strict";
+      var params=new URLSearchParams(location.search);
+      if(params.get("source")!=="estimation"){
+        location.replace("/estimation.html");
+        return;
+      }
+      function get(name){return String(params.get(name)||"").trim()}
+      var data={
+        source:"estimation",
+        cardId:get("card"),
+        cardName:get("name"),
+        cardGame:get("game"),
+        condition:get("condition"),
+        customerName:get("customerName"),
+        customerEmail:get("customerEmail")
+      };
+      if(!data.cardName||!data.customerEmail){
+        location.replace("/estimation.html");
+        return;
+      }
+      document.getElementById("summaryName").textContent=data.cardName||"—";
+      document.getElementById("summaryGame").textContent=data.cardGame||"—";
+      document.getElementById("summaryCondition").textContent=data.condition||"—";
+      document.getElementById("summaryCustomer").textContent=data.customerName?data.customerName+" · "+data.customerEmail:data.customerEmail;
+
+      document.getElementById("saleForm").addEventListener("submit",async function(event){
+        event.preventDefault();
+        var button=document.getElementById("saleSubmit");
+        var status=document.getElementById("saleStatus");
+        button.disabled=true;
+        status.className="sale-status";
+        status.textContent="Transmission en cours…";
+        try{
+          var response=await fetch("/api/rachat/propositions",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(Object.assign({},data,{
+              message:document.getElementById("saleMessage").value||"",
+              website:document.getElementById("saleWebsite").value||""
+            }))
+          });
+          var result=await response.json();
+          if(!response.ok||!result.ok)throw new Error(result.error||"Transmission impossible.");
+          status.className="sale-status ok";
+          status.textContent="Proposition transmise. Référence : "+result.id;
+          button.textContent="Proposition envoyée";
+        }catch(error){
+          status.className="sale-status error";
+          status.textContent=error.message||"Transmission impossible.";
+          button.disabled=false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

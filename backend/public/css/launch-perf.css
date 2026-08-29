@@ -1,0 +1,4 @@
+/* Launch perf V1 — complète css/perf.css sans le modifier */
+img[loading="lazy"]{content-visibility:auto}
+.reduce-motion *,.reduce-motion *::before,.reduce-motion *::after{animation:none!important;transition:none!important}
+@media print{.header,.footer{display:none}}

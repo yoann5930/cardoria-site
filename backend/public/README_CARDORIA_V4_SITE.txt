@@ -1,0 +1,1 @@
+CARDORIA V4 SITE - Tout est à la racine. Pas de dossier assets. Un seul script.js.

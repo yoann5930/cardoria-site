@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marketplace Cardoria — Cartes par catégorie</title>
+<meta name="description" content="Achetez et vendez des cartes sur la marketplace Cardoria, classées par catégorie TCG.">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://cardoria-site-2.onrender.com/marketplace.html">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/css/marketplace.css?v=2">
+<link rel="stylesheet" href="/css/perf.css">
+<script src="/js/seo-config.js"></script>
+<script src="/js/seo.js"></script>
+<link rel="icon" href="/assets/logo/cardoria-premium.png">
+</head>
+<body>
+<div id="site-header"></div>
+
+<main class="container mk-page">
+  <section class="mk-hero">
+    <div>
+      <span class="badge">MARKETPLACE</span>
+      <h1>Les cartes à vendre, par catégorie</h1>
+      <p>Choisissez une catégorie pour consulter uniquement les annonces correspondantes.</p>
+    </div>
+    <a class="mk-sell-cta" href="/vendre.html">Vendre une carte</a>
+  </section>
+
+  <section class="mk-category-view" id="mkCategoryView" aria-labelledby="mkCategoryTitle">
+    <div class="mk-section-head">
+      <div>
+        <span class="mk-eyebrow">CATÉGORIES</span>
+        <h2 id="mkCategoryTitle">Choisissez votre catégorie de cartes</h2>
+      </div>
+      <p>Les annonces sont séparées par univers pour garder une Marketplace claire.</p>
+    </div>
+
+    <div class="mk-category-grid">
+      <button class="mk-category-card" type="button" data-market-category="pokemon">
+        <span class="mk-category-mark">Pokémon</span>
+        <strong>Pokémon</strong>
+        <small>Voir les cartes Pokémon</small>
+      </button>
+      <button class="mk-category-card" type="button" data-market-category="yugioh">
+        <span class="mk-category-mark">Yu-Gi-Oh!</span>
+        <strong>Yu-Gi-Oh!</strong>
+        <small>Voir les cartes Yu-Gi-Oh!</small>
+      </button>
+      <button class="mk-category-card" type="button" data-market-category="onepiece">
+        <span class="mk-category-mark">One Piece</span>
+        <strong>One Piece</strong>
+        <small>Voir les cartes One Piece</small>
+      </button>
+      <button class="mk-category-card" type="button" data-market-category="lorcana">
+        <span class="mk-category-mark">Lorcana</span>
+        <strong>Lorcana</strong>
+        <small>Voir les cartes Lorcana</small>
+      </button>
+      <button class="mk-category-card" type="button" data-market-category="magic">
+        <span class="mk-category-mark">Magic</span>
+        <strong>Magic</strong>
+        <small>Voir les cartes Magic</small>
+      </button>
+    </div>
+  </section>
+
+  <section class="mk-listing-view" id="mkListingView" hidden aria-labelledby="mkListingTitle">
+    <div class="mk-category-toolbar">
+      <button class="mk-back-categories" id="mkBackCategories" type="button">← Retour aux catégories</button>
+      <div class="mk-current-category">
+        <span>Catégorie</span>
+        <strong id="mkCurrentCategory">Pokémon</strong>
+      </div>
+    </div>
+
+    <div class="mk-section-head mk-listing-head">
+      <div>
+        <span class="mk-eyebrow">ANNONCES</span>
+        <h2 id="mkListingTitle">Cartes disponibles</h2>
+      </div>
+      <a class="mk-inline-sell" href="/vendre.html">+ Mettre une carte en vente</a>
+    </div>
+
+    <div class="mk-toolbar" aria-label="Recherche et tri Marketplace">
+      <input class="mk-search" id="mkSearch" placeholder="Rechercher une carte, une extension ou un vendeur…" autocomplete="off">
+      <select id="mkSort" aria-label="Trier les annonces">
+        <option value="recent">Plus récentes</option>
+        <option value="price_asc">Prix croissant</option>
+        <option value="price">Prix décroissant</option>
+        <option value="popular">Populaires</option>
+      </select>
+      <button type="button" id="mkNeg">Négociable</button>
+      <span class="mk-ms" id="mkMs" aria-live="polite"></span>
+    </div>
+
+    <div class="mk-grid" id="mkGrid" aria-live="polite">
+      <div class="engine-loading">Chargement…</div>
+    </div>
+    <div class="mk-pagination" id="mkPages"></div>
+  </section>
+
+  <nav class="mk-secondary-links" aria-label="Outils Marketplace">
+    <a href="/comparateur.html">Comparateur de prix</a>
+    <a href="/souhaits.html">Liste de souhaits & alertes</a>
+    <a href="/pages/licences/">Licences TCG</a>
+  </nav>
+</main>
+
+<div id="site-footer"></div>
+<script src="/js/layout.js" defer></script>
+<script src="/js/analytics.js" defer></script>
+<script src="/js/cookie-consent.js" defer></script>
+<script src="/js/marketplace-client.js"></script>
+<script src="/js/marketplace-browse.js?v=2"></script>
+</body>
+</html>

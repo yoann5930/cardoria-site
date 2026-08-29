@@ -1,0 +1,16 @@
+/* Cardoria admin — native dropdown readability */
+.admin-app select,
+.admin-app select option,
+.admin-app select optgroup,
+body.admin-app select,
+body.admin-app select option,
+body.admin-app select optgroup {
+  color: #000 !important;
+}
+
+.admin-app select option,
+.admin-app select optgroup,
+body.admin-app select option,
+body.admin-app select optgroup {
+  background: #fff !important;
+}

@@ -1,0 +1,42 @@
+/* Cardoria public header brand. The markup selects the logo asset; this file only controls presentation. */
+.header .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  min-width: max-content;
+  padding: 4px 0;
+}
+
+.header .brand > img {
+  display: block;
+  flex: 0 0 54px;
+  width: 54px;
+  height: 54px;
+  max-width: 54px;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  filter: drop-shadow(0 5px 14px rgba(212,175,55,.26));
+}
+
+.header .brand > span {
+  font-size: 21px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: .075em;
+  color: #ffe18a;
+  text-shadow: 0 1px 18px rgba(212,175,55,.12);
+}
+
+@media (max-width: 720px) {
+  .header .brand { gap: 10px; }
+  .header .brand > img {
+    flex-basis: 46px;
+    width: 46px;
+    height: 46px;
+    max-width: 46px;
+  }
+  .header .brand > span { font-size: 17px; }
+}

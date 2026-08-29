@@ -1,0 +1,33 @@
+/* Cardoria IA Premium — résultats estimation */
+.ai-result{margin-top:20px;padding:0}
+.ai-detection{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.ai-detection div{padding:12px;background:rgba(255,255,255,.04);border:1px solid rgba(212,175,55,.18);border-radius:10px;font-size:13px}
+.ai-detection label{display:block;font-size:10px;text-transform:uppercase;color:#baaf97;margin-bottom:4px}
+.ai-detection strong{color:#ffe18a;font-size:14px}
+.ai-prices{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}
+.ai-price-box{padding:14px;text-align:center;border-radius:12px;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.2)}
+.ai-price-box.rec{background:linear-gradient(145deg,rgba(212,175,55,.2),rgba(212,175,55,.06));border-color:rgba(212,175,55,.45)}
+.ai-price-box label{display:block;font-size:10px;color:#baaf97;text-transform:uppercase;margin-bottom:4px}
+.ai-price-box strong{font-size:20px;color:#ffe18a}
+.ai-chart{width:100%;height:180px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(212,175,55,.15);margin-top:12px}
+.ai-trend{display:inline-flex;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:800;margin-top:8px}
+.ai-trend.up{background:rgba(76,175,125,.15);color:#8fd4a8}
+.ai-trend.down{background:rgba(255,107,107,.15);color:#ff8a8a}
+.ai-trend.stable{background:rgba(212,175,55,.12);color:#ffe18a}
+.ai-message{white-space:pre-wrap;line-height:1.6;color:#fff8e8;font-size:15px;padding:16px;background:rgba(255,255,255,.03);border-radius:14px;border:1px solid rgba(212,175,55,.15)}
+.ai-periods{margin-bottom:12px}
+.ai-periods button{padding:8px 12px;border:1px solid rgba(212,175,55,.25);background:transparent;color:#baaf97;border-radius:10px;font-weight:700;cursor:pointer;font-size:12px;margin-right:6px}
+.ai-periods button.active{background:rgba(212,175,55,.15);color:#ffe18a}
+.ai-prices--premium{grid-template-columns:repeat(4,1fr)}
+.ai-score-ring{padding:14px;text-align:center;border-radius:12px;background:linear-gradient(145deg,rgba(212,175,55,.25),rgba(120,90,20,.15));border:1px solid rgba(212,175,55,.5)}
+.ai-score-ring label{display:block;font-size:10px;color:#baaf97;text-transform:uppercase;margin-bottom:4px}
+.ai-score-ring strong{font-size:26px;color:#ffe18a;line-height:1}
+.ai-score-ring strong span{font-size:14px;color:#baaf97;font-weight:600}
+.ai-rec{margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(212,175,55,.25);background:rgba(255,255,255,.03)}
+.ai-rec-label{display:inline-block;font-weight:800;font-size:13px;letter-spacing:.08em;padding:6px 14px;border-radius:999px}
+.ai-rec--buy .ai-rec-label{background:rgba(76,175,125,.2);color:#8fd4a8}
+.ai-rec--hold .ai-rec-label{background:rgba(212,175,55,.15);color:#ffe18a}
+.ai-rec--wait .ai-rec-label{background:rgba(150,150,150,.15);color:#ccc}
+.ai-rec--sell .ai-rec-label{background:rgba(255,107,107,.15);color:#ff8a8a}
+.ai-rec p{margin:8px 0 0;font-size:13px;color:#baaf97;line-height:1.5}
+@media(max-width:768px){.ai-detection,.ai-prices,.ai-prices--premium{grid-template-columns:1fr 1fr}}

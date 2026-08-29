@@ -1,0 +1,21 @@
+[
+  {
+    "id": "CMD-20260630-001",
+    "date": "2026-06-30",
+    "client": "Client test",
+    "email": "client@test.fr",
+    "address": "France",
+    "items": [
+      {
+        "ref": "ACC-001",
+        "name": "Sleeves premium x100",
+        "qty": 2,
+        "price": 6.9
+      }
+    ],
+    "payment": "Paiement test",
+    "status": "À préparer",
+    "shipping": "Mondial Relay",
+    "tracking": ""
+  }
+]

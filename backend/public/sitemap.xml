@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://cardoria.vercel.app/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://cardoria.vercel.app/boutique.html</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://cardoria.vercel.app/estimation.html</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://cardoria.vercel.app/marketplace.html</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://cardoria.vercel.app/rachat-cartes.html</loc><changefreq>weekly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://cardoria.vercel.app/tendances.html</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://cardoria.vercel.app/comparateur.html</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://cardoria.vercel.app/licence.html</loc><changefreq>daily</changefreq><priority>0.85</priority></url>
+  <url><loc>https://cardoria.vercel.app/referencement.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://cardoria.vercel.app/accessoires.html</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/contact/</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/faq/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/a-propos/</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/mentions-legales/</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/confidentialite/</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/cgv/</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/blog/</loc><changefreq>weekly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/licences/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/licences/pokemon/</loc><changefreq>weekly</changefreq><priority>0.88</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/licences/yugioh/</loc><changefreq>weekly</changefreq><priority>0.88</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/licences/onepiece/</loc><changefreq>weekly</changefreq><priority>0.88</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/licences/lorcana/</loc><changefreq>weekly</changefreq><priority>0.88</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/licences/magic/</loc><changefreq>weekly</changefreq><priority>0.88</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/licences/dragonball/</loc><changefreq>weekly</changefreq><priority>0.88</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/licences/sports/</loc><changefreq>weekly</changefreq><priority>0.88</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/estimation/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://cardoria.vercel.app/pages/boutique/</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+</urlset>

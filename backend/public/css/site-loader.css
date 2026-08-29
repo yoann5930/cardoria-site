@@ -1,0 +1,230 @@
+/* Cardoria — ecran de chargement premium */
+html.cardoria-loading,
+html.cardoria-loading body {
+  overflow: hidden;
+}
+
+.cardoria-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(206, 164, 63, 0.12), transparent 32%),
+    radial-gradient(circle at 15% 12%, rgba(255, 226, 145, 0.05), transparent 24%),
+    linear-gradient(145deg, #050505 0%, #090909 46%, #020202 100%);
+  color: #f8f4e8;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 700ms ease, visibility 700ms ease;
+}
+
+.cardoria-loader::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background-image:
+    linear-gradient(rgba(212, 175, 55, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212, 175, 55, 0.025) 1px, transparent 1px);
+  background-size: 54px 54px;
+  transform: perspective(700px) rotateX(62deg) translateY(15%);
+  transform-origin: center center;
+  -webkit-mask-image: radial-gradient(circle, #000 15%, transparent 68%);
+  mask-image: radial-gradient(circle, #000 15%, transparent 68%);
+  animation: cardoriaGridDrift 12s linear infinite;
+}
+
+.cardoria-loader::after {
+  content: "";
+  position: absolute;
+  width: min(82vw, 820px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(212, 175, 55, 0.08);
+  border-radius: 50%;
+  box-shadow:
+    0 0 90px rgba(212, 175, 55, 0.04),
+    inset 0 0 90px rgba(212, 175, 55, 0.025);
+  animation: cardoriaAura 4.5s ease-in-out infinite;
+}
+
+.cardoria-loader.is-leaving {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.cardoria-loader__content {
+  position: relative;
+  z-index: 2;
+  width: min(92vw, 700px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.cardoria-loader__emblem {
+  position: relative;
+  width: clamp(250px, 31vw, 380px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  margin-bottom: 24px;
+}
+
+.cardoria-loader__orbit,
+.cardoria-loader__orbit::before,
+.cardoria-loader__orbit::after {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  content: "";
+}
+
+.cardoria-loader__orbit {
+  border: 1px solid rgba(212, 175, 55, 0.34);
+  box-shadow: 0 0 48px rgba(212, 175, 55, 0.14);
+  animation: cardoriaSpin 7s linear infinite;
+}
+
+.cardoria-loader__orbit::before {
+  inset: 12px;
+  border: 1px solid transparent;
+  border-top-color: rgba(255, 232, 160, 0.9);
+  border-right-color: rgba(212, 175, 55, 0.35);
+  animation: cardoriaSpin 3.8s linear infinite reverse;
+}
+
+.cardoria-loader__orbit::after {
+  inset: -7px;
+  border: 1px solid transparent;
+  border-bottom-color: rgba(212, 175, 55, 0.7);
+  filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.55));
+}
+
+.cardoria-loader__logo-shell {
+  width: 91%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(26, 23, 16, 0.7) 0%, rgba(7, 7, 7, 0.92) 76%);
+  box-shadow:
+    0 0 0 1px rgba(255, 225, 132, 0.12),
+    0 18px 56px rgba(0, 0, 0, 0.58),
+    0 0 48px rgba(212, 175, 55, 0.14);
+  animation: cardoriaLogoPulse 2.6s ease-in-out infinite;
+}
+
+.cardoria-loader__logo {
+  width: 94%;
+  height: 94%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.6));
+}
+
+.cardoria-loader__eyebrow {
+  margin: 0 0 10px;
+  color: #d8bb68;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+
+.cardoria-loader__title { display:none; }
+
+.cardoria-loader__tagline {
+  margin: 14px 0 0;
+  max-width: 430px;
+  color: rgba(244, 238, 220, 0.64);
+  font-size: clamp(0.84rem, 2vw, 1rem);
+  letter-spacing: 0.08em;
+}
+
+.cardoria-loader__progress {
+  width: min(76vw, 400px);
+  margin-top: 34px;
+}
+
+.cardoria-loader__track {
+  height: 1px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.cardoria-loader__bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: linear-gradient(90deg, #846a26, #e7c765 45%, #fff0b0 70%, #a8862e);
+  box-shadow: 0 0 14px rgba(212, 175, 55, 0.45);
+  transition: transform 180ms ease-out;
+}
+
+.cardoria-loader__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  color: rgba(234, 223, 194, 0.48);
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.cardoria-loader__percent {
+  min-width: 3.4em;
+  color: rgba(236, 206, 119, 0.78);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cardoria-loader__corner {
+  position: absolute;
+  z-index: 2;
+  width: 46px;
+  height: 46px;
+  opacity: 0.32;
+}
+
+.cardoria-loader__corner--tl {
+  top: 28px;
+  left: 28px;
+  border-top: 1px solid #d4af37;
+  border-left: 1px solid #d4af37;
+}
+
+.cardoria-loader__corner--br {
+  right: 28px;
+  bottom: 28px;
+  border-right: 1px solid #d4af37;
+  border-bottom: 1px solid #d4af37;
+}
+
+@keyframes cardoriaSpin { to { transform: rotate(360deg); } }
+@keyframes cardoriaLogoPulse { 0%,100% { transform: scale(.985); } 50% { transform: scale(1.035); } }
+@keyframes cardoriaAura { 0%,100% { transform: scale(.96); opacity:.5; } 50% { transform: scale(1.03); opacity:1; } }
+@keyframes cardoriaGridDrift { from { transform: perspective(700px) rotateX(62deg) translateY(15%) translateX(0); } to { transform: perspective(700px) rotateX(62deg) translateY(15%) translateX(54px); } }
+
+@media (max-width: 640px) {
+  .cardoria-loader__emblem { width: clamp(220px, 72vw, 320px); margin-bottom:20px; }
+  .cardoria-loader__progress { margin-top:28px; }
+  .cardoria-loader__corner--tl { top:18px; left:18px; }
+  .cardoria-loader__corner--br { right:18px; bottom:18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardoria-loader,
+  .cardoria-loader *,
+  .cardoria-loader::before,
+  .cardoria-loader::after {
+    animation: none !important;
+    transition-duration: 120ms !important;
+  }
+}
