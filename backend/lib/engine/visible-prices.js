@@ -1,4 +1,5 @@
 import { getDb, normalizeText } from "./database.js";
+import { createCard } from "./cards.js";
 
 const API_ROOT = "https://api.tcgdex.net/v2";
 const VISIBLE_LIMIT = 100;
@@ -6,6 +7,11 @@ const RETRY_MISSING_AFTER_MS = 6 * 60 * 60 * 1000;
 const SUPPORTED_LANGUAGES = new Set(["fr", "en", "ja", "ko"]);
 
 function normalizeLanguage(value) { const v = String(value || "fr").toLowerCase(); return SUPPORTED_LANGUAGES.has(v) ? v : "fr"; }
+function languageFromCardId(cardId) {
+  const id = String(cardId || "");
+  const match = id.match(/^pokemon-(en|ja|ko)-/i);
+  return match ? normalizeLanguage(match[1]) : "fr";
+}
 function rawCardId(cardId, language) {
   const lang = normalizeLanguage(language), id = String(cardId || ""), prefix = lang === "fr" ? "pokemon-" : `pokemon-${lang}-`;
   if (id.startsWith(prefix)) return id.slice(prefix.length);
@@ -14,6 +20,7 @@ function rawCardId(cardId, language) {
 function round2(n) { return Math.round(Number(n || 0) * 100) / 100; }
 function percent(current, base) { const c = Number(current || 0), b = Number(base || 0); return c > 0 && b > 0 ? round2(((c - b) / b) * 100) : 0; }
 function marketDirection(change) { return change > 2 ? "up" : change < -2 ? "down" : "stable"; }
+function imageUrl(base, quality) { return base ? `${String(base).replace(/\/$/, "")}/${quality}.webp` : ""; }
 function shouldRetryMissing(row) {
   if (Number(row?.recommended_price || 0) > 0) return false;
   if (!row?.market_checked_at) return true;
@@ -63,10 +70,66 @@ function cardmarketReference(pricing, variants = {}) {
   return { current: round2(current), avg: round2(avg || current), low: round2(low || current), high: round2(high || current), avg1: round2(avg1 || 0), avg7: round2(avg7 || 0), avg30: round2(avg30 || 0), updated: cm.updated || null };
 }
 
+function identityFromRaw(cardId, language, raw) {
+  const set = raw?.set || {};
+  const variants = raw?.variants || {};
+  return {
+    id: cardId,
+    license: "pokemon",
+    language,
+    name: String(raw?.name || "Carte Pokémon"),
+    extension: String(set?.name || set?.id || ""),
+    extensionCode: String(set?.id || ""),
+    number: String(raw?.localId ?? ""),
+    rarity: String(raw?.rarity || ""),
+    hitFamily: hitFamily(raw?.rarity || "", raw?.name || "", variants),
+    variants,
+    illustration: String(raw?.illustrator || ""),
+    imageHd: imageUrl(raw?.image || "", "high"),
+    imageThumb: imageUrl(raw?.image || "", "low"),
+    condition: "NM"
+  };
+}
+
+async function restoreMissingCards(cleanIds, detailCache) {
+  const db = getDb();
+  const exists = db.prepare("SELECT id FROM cards WHERE id=?");
+  const missing = cleanIds.filter((id) => !exists.get(id));
+  let restored = 0;
+
+  for (let i = 0; i < missing.length; i += 8) {
+    const batch = missing.slice(i, i + 8);
+    const details = await Promise.all(batch.map(async (id) => {
+      const language = languageFromCardId(id);
+      try {
+        const raw = await fetchJson(language, `/cards/${encodeURIComponent(rawCardId(id, language))}`);
+        return { id, language, raw };
+      } catch {
+        return { id, language, raw: null };
+      }
+    }));
+
+    for (const detail of details) {
+      if (!detail.raw) continue;
+      detailCache.set(detail.id, detail.raw);
+      try {
+        createCard(identityFromRaw(detail.id, detail.language, detail.raw));
+        restored += 1;
+      } catch (error) {
+        if (!exists.get(detail.id)) console.warn(`[visible-prices] card restore failed ${detail.id}:`, error?.message || String(error));
+      }
+    }
+  }
+  return restored;
+}
+
 export async function refreshVisibleCardPrices(ids = [], { retryMissingNow = true } = {}) {
   const cleanIds = [...new Set((ids || []).map(String).filter((id) => /^pokemon-(?:en-|ja-|ko-)?[a-zA-Z0-9_.-]+$/.test(id)))].slice(0, VISIBLE_LIMIT);
-  if (!cleanIds.length) return { ok: true, requested: 0, checked: 0, priced: 0, unavailable: 0 };
+  if (!cleanIds.length) return { ok: true, requested: 0, checked: 0, priced: 0, unavailable: 0, restored: 0 };
+
   const db = getDb();
+  const detailCache = new Map();
+  const restored = await restoreMissingCards(cleanIds, detailCache);
   const select = db.prepare("SELECT id,language,market_checked_at,recommended_price FROM cards WHERE id=? AND license_slug='pokemon' AND active=1");
   const update = db.prepare(`UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,avg_price=?,low_price=?,high_price=?,recommended_price=?,market_avg1=?,market_avg7=?,market_avg30=?,market_source=?,market_updated_at=?,market_checked_at=?,market_trend=?,trend_percent=?,updated_at=? WHERE id=?`);
   const updateWithoutPrice = db.prepare(`UPDATE cards SET rarity=?,hit_family=?,variants_json=?,illustration=?,market_checked_at=?,updated_at=? WHERE id=?`);
@@ -77,9 +140,13 @@ export async function refreshVisibleCardPrices(ids = [], { retryMissingNow = tru
   const rows = cleanIds.map((id) => select.get(id)).filter(Boolean);
   const candidates = rows.filter((row) => Number(row?.recommended_price || 0) <= 0 && (retryMissingNow || shouldRetryMissing(row)));
   let checked = 0, priced = 0, unavailable = 0;
+
   for (let i = 0; i < candidates.length; i += 8) {
     const batch = candidates.slice(i, i + 8);
-    const details = await Promise.all(batch.map(async (c) => { try { return await fetchJson(c.language, `/cards/${encodeURIComponent(rawCardId(c.id, c.language))}`); } catch { return null; } }));
+    const details = await Promise.all(batch.map(async (c) => {
+      if (detailCache.has(c.id)) return detailCache.get(c.id);
+      try { return await fetchJson(c.language, `/cards/${encodeURIComponent(rawCardId(c.id, c.language))}`); } catch { return null; }
+    }));
     db.transaction(() => {
       details.forEach((raw, index) => {
         const card = batch[index], cardId = card.id, stampedAt = new Date().toISOString(); checked += 1;
@@ -92,5 +159,5 @@ export async function refreshVisibleCardPrices(ids = [], { retryMissingNow = tru
       });
     })();
   }
-  return { ok: true, requested: rows.length, checked, priced, unavailable };
+  return { ok: true, requested: cleanIds.length, catalogMatches: rows.length, checked, priced, unavailable, restored };
 }
