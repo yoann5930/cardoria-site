@@ -6,6 +6,7 @@
   var STOCK_PREFS_TAG = "[STOCK_PREFS]";
   var purchasesById = Object.create(null);
   var inventoryByKey = Object.create(null);
+  var saveQueue = Promise.resolve();
   var conditions = ["", "M", "NM", "EX", "GD", "LP", "PL", "PO"];
 
   function esc(v) { return String(v == null ? "" : v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#039;"); }
@@ -49,7 +50,14 @@
     return '<span class="admin-badge admin-badge--ok">Disponible</span>';
   }
 
-  async function persistPrefs(item, patch, statusText) {
+  function queuePreferenceSave(item, patch, statusText) {
+    saveQueue = saveQueue.then(function () {
+      return persistPrefsNow(item, patch, statusText);
+    }).catch(function () {});
+    return saveQueue;
+  }
+
+  async function persistPrefsNow(item, patch, statusText) {
     var row = document.querySelector('[data-stock-row="' + CSS.escape(item.key) + '"]');
     if (!row) return;
     var msg = row.querySelector("[data-save-status]");
@@ -58,14 +66,17 @@
       for (var i = 0; i < (item.purchaseIds || []).length; i++) {
         var id = item.purchaseIds[i], purchase = purchasesById[id];
         if (!purchase) continue;
-        var body = Object.assign({}, purchase, { notes: writePrefs(purchase.notes, item.key, patch) });
-        var d = await A.adminFetch("/api/admin/accounting/purchases/" + encodeURIComponent(id), { method: "PUT", body: JSON.stringify(body) });
+        var notes = writePrefs(purchase.notes, item.key, patch);
+        var d = await A.adminFetch("/api/admin/stock/preferences/" + encodeURIComponent(id), { method: "PUT", body: JSON.stringify({ notes: notes }) });
         if (!d || !d.ok) throw new Error(d && d.error || "Enregistrement impossible");
-        purchasesById[id] = d.purchase || body;
+        purchasesById[id] = d.purchase || Object.assign({}, purchase, { notes: notes });
       }
       if (msg) msg.textContent = "Enregistré";
       await load();
-    } catch (e) { if (msg) msg.textContent = e.message || "Erreur"; }
+    } catch (e) {
+      if (msg) msg.textContent = "Erreur d'enregistrement";
+      console.error("[stock] preference save failed", e);
+    }
   }
 
   async function savePreference(item) {
@@ -74,7 +85,7 @@
     var condition = row.querySelector("[data-condition]")?.value || "";
     var boutique = row.querySelector("[data-boutique]")?.value !== "no";
     var boutiquePrice = row.querySelector("[data-price]")?.value || "";
-    await persistPrefs(item, { condition: condition, boutique: boutique, boutiquePrice: boutiquePrice }, "Enregistrement...");
+    await queuePreferenceSave(item, { condition: condition, boutique: boutique, boutiquePrice: boutiquePrice }, "Enregistrement...");
   }
 
   async function changeQuantity(item) {
@@ -88,14 +99,14 @@
       return;
     }
     var newBase = committed + desiredAvailable;
-    await persistPrefs(item, { stockBase: newBase, removed: false }, "Mise à jour du stock...");
+    await queuePreferenceSave(item, { stockBase: newBase, removed: false }, "Mise à jour du stock...");
   }
 
   async function removeFromStock(item) {
     var committed = Number(item.committedStock || 0);
     var ok = window.confirm("Retirer « " + item.name + " » du stock Boutique ?\n\nLa quantité disponible passera à 0. L'historique d'achat, les ventes et les écritures comptables seront conservés.");
     if (!ok) return;
-    await persistPrefs(item, { stockBase: committed, removed: true, boutique: false }, "Retrait du stock...");
+    await queuePreferenceSave(item, { stockBase: committed, removed: true, boutique: false }, "Retrait du stock...");
   }
 
   async function restoreToStock(item) {
@@ -107,7 +118,7 @@
       return;
     }
     var newBase = Number(item.committedStock || 0) + desiredAvailable;
-    await persistPrefs(item, { stockBase: newBase, removed: false, boutique: true }, "Remise en stock...");
+    await queuePreferenceSave(item, { stockBase: newBase, removed: false, boutique: true }, "Remise en stock...");
   }
 
   function render(inventory, totals) {
@@ -143,8 +154,8 @@
       A.adminFetch("/api/admin/payments/boutique-inventory", { cache: "no-store" })
     ]);
     var p = results[0], inv = results[1];
-    if (!p.ok) throw new Error(p.error || "Achats indisponibles");
-    if (!inv.ok) throw new Error(inv.error || "Stock Boutique indisponible");
+    if (!p || !p.ok) throw new Error(p && p.error || "Achats indisponibles");
+    if (!inv || !inv.ok) throw new Error(inv && inv.error || "Stock Boutique indisponible");
     purchasesById = Object.create(null);
     (p.purchases || []).forEach(function (purchase) { purchasesById[purchase.id] = purchase; });
     render(inv.inventory || [], inv.totals || {});
@@ -152,7 +163,7 @@
 
   A.renderShell("stock", "Stock Boutique", "Source unique : achats Pokémon payés moins réservations, ventes et remboursements",
     '<div class="admin-kpi-grid" style="margin-bottom:16px"><div class="admin-kpi"><label>Stock disponible</label><strong id="stockUnits">0</strong></div><div class="admin-kpi"><label>Valeur achat disponible</label><strong id="stockValue">0,00 €</strong></div><div class="admin-kpi"><label>Lié catalogue</label><strong id="stockLinked">0 / 0</strong></div><div class="admin-kpi"><label>Dans Boutique</label><strong id="stockBoutique">0 / 0</strong></div></div>' +
-    '<div class="admin-panel"><p id="stockSummary" class="small">Chargement...</p><p class="small">Vous pouvez maintenant modifier directement la quantité disponible ou retirer une référence du stock. Le retrait conserve toujours l’historique d’achat, les ventes et la comptabilité. Une commande en attente réserve le stock pendant 30 minutes ; une vente payée est toujours déduite automatiquement.</p><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Réf.</th><th>Nom</th><th>Catégorie</th><th>État</th><th>Prix achat moy.</th><th>Prix Boutique</th><th>Stock réel / actions</th><th>Boutique</th><th>Source</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
+    '<div class="admin-panel"><p id="stockSummary" class="small">Chargement...</p><p class="small">Vous pouvez modifier la quantité disponible, le prix, l’état et la présence en Boutique. Le retrait conserve toujours l’historique d’achat, les ventes et la comptabilité. Une commande en attente réserve le stock pendant 30 minutes ; une vente payée est toujours déduite automatiquement.</p><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Réf.</th><th>Nom</th><th>Catégorie</th><th>État</th><th>Prix achat moy.</th><th>Prix Boutique</th><th>Stock réel / actions</th><th>Boutique</th><th>Source</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
 
-  load().catch(function (e) { A.qs("#stockRows").innerHTML = '<tr><td colspan="9">'+esc(e.message || "Chargement impossible")+'</td></tr>'; });
+  load().catch(function (e) { A.qs("#stockRows").innerHTML = '<tr><td colspan="9">Chargement du stock impossible.</td></tr>'; console.error("[stock] load failed", e); });
 })();
