@@ -63,7 +63,7 @@ function cardmarketReference(pricing, variants = {}) {
   return { current: round2(current), avg: round2(avg || current), low: round2(low || current), high: round2(high || current), avg1: round2(avg1 || 0), avg7: round2(avg7 || 0), avg30: round2(avg30 || 0), updated: cm.updated || null };
 }
 
-export async function refreshVisibleCardPrices(ids = [], { retryMissingNow = false } = {}) {
+export async function refreshVisibleCardPrices(ids = [], { retryMissingNow = true } = {}) {
   const cleanIds = [...new Set((ids || []).map(String).filter((id) => /^pokemon-(?:en-|ja-|ko-)?[a-zA-Z0-9_.-]+$/.test(id)))].slice(0, VISIBLE_LIMIT);
   if (!cleanIds.length) return { ok: true, requested: 0, checked: 0, priced: 0, unavailable: 0 };
   const db = getDb();
