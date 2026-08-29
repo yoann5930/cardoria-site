@@ -77,16 +77,43 @@ function catalogCardId(reference) {
   return value.startsWith(prefix) ? value.slice(prefix.length) : "";
 }
 
+function parseJsonTag(notes, tag) {
+  const escaped = String(tag || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = String(notes || "").match(new RegExp("\\[" + escaped + "\\]\\s*(\\[[^\\n\\r]*\\]|\\{[^\\n\\r]*\\})"));
+  if (!match) return null;
+  try { return JSON.parse(match[1]); } catch { return null; }
+}
+
 function lotCardIds(purchase) {
   if (Array.isArray(purchase?.lotCards) && purchase.lotCards.length) return purchase.lotCards.filter(Boolean);
-  const match = String(purchase?.notes || "").match(/\[LOT_CARDS\]\s*(\[[^\n\r]*\])/);
-  if (!match) return [];
-  try {
-    const ids = JSON.parse(match[1]);
-    return Array.isArray(ids) ? ids.filter(Boolean) : [];
-  } catch {
-    return [];
-  }
+  const parsed = parseJsonTag(purchase?.notes, "LOT_CARDS");
+  return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+}
+
+function lotCardSnapshots(purchase) {
+  const parsed = parseJsonTag(purchase?.notes, "LOT_CARD_SNAPSHOTS");
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map((item) => item && typeof item === "object" ? {
+    id: String(item.id || "").trim(),
+    name: String(item.name || "").trim(),
+    extension: String(item.extension || "").trim(),
+    number: String(item.number || "").trim(),
+    rarity: String(item.rarity || item.hitFamily || "").trim(),
+    image: String(item.imageThumb || item.imageHd || item.image || "").trim()
+  } : null).filter(Boolean);
+}
+
+function singleCardSnapshot(purchase) {
+  const parsed = parseJsonTag(purchase?.notes, "CARD_SNAPSHOT");
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  return {
+    id: String(parsed.id || "").trim(),
+    name: String(parsed.name || "").trim(),
+    extension: String(parsed.extension || "").trim(),
+    number: String(parsed.number || "").trim(),
+    rarity: String(parsed.rarity || parsed.hitFamily || "").trim(),
+    image: String(parsed.imageThumb || parsed.imageHd || parsed.image || "").trim()
+  };
 }
 
 function isStockPurchase(purchase) {
@@ -94,6 +121,10 @@ function isStockPurchase(purchase) {
   if (purchase?.purchaseType === "pokemon_card") return true;
   return String(purchase?.license || "").toLowerCase() === "pokemon" &&
     ["cartes", "lots", "boosters"].includes(String(purchase?.category || "").toLowerCase());
+}
+
+function isCardPackaging(packaging) {
+  return packaging === "carte_unite" || packaging === "lot_cartes";
 }
 
 function getCardCached(cache, id) {
@@ -138,7 +169,7 @@ function addLine(map, item) {
       stockRemoved: pref.removed === true,
       preferenceApplied: pref.explicit === true,
       catalogPrice: recommendedPrice(item.card),
-      image: item.card?.imageThumb || item.card?.imageHd || "",
+      image: item.card?.imageThumb || item.card?.imageHd || item.image || "",
       baseStock: qty,
       totalCost: unitCost * qty,
       latestPurchaseAt: item.latestPurchaseAt || "",
@@ -161,7 +192,7 @@ function addLine(map, item) {
   }
   if (pref.explicit && pref.stockBase !== null && pref.stockBase !== undefined) current.stockBaseOverride = pref.stockBase;
   if (pref.explicit) current.stockRemoved = pref.removed === true;
-  if (!current.image && item.card) current.image = item.card.imageThumb || item.card.imageHd || "";
+  if (!current.image) current.image = item.card?.imageThumb || item.card?.imageHd || item.image || "";
   if (!current.catalogPrice && item.card) current.catalogPrice = recommendedPrice(item.card);
 }
 
@@ -179,20 +210,23 @@ function buildBaseStock() {
 
     if (packaging === "lot_cartes") {
       const ids = lotCardIds(purchase);
-      if (ids.length) {
+      const snapshots = lotCardSnapshots(purchase);
+      if (ids.length || snapshots.length) {
         for (let index = 0; index < qty; index += 1) {
-          const cardId = ids[index] || "";
+          const snapshot = snapshots[index] || {};
+          const cardId = String(ids[index] || snapshot.id || "").trim();
           const card = getCardCached(cardCache, cardId);
           const key = cardId ? `card:${cardId}` : `purchase:${purchase.id}:${index}`;
           addLine(map, {
             key,
             cardId,
             card,
-            name: card?.name || purchase.description || "Carte Pokémon du lot",
-            extension: card?.extension || "",
-            number: card?.number || "",
-            rarity: card?.hitFamily || card?.rarity || "",
-            categoryLabel: card?.hitFamily || card?.rarity || "Carte Pokémon",
+            image: snapshot.image,
+            name: card?.name || snapshot.name || "Carte Pokémon",
+            extension: card?.extension || snapshot.extension || "",
+            number: card?.number || snapshot.number || "",
+            rarity: card?.hitFamily || card?.rarity || snapshot.rarity || "",
+            categoryLabel: card?.hitFamily || card?.rarity || snapshot.rarity || "Carte Pokémon",
             packaging,
             condition: purchase.condition || purchase.cardCondition || "",
             preference: readLinePreference(purchase, key),
@@ -206,7 +240,7 @@ function buildBaseStock() {
         const key = `purchase:${purchase.id}:lot`;
         addLine(map, {
           key,
-          name: purchase.description || "Lot de cartes Pokémon",
+          name: "Lot de cartes non relié au catalogue",
           categoryLabel: "Lot de cartes",
           packaging,
           condition: purchase.condition || purchase.cardCondition || "",
@@ -221,18 +255,20 @@ function buildBaseStock() {
     }
 
     if (packaging === "carte_unite" || !purchase.packaging) {
-      const cardId = catalogCardId(purchase.reference);
+      const snapshot = singleCardSnapshot(purchase) || {};
+      const cardId = catalogCardId(purchase.reference) || snapshot.id || "";
       const card = getCardCached(cardCache, cardId);
       const key = cardId ? `card:${cardId}` : `purchase:${purchase.id}`;
       addLine(map, {
         key,
         cardId,
         card,
-        name: card?.name || purchase.description || "Carte Pokémon",
-        extension: card?.extension || "",
-        number: card?.number || "",
-        rarity: card?.hitFamily || card?.rarity || "",
-        categoryLabel: card?.hitFamily || card?.rarity || "Carte Pokémon",
+        image: snapshot.image,
+        name: card?.name || snapshot.name || "Carte Pokémon non reliée au catalogue",
+        extension: card?.extension || snapshot.extension || "",
+        number: card?.number || snapshot.number || "",
+        rarity: card?.hitFamily || card?.rarity || snapshot.rarity || "",
+        categoryLabel: card?.hitFamily || card?.rarity || snapshot.rarity || "Carte Pokémon",
         packaging,
         condition: purchase.condition || purchase.cardCondition || "",
         preference: readLinePreference(purchase, key),
@@ -310,6 +346,8 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
   const price = line.boutiquePrice || line.catalogPrice || 0;
   const priceSource = line.boutiquePrice ? "admin" : (line.catalogPrice ? "cardoria_market" : "missing");
   const boutiqueEnabled = line.stockRemoved ? false : line.boutiqueEnabled !== false;
+  const catalogLinked = !isCardPackaging(line.packaging) || Boolean(line.cardId);
+  const identityReady = !isCardPackaging(line.packaging) || (Boolean(line.cardId) && Boolean(line.name) && Boolean(line.image));
   const publicProduct = {
     id: line.key,
     cardId: line.cardId,
@@ -328,7 +366,9 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     image: line.image,
     boutiqueEnabled,
     stockRemoved: line.stockRemoved === true,
-    purchasable: boutiqueEnabled && stock > 0 && price > 0 && oversoldStock === 0
+    catalogLinked,
+    identityReady,
+    purchasable: boutiqueEnabled && identityReady && stock > 0 && price > 0 && oversoldStock === 0
   };
 
   if (!includeAdminDetails) return publicProduct;
@@ -350,7 +390,7 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     catalogPrice: line.catalogPrice,
     boutiquePrice: line.boutiquePrice,
     latestPurchaseAt: line.latestPurchaseAt,
-    inventoryStatus: line.stockRemoved ? "removed" : oversoldStock > 0 ? "oversold" : stock <= 0 ? "out_of_stock" : allocation.pendingStock > 0 ? "reserved" : "available"
+    inventoryStatus: line.stockRemoved ? "removed" : !identityReady ? "catalog_link_required" : oversoldStock > 0 ? "oversold" : stock <= 0 ? "out_of_stock" : allocation.pendingStock > 0 ? "reserved" : "available"
   };
 }
 
@@ -359,6 +399,7 @@ export function listBoutiqueProducts({ includeDisabled = false } = {}) {
   return buildBaseStock()
     .map((line) => buildInventoryLine(line, orders, false))
     .filter((product) => !product.stockRemoved)
+    .filter((product) => !isCardPackaging(product.packaging) || product.identityReady)
     .filter((product) => includeDisabled || product.boutiqueEnabled)
     .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "fr"));
 }
