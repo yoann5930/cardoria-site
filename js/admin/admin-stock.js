@@ -43,6 +43,8 @@
 
   function statusLabel(item) {
     if (item.stockRemoved) return '<span class="admin-badge admin-badge--danger">Retiré du stock</span>';
+    if (item.inventoryStatus === "catalog_link_required") return '<span class="admin-badge admin-badge--warn">Lien catalogue requis</span>';
+    if (item.inventoryStatus === "catalog_price_required") return '<span class="admin-badge admin-badge--warn">Prix catalogue indisponible</span>';
     if (Number(item.oversoldStock || 0) > 0) return '<span class="admin-badge admin-badge--danger">SURVENTE</span>';
     if (Number(item.refundHoldStock || 0) > 0) return '<span class="admin-badge admin-badge--warn">Remboursement</span>';
     if (Number(item.pendingStock || 0) > 0) return '<span class="admin-badge admin-badge--gold">Réservé</span>';
@@ -136,7 +138,7 @@
       var actions = i.stockRemoved
         ? '<button type="button" class="admin-btn admin-btn--small" data-restore-stock>Remettre</button>'
         : '<button type="button" class="admin-btn admin-btn--small" data-edit-stock>Modifier</button> <button type="button" class="admin-btn admin-btn--small admin-btn--danger" data-remove-stock>Supprimer</button>';
-      return '<tr data-stock-row="'+esc(i.key)+'"><td><small>'+esc(i.cardId || i.key)+'</small></td><td><strong>'+esc(i.name)+'</strong><br><small>'+esc([i.extension,i.number?"#"+i.number:""].filter(Boolean).join(" · "))+'</small></td><td>'+esc(i.categoryLabel || i.packaging)+'</td><td><select data-condition '+((i.packaging!=="carte_unite"&&i.packaging!=="lot_cartes")?'disabled':'')+'>'+conditionOptions(i)+'</select></td><td>'+euro(i.averagePurchaseCost)+'</td><td><input data-price type="number" min="0" step="0.01" value="'+(i.boutiquePrice ? Number(i.boutiquePrice).toFixed(2) : '')+'" placeholder="'+(i.catalogPrice ? Number(i.catalogPrice).toFixed(2) : 'Prix requis')+'"><br><small>'+(i.boutiquePrice?'Prix Admin':i.catalogPrice?'Auto Cardoria '+euro(i.catalogPrice):'Prix requis')+'</small></td><td><strong>'+Number(i.stock||0)+'</strong> dispo<br><small>'+Number(i.pendingStock||0)+' réservé · '+Number(i.soldStock||0)+' vendu'+(Number(i.refundHoldStock||0)?' · '+Number(i.refundHoldStock)+' remboursement':'')+'</small><br>'+statusLabel(i)+'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+actions+'</div></td><td><select data-boutique '+(i.stockRemoved?'disabled':'')+'><option value="yes"'+(i.boutiqueEnabled?' selected':'')+'>Oui</option><option value="no"'+(!i.boutiqueEnabled?' selected':'')+'>Non</option></select></td><td>Achats payés<br><small data-save-status></small></td></tr>';
+      return '<tr data-stock-row="'+esc(i.key)+'"><td><small>'+esc(i.cardId || i.key)+'</small></td><td><strong>'+esc(i.name)+'</strong><br><small>'+esc([i.extension,i.number?"#"+i.number:""].filter(Boolean).join(" · "))+'</small></td><td>'+esc(i.categoryLabel || i.packaging)+'</td><td><select data-condition '+((i.packaging!=="carte_unite"&&i.packaging!=="lot_cartes")?'disabled':'')+'>'+conditionOptions(i)+'</select></td><td>'+euro(i.averagePurchaseCost)+'</td><td><input data-price type="number" min="0" step="0.01" value="'+(i.boutiquePrice ? Number(i.boutiquePrice).toFixed(2) : '')+'" placeholder="'+(i.catalogPrice ? Number(i.catalogPrice).toFixed(2) : 'Prix requis')+'"><br><small>'+(i.boutiquePrice?'Prix Admin':i.catalogPrice?'Auto Cardoria '+euro(i.catalogPrice):'Prix catalogue indisponible')+'</small></td><td><strong>'+Number(i.stock||0)+'</strong> dispo<br><small>'+Number(i.pendingStock||0)+' réservé · '+Number(i.soldStock||0)+' vendu'+(Number(i.refundHoldStock||0)?' · '+Number(i.refundHoldStock)+' remboursement':'')+'</small><br>'+statusLabel(i)+'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+actions+'</div></td><td><select data-boutique '+(i.stockRemoved?'disabled':'')+'><option value="yes"'+(i.boutiqueEnabled?' selected':'')+'>Oui</option><option value="no"'+(!i.boutiqueEnabled?' selected':'')+'>Non</option></select></td><td>Achats payés<br><small data-save-status></small></td></tr>';
     }).join("") || '<tr><td colspan="9">Aucun stock Boutique.</td></tr>';
 
     A.qs("#stockRows").querySelectorAll("tr[data-stock-row]").forEach(function (row) {
@@ -156,6 +158,26 @@
     var p = results[0], inv = results[1];
     if (!p || !p.ok) throw new Error(p && p.error || "Achats indisponibles");
     if (!inv || !inv.ok) throw new Error(inv && inv.error || "Stock Boutique indisponible");
+
+    var missingPriceIds = Array.from(new Set((inv.inventory || []).filter(function (item) {
+      return item.cardId && !item.boutiquePrice && Number(item.catalogPrice || 0) <= 0;
+    }).map(function (item) { return item.cardId; })));
+
+    if (missingPriceIds.length) {
+      try {
+        var refreshed = await A.adminFetch("/api/admin/engine/market-prices/visible", {
+          method: "POST",
+          body: JSON.stringify({ ids: missingPriceIds })
+        });
+        if (refreshed && refreshed.ok) {
+          var updatedInventory = await A.adminFetch("/api/admin/payments/boutique-inventory", { cache: "no-store" });
+          if (updatedInventory && updatedInventory.ok) inv = updatedInventory;
+        }
+      } catch (e) {
+        console.warn("[stock] actualisation automatique des prix indisponible", e);
+      }
+    }
+
     purchasesById = Object.create(null);
     (p.purchases || []).forEach(function (purchase) { purchasesById[purchase.id] = purchase; });
     render(inv.inventory || [], inv.totals || {});
@@ -163,7 +185,7 @@
 
   A.renderShell("stock", "Stock Boutique", "Source unique : achats Pokémon payés moins réservations, ventes et remboursements",
     '<div class="admin-kpi-grid" style="margin-bottom:16px"><div class="admin-kpi"><label>Stock disponible</label><strong id="stockUnits">0</strong></div><div class="admin-kpi"><label>Valeur achat disponible</label><strong id="stockValue">0,00 €</strong></div><div class="admin-kpi"><label>Lié catalogue</label><strong id="stockLinked">0 / 0</strong></div><div class="admin-kpi"><label>Dans Boutique</label><strong id="stockBoutique">0 / 0</strong></div></div>' +
-    '<div class="admin-panel"><p id="stockSummary" class="small">Chargement...</p><p class="small">Vous pouvez modifier la quantité disponible, le prix, l’état et la présence en Boutique. Le retrait conserve toujours l’historique d’achat, les ventes et la comptabilité. Une commande en attente réserve le stock pendant 30 minutes ; une vente payée est toujours déduite automatiquement.</p><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Réf.</th><th>Nom</th><th>Catégorie</th><th>État</th><th>Prix achat moy.</th><th>Prix Boutique</th><th>Stock réel / actions</th><th>Boutique</th><th>Source</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
+    '<div class="admin-panel"><p id="stockSummary" class="small">Chargement...</p><p class="small">Les cartes liées au catalogue récupèrent automatiquement leur tarif de référence Cardoria. Vous pouvez toujours saisir un prix Admin pour le remplacer. Vous pouvez aussi modifier la quantité disponible, l’état et la présence en Boutique. Le retrait conserve toujours l’historique d’achat, les ventes et la comptabilité.</p><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Réf.</th><th>Nom</th><th>Catégorie</th><th>État</th><th>Prix achat moy.</th><th>Prix Boutique</th><th>Stock réel / actions</th><th>Boutique</th><th>Source</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
 
   load().catch(function (e) { A.qs("#stockRows").innerHTML = '<tr><td colspan="9">Chargement du stock impossible.</td></tr>'; console.error("[stock] load failed", e); });
 })();
