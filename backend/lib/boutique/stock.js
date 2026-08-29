@@ -55,13 +55,18 @@ function readLinePreference(purchase, key) {
   const prefs = parseStockPrefs(purchase?.notes);
   const pref = prefs[key];
   if (!pref || typeof pref !== "object" || Array.isArray(pref)) {
-    return { condition: "", boutiqueEnabled: true, boutiquePrice: null, explicit: false };
+    return { condition: "", boutiqueEnabled: true, boutiquePrice: null, stockBase: null, removed: false, explicit: false };
   }
   const rawPrice = Number(pref.boutiquePrice);
+  const rawStockBase = Number(pref.stockBase);
   return {
     condition: normalizeCondition(pref.condition),
     boutiqueEnabled: pref.boutique === undefined ? true : pref.boutique === true,
     boutiquePrice: Number.isFinite(rawPrice) && rawPrice > 0 ? money(rawPrice) : null,
+    stockBase: pref.stockBase === null || pref.stockBase === undefined || pref.stockBase === "" || !Number.isFinite(rawStockBase)
+      ? null
+      : Math.max(0, Math.trunc(rawStockBase)),
+    removed: pref.removed === true,
     explicit: true
   };
 }
@@ -115,7 +120,7 @@ function addPurchaseId(line, purchaseId) {
 function addLine(map, item) {
   const qty = Math.max(1, Math.trunc(Number(item.stock) || 1));
   const unitCost = Math.max(0, Number(item.unitCost) || 0);
-  const pref = item.preference || { condition: "", boutiqueEnabled: true, boutiquePrice: null, explicit: false };
+  const pref = item.preference || { condition: "", boutiqueEnabled: true, boutiquePrice: null, stockBase: null, removed: false, explicit: false };
   if (!map[item.key]) {
     map[item.key] = {
       key: item.key,
@@ -129,6 +134,8 @@ function addLine(map, item) {
       condition: pref.condition || normalizeCondition(item.condition),
       boutiqueEnabled: pref.boutiqueEnabled !== false,
       boutiquePrice: pref.boutiquePrice,
+      stockBaseOverride: pref.stockBase,
+      stockRemoved: pref.removed === true,
       preferenceApplied: pref.explicit === true,
       catalogPrice: recommendedPrice(item.card),
       image: item.card?.imageThumb || item.card?.imageHd || "",
@@ -152,6 +159,8 @@ function addLine(map, item) {
     current.boutiquePrice = pref.boutiquePrice;
     current.preferenceApplied = true;
   }
+  if (pref.explicit && pref.stockBase !== null && pref.stockBase !== undefined) current.stockBaseOverride = pref.stockBase;
+  if (pref.explicit) current.stockRemoved = pref.removed === true;
   if (!current.image && item.card) current.image = item.card.imageThumb || item.card.imageHd || "";
   if (!current.catalogPrice && item.card) current.catalogPrice = recommendedPrice(item.card);
 }
@@ -292,10 +301,15 @@ function allocationStats(productId, orders) {
 function buildInventoryLine(line, orders, includeAdminDetails) {
   const allocation = allocationStats(line.key, orders);
   const committedStock = allocation.pendingStock + allocation.soldStock + allocation.refundHoldStock;
-  const stock = Math.max(0, line.baseStock - committedStock);
-  const oversoldStock = Math.max(0, committedStock - line.baseStock);
+  const configuredBaseStock = line.stockBaseOverride === null || line.stockBaseOverride === undefined
+    ? line.baseStock
+    : Math.max(0, Math.trunc(Number(line.stockBaseOverride) || 0));
+  const effectiveBaseStock = line.stockRemoved ? committedStock : configuredBaseStock;
+  const stock = Math.max(0, effectiveBaseStock - committedStock);
+  const oversoldStock = Math.max(0, committedStock - effectiveBaseStock);
   const price = line.boutiquePrice || line.catalogPrice || 0;
   const priceSource = line.boutiquePrice ? "admin" : (line.catalogPrice ? "cardoria_market" : "missing");
+  const boutiqueEnabled = line.stockRemoved ? false : line.boutiqueEnabled !== false;
   const publicProduct = {
     id: line.key,
     cardId: line.cardId,
@@ -312,8 +326,9 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     price: money(price),
     priceSource,
     image: line.image,
-    boutiqueEnabled: line.boutiqueEnabled !== false,
-    purchasable: line.boutiqueEnabled !== false && stock > 0 && price > 0 && oversoldStock === 0
+    boutiqueEnabled,
+    stockRemoved: line.stockRemoved === true,
+    purchasable: boutiqueEnabled && stock > 0 && price > 0 && oversoldStock === 0
   };
 
   if (!includeAdminDetails) return publicProduct;
@@ -321,6 +336,8 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     ...publicProduct,
     key: line.key,
     baseStock: line.baseStock,
+    effectiveBaseStock,
+    stockBaseOverride: line.stockBaseOverride,
     pendingStock: allocation.pendingStock,
     soldStock: allocation.soldStock,
     refundHoldStock: allocation.refundHoldStock,
@@ -333,7 +350,7 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     catalogPrice: line.catalogPrice,
     boutiquePrice: line.boutiquePrice,
     latestPurchaseAt: line.latestPurchaseAt,
-    inventoryStatus: oversoldStock > 0 ? "oversold" : stock <= 0 ? "out_of_stock" : allocation.pendingStock > 0 ? "reserved" : "available"
+    inventoryStatus: line.stockRemoved ? "removed" : oversoldStock > 0 ? "oversold" : stock <= 0 ? "out_of_stock" : allocation.pendingStock > 0 ? "reserved" : "available"
   };
 }
 
@@ -341,6 +358,7 @@ export function listBoutiqueProducts({ includeDisabled = false } = {}) {
   const orders = readJson("orders", DEFAULT_ORDERS);
   return buildBaseStock()
     .map((line) => buildInventoryLine(line, orders, false))
+    .filter((product) => !product.stockRemoved)
     .filter((product) => includeDisabled || product.boutiqueEnabled)
     .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "fr"));
 }
