@@ -42,6 +42,51 @@ jobs:
 
           printf 'frontend-source-sha=%s\n' "$(git rev-parse HEAD)" > backend/.frontend-runtime-sha
 
+      - name: Validate required runtime pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            backend/public/index.html
+            backend/public/admin-login.html
+            backend/public/admin.html
+            backend/public/admin-achats-cartes.html
+            backend/public/admin-achats-consommables.html
+            backend/public/admin-achats-materiel.html
+            backend/public/admin-achats-acheteurs.html
+            backend/public/admin-comptabilite.html
+            backend/public/admin-paiements.html
+            backend/public/admin-commandes.html
+            backend/public/admin-stock.html
+            backend/public/admin-estimations.html
+            backend/public/admin-rachat.html
+            backend/public/admin-catalogue.html
+            backend/public/admin-marketplace.html
+            backend/public/admin-utilisateurs.html
+            backend/public/admin-journal.html
+            backend/public/admin-system.html
+            backend/public/boutique.html
+            backend/public/marketplace.html
+            backend/public/estimation.html
+            backend/public/scanner.html
+            backend/public/comparateur.html
+            backend/public/tendances.html
+            backend/public/pages/contact/index.html
+            backend/public/pages/faq/index.html
+            backend/public/pages/licences/index.html
+            backend/public/style.css
+            backend/public/css/admin.css
+            backend/public/js/admin/admin-core.js
+            backend/public/js/admin/admin-stock.js
+          )
+          for file in "${required[@]}"; do
+            test -f "$file" || { echo "Missing runtime file: $file"; exit 1; }
+          done
+          if grep -R -n "cardoria\.vercel\.app" backend/public --include='*.html' --include='*.js' --include='*.xml' --include='*.txt'; then
+            echo "Legacy Vercel production URL still present in runtime frontend."
+            exit 1
+          fi
+
       - name: Commit runtime mirror when changed
         shell: bash
         run: |
