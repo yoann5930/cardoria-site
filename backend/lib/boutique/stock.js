@@ -138,9 +138,20 @@ function getCardCached(cache, id) {
   return cache[id];
 }
 
-function recommendedPrice(card) {
-  const value = Number(card?.prices?.recommended ?? card?.prices?.avg ?? 0);
-  return Number.isFinite(value) && value > 0 ? money(value) : 0;
+function catalogReferencePrice(card) {
+  const candidates = [
+    ["recommended", card?.prices?.recommended],
+    ["market_avg7", card?.market?.avg7],
+    ["market_avg30", card?.market?.avg30],
+    ["market_avg1", card?.market?.avg1],
+    ["catalog_avg", card?.prices?.avg],
+    ["catalog_low", card?.prices?.low]
+  ];
+  for (const [source, raw] of candidates) {
+    const value = Number(raw || 0);
+    if (Number.isFinite(value) && value > 0) return { price: money(value), source };
+  }
+  return { price: 0, source: "missing" };
 }
 
 function addPurchaseId(line, purchaseId) {
@@ -152,6 +163,7 @@ function addLine(map, item) {
   const qty = Math.max(1, Math.trunc(Number(item.stock) || 1));
   const unitCost = Math.max(0, Number(item.unitCost) || 0);
   const pref = item.preference || { condition: "", boutiqueEnabled: true, boutiquePrice: null, stockBase: null, removed: false, explicit: false };
+  const catalogPrice = catalogReferencePrice(item.card);
   if (!map[item.key]) {
     map[item.key] = {
       key: item.key,
@@ -168,7 +180,8 @@ function addLine(map, item) {
       stockBaseOverride: pref.stockBase,
       stockRemoved: pref.removed === true,
       preferenceApplied: pref.explicit === true,
-      catalogPrice: recommendedPrice(item.card),
+      catalogPrice: catalogPrice.price,
+      catalogPriceSource: catalogPrice.source,
       image: item.card?.imageThumb || item.card?.imageHd || item.image || "",
       baseStock: qty,
       totalCost: unitCost * qty,
@@ -193,7 +206,10 @@ function addLine(map, item) {
   if (pref.explicit && pref.stockBase !== null && pref.stockBase !== undefined) current.stockBaseOverride = pref.stockBase;
   if (pref.explicit) current.stockRemoved = pref.removed === true;
   if (!current.image) current.image = item.card?.imageThumb || item.card?.imageHd || item.image || "";
-  if (!current.catalogPrice && item.card) current.catalogPrice = recommendedPrice(item.card);
+  if (!current.catalogPrice && catalogPrice.price) {
+    current.catalogPrice = catalogPrice.price;
+    current.catalogPriceSource = catalogPrice.source;
+  }
 }
 
 function buildBaseStock() {
@@ -344,10 +360,11 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
   const stock = Math.max(0, effectiveBaseStock - committedStock);
   const oversoldStock = Math.max(0, committedStock - effectiveBaseStock);
   const price = line.boutiquePrice || line.catalogPrice || 0;
-  const priceSource = line.boutiquePrice ? "admin" : (line.catalogPrice ? "cardoria_market" : "missing");
+  const priceSource = line.boutiquePrice ? "admin" : (line.catalogPriceSource || "missing");
   const boutiqueEnabled = line.stockRemoved ? false : line.boutiqueEnabled !== false;
   const catalogLinked = !isCardPackaging(line.packaging) || Boolean(line.cardId);
   const identityReady = !isCardPackaging(line.packaging) || (Boolean(line.cardId) && Boolean(line.name) && Boolean(line.image));
+  const priceReady = Number(price || 0) > 0;
   const publicProduct = {
     id: line.key,
     cardId: line.cardId,
@@ -363,12 +380,15 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     stock,
     price: money(price),
     priceSource,
+    catalogPrice: line.catalogPrice,
+    catalogPriceSource: line.catalogPriceSource,
     image: line.image,
     boutiqueEnabled,
     stockRemoved: line.stockRemoved === true,
     catalogLinked,
     identityReady,
-    purchasable: boutiqueEnabled && identityReady && stock > 0 && price > 0 && oversoldStock === 0
+    priceReady,
+    purchasable: boutiqueEnabled && identityReady && priceReady && stock > 0 && oversoldStock === 0
   };
 
   if (!includeAdminDetails) return publicProduct;
@@ -387,10 +407,9 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     averagePurchaseCost: line.baseStock ? money(line.totalCost / line.baseStock) : 0,
     totalPurchaseCost: money(line.totalCost),
     purchaseIds: line.purchaseIds.slice(),
-    catalogPrice: line.catalogPrice,
     boutiquePrice: line.boutiquePrice,
     latestPurchaseAt: line.latestPurchaseAt,
-    inventoryStatus: line.stockRemoved ? "removed" : !identityReady ? "catalog_link_required" : oversoldStock > 0 ? "oversold" : stock <= 0 ? "out_of_stock" : allocation.pendingStock > 0 ? "reserved" : "available"
+    inventoryStatus: line.stockRemoved ? "removed" : !identityReady ? "catalog_link_required" : !priceReady ? "catalog_price_required" : oversoldStock > 0 ? "oversold" : stock <= 0 ? "out_of_stock" : allocation.pendingStock > 0 ? "reserved" : "available"
   };
 }
 
@@ -399,7 +418,7 @@ export function listBoutiqueProducts({ includeDisabled = false } = {}) {
   return buildBaseStock()
     .map((line) => buildInventoryLine(line, orders, false))
     .filter((product) => !product.stockRemoved)
-    .filter((product) => !isCardPackaging(product.packaging) || product.identityReady)
+    .filter((product) => !isCardPackaging(product.packaging) || (product.identityReady && product.priceReady))
     .filter((product) => includeDisabled || product.boutiqueEnabled)
     .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "fr"));
 }
