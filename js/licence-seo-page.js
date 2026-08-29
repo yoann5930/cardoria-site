@@ -51,7 +51,7 @@
   }
 
   function render(page, cards, extensions) {
-    var siteUrl = (window.CARDORIA_SEO && CARDORIA_SEO.siteUrl) || "https://cardoria.vercel.app";
+    var siteUrl = (window.CARDORIA_SEO && CARDORIA_SEO.siteUrl) || "https://cardoria-site-2.onrender.com";
     var pageUrl = siteUrl + "/pages/licences/" + slug + "/";
     updateSocialMeta(page.title, page.metaDescription, pageUrl, siteUrl + (window.CARDORIA_SEO.defaultImage || "/assets/logo/cardoria-premium.png"));
     window.CARDORIA_SEO_PAGE.title = page.title;
@@ -82,7 +82,7 @@
       '<section class="seo-section"><h2>Extensions ' + licCfg.name + " populaires</h2><div class=\"seo-links\">" + (extHtml || "<span>Catalogue en cours de référencement</span>") + "</div></section>" +
       '<section class="seo-section"><h2>Cartes ' + licCfg.name + " référencées</h2><div class=\"seo-grid\">" + cardsHtml + "</div></section>" +
       '<section class="seo-section"><h2>Pourquoi Cardoria pour vos cartes ' + licCfg.name + " ?</h2>" +
-      "<p>Estimation IA premium, historique des prix sur 7 à 365 jours, marketplace avec paiement SumUp et équipe d'experts TCG basée en France.</p></section>";
+      "<p>Estimation IA premium, historique des prix sur 7 à 365 jours, marketplace avec paiement dédié et équipe d'experts TCG basée en France.</p></section>";
 
     injectJsonLd({
       "@context": "https://schema.org",
