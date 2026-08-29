@@ -2,4 +2,4 @@
 # Les fiches cartes sont générées via GET /api/engine/sitemap?page=1&limit=500
 # En production : cron Render → fusionner les URLs dans sitemap-index.xml
 
-Sitemap: https://cardoria.vercel.app/sitemap.xml
+Sitemap: https://cardoria-site-2.onrender.com/sitemap.xml
