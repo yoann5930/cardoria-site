@@ -136,7 +136,7 @@
     setLink("canonical", url);
     if (card.imageHd) setMeta("og:image", card.imageHd, "property");
 
-    var siteUrl = window.CARDORIA_SEO?.siteUrl || "https://cardoria-site-2.onrender.com";
+    var siteUrl = window.CARDORIA_SEO?.siteUrl || "https://cardoria-site-f2cy.onrender.com";
     var ldProduct = document.createElement("script");
     ldProduct.type = "application/ld+json";
     ldProduct.textContent = JSON.stringify({

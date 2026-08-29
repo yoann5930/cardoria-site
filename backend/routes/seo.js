@@ -8,7 +8,7 @@ import { getLicenseSeoContent, listExtensions, getGeneratedPage } from "../lib/s
 import { readJson } from "../lib/storage.js";
 
 const router = Router();
-const SITE = process.env.SITE_URL || "https://cardoria.vercel.app";
+const SITE = process.env.SITE_URL || "https://cardoria-site-f2cy.onrender.com";
 
 router.get("/sitemap.xml", (req, res) => {
   const xml = generateSitemapXml(SITE);

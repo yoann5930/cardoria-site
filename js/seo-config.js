@@ -2,8 +2,8 @@
  * Configuration SEO entreprise Cardoria — pages, licences, avis, analytics.
  */
 window.CARDORIA_SEO = {
-  siteUrl: "https://cardoria-site-2.onrender.com",
-  backendUrl: "https://cardoria-site-2.onrender.com",
+  siteUrl: "https://cardoria-site-f2cy.onrender.com",
+  backendUrl: "https://cardoria-site-f2cy.onrender.com",
   siteName: "Cardoria",
   locale: "fr_FR",
   lang: "fr",
@@ -16,8 +16,8 @@ window.CARDORIA_SEO = {
   organization: {
     name: "Cardoria",
     legalName: "Cardoria",
-    url: "https://cardoria-site-2.onrender.com",
-    logo: "https://cardoria-site-2.onrender.com/assets/logo/cardoria-premium.png",
+    url: "https://cardoria-site-f2cy.onrender.com",
+    logo: "https://cardoria-site-f2cy.onrender.com/assets/logo/cardoria-premium.png",
     email: "Cardoria59330@gmail.com",
     address: { street: "", city: "France", country: "FR" },
     sameAs: []

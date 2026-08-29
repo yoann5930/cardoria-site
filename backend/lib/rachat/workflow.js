@@ -181,7 +181,7 @@ export function startRachatReview(id, { user = "admin", note = "" } = {}) {
 }
 
 function publicBaseUrl() {
-  return clean(process.env.SITE_URL || process.env.FRONTEND_URL || "https://cardoria-site-2.onrender.com", 500).replace(/\/$/, "");
+  return clean(process.env.SITE_URL || process.env.FRONTEND_URL || "https://cardoria-site-f2cy.onrender.com", 500).replace(/\/$/, "");
 }
 
 export async function sendRachatOffer(id, { amount, note = "", expiresDays = DECISION_TTL_DAYS, user = "admin" } = {}) {

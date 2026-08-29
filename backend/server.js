@@ -63,6 +63,11 @@ const LEGACY_PUBLIC_ROOT = path.resolve(__dirname, "..");
 const PUBLIC_ROOT = fs.existsSync(path.join(MIRRORED_PUBLIC_ROOT, "index.html")) ? MIRRORED_PUBLIC_ROOT : LEGACY_PUBLIC_ROOT;
 const BLOCKED_PUBLIC_ROOTS = new Set(["backend", ".git", ".github", "node_modules", "database", "scripts", "logs", "backups"]);
 const PUBLIC_EXTENSIONS = new Set([".html", ".css", ".js", ".json", ".xml", ".txt", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".map"]);
+const SERVED_SITE_HOSTS = [
+  "https://cardoria-site-2.onrender.com",
+  "https://cardoria-site-f2cy.onrender.com",
+  "https://cardoria.vercel.app"
+];
 const app = express();
 const startup = { ok: true, ready: false, degraded: [], startedAt: new Date().toISOString() };
 
@@ -82,6 +87,48 @@ app.use(maintenanceMiddleware);
 app.use(connectionJournalMiddleware());
 app.use("/api/health", healthRoutes);
 app.use("/api/system", systemRoutes);
+
+function rewriteSiteUrlsToOrigin(source) {
+  let out = String(source || "");
+  for (const host of SERVED_SITE_HOSTS) out = out.split(`"${host}`).join("window.location.origin + \"");
+  return out;
+}
+
+function sendRewrittenJs(fileName, res, next) {
+  try {
+    const scriptPath = path.join(PUBLIC_ROOT, fileName);
+    res.type("application/javascript; charset=utf-8").send(rewriteSiteUrlsToOrigin(fs.readFileSync(scriptPath, "utf8")));
+  } catch (error) {
+    next(error);
+  }
+}
+
+function sendPublicFile(req, res, next) {
+  let requestPath;
+  try { requestPath = decodeURIComponent(req.path || "/"); } catch { return res.status(400).send("Requete invalide."); }
+  if (requestPath.startsWith("/api/")) return next();
+  if (requestPath === "/") return res.sendFile(path.join(PUBLIC_ROOT, "index.html"));
+
+  let relativePath = requestPath.replace(/^\/+/, "");
+  if (!relativePath || relativePath.includes("..")) return next();
+  const firstSegment = relativePath.split("/")[0];
+  if (BLOCKED_PUBLIC_ROOTS.has(firstSegment)) return res.status(404).send("Not found");
+  if (requestPath.endsWith("/")) relativePath = path.posix.join(relativePath, "index.html");
+
+  const extension = path.extname(relativePath).toLowerCase();
+  if (!PUBLIC_EXTENSIONS.has(extension)) return next();
+  const absolutePath = path.resolve(PUBLIC_ROOT, relativePath);
+  if (absolutePath !== PUBLIC_ROOT && !absolutePath.startsWith(PUBLIC_ROOT + path.sep)) return res.status(403).send("Forbidden");
+  return res.sendFile(absolutePath, (error) => { if (!error) return; if (error.status === 404) return next(); return next(error); });
+}
+
+app.get(["/boutique", "/boutique/", "/pages/boutique", "/pages/boutique/"], (req, res) => res.redirect(308, "/boutique.html"));
+app.get("/script.js", (req, res, next) => sendRewrittenJs("script.js", res, next));
+app.get("/js/seo-config.js", (req, res, next) => sendRewrittenJs("js/seo-config.js", res, next));
+app.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") return next();
+  return sendPublicFile(req, res, next);
+});
 
 const port = process.env.PORT || 10000;
 const server = app.listen(port, "0.0.0.0", () => {
@@ -193,35 +240,6 @@ app.use("/api/admin/ai-enterprise", aiEnterpriseAdminRoutes);
 app.use("/api/admin/ultimate", ultimateAdminRoutes);
 app.use("/api/admin/bigdata", bigdataAdminRoutes);
 
-app.get(["/boutique", "/boutique/", "/pages/boutique", "/pages/boutique/"], (req, res) => res.redirect(308, "/boutique.html"));
-app.get("/script.js", (req, res, next) => {
-  try {
-    const scriptPath = path.join(PUBLIC_ROOT, "script.js");
-    let source = fs.readFileSync(scriptPath, "utf8");
-    source = source.replace('const BACKEND_URL="https://cardoria-site-2.onrender.com";', 'const BACKEND_URL=window.location.origin;');
-    res.type("application/javascript; charset=utf-8").send(source);
-  } catch (error) { next(error); }
-});
-
-function sendPublicFile(req, res, next) {
-  let requestPath;
-  try { requestPath = decodeURIComponent(req.path || "/"); } catch { return res.status(400).send("Requete invalide."); }
-  if (requestPath.startsWith("/api/")) return next();
-  if (requestPath === "/") return res.sendFile(path.join(PUBLIC_ROOT, "index.html"));
-
-  let relativePath = requestPath.replace(/^\/+/, "");
-  if (!relativePath || relativePath.includes("..")) return next();
-  const firstSegment = relativePath.split("/")[0];
-  if (BLOCKED_PUBLIC_ROOTS.has(firstSegment)) return res.status(404).send("Not found");
-  if (requestPath.endsWith("/")) relativePath = path.posix.join(relativePath, "index.html");
-
-  const extension = path.extname(relativePath).toLowerCase();
-  if (!PUBLIC_EXTENSIONS.has(extension)) return next();
-  const absolutePath = path.resolve(PUBLIC_ROOT, relativePath);
-  if (absolutePath !== PUBLIC_ROOT && !absolutePath.startsWith(PUBLIC_ROOT + path.sep)) return res.status(403).send("Forbidden");
-  return res.sendFile(absolutePath, (error) => { if (!error) return; if (error.status === 404) return next(); return next(error); });
-}
-app.get("*", sendPublicFile);
 app.use(errorHandler);
 
 startup.ready = true;

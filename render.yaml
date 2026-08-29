@@ -1,11 +1,14 @@
-# Cardoria production deployment
+# Cardoria production deployment — Root Directory = backend
 services:
   - type: web
-    name: cardoria-site-2
+    name: cardoria-site
     runtime: node
+    region: frankfurt
+    plan: free
+    rootDir: backend
     autoDeployTrigger: commit
-    buildCommand: cd backend && npm install --omit=dev
-    startCommand: cd backend && npm start
+    buildCommand: npm install
+    startCommand: npm start
     healthCheckPath: /api/health/
     maxShutdownDelaySeconds: 30
     envVars:
@@ -22,11 +25,11 @@ services:
       - key: ADMIN_LOGIN_PASSWORD
         sync: false
       - key: SITE_URL
-        value: https://cardoria-site-2.onrender.com
+        value: https://cardoria-site-f2cy.onrender.com
       - key: FRONTEND_URL
-        value: https://cardoria-site-2.onrender.com
+        value: https://cardoria-site-f2cy.onrender.com
       - key: CORS_ORIGINS
-        value: https://cardoria-site-2.onrender.com,https://cardoria.fr,https://www.cardoria.fr
+        value: https://cardoria-site-f2cy.onrender.com,https://cardoria.fr,https://www.cardoria.fr
       - key: MARKETPLACE_DEMO_MODE
         value: "false"
       - key: MARKETPLACE_COMMISSION_PERCENT

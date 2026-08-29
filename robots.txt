@@ -25,7 +25,7 @@ Disallow: /favoris.html
 Disallow: /souhaits.html
 Disallow: /document-commande.html
 
-Sitemap: https://cardoria-site-2.onrender.com/sitemap-index.xml
-Sitemap: https://cardoria-site-2.onrender.com/sitemap.xml
-Sitemap: https://cardoria-site-2.onrender.com/api/seo/sitemap.xml
-Sitemap: https://cardoria-site-2.onrender.com/api/marketplace/v1/sitemap.xml
+Sitemap: https://cardoria-site-f2cy.onrender.com/sitemap-index.xml
+Sitemap: https://cardoria-site-f2cy.onrender.com/sitemap.xml
+Sitemap: https://cardoria-site-f2cy.onrender.com/api/seo/sitemap.xml
+Sitemap: https://cardoria-site-f2cy.onrender.com/api/marketplace/v1/sitemap.xml

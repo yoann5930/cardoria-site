@@ -128,8 +128,8 @@ router.post("/checkout", async (req, res) => {
     if (!order) return res.status(404).json({ ok: false, error: "Commande introuvable" });
     const session = await createCheckoutSession(
       order,
-      successUrl || process.env.MARKETPLACE_SUCCESS_URL || "https://cardoria.vercel.app/mes-commandes.html",
-      cancelUrl || process.env.MARKETPLACE_CANCEL_URL || "https://cardoria.vercel.app/marketplace.html"
+      successUrl || process.env.MARKETPLACE_SUCCESS_URL || "https://cardoria-site-f2cy.onrender.com/mes-commandes.html",
+      cancelUrl || process.env.MARKETPLACE_CANCEL_URL || "https://cardoria-site-f2cy.onrender.com/marketplace.html"
     );
     res.json({ ok: true, ...session });
   } catch (e) {

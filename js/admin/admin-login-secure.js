@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const BACKEND = window.CARDORIA_BACKEND || (window.CARDORIA_SEO && window.CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
+  const BACKEND = window.CARDORIA_BACKEND || (window.CARDORIA_SEO && window.CARDORIA_SEO.backendUrl) || "https://cardoria-site-f2cy.onrender.com";
   const ADMIN_ROLES = ["super_admin", "admin", "employee"];
   let challengeToken = "";
   let challengeMode = "";

@@ -33,7 +33,7 @@ export async function requestMagicLogin(email) {
   });
   tx();
 
-  const siteUrl = String(process.env.SITE_URL || "https://cardoria-site-2.onrender.com").replace(/\/$/, "");
+  const siteUrl = String(process.env.SITE_URL || "https://cardoria-site-f2cy.onrender.com").replace(/\/$/, "");
   const link = `${siteUrl}/admin-email-login.html?token=${encodeURIComponent(token)}`;
 
   let sent = false;

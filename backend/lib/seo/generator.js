@@ -5,7 +5,7 @@ import { getDb } from "../engine/database.js";
 import { listLicenses } from "../engine/licenses.js";
 import { getSitemapCards, getCardCount } from "../engine/cards.js";
 
-const SITE = process.env.SITE_URL || "https://cardoria.vercel.app";
+const SITE = process.env.SITE_URL || "https://cardoria-site-f2cy.onrender.com";
 
 const LICENSE_SEO = {
   pokemon: {
