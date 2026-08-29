@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-2.onrender.com";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-f2cy.onrender.com";
 
   function euro(n) {
     if (n == null) return "—";
