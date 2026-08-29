@@ -63,7 +63,7 @@ function cardmarketReference(pricing, variants = {}) {
   return { current: round2(current), avg: round2(avg || current), low: round2(low || current), high: round2(high || current), avg1: round2(avg1 || 0), avg7: round2(avg7 || 0), avg30: round2(avg30 || 0), updated: cm.updated || null };
 }
 
-export async function refreshVisibleCardPrices(ids = []) {
+export async function refreshVisibleCardPrices(ids = [], { retryMissingNow = false } = {}) {
   const cleanIds = [...new Set((ids || []).map(String).filter((id) => /^pokemon-(?:en-|ja-|ko-)?[a-zA-Z0-9_.-]+$/.test(id)))].slice(0, VISIBLE_LIMIT);
   if (!cleanIds.length) return { ok: true, requested: 0, checked: 0, priced: 0, unavailable: 0 };
   const db = getDb();
@@ -74,7 +74,8 @@ export async function refreshVisibleCardPrices(ids = []) {
   const deleteSource = db.prepare("DELETE FROM price_sources WHERE card_id=? AND source='cardmarket'");
   const insertSource = db.prepare("INSERT INTO price_sources(card_id,source,price,currency,weight,fetched_at) VALUES (?,'cardmarket',?,'EUR',0.55,?)");
   const insertHistory = db.prepare(`INSERT OR IGNORE INTO card_price_history(card_id,source,current_price,avg_price,low_price,high_price,avg1,avg7,avg30,captured_at) VALUES (?,'cardmarket',?,?,?,?,?,?,?,?)`);
-  const rows = cleanIds.map((id) => select.get(id)).filter(Boolean), candidates = rows.filter(shouldRetryMissing);
+  const rows = cleanIds.map((id) => select.get(id)).filter(Boolean);
+  const candidates = rows.filter((row) => Number(row?.recommended_price || 0) <= 0 && (retryMissingNow || shouldRetryMissing(row)));
   let checked = 0, priced = 0, unavailable = 0;
   for (let i = 0; i < candidates.length; i += 8) {
     const batch = candidates.slice(i, i + 8);
