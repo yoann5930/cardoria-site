@@ -1,5 +1,5 @@
 /**
- * Authentification Cardoria — comptes clients/admin, sessions et 2FA obligatoire Admin.
+ * Authentification Cardoria — comptes clients/admin, sessions et 2FA facultatif.
  */
 import crypto from "crypto";
 import { Router } from "express";
@@ -109,7 +109,6 @@ router.post("/login", authRateLimit, (req, res) => {
       logAudit({ type: "auth", action: "login_failed", user: email || req.ip || "unknown", detail: "invalid_credentials" });
       return res.status(401).json({ ok: false, error: "Email ou mot de passe incorrect." });
     }
-    if (ADMIN_ROLES.includes(user.role)) return res.json(beginAdmin2fa(user, req, "password"));
     logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });
     res.json(completeSession(user, req));
   } catch (e) {
@@ -165,7 +164,6 @@ router.post("/request-magic-link", authRateLimit, handleMagicLinkRequest);
 router.post("/email/confirm", authRateLimit, (req, res) => {
   try {
     const user = consumeMagicLogin(String(req.body?.token || ""));
-    if (ADMIN_ROLES.includes(user.role)) return res.json(beginAdmin2fa(user, req, "magic_link"));
     logAudit({ type: "auth", action: "email_login_success", user: user.email, detail: user.role });
     res.json(completeSession(user, req));
   } catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
