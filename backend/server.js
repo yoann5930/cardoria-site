@@ -158,6 +158,13 @@ if (!marketplacePersistence.ok) {
 }
 
 try {
+  await import("./lib/engine/multilingual-bootstrap.js");
+  console.log("[startup] multilingual-catalog: preload completed before provider sync");
+} catch (error) {
+  console.error("[startup] multilingual-catalog: preload failed", error?.message || String(error));
+}
+
+try {
   const pokemonSync = await syncPokemonCatalog();
   if (pokemonSync.skipped) console.log(`[startup] pokemon-catalog: already populated (${pokemonSync.count} cards)`);
   else {
@@ -244,17 +251,10 @@ app.use(errorHandler);
 
 startup.ready = true;
 console.log(`Cardoria V6 single-host ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`);
-const multilingualBootstrapTimer = setTimeout(() => {
-  import("./lib/engine/multilingual-bootstrap.js")
-    .then(() => console.log("[startup] multilingual-catalog: background repair started"))
-    .catch((error) => console.error("[startup] multilingual-catalog: background repair failed", error?.message || String(error)));
-}, 1000);
-multilingualBootstrapTimer.unref?.();
 
 function shutdown(signal) {
   console.log(`[process] ${signal} received, closing HTTP server`);
   clearTimeout(firstMarketRefresh);
-  clearTimeout(multilingualBootstrapTimer);
   clearInterval(marketRefreshTimer);
   const forceExit = setTimeout(() => process.exit(1), 10000); forceExit.unref();
   server.close(async () => {
