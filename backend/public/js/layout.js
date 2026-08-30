@@ -21,12 +21,10 @@
       '<a href="' + base + 'index.html">Accueil</a>' +
       '<a href="' + base + 'pages/boutique/">Boutique</a>' +
       '<a href="' + base + 'marketplace.html">Marketplace</a>' +
-      '<a href="' + base + 'pages/estimation/">Estimation IA</a>' +
-      '<a href="' + base + 'rachat-cartes.html">Rachat</a>' +
+      '<a href="' + base + 'pages/estimation/">Estimation</a>' +
       '<a href="' + base + 'pages/licences/">Licences</a>' +
-      '<a href="' + base + 'pages/blog/">Blog</a>' +
-      '<a href="' + base + 'pages/faq/">FAQ</a>' +
       '<a href="' + base + 'pages/contact/">Contact</a>' +
+      '<a href="' + base + 'admin-login.html">Admin</a>' +
       "</nav></div></header>";
   }
 
@@ -45,7 +43,7 @@
       '<div class="container footer-grid">' +
       '<div class="footer-brand">' +
       '<img src="' + A.logo + '" alt="Cardoria logo" width="90" height="65" loading="lazy" decoding="async">' +
-      "<p>Plateforme premium française : estimation IA, marketplace, rachat et expertise cartes TCG.</p>" +
+      "<p>Plateforme premium française : estimation, boutique, marketplace et expertise cartes TCG.</p>" +
       '<p class="footer-email"><a href="mailto:Cardoria59330@gmail.com">Cardoria59330@gmail.com</a></p>' +
       "</div>" +
       '<div class="footer-col"><h4>Navigation</h4><ul>' +
@@ -61,6 +59,7 @@
       '<li><a href="' + base + 'pages/blog/">Blog TCG</a></li>' +
       '<li><a href="' + base + 'referencement.html">Référencement</a></li>' +
       '<li><a href="' + base + 'pages/contact/">Contact</a></li>' +
+      '<li><a href="' + base + 'admin-login.html">Admin</a></li>' +
       "</ul></div>" +
       '<div class="footer-col"><h4>Légal</h4><ul>' +
       '<li><a href="' + base + 'pages/mentions-legales/">Mentions légales</a></li>' +
