@@ -1,0 +1,194 @@
+/* Cardoria — ajustements finaux pour coller a la maquette de reference. */
+body.home-premium{
+  font-family:"Montserrat",Inter,Arial,sans-serif!important;
+  background:#030609!important;
+}
+
+.premium-header{
+  height:94px!important;
+  background:#030609!important;
+  border-bottom:1px solid rgba(204,153,45,.20)!important;
+  box-shadow:none!important;
+}
+.premium-header__inner{
+  width:min(1480px,calc(100vw - 80px))!important;
+  min-height:94px!important;
+  grid-template-columns:300px 1fr auto!important;
+  gap:34px!important;
+}
+.premium-brand{gap:15px!important}
+.premium-brand img{width:64px!important;height:64px!important;filter:drop-shadow(0 0 9px rgba(221,170,51,.18))!important}
+.premium-brand__text{gap:4px!important}
+.premium-brand__text strong{
+  font-family:"Cinzel",Georgia,serif!important;
+  font-size:27px!important;
+  font-weight:600!important;
+  letter-spacing:.10em!important;
+  line-height:.95!important;
+  color:#e2ba55!important;
+}
+.premium-brand__text small{
+  font-family:"Montserrat",Arial,sans-serif!important;
+  font-size:8px!important;
+  font-weight:500!important;
+  letter-spacing:.23em!important;
+  color:#7d8189!important;
+}
+.premium-menu{gap:34px!important}
+.premium-menu a{
+  font-family:"Montserrat",Arial,sans-serif!important;
+  font-size:12px!important;
+  font-weight:500!important;
+  color:#d7d2c8!important;
+}
+.premium-menu a.is-active{color:#d9ab42!important}
+.premium-menu a::after{bottom:-17px!important;height:1px!important;background:#d4a63b!important}
+.premium-login{font-size:12px!important;font-weight:500!important;color:#c8c2b7!important}
+.premium-cta{
+  min-height:46px!important;
+  padding:0 23px!important;
+  border-radius:7px!important;
+  font-size:11px!important;
+  font-weight:600!important;
+  background:linear-gradient(180deg,#e4c263 0%,#b98528 100%)!important;
+  color:#fff6db!important;
+}
+
+.lux-hero{padding:26px 0 30px!important;background:#030609!important}
+.lux-hero__shell{
+  width:min(1540px,calc(100vw - 34px))!important;
+  border:1px solid rgba(190,137,35,.52)!important;
+  border-radius:20px!important;
+  background:linear-gradient(110deg,#05090d 0%,#060b11 52%,#030609 100%)!important;
+  box-shadow:none!important;
+}
+.lux-hero__main{
+  min-height:515px!important;
+  grid-template-columns:47% 53%!important;
+  gap:0!important;
+  padding:55px 48px 22px!important;
+}
+.lux-hero__copy{padding:7px 0 0!important}
+.lux-kicker{
+  margin:0 0 24px!important;
+  font-family:"Montserrat",Arial,sans-serif!important;
+  font-size:10px!important;
+  font-weight:600!important;
+  letter-spacing:.17em!important;
+  color:#d5aa42!important;
+}
+.lux-kicker::before{display:none!important}
+.lux-hero h1{
+  max-width:690px!important;
+  margin:0!important;
+  font-family:"Cinzel",Georgia,serif!important;
+  font-size:clamp(56px,4.25vw,74px)!important;
+  font-weight:500!important;
+  line-height:1.05!important;
+  letter-spacing:.005em!important;
+  text-transform:uppercase!important;
+  color:#d9ad47!important;
+  text-shadow:0 1px 0 #f3d47a,0 5px 18px rgba(191,134,31,.16)!important;
+}
+.lux-hero h1 span{display:block!important;color:#d9ad47!important}
+.lux-ornament{width:500px!important;margin:22px 0 22px!important;color:#d0a23a!important}
+.lux-ornament::before,.lux-ornament::after{background:#8c641d!important;opacity:.9!important}
+.lux-lead{
+  max-width:570px!important;
+  font-family:"Montserrat",Arial,sans-serif!important;
+  font-size:15px!important;
+  line-height:1.65!important;
+  color:#c6c1b8!important;
+}
+.lux-actions{margin-top:25px!important;gap:23px!important}
+.lux-btn{
+  min-height:48px!important;
+  padding:0 22px!important;
+  border-radius:6px!important;
+  font-family:"Montserrat",Arial,sans-serif!important;
+  font-size:11px!important;
+  font-weight:600!important;
+  letter-spacing:.025em!important;
+}
+.lux-btn--gold{background:linear-gradient(180deg,#dfbc59,#a77320)!important;color:#fff8e5!important}
+.lux-btn--outline{border-color:#9d6e1d!important;color:#d9ac42!important;background:#05070a!important}
+
+.lux-stage{min-height:470px!important}
+.lux-stage::before{width:520px!important;height:145px!important;bottom:10px!important;border-color:rgba(213,166,55,.36)!important}
+.lux-stage::after{width:470px!important;height:470px!important;border-color:rgba(213,166,55,.08)!important}
+.lux-pack{width:250px!important;border-radius:8px!important;box-shadow:0 26px 70px rgba(0,0,0,.66),0 0 36px rgba(211,157,39,.20)!important}
+.lux-pack__inner img{width:128px!important;height:128px!important;border-radius:18px!important}
+.lux-pack__inner strong{font-family:"Cinzel",Georgia,serif!important;font-size:28px!important;color:#ddb450!important}
+.lux-fan-card{width:192px!important;border-radius:7px!important}
+.lux-fan-card__label{font-family:"Cinzel",Georgia,serif!important;color:#e2bb5c!important}
+.lux-fan-card__mark{font-family:"Cinzel",Georgia,serif!important}
+
+.lux-univers{padding:0 48px 28px!important}
+.lux-univers__title{
+  margin:0 0 13px!important;
+  font-family:"Montserrat",Arial,sans-serif!important;
+  font-size:10px!important;
+  font-weight:600!important;
+  letter-spacing:.20em!important;
+  color:#d9aa3d!important;
+}
+.lux-univers__grid{gap:9px!important}
+.lux-universe{
+  min-height:165px!important;
+  padding:16px 12px!important;
+  border:1px solid rgba(194,143,42,.30)!important;
+  border-radius:5px!important;
+  background:linear-gradient(180deg,#081019,#05090e)!important;
+}
+.lux-universe__no{font-family:"Montserrat",Arial,sans-serif!important;font-size:9px!important;color:#b6aea0!important}
+.lux-universe strong{
+  font-family:"Cinzel",Georgia,serif!important;
+  font-size:18px!important;
+  font-weight:500!important;
+  text-transform:uppercase!important;
+  color:#f0e6d4!important;
+}
+.lux-universe__sigil{border-color:#c08c28!important;color:#e0ad3e!important}
+.lux-universe span:last-child{font-family:"Montserrat",Arial,sans-serif!important;color:#d3a233!important;text-transform:none!important;letter-spacing:0!important;font-size:10px!important}
+
+.lux-trust{
+  margin:0 35px 20px!important;
+  border:1px solid rgba(194,143,42,.35)!important;
+  border-radius:5px!important;
+  background:#05090d!important;
+}
+.lux-trust article{min-height:87px!important;padding:17px 28px!important}
+.lux-trust__icon{border-color:#c0912e!important;color:#d9a839!important}
+.lux-trust strong{font-family:"Cinzel",Georgia,serif!important;font-size:16px!important;color:#dcb24c!important}
+.lux-trust p{font-family:"Montserrat",Arial,sans-serif!important;color:#c4beb2!important;font-size:10px!important}
+
+.premium-footer{background:#030609!important}
+
+/* Ecran de demarrage : même typographie que la signature Cardoria. */
+.cardoria-loader__wordmark{
+  font-family:"Cinzel",Georgia,serif!important;
+  font-size:clamp(2rem,4.2vw,3rem)!important;
+  font-weight:600!important;
+  letter-spacing:.10em!important;
+}
+.cardoria-loader__tagline,.cardoria-loader__eyebrow,.cardoria-loader__meta{font-family:"Montserrat",Arial,sans-serif!important}
+
+@media(max-width:1100px){
+  .premium-header__inner{grid-template-columns:auto 1fr auto!important;width:calc(100vw - 34px)!important}
+  .premium-menu{gap:18px!important}
+  .lux-hero__main{grid-template-columns:1fr!important;padding:50px 34px 20px!important}
+  .lux-stage{min-height:430px!important}
+  .lux-univers__grid{grid-template-columns:repeat(3,1fr)!important}
+}
+@media(max-width:720px){
+  .premium-header{height:auto!important}
+  .premium-header__inner{min-height:72px!important}
+  .premium-brand img{width:48px!important;height:48px!important}
+  .premium-brand__text strong{font-size:20px!important}
+  .lux-hero__shell{width:calc(100vw - 18px)!important;border-radius:12px!important}
+  .lux-hero__main{padding:38px 22px 14px!important}
+  .lux-hero h1{font-size:clamp(38px,11vw,54px)!important}
+  .lux-univers{padding:0 20px 22px!important}
+  .lux-univers__grid{grid-template-columns:repeat(2,1fr)!important}
+  .lux-trust{margin:0 14px 14px!important}
+}
