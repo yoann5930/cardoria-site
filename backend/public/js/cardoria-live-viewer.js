@@ -5,8 +5,10 @@
   const viewersNode = document.getElementById("cardoriaLiveViewers");
   const soundButton = document.getElementById("cardoriaLiveSound");
   const stageNode = document.getElementById("cardoriaLiveStage");
+  const directoryNode = document.getElementById("cardoriaLiveDirectory");
+  const directoryStateNode = document.getElementById("cardoriaLiveDirectoryState");
 
-  if (!(video instanceof HTMLVideoElement) || !stateNode || !viewersNode || !stageNode) return;
+  if (!(video instanceof HTMLVideoElement) || !stateNode || !viewersNode || !stageNode || !directoryNode) return;
 
   let mediaSource = null;
   let sourceBuffer = null;
@@ -14,6 +16,8 @@
   let activeSessionId = null;
   let pendingChunks = [];
   let liveActive = false;
+  let eventSource = null;
+  let directoryTimer = null;
 
   const setStatus = (message, active = false) => {
     stateNode.textContent = message;
@@ -39,12 +43,18 @@
       try { mediaSource.endOfStream(); } catch {}
     }
     mediaSource = null;
-    activeSessionId = null;
     video.pause();
     video.removeAttribute("src");
     video.load();
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = null;
+  };
+
+  const disconnectSession = () => {
+    eventSource?.close();
+    eventSource = null;
+    liveActive = false;
+    clearPlayer();
   };
 
   const appendNext = () => {
@@ -94,6 +104,7 @@
     liveActive = false;
     setStatus("Le live est terminé.", false);
     window.setTimeout(clearPlayer, 500);
+    window.setTimeout(loadDirectory, 700);
   };
 
   const enqueueChunk = (event) => {
@@ -108,44 +119,99 @@
   };
 
   const applyState = (live) => {
-    if (!live) return;
+    if (!live || live.sessionId !== activeSessionId) return;
     setViewers(live.viewerCount);
-    if (!live.active && !liveActive) setStatus("Aucun live public n’est actuellement en cours.", false);
+    if (!live.active && !liveActive) setStatus("Ce live n’est plus en cours.", false);
   };
 
-  const connectEvents = () => {
-    const source = new EventSource(`${API_BASE}/api/v1/live/events`);
+  const connectSession = (sessionId) => {
+    if (!sessionId) return;
+    disconnectSession();
+    activeSessionId = sessionId;
+    setStatus("Connexion au live…", false);
+    setViewers(0);
 
-    source.addEventListener("state", (message) => {
+    eventSource = new EventSource(`${API_BASE}/api/v1/live/sessions/${encodeURIComponent(sessionId)}/events`);
+    eventSource.addEventListener("state", (message) => {
       try { applyState(JSON.parse(message.data).state); } catch {}
     });
-
-    source.addEventListener("stream-start", (message) => {
+    eventSource.addEventListener("stream-start", (message) => {
       try {
         const event = JSON.parse(message.data);
-        startPlayer(event.sessionId, event.mimeType);
+        if (event.sessionId === activeSessionId) startPlayer(event.sessionId, event.mimeType);
       } catch {
         setStatus("Impossible d’initialiser le direct.", false);
       }
     });
-
-    source.addEventListener("chunk", (message) => {
+    eventSource.addEventListener("chunk", (message) => {
       try { enqueueChunk(JSON.parse(message.data)); } catch {}
     });
-
-    source.addEventListener("stream-stop", (message) => {
+    eventSource.addEventListener("stream-stop", (message) => {
       try {
         const event = JSON.parse(message.data);
-        if (!activeSessionId || event.sessionId === activeSessionId) stopPlayer();
-      } catch {
-        stopPlayer();
+        if (event.sessionId === activeSessionId) stopPlayer();
+      } catch {}
+    });
+    eventSource.onerror = () => {
+      if (!liveActive) setStatus("Connexion au live…", false);
+    };
+
+    directoryNode.querySelectorAll("[data-session-id]").forEach((button) => {
+      button.dataset.selected = button.dataset.sessionId === sessionId ? "true" : "false";
+    });
+  };
+
+  const renderDirectory = (directory) => {
+    const sessions = Array.isArray(directory?.sessions) ? directory.sessions : [];
+    if (directoryStateNode) {
+      directoryStateNode.textContent = sessions.length
+        ? `${sessions.length} live${sessions.length > 1 ? "s" : ""} en cours`
+        : "Aucun live en cours";
+    }
+
+    directoryNode.innerHTML = "";
+    if (!sessions.length) {
+      const empty = document.createElement("div");
+      empty.className = "live-directory-empty";
+      empty.textContent = "Aucun vendeur n’est en direct pour le moment.";
+      directoryNode.appendChild(empty);
+      if (!liveActive) {
+        activeSessionId = null;
+        setStatus("Aucun live public n’est actuellement en cours.", false);
+        setViewers(0);
       }
+      return;
+    }
+
+    sessions.forEach((session, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "live-card-select";
+      button.dataset.sessionId = session.sessionId;
+      button.dataset.selected = session.sessionId === activeSessionId ? "true" : "false";
+      const started = session.startedAt ? new Date(session.startedAt) : null;
+      const timeLabel = started && !Number.isNaN(started.getTime())
+        ? started.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+        : "maintenant";
+      button.innerHTML = `<span class="live-card-dot"></span><span><strong>Live ${index + 1}</strong><small>Démarré à ${timeLabel} · ${session.viewerCount || 0} spectateur${Number(session.viewerCount) > 1 ? "s" : ""}</small></span>`;
+      button.addEventListener("click", () => connectSession(session.sessionId));
+      directoryNode.appendChild(button);
     });
 
-    source.onerror = () => {
-      if (!liveActive) setStatus("Connexion au service Live…", false);
-    };
+    const currentStillExists = sessions.some((session) => session.sessionId === activeSessionId);
+    if (!currentStillExists) connectSession(sessions[0].sessionId);
   };
+
+  async function loadDirectory() {
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/live/sessions`, { headers: { Accept: "application/json" }, cache: "no-store" });
+      if (!response.ok) throw new Error("directory");
+      const payload = await response.json();
+      renderDirectory(payload.live);
+    } catch {
+      if (directoryStateNode) directoryStateNode.textContent = "Connexion au service Live…";
+    }
+  }
 
   soundButton?.addEventListener("click", () => {
     video.muted = !video.muted;
@@ -153,9 +219,10 @@
     if (!video.muted) video.play().catch(() => {});
   });
 
-  fetch(`${API_BASE}/api/v1/live/state`, { headers: { Accept: "application/json" } })
-    .then((response) => response.ok ? response.json() : Promise.reject(new Error("state")))
-    .then((payload) => applyState(payload.live))
-    .catch(() => setStatus("Connexion au service Live…", false))
-    .finally(connectEvents);
+  void loadDirectory();
+  directoryTimer = window.setInterval(loadDirectory, 5000);
+  window.addEventListener("beforeunload", () => {
+    if (directoryTimer) window.clearInterval(directoryTimer);
+    disconnectSession();
+  }, { once: true });
 })();
