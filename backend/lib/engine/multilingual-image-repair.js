@@ -1,10 +1,10 @@
 import { getDb } from "./database.js";
 
 const API_ROOT = "https://api.tcgdex.net/v2";
-const SUPPORTED = new Set(["en", "ja", "ko"]);
+const SUPPORTED = new Set(["fr", "en", "ja", "ko"]);
 const CONCURRENCY = 10;
 const DEFAULT_BATCH = 500;
-const RETRY_AFTER_MS = 24 * 60 * 60 * 1000;
+const RETRY_AFTER_MS = 6 * 60 * 60 * 1000;
 
 function ensureRepairColumn(db) {
   const columns = db.prepare("PRAGMA table_info(cards)").all().map((row) => row.name);
@@ -13,9 +13,9 @@ function ensureRepairColumn(db) {
 }
 
 function rawCardId(card) {
-  const language = String(card.language || "");
-  const prefix = `pokemon-${language}-`;
+  const language = String(card.language || "").toLowerCase();
   const id = String(card.id || "");
+  const prefix = language === "fr" ? "pokemon-" : `pokemon-${language}-`;
   return id.startsWith(prefix) ? id.slice(prefix.length) : "";
 }
 
@@ -41,13 +41,17 @@ async function fetchCard(language, rawId) {
   }
 }
 
+function fallbackLanguages(language) {
+  if (language === "ko") return ["ko", "ja", "en", "fr"];
+  if (language === "ja") return ["ja", "en", "fr"];
+  if (language === "en") return ["en", "fr"];
+  return ["fr", "en"];
+}
+
 async function resolveImage(card) {
   const rawId = rawCardId(card);
   if (!rawId) return null;
-  const languages = [card.language];
-  if (card.language !== "fr") languages.push("fr");
-  if (card.language !== "en") languages.push("en");
-  for (const language of languages) {
+  for (const language of [...new Set(fallbackLanguages(card.language))]) {
     const detail = await fetchCard(language, rawId);
     if (!detail?.image) continue;
     return {
@@ -60,26 +64,30 @@ async function resolveImage(card) {
   return null;
 }
 
+function emptyLanguageCounts() {
+  return { fr: 0, en: 0, ja: 0, ko: 0 };
+}
+
 export function getMultilingualImageRepairStatus() {
   const db = ensureRepairColumn(getDb());
   const rows = db.prepare(`SELECT language,COUNT(*) AS count FROM cards
-    WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
+    WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1
       AND (COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='')
     GROUP BY language`).all();
   const pendingRows = db.prepare(`SELECT language,COUNT(*) AS count FROM cards
-    WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
+    WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1
       AND (COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='')
       AND (COALESCE(image_repair_checked_at,'')='' OR image_repair_checked_at<?)
     GROUP BY language`).all(new Date(Date.now() - RETRY_AFTER_MS).toISOString());
-  const missing = { en: 0, ja: 0, ko: 0 };
-  const pending = { en: 0, ja: 0, ko: 0 };
+  const missing = emptyLanguageCounts();
+  const pending = emptyLanguageCounts();
   for (const row of rows) if (SUPPORTED.has(row.language)) missing[row.language] = Number(row.count || 0);
   for (const row of pendingRows) if (SUPPORTED.has(row.language)) pending[row.language] = Number(row.count || 0);
   return {
     missing,
     pending,
-    totalMissing: missing.en + missing.ja + missing.ko,
-    totalPending: pending.en + pending.ja + pending.ko
+    totalMissing: missing.fr + missing.en + missing.ja + missing.ko,
+    totalPending: pending.fr + pending.en + pending.ja + pending.ko
   };
 }
 
@@ -88,10 +96,10 @@ export async function repairMultilingualImages({ limit = DEFAULT_BATCH } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || DEFAULT_BATCH, 1), 2000);
   const retryBefore = new Date(Date.now() - RETRY_AFTER_MS).toISOString();
   const cards = db.prepare(`SELECT id,language FROM cards
-    WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
+    WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1
       AND (COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='')
       AND (COALESCE(image_repair_checked_at,'')='' OR image_repair_checked_at<?)
-    ORDER BY CASE language WHEN 'ko' THEN 0 WHEN 'ja' THEN 1 ELSE 2 END,
+    ORDER BY CASE language WHEN 'fr' THEN 0 WHEN 'ko' THEN 1 WHEN 'ja' THEN 2 ELSE 3 END,
       CASE WHEN COALESCE(image_repair_checked_at,'')='' THEN 0 ELSE 1 END,
       image_repair_checked_at ASC, id
     LIMIT ?`).all(retryBefore, safeLimit);
@@ -108,7 +116,7 @@ export async function repairMultilingualImages({ limit = DEFAULT_BATCH } = {}) {
     image_hd=?, image_thumb=?, image_language=?,
     source_image_hd=CASE WHEN ?=language THEN ? ELSE source_image_hd END,
     source_image_thumb=CASE WHEN ?=language THEN ? ELSE source_image_thumb END,
-    translation_source=CASE WHEN translation_source='' THEN ? ELSE translation_source END,
+    translation_source=CASE WHEN COALESCE(translation_source,'')='' THEN ? ELSE translation_source END,
     image_repair_checked_at=?, updated_at=? WHERE id=?`);
   const markChecked = db.prepare("UPDATE cards SET image_repair_checked_at=? WHERE id=?");
   let repaired = 0, unresolved = 0;
@@ -130,6 +138,6 @@ export async function repairMultilingualImages({ limit = DEFAULT_BATCH } = {}) {
   })();
 
   const status = getMultilingualImageRepairStatus();
-  console.log(`[multilingual-image-repair] requested=${cards.length} repaired=${repaired} unresolved=${unresolved} remaining=${status.totalMissing} pending=${status.totalPending} EN=${status.missing.en} JA=${status.missing.ja} KO=${status.missing.ko}`);
+  console.log(`[multilingual-image-repair] requested=${cards.length} repaired=${repaired} unresolved=${unresolved} remaining=${status.totalMissing} pending=${status.totalPending} FR=${status.missing.fr} EN=${status.missing.en} JA=${status.missing.ja} KO=${status.missing.ko}`);
   return { ok: true, requested: cards.length, repaired, unresolved, ...status };
 }
