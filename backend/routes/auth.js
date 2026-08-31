@@ -4,6 +4,7 @@
 import crypto from "crypto";
 import { Router } from "express";
 import { getUserById, getUserByEmail, createUser, authenticateUser, setTotpSecret, getTotpSecret, ADMIN_ROLES } from "../lib/auth/users.js";
+import { migrateAuth } from "../lib/auth/migrate.js";
 import { createSession, revokeSession, validateSession } from "../lib/auth/session.js";
 import { generateTotpSecret, verifyTotp, getTotpUri } from "../lib/auth/totp.js";
 import { create2faChallenge, get2faChallenge, record2faFailure, consume2faChallenge, revokeUser2faChallenges } from "../lib/auth/2faChallenge.js";
@@ -102,16 +103,24 @@ router.post("/register", authRateLimit, (req, res) => {
 
 router.post("/login", authRateLimit, (req, res) => {
   try {
+    // PostgreSQL peut restaurer un ancien snapshot auth après le démarrage.
+    // Réappliquer ici la configuration Render garantit que ADMIN_EMAIL et
+    // ADMIN_LOGIN_PASSWORD restent la source d'autorité au moment du login.
+    migrateAuth();
+
     const email = normalizedEmail(req.body?.email);
     const password = String(req.body?.password || "");
     const user = authenticateConfiguredAdmin(email, password) || authenticateUser(email, password);
     if (!user) {
+      console.warn("[auth] login_failed invalid_credentials");
       logAudit({ type: "auth", action: "login_failed", user: email || req.ip || "unknown", detail: "invalid_credentials" });
       return res.status(401).json({ ok: false, error: "Email ou mot de passe incorrect." });
     }
+    console.log(`[auth] login_success role=${user.role}`);
     logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });
     res.json(completeSession(user, req));
   } catch (e) {
+    console.warn(`[auth] login_failed status=${e.status || 500} reason=${e.message || "unknown"}`);
     logAudit({ type: "auth", action: "login_failed", user: normalizedEmail(req.body?.email) || req.ip || "unknown", detail: e.message });
     res.status(e.status || 500).json({ ok: false, error: e.message });
   }
