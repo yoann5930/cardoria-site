@@ -6,11 +6,6 @@
 
     document.documentElement.classList.add("cardoria-loading");
 
-    var css = document.createElement("link");
-    css.rel = "stylesheet";
-    css.href = "/css/site-loader.css?v=3";
-    document.head.appendChild(css);
-
     var loader = document.createElement("div");
     loader.id = "cardoriaLoader";
     loader.className = "cardoria-loader";
@@ -24,7 +19,8 @@
         '<div class="cardoria-loader__emblem" aria-hidden="true">' +
           '<span class="cardoria-loader__orbit"></span>' +
           '<span class="cardoria-loader__logo-shell">' +
-            '<img class="cardoria-loader__logo" src="/assets/logo/cardoria-premium.png" alt="">' +
+            '<img class="cardoria-loader__logo" src="/assets/logo/cardoria-header-mark.svg?v=5" alt="">' +
+            '<span class="cardoria-loader__wordmark">CARDORIA</span>' +
           '</span>' +
         '</div>' +
         '<p class="cardoria-loader__eyebrow">Le Royaume des Collectionneurs</p>' +
