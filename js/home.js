@@ -8,7 +8,7 @@
 
     var css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "/css/site-loader.css?v=2";
+    css.href = "/css/site-loader.css?v=3";
     document.head.appendChild(css);
 
     var loader = document.createElement("div");
