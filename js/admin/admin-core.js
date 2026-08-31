@@ -93,7 +93,7 @@
     fetch(BACKEND + "/api/auth/me", { headers: { Authorization: "Bearer " + token }, cache: "no-store" })
       .then(function (r) { if (!r.ok) throw new Error("invalid_session"); return r.json(); })
       .then(function (d) {
-        if (!d.ok || !d.user || ["super_admin", "admin", "employee"].indexOf(d.user.role) === -1 || d.user.totpEnabled !== true) throw new Error("invalid_admin_session");
+        if (!d.ok || !d.user || ["super_admin", "admin", "employee"].indexOf(d.user.role) === -1) throw new Error("invalid_admin_session");
       })
       .catch(function () { clearAdminSession(); location.replace("admin-login.html"); });
     return true;
