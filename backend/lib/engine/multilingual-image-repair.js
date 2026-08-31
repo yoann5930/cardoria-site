@@ -1,9 +1,11 @@
 import { getDb } from "./database.js";
+import { repairJapaneseImagesWithJpnCards } from "./jpn-cards-image-repair.js";
 
 const API_ROOT = "https://api.tcgdex.net/v2";
 const SUPPORTED = new Set(["fr", "en", "ja", "ko"]);
 const CONCURRENCY = 10;
 const DEFAULT_BATCH = 500;
+const JPN_FALLBACK_BATCH = 250;
 const RETRY_AFTER_MS = 6 * 60 * 60 * 1000;
 
 function ensureRepairColumn(db) {
@@ -103,41 +105,51 @@ export async function repairMultilingualImages({ limit = DEFAULT_BATCH } = {}) {
       CASE WHEN COALESCE(image_repair_checked_at,'')='' THEN 0 ELSE 1 END,
       image_repair_checked_at ASC, id
     LIMIT ?`).all(retryBefore, safeLimit);
-  if (!cards.length) return { ok: true, requested: 0, repaired: 0, unresolved: 0, ...getMultilingualImageRepairStatus() };
 
-  const results = [];
-  for (let offset = 0; offset < cards.length; offset += CONCURRENCY) {
-    const batch = cards.slice(offset, offset + CONCURRENCY);
-    results.push(...await Promise.all(batch.map(async (card) => ({ card, image: await resolveImage(card) }))));
+  let repaired = 0, unresolved = 0;
+  if (cards.length) {
+    const results = [];
+    for (let offset = 0; offset < cards.length; offset += CONCURRENCY) {
+      const batch = cards.slice(offset, offset + CONCURRENCY);
+      results.push(...await Promise.all(batch.map(async (card) => ({ card, image: await resolveImage(card) }))));
+    }
+
+    const now = new Date().toISOString();
+    const updateResolved = db.prepare(`UPDATE cards SET
+      image_hd=?, image_thumb=?, image_language=?,
+      source_image_hd=CASE WHEN ?=language THEN ? ELSE source_image_hd END,
+      source_image_thumb=CASE WHEN ?=language THEN ? ELSE source_image_thumb END,
+      translation_source=CASE WHEN COALESCE(translation_source,'')='' THEN ? ELSE translation_source END,
+      image_repair_checked_at=?, updated_at=? WHERE id=?`);
+    const markChecked = db.prepare("UPDATE cards SET image_repair_checked_at=? WHERE id=?");
+    db.transaction(() => {
+      for (const { card, image } of results) {
+        if (image) {
+          updateResolved.run(
+            image.imageHd, image.imageThumb, image.imageLanguage,
+            image.imageLanguage, image.imageHd,
+            image.imageLanguage, image.imageThumb,
+            image.source, now, now, card.id
+          );
+          repaired += 1;
+        } else {
+          markChecked.run(now, card.id);
+          unresolved += 1;
+        }
+      }
+    })();
   }
 
-  const now = new Date().toISOString();
-  const updateResolved = db.prepare(`UPDATE cards SET
-    image_hd=?, image_thumb=?, image_language=?,
-    source_image_hd=CASE WHEN ?=language THEN ? ELSE source_image_hd END,
-    source_image_thumb=CASE WHEN ?=language THEN ? ELSE source_image_thumb END,
-    translation_source=CASE WHEN COALESCE(translation_source,'')='' THEN ? ELSE translation_source END,
-    image_repair_checked_at=?, updated_at=? WHERE id=?`);
-  const markChecked = db.prepare("UPDATE cards SET image_repair_checked_at=? WHERE id=?");
-  let repaired = 0, unresolved = 0;
-  db.transaction(() => {
-    for (const { card, image } of results) {
-      if (image) {
-        updateResolved.run(
-          image.imageHd, image.imageThumb, image.imageLanguage,
-          image.imageLanguage, image.imageHd,
-          image.imageLanguage, image.imageThumb,
-          image.source, now, now, card.id
-        );
-        repaired += 1;
-      } else {
-        markChecked.run(now, card.id);
-        unresolved += 1;
-      }
-    }
-  })();
+  let jpnFallback = { requested: 0, repaired: 0, unresolved: 0 };
+  try {
+    jpnFallback = await repairJapaneseImagesWithJpnCards({ limit: Math.min(JPN_FALLBACK_BATCH, safeLimit) });
+    repaired += Number(jpnFallback.repaired || 0);
+    unresolved += Number(jpnFallback.unresolved || 0);
+  } catch (error) {
+    console.warn(`[jpn-cards-image-repair] automatic fallback failed: ${error?.message || String(error)}`);
+  }
 
   const status = getMultilingualImageRepairStatus();
-  console.log(`[multilingual-image-repair] requested=${cards.length} repaired=${repaired} unresolved=${unresolved} remaining=${status.totalMissing} pending=${status.totalPending} FR=${status.missing.fr} EN=${status.missing.en} JA=${status.missing.ja} KO=${status.missing.ko}`);
-  return { ok: true, requested: cards.length, repaired, unresolved, ...status };
+  console.log(`[multilingual-image-repair] requested=${cards.length} repaired=${repaired} unresolved=${unresolved} jpn-requested=${jpnFallback.requested || 0} jpn-repaired=${jpnFallback.repaired || 0} remaining=${status.totalMissing} pending=${status.totalPending} FR=${status.missing.fr} EN=${status.missing.en} JA=${status.missing.ja} KO=${status.missing.ko}`);
+  return { ok: true, requested: cards.length + Number(jpnFallback.requested || 0), repaired, unresolved, jpnFallback, ...status };
 }
