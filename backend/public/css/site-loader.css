@@ -111,11 +111,8 @@ html.cardoria-loading body {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(26, 23, 16, 0.7) 0%, rgba(7, 7, 7, 0.92) 76%);
-  box-shadow:
-    0 0 0 1px rgba(255, 225, 132, 0.12),
-    0 18px 56px rgba(0, 0, 0, 0.58),
-    0 0 48px rgba(212, 175, 55, 0.14);
+  background: transparent;
+  box-shadow: none;
   animation: cardoriaLogoPulse 2.6s ease-in-out infinite;
 }
 
@@ -123,6 +120,7 @@ html.cardoria-loading body {
   width: 94%;
   height: 94%;
   object-fit: contain;
+  mix-blend-mode: screen;
   filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.6));
 }
 
