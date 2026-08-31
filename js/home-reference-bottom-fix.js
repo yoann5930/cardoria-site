@@ -1,0 +1,20 @@
+(function(){
+  "use strict";
+  var frame=document.querySelector('.reference-frame');
+  var src=window.CARDORIA_REFERENCE_BOTTOM_CLEAN;
+  if(!frame||!src)return;
+  var patch=document.createElement('img');
+  patch.alt='';
+  patch.setAttribute('aria-hidden','true');
+  patch.src=src;
+  patch.style.position='absolute';
+  patch.style.left='0';
+  patch.style.bottom='0';
+  patch.style.width='100%';
+  patch.style.height='15.612%';
+  patch.style.objectFit='fill';
+  patch.style.display='block';
+  patch.style.zIndex='2';
+  patch.style.pointerEvents='none';
+  frame.appendChild(patch);
+})();
