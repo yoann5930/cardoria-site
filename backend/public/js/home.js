@@ -4,6 +4,14 @@
   function initLoader() {
     if (!document.body || document.getElementById("cardoriaLoader")) return;
 
+    var loaderSessionKey = "cardoriaLoaderShown";
+    try {
+      if (window.sessionStorage && window.sessionStorage.getItem(loaderSessionKey) === "1") return;
+      if (window.sessionStorage) window.sessionStorage.setItem(loaderSessionKey, "1");
+    } catch (_) {
+      // If session storage is unavailable, keep the loader functional.
+    }
+
     document.documentElement.classList.add("cardoria-loading");
 
     var loader = document.createElement("div");
