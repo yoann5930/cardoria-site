@@ -1,35 +1,33 @@
-/* Cardoria — couche d'identite visuelle inspiree du logo fourni.
-   CSS uniquement : aucun comportement, stock, paiement, admin ou API n'est modifie. */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap');
+
+/* Cardoria — identité visuelle calée sur la maquette noir/or. CSS uniquement. */
 :root{
-  --cardoria-display:"Palatino Linotype","Book Antiqua",Palatino,Georgia,"Times New Roman",serif;
-  --cardoria-ui:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
-  --cardoria-gold-deep:#9d741f;
-  --cardoria-gold:#d4af37;
-  --cardoria-gold-light:#f0d47c;
-  --cardoria-gold-pale:#fff0b1;
+  --cardoria-display:"Cinzel",Georgia,"Times New Roman",serif;
+  --cardoria-ui:"Montserrat",Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  --cardoria-gold-deep:#8f6417;
+  --cardoria-gold:#d2a83b;
+  --cardoria-gold-light:#f0c95d;
+  --cardoria-gold-pale:#f8e6aa;
 }
 
-/* Signature CARDORIA : proche de l'esprit du logo, sans changer l'image du logo. */
+body{font-family:var(--cardoria-ui)}
+
 .premium-brand__text strong,
 .shop-brand strong,
 .header .brand>span,
 .shop-footer-brand>strong,
 .premium-footer__brand>strong{
-  font-family:var(--cardoria-display);
+  font-family:var(--cardoria-display)!important;
   font-weight:600!important;
-  letter-spacing:.16em!important;
+  letter-spacing:.12em!important;
   text-transform:uppercase;
   color:var(--cardoria-gold-light)!important;
-  text-shadow:0 1px 0 rgba(255,255,255,.08),0 3px 16px rgba(212,175,55,.18);
+  text-shadow:0 0 16px rgba(210,168,59,.12);
 }
 
-/* Titres premium : serif classique, elegant et lisible. */
-body.home-premium .premium-hero h1,
-body.home-premium .premium-section-head h2,
-body.home-premium .premium-search-copy h2,
-body.home-premium .premium-process__copy h2,
-body.home-premium .premium-space h3,
-body.home-premium .collector-card__inner strong,
+body.home-premium h1,
+body.home-premium h2,
+body.home-premium h3,
 body.shop-v1 .shop-hero h1,
 body.shop-v1 .shop-catalog-head h2,
 body.shop-v1 .shop-range-copy h3,
@@ -48,36 +46,18 @@ body.shop-v1 .product h3,
 .header~main h2{
   font-family:var(--cardoria-display)!important;
   font-weight:500!important;
-  letter-spacing:.005em!important;
 }
 
-body.home-premium .premium-hero h1,
-body.shop-v1 .shop-hero h1,
-.mk-hero h1,
-.seo-page h1,
-.header~main h1{
-  color:#f7e5a5;
-  text-shadow:0 2px 22px rgba(212,175,55,.10);
+body.shop-v1,
+.mk-page,
+.seo-page,
+.header,
+.shop-header,
+.premium-header,
+.premium-footer{
+  font-family:var(--cardoria-ui)!important;
 }
 
-body.home-premium .premium-hero h1 em,
-body.shop-v1 .shop-hero h1 span{
-  color:var(--cardoria-gold-light)!important;
-}
-
-/* Petits titres / labels : esprit gravure du logo, sans sacrifier la lecture. */
-body.home-premium .premium-kicker,
-body.home-premium .premium-eyebrow,
-body.shop-v1 .shop-kicker,
-.mk-eyebrow,
-.seo-page .badge,
-.cardoria-loader__eyebrow{
-  font-family:var(--cardoria-display)!important;
-  font-weight:600!important;
-  letter-spacing:.22em!important;
-}
-
-/* Boutons et navigation restent tres lisibles mais gagnent une finition plus classique. */
 body.home-premium .premium-menu a,
 body.home-premium .premium-cta,
 body.home-premium .premium-btn,
@@ -86,43 +66,45 @@ body.shop-v1 .shop-nav-action,
 .mk-sell-cta,.mk-inline-sell,
 .seo-page .primary,
 .header .menu a{
-  letter-spacing:.035em;
+  font-family:var(--cardoria-ui)!important;
+  letter-spacing:.02em;
 }
 
-/* Ecran de demarrage : mot CARDORIA dans l'esprit exact du logo fourni. */
+body.home-premium .premium-kicker,
+body.home-premium .premium-eyebrow,
+body.shop-v1 .shop-kicker,
+.mk-eyebrow,
+.seo-page .badge,
+.cardoria-loader__eyebrow{
+  font-family:var(--cardoria-ui)!important;
+  font-weight:600!important;
+  letter-spacing:.18em!important;
+  text-transform:uppercase;
+}
+
 .cardoria-loader__wordmark{
   font-family:var(--cardoria-display)!important;
-  font-size:clamp(1.72rem,4.5vw,2.65rem)!important;
   font-weight:600!important;
-  letter-spacing:.14em!important;
-  text-indent:.14em!important;
-  color:var(--cardoria-gold-light)!important;
-  background:linear-gradient(180deg,#fff3b9 0%,#e3bd54 45%,#9e731f 100%);
+  letter-spacing:.12em!important;
+  text-indent:.12em!important;
+  background:linear-gradient(180deg,#fff0a8 0%,#e4b84e 48%,#956719 100%);
   -webkit-background-clip:text;
   background-clip:text;
   -webkit-text-fill-color:transparent;
+  color:var(--cardoria-gold-light)!important;
   text-shadow:none!important;
-  filter:drop-shadow(0 2px 9px rgba(212,175,55,.24));
+  filter:drop-shadow(0 2px 8px rgba(210,168,59,.22));
 }
-.cardoria-loader__tagline{
-  font-family:var(--cardoria-display)!important;
-  color:rgba(243,228,184,.72)!important;
-  letter-spacing:.045em!important;
-  font-size:clamp(.88rem,2vw,1.03rem)!important;
-}
-.cardoria-loader__logo{
-  filter:drop-shadow(0 0 12px rgba(212,175,55,.26)) drop-shadow(0 8px 18px rgba(0,0,0,.45))!important;
-}
+.cardoria-loader__tagline{font-family:var(--cardoria-ui)!important}
 
-/* Finition doree discrete des zones principales. */
 body.home-premium .premium-space,
 body.shop-v1 .shop-range-card,
 .mk-hero,.mk-category-card,.mk-card,
 .seo-page .seo-card,.seo-page .seo-catalog a{
-  border-color:rgba(212,175,55,.18)!important;
+  border-color:rgba(210,168,59,.18)!important;
 }
 
 @media(max-width:720px){
-  .premium-brand__text strong,.shop-brand strong,.header .brand>span{letter-spacing:.12em!important;}
-  .cardoria-loader__wordmark{letter-spacing:.10em!important;text-indent:.10em!important;}
+  .premium-brand__text strong,.shop-brand strong,.header .brand>span{letter-spacing:.09em!important}
+  .cardoria-loader__wordmark{letter-spacing:.08em!important;text-indent:.08em!important}
 }
