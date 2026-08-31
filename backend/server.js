@@ -70,6 +70,7 @@ const SERVED_SITE_HOSTS = [
 ];
 const app = express();
 const startup = { ok: true, ready: false, degraded: [], startedAt: new Date().toISOString() };
+let authReady = false;
 
 function safeInit(name, fn) {
   try { fn(); console.log(`[startup] ${name}: ok`); }
@@ -89,7 +90,10 @@ app.use("/api/health", healthRoutes);
 app.use("/api/system", systemRoutes);
 
 safeInit("auth-migration", migrateAuth);
-app.use("/api/auth", marketplacePersistenceMiddleware, authRoutes);
+app.use("/api/auth", marketplacePersistenceMiddleware, (req, res, next) => {
+  if (!authReady) return res.status(503).json({ ok: false, error: "Authentification en cours d'initialisation. Réessayez dans quelques secondes." });
+  return authRoutes(req, res, next);
+});
 
 function rewriteSiteUrlsToOrigin(source) {
   let out = String(source || "");
@@ -158,6 +162,10 @@ if (!marketplacePersistence.ok) {
     console.error("[startup] catalog-cleanup: degraded", error);
   }
 }
+
+safeInit("auth-post-restore", migrateAuth);
+authReady = true;
+console.log("[startup] auth-routes: ready after persistence restore");
 
 try {
   await import("./lib/engine/multilingual-bootstrap.js");
