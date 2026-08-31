@@ -88,6 +88,9 @@ app.use(connectionJournalMiddleware());
 app.use("/api/health", healthRoutes);
 app.use("/api/system", systemRoutes);
 
+safeInit("auth-migration", migrateAuth);
+app.use("/api/auth", marketplacePersistenceMiddleware, authRoutes);
+
 function rewriteSiteUrlsToOrigin(source) {
   let out = String(source || "");
   for (const host of SERVED_SITE_HOSTS) out = out.split(`"${host}`).join("window.location.origin + \"");
@@ -136,7 +139,6 @@ const server = app.listen(port, "0.0.0.0", () => {
   console.log(`[startup] public root: ${PUBLIC_ROOT}`);
 });
 
-safeInit("auth-migration", migrateAuth);
 safeInit("ai", initAi);
 safeInit("engine-seed", seedEngineIfEmpty);
 safeInit("marketplace", initMarketplace);
@@ -213,7 +215,6 @@ safeInit("seo", initSeo);
 safeInit("backup-scheduler", scheduleAutoBackup);
 safeInit("launch", initLaunch);
 
-app.use("/api/auth", marketplacePersistenceMiddleware, authRoutes);
 app.use("/api/gdpr", marketplacePersistenceMiddleware, gdprRoutes);
 app.use("/api/analytics", apiRateLimit, analyticsRoutes);
 app.use("/api/ai", aiRateLimit, aiRoutes);
