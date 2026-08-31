@@ -9,7 +9,7 @@
   <title>Cardoria — Le Royaume des Collectionneurs</title>
   <meta name="description" content="Cardoria : estimez, achetez et vendez vos cartes à collectionner.">
   <meta name="robots" content="index,follow">
-  <meta name="theme-color" content="#07090d">
+  <meta name="theme-color" content="#05070a">
   <link rel="canonical" href="https://cardoria-site-f2cy.onrender.com/">
   <link rel="preload" href="/style.css?v=20260828-2" as="style">
   <link rel="stylesheet" href="/style.css?v=20260828-2">
@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="/css/home-premium-v11.css?v=20260828-2">
   <link rel="stylesheet" href="/css/site-loader.css?v=4">
   <link rel="stylesheet" href="/css/cardoria-brand-polish.css?v=20260831-1">
+  <link rel="stylesheet" href="/css/home-cardoria-lux.css?v=20260831-1">
   <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
   <script src="/js/asset-paths.js?v=20260828-2"></script>
   <script src="/js/seo-config.js?v=20260828-2"></script>
@@ -46,46 +47,72 @@
   </header>
 
   <main>
-    <section class="premium-hero" aria-labelledby="homeTitle">
-      <div class="premium-hero__grid">
-        <div class="premium-hero__copy home-reveal">
-          <p class="premium-kicker">Cardoria • Trading Cards & Collectibles</p>
-          <h1 id="homeTitle">Vos cartes. <em>Votre collection.</em></h1>
-          <p class="premium-hero__lead">Estimez, achetez ou vendez vos cartes simplement.</p>
-          <div class="premium-actions">
-            <a class="premium-btn premium-btn--gold" href="/pages/estimation/">Estimer une carte</a>
-            <a class="premium-btn premium-btn--ghost" href="/marketplace.html">Voir la marketplace</a>
+    <section class="lux-hero" aria-labelledby="homeTitle">
+      <div class="lux-hero__shell">
+        <div class="lux-hero__main">
+          <div class="lux-hero__copy home-reveal">
+            <p class="lux-kicker">Bienvenue sur Cardoria</p>
+            <h1 id="homeTitle">L’univers des cartes <span>à collectionner</span></h1>
+            <div class="lux-ornament" aria-hidden="true"><span>♛</span></div>
+            <p class="lux-lead">Découvrez, collectionnez, estimez et échangez vos cartes dans un univers premium dédié aux passionnés de TCG.</p>
+            <div class="lux-actions">
+              <a class="lux-btn lux-btn--gold" href="#univers">Explorer les licences →</a>
+              <a class="lux-btn lux-btn--outline" href="/pages/estimation/">Estimer une carte →</a>
+            </div>
+          </div>
+
+          <div class="lux-stage home-reveal" aria-label="Univers Cardoria">
+            <article class="lux-fan-card lux-fan-card--one" aria-hidden="true">
+              <span class="lux-fan-card__mark">P</span>
+              <span class="lux-fan-card__label">Pokémon</span>
+            </article>
+            <article class="lux-fan-card lux-fan-card--two" aria-hidden="true">
+              <span class="lux-fan-card__mark">Y</span>
+              <span class="lux-fan-card__label">Yu-Gi-Oh!</span>
+            </article>
+            <article class="lux-fan-card lux-fan-card--three" aria-hidden="true">
+              <span class="lux-fan-card__mark">OP</span>
+              <span class="lux-fan-card__label">One Piece</span>
+            </article>
+            <article class="lux-pack" aria-hidden="true">
+              <div class="lux-pack__inner">
+                <img src="/assets/logo/cardoria-premium.png" alt="">
+                <strong>CARDORIA</strong>
+                <small>Trading Cards • Collectibles</small>
+              </div>
+            </article>
           </div>
         </div>
 
-        <div class="premium-card-stage home-reveal" aria-hidden="true">
-          <article class="collector-card collector-card--one"><div class="collector-card__inner"><img src="/assets/logo/cardoria-premium.png" alt=""><strong>CARDORIA</strong><small>Collection • Premium</small></div></article>
-          <article class="collector-card collector-card--two"><div class="collector-card__inner"><img src="/assets/logo/cardoria-premium.png" alt=""><strong>CARDORIA</strong><small>Estimation • TCG</small></div></article>
-          <article class="collector-card collector-card--three"><div class="collector-card__inner"><img src="/assets/logo/cardoria-premium.png" alt=""><strong>CARDORIA</strong><small>Marketplace • TCG</small></div></article>
-        </div>
-      </div>
-    </section>
+        <section class="lux-univers" id="univers" aria-labelledby="universTitle">
+          <h2 class="lux-univers__title" id="universTitle">Explorez nos univers</h2>
+          <div class="lux-univers__grid">
+            <a class="lux-universe home-reveal" href="/pages/licences/">
+              <span class="lux-universe__no">01</span><strong>Pokémon</strong><span class="lux-universe__sigil">P</span><span>Explorer →</span>
+            </a>
+            <a class="lux-universe home-reveal" href="/pages/licences/">
+              <span class="lux-universe__no">02</span><strong>Yu-Gi-Oh!</strong><span class="lux-universe__sigil">Y</span><span>Explorer →</span>
+            </a>
+            <a class="lux-universe home-reveal" href="/pages/licences/">
+              <span class="lux-universe__no">03</span><strong>One Piece</strong><span class="lux-universe__sigil">OP</span><span>Explorer →</span>
+            </a>
+            <a class="lux-universe home-reveal" href="/pages/licences/">
+              <span class="lux-universe__no">04</span><strong>Lorcana</strong><span class="lux-universe__sigil">L</span><span>Explorer →</span>
+            </a>
+            <a class="lux-universe home-reveal" href="/pages/licences/">
+              <span class="lux-universe__no">05</span><strong>Magic</strong><span class="lux-universe__sigil">M</span><span>Explorer →</span>
+            </a>
+            <a class="lux-universe home-reveal" href="/pages/licences/">
+              <span class="lux-universe__no">06</span><strong>Dragon Ball</strong><span class="lux-universe__sigil">DB</span><span>Explorer →</span>
+            </a>
+          </div>
+        </section>
 
-    <section class="premium-section" id="actions" aria-labelledby="quickTitle">
-      <div class="home-shell">
-        <div class="premium-section-head home-reveal">
-          <p class="premium-eyebrow">Que souhaitez-vous faire ?</p>
-          <h2 id="quickTitle">Choisissez votre espace.</h2>
-        </div>
-        <div class="premium-spaces">
-          <a class="premium-space home-reveal" href="/pages/estimation/">
-            <div class="premium-space__top"><span class="premium-space__number">01</span><span class="premium-space__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></svg></span></div>
-            <div><h3>Estimation</h3><p>Connaître la valeur d'une carte.</p><span class="premium-space__arrow">Estimer →</span></div>
-          </a>
-          <a class="premium-space home-reveal" href="/pages/boutique/">
-            <div class="premium-space__top"><span class="premium-space__number">02</span><span class="premium-space__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16l-1 12H5L4 8Zm3 0V6a5 5 0 0 1 10 0v2"/></svg></span></div>
-            <div><h3>Boutique</h3><p>Découvrir les produits Cardoria.</p><span class="premium-space__arrow">Voir la boutique →</span></div>
-          </a>
-          <a class="premium-space home-reveal" href="/marketplace.html">
-            <div class="premium-space__top"><span class="premium-space__number">03</span><span class="premium-space__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 3-3 3 3M10 4v11M17 17l-3 3-3-3M14 20V9"/></svg></span></div>
-            <div><h3>Marketplace</h3><p>Acheter ou vendre entre collectionneurs.</p><span class="premium-space__arrow">Explorer →</span></div>
-          </a>
-        </div>
+        <section class="lux-trust" aria-label="Engagements Cardoria">
+          <article><span class="lux-trust__icon">✓</span><div><strong>Authenticité garantie</strong><p>Des références contrôlées et un catalogue construit pour les collectionneurs.</p></div></article>
+          <article><span class="lux-trust__icon">◇</span><div><strong>Collectionnez en confiance</strong><p>Une expérience claire pour estimer, acheter et vendre vos cartes.</p></div></article>
+          <article><span class="lux-trust__icon">♛</span><div><strong>Passion avant tout</strong><p>Cardoria réunit les grands univers TCG dans une identité premium.</p></div></article>
+        </section>
       </div>
     </section>
   </main>
