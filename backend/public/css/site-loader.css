@@ -110,6 +110,8 @@ html.cardoria-loading body {
   aspect-ratio: 1;
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: 8px;
   border-radius: 50%;
   background: transparent;
   box-shadow: none;
@@ -117,11 +119,21 @@ html.cardoria-loading body {
 }
 
 .cardoria-loader__logo {
-  width: 94%;
-  height: 94%;
+  width: 42%;
+  height: auto;
   object-fit: contain;
-  mix-blend-mode: screen;
-  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 0 18px rgba(212, 175, 55, 0.35));
+}
+
+.cardoria-loader__wordmark {
+  display: block;
+  color: #f0cf72;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.55rem, 4vw, 2.35rem);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  text-shadow: 0 0 18px rgba(212, 175, 55, 0.18);
 }
 
 .cardoria-loader__eyebrow {
