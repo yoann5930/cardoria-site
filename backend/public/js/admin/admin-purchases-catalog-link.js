@@ -9,6 +9,29 @@
   function setLabel(inputId,text){var el=qs(inputId);if(!el||!el.parentElement)return;var label=el.parentElement;for(var i=0;i<label.childNodes.length;i++){if(label.childNodes[i].nodeType===3){label.childNodes[i].nodeValue=text;return;}}}
   function draft(){return Store.get();}
 
+  function lotDescription(cards){
+    var counts={},order=[];
+    (cards||[]).forEach(function(card){
+      var name=String(card&&card.name||"Carte Pokémon").trim()||"Carte Pokémon",key=name.toLocaleLowerCase("fr-FR");
+      if(!counts[key]){counts[key]={name:name,count:0};order.push(key);}
+      counts[key].count+=1;
+    });
+    var text=order.map(function(key){var item=counts[key];return item.name+(item.count>1?" x"+item.count:"");}).join(", ");
+    return text.length>240?text.slice(0,237)+"...":text;
+  }
+
+  function syncLotDescription(cards){
+    var text=lotDescription(cards),input=qs("pDescription"),preview=qs("purchaseLotDescription");
+    if(input){input.value=text;input.readOnly=true;input.title="Description générée automatiquement à partir des cartes du lot.";}
+    if(preview)preview.textContent=text||"La description apparaîtra automatiquement après l’ajout des cartes.";
+    return text;
+  }
+
+  function unlockDescription(){
+    var input=qs("pDescription");
+    if(input){input.readOnly=false;input.title="";}
+  }
+
   function formSnapshot(){
     var ids=["pDate","pBuyer","pSeller","pDescription","pAmount","pPayment","pStatus","pReference","pNotes"];
     var out={};ids.forEach(function(id){var el=qs(id);if(el)out[id]=el.value;});return out;
@@ -19,7 +42,7 @@
   function ensureLotBox(){
     var form=qs("purchaseForm");if(!form||qs("purchaseLotCards"))return;
     var box=document.createElement("div");box.id="purchaseLotCards";box.className="admin-panel";box.style.marginTop="16px";box.hidden=true;
-    box.innerHTML='<h3>Cartes du lot</h3><p><strong id="purchaseLotCounter">0 / 0 carte</strong></p><p id="purchaseLotState" style="color:#baaf97">Ajoute exactement le nombre de cartes indiqué.</p><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>#</th><th>Carte</th><th>Extension</th><th>Numéro</th><th>Action</th></tr></thead><tbody id="purchaseLotBody"></tbody></table></div><div class="actions" style="margin-top:12px"><button type="button" class="btn btn-secondary" id="purchaseLotBack">Ajouter des cartes depuis le catalogue</button><button type="button" class="btn btn-secondary" id="purchaseLotClear">Vider le lot</button></div>';
+    box.innerHTML='<h3>Cartes du lot</h3><p><strong id="purchaseLotCounter">0 / 0 carte</strong></p><p><strong>Description du lot :</strong> <span id="purchaseLotDescription" style="color:#f6d66c">La description apparaîtra automatiquement après l’ajout des cartes.</span></p><p id="purchaseLotState" style="color:#baaf97">Ajoute exactement le nombre de cartes indiqué.</p><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>#</th><th>Carte</th><th>Extension</th><th>Numéro</th><th>Action</th></tr></thead><tbody id="purchaseLotBody"></tbody></table></div><div class="actions" style="margin-top:12px"><button type="button" class="btn btn-secondary" id="purchaseLotBack">Ajouter des cartes depuis le catalogue</button><button type="button" class="btn btn-secondary" id="purchaseLotClear">Vider le lot</button></div>';
     form.appendChild(box);
     qs("purchaseLotBack").onclick=function(){saveDraftForm();location.href="admin-catalogue.html";};
     qs("purchaseLotClear").onclick=function(){if(confirm("Vider toutes les cartes et le brouillon du lot ?")){Store.clear();if(qs("pQty"))qs("pQty").value="1";renderLot();}};
@@ -29,8 +52,9 @@
     ensureLotBox();var box=qs("purchaseLotCards"),packaging=qs("pPackaging");if(!box||!packaging)return;
     var isLot=packaging.value==="lot_cartes";box.hidden=!isLot;
     var submit=qs("purchaseForm")&&qs("purchaseForm").querySelector('button[type="submit"]');
-    if(!isLot){if(submit)submit.disabled=false;return;}
+    if(!isLot){unlockDescription();if(submit)submit.disabled=false;return;}
     var d=draft(),expected=Math.max(1,Number(qs("pQty").value||d.targetQty||1)),cards=d.cards||[],counter=qs("purchaseLotCounter"),state=qs("purchaseLotState"),body=qs("purchaseLotBody");
+    syncLotDescription(cards);
     if(counter)counter.textContent=cards.length+" / "+expected+" carte(s)";
     if(state){
       if(cards.length===expected){state.textContent="Lot complet : tu peux valider l’achat.";state.style.color="#6bd98f";}
@@ -49,12 +73,12 @@
   function updateLotLabels(){
     var packaging=qs("pPackaging");if(!packaging)return;
     if(packaging.value==="lot_cartes"){
-      setLabel("pQty","Nombre exact de cartes dans le lot");setLabel("pAmount","Prix total du lot (€)");
+      setLabel("pDescription","Description du lot (automatique)");setLabel("pQty","Nombre exact de cartes dans le lot");setLabel("pAmount","Prix total du lot (€)");
       var qty=Math.max(1,Number(qs("pQty").value||draft().targetQty||1));Store.begin(qty,formSnapshot());
     }else if(packaging.value==="carte_unite"){
-      setLabel("pQty","Nombre de cartes");setLabel("pAmount","Montant total (€)");
+      setLabel("pDescription","Description");setLabel("pQty","Nombre de cartes");setLabel("pAmount","Montant total (€)");
     }else{
-      setLabel("pQty","Quantité achetée");setLabel("pAmount","Prix total (€)");
+      setLabel("pDescription","Description");setLabel("pQty","Quantité achetée");setLabel("pAmount","Prix total (€)");
     }
     renderLot();
   }
@@ -89,8 +113,8 @@
     form.addEventListener("submit",function(e){
       pendingLotSubmit=false;
       if(qs("pPackaging")&&qs("pPackaging").value==="lot_cartes"){
-        saveDraftForm();var d=draft(),cards=d.cards||[],expected=Math.max(1,Number(qs("pQty").value||d.targetQty||1));
-        Store.setTarget(expected);
+        var d=draft(),cards=d.cards||[],expected=Math.max(1,Number(qs("pQty").value||d.targetQty||1));
+        syncLotDescription(cards);saveDraftForm();Store.setTarget(expected);
         if(cards.length!==expected){e.preventDefault();e.stopImmediatePropagation();var msg=qs("pMessage");if(msg)msg.textContent="Impossible de valider : le lot doit contenir exactement "+expected+" carte(s), actuellement "+cards.length+".";renderLot();return;}
         var refs=cards.map(function(c){return c.id;}),notes=qs("pNotes");
         if(notes){var cleaned=(notes.value||"").replace(/\n?\[LOT_CARDS\][\s\S]*$/m,"").trim();notes.value=cleaned+(cleaned?"\n":"")+"[LOT_CARDS] "+JSON.stringify(refs);}
