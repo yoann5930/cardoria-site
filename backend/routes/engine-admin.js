@@ -100,7 +100,7 @@ router.post("/sync/pokemon-reference", async (req, res) => {
   } catch (e) { res.status(502).json({ ok: false, error: e.message || "Enrichissement Pokémon impossible" }); }
 });
 
-router.get("/cards", (req, res) => res.json({ ok: true, ...searchCards({ ...req.query, activeOnly: false }) }));
+router.get("/cards", (req, res) => res.json({ ok: true, ...searchCards({ ...req.query, activeOnly: false, requireImage: true }) }));
 router.get("/cards/:id", (req, res) => { const card = getCardById(req.params.id); if (!card) return res.status(404).json({ ok: false, error: "Carte introuvable" }); res.json({ ok: true, card }); });
 router.post("/cards", (req, res) => {
   try { const card = createCard(req.body || {}); logAudit({ type: "engine", action: "card_create", user: req.authUser?.email || "admin", detail: card.id }); res.json({ ok: true, card }); }
