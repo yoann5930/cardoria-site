@@ -1,0 +1,146 @@
+/* Cardoria — accueil luxe noir & or. Mise en page uniquement. */
+:root{
+  --lux-bg:#05070a;
+  --lux-panel:#090d12;
+  --lux-panel-2:#0d121a;
+  --lux-line:rgba(213,173,62,.30);
+  --lux-line-soft:rgba(213,173,62,.14);
+  --lux-gold:#d5ad3e;
+  --lux-gold-light:#f0d77f;
+  --lux-cream:#f4e5b2;
+  --lux-text:#eee9dc;
+  --lux-muted:#9d998f;
+  --lux-display:"Palatino Linotype","Book Antiqua",Palatino,Georgia,"Times New Roman",serif;
+}
+
+body.home-premium{
+  background:
+    radial-gradient(circle at 74% 22%,rgba(213,173,62,.075),transparent 28%),
+    radial-gradient(circle at 18% 38%,rgba(213,173,62,.045),transparent 24%),
+    linear-gradient(180deg,#05070a 0%,#06090e 55%,#040609 100%)!important;
+  color:var(--lux-text);
+}
+
+body.home-premium::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;opacity:.18;
+  background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px);
+  background-size:54px 54px;
+  -webkit-mask-image:radial-gradient(circle at 50% 35%,#000,transparent 72%);mask-image:radial-gradient(circle at 50% 35%,#000,transparent 72%);
+}
+
+/* Header */
+.premium-header{background:rgba(4,6,9,.91)!important;border-bottom:1px solid rgba(213,173,62,.13)!important;box-shadow:0 10px 30px rgba(0,0,0,.16)}
+.premium-header__inner{min-height:82px!important;width:min(1480px,calc(100vw - 48px))!important;gap:30px!important}
+.premium-brand img{width:51px!important;height:51px!important;border-radius:0!important;object-fit:contain!important;box-shadow:none!important;filter:drop-shadow(0 5px 15px rgba(213,173,62,.24))}
+.premium-brand__text strong{font-size:20px!important;letter-spacing:.14em!important}
+.premium-brand__text small{font-size:8px!important;letter-spacing:.22em!important;color:#747a86!important}
+.premium-menu{gap:31px!important}
+.premium-menu a{font-size:12px!important;color:#c5c0b6!important;font-weight:600!important}
+.premium-menu a:hover,.premium-menu a.is-active{color:var(--lux-gold-light)!important}
+.premium-menu a::after{bottom:-13px!important;background:linear-gradient(90deg,transparent,var(--lux-gold-light),transparent)!important}
+.premium-login{color:#c9c3b8!important}
+.premium-cta{border:1px solid rgba(255,231,154,.30)!important;border-radius:7px!important;background:linear-gradient(135deg,#efd887,#be8f2d)!important;color:#151006!important;box-shadow:0 8px 28px rgba(213,173,62,.18)!important}
+
+/* Hero */
+.lux-hero{position:relative;overflow:hidden;padding:76px 0 34px}
+.lux-hero::before{content:"";position:absolute;width:620px;height:620px;right:7%;top:3%;border-radius:50%;background:radial-gradient(circle,rgba(213,173,62,.12),rgba(213,173,62,.035) 36%,transparent 67%);filter:blur(10px);pointer-events:none}
+.lux-hero__shell{width:min(1480px,calc(100vw - 48px));margin:0 auto;border:1px solid rgba(213,173,62,.25);border-radius:22px;background:linear-gradient(145deg,rgba(8,11,16,.82),rgba(4,6,9,.92));box-shadow:0 32px 90px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,240,185,.025);overflow:hidden}
+.lux-hero__main{min-height:610px;display:grid;grid-template-columns:.9fr 1.1fr;align-items:center;gap:22px;padding:66px 56px 46px}
+.lux-hero__copy{position:relative;z-index:3}
+.lux-kicker{display:flex;align-items:center;gap:12px;margin:0 0 21px;color:var(--lux-gold-light);font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase}
+.lux-kicker::before{content:"";width:35px;height:1px;background:linear-gradient(90deg,var(--lux-gold),transparent)}
+.lux-hero h1{margin:0;max-width:680px;font-family:var(--lux-display);font-size:clamp(54px,5.6vw,88px);line-height:.94;font-weight:500;letter-spacing:-.025em;color:var(--lux-cream)!important;text-shadow:0 3px 28px rgba(213,173,62,.09)}
+.lux-hero h1 span{display:block;color:var(--lux-gold-light)}
+.lux-ornament{display:flex;align-items:center;gap:10px;width:min(430px,80%);margin:24px 0 23px;color:var(--lux-gold)}
+.lux-ornament::before,.lux-ornament::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,transparent,rgba(213,173,62,.62))}
+.lux-ornament::after{background:linear-gradient(90deg,rgba(213,173,62,.62),transparent)}
+.lux-ornament span{font-size:17px}
+.lux-lead{max-width:590px;margin:0;color:#aaa69c;font-size:16px;line-height:1.75}
+.lux-actions{display:flex;flex-wrap:wrap;gap:13px;margin-top:29px}
+.lux-btn{min-height:48px;display:inline-flex;align-items:center;justify-content:center;padding:0 21px;border-radius:7px;text-decoration:none;font-size:12px;font-weight:800;letter-spacing:.035em;text-transform:uppercase;transition:.22s ease}
+.lux-btn:hover{transform:translateY(-2px)}
+.lux-btn--gold{background:linear-gradient(135deg,#f0d77d,#b98727);color:#171004;border:1px solid rgba(255,241,185,.30);box-shadow:0 12px 32px rgba(213,173,62,.16)}
+.lux-btn--outline{border:1px solid rgba(213,173,62,.46);color:var(--lux-gold-light);background:rgba(0,0,0,.12)}
+
+/* CSS-only collector stage; uses only the existing Cardoria logo asset. */
+.lux-stage{position:relative;min-height:500px;display:grid;place-items:center;perspective:1200px}
+.lux-stage::before{content:"";position:absolute;width:480px;height:130px;bottom:34px;border-radius:50%;border:1px solid rgba(213,173,62,.30);background:radial-gradient(ellipse,rgba(213,173,62,.17),rgba(213,173,62,.035) 48%,transparent 70%);box-shadow:0 0 60px rgba(213,173,62,.10),inset 0 0 35px rgba(213,173,62,.07);transform:rotateX(72deg)}
+.lux-stage::after{content:"";position:absolute;width:410px;height:410px;border-radius:50%;border:1px solid rgba(213,173,62,.08);box-shadow:0 0 80px rgba(213,173,62,.045)}
+.lux-pack{position:absolute;z-index:5;width:255px;aspect-ratio:.70;border:1px solid rgba(213,173,62,.58);border-radius:13px;padding:10px;background:linear-gradient(145deg,#101721,#05070b 62%,#0b0e13);box-shadow:0 34px 70px rgba(0,0,0,.55),0 0 32px rgba(213,173,62,.12);transform:rotate(-1.5deg);animation:luxFloat 5.6s ease-in-out infinite}
+.lux-pack::before,.lux-pack::after{content:"";position:absolute;inset:8px;border:1px solid rgba(213,173,62,.19);border-radius:9px;pointer-events:none}
+.lux-pack::after{inset:18px;background:radial-gradient(circle at 50% 35%,rgba(213,173,62,.08),transparent 48%);border-color:rgba(213,173,62,.09)}
+.lux-pack__inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.lux-pack__inner img{width:118px;height:118px;object-fit:contain;border-radius:22px;filter:drop-shadow(0 10px 24px rgba(0,0,0,.42))}
+.lux-pack__inner strong{margin-top:18px;font-family:var(--lux-display);font-size:29px;font-weight:500;letter-spacing:.08em;color:var(--lux-gold-light)}
+.lux-pack__inner small{margin-top:7px;color:#837b68;font-size:8px;letter-spacing:.22em;text-transform:uppercase}
+.lux-fan-card{position:absolute;width:205px;aspect-ratio:.71;border:1px solid rgba(213,173,62,.32);border-radius:12px;background:linear-gradient(145deg,#131a23,#07090d);box-shadow:0 25px 55px rgba(0,0,0,.45);overflow:hidden}
+.lux-fan-card::before{content:"";position:absolute;inset:10px;border:1px solid rgba(213,173,62,.14);border-radius:8px}
+.lux-fan-card__label{position:absolute;left:18px;right:18px;bottom:22px;font-family:var(--lux-display);font-size:21px;color:#e5cb7a;text-align:center;letter-spacing:.03em}
+.lux-fan-card__mark{position:absolute;top:42px;left:50%;transform:translateX(-50%);width:82px;height:82px;display:grid;place-items:center;border:1px solid rgba(213,173,62,.25);border-radius:50%;color:var(--lux-gold);font-family:var(--lux-display);font-size:35px;background:radial-gradient(circle,rgba(213,173,62,.08),transparent 70%)}
+.lux-fan-card--one{left:8%;top:90px;transform:rotate(-16deg) translateZ(-50px);opacity:.82}
+.lux-fan-card--two{right:7%;top:112px;transform:rotate(14deg) translateZ(-70px);opacity:.78}
+.lux-fan-card--three{right:17%;bottom:28px;transform:rotate(22deg) scale(.82);opacity:.66}
+@keyframes luxFloat{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-11px) rotate(-.4deg)}}
+
+/* Univers */
+.lux-univers{padding:0 56px 46px}
+.lux-univers__title{display:flex;align-items:center;gap:11px;margin:0 0 15px;color:var(--lux-gold-light);font-size:10px;font-weight:800;letter-spacing:.20em;text-transform:uppercase}
+.lux-univers__title::after{content:"";width:70px;height:1px;background:linear-gradient(90deg,rgba(213,173,62,.55),transparent)}
+.lux-univers__grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.lux-universe{position:relative;min-height:168px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:18px 12px;border:1px solid rgba(213,173,62,.18);border-radius:8px;background:linear-gradient(180deg,rgba(14,19,26,.88),rgba(5,8,12,.94));text-decoration:none;overflow:hidden;transition:.25s ease}
+.lux-universe:hover{transform:translateY(-3px);border-color:rgba(213,173,62,.48);background:linear-gradient(180deg,rgba(20,25,33,.92),rgba(7,10,14,.97))}
+.lux-universe__no{align-self:flex-start;color:#817a6d;font-size:9px;letter-spacing:.13em}
+.lux-universe strong{font-family:var(--lux-display);font-size:19px;font-weight:500;color:#ece3cb;text-align:center}
+.lux-universe__sigil{width:46px;height:46px;display:grid;place-items:center;border:1px solid rgba(213,173,62,.30);border-radius:50%;color:var(--lux-gold-light);font-family:var(--lux-display);font-size:18px;box-shadow:inset 0 0 20px rgba(213,173,62,.035)}
+.lux-universe span:last-child{color:#c19c40;font-size:9px;letter-spacing:.08em;text-transform:uppercase}
+
+/* Trust strip */
+.lux-trust{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid rgba(213,173,62,.16);background:rgba(3,5,8,.50)}
+.lux-trust article{min-height:104px;display:grid;grid-template-columns:42px 1fr;gap:14px;align-items:center;padding:22px 34px;border-right:1px solid rgba(213,173,62,.13)}
+.lux-trust article:last-child{border-right:0}
+.lux-trust__icon{width:42px;height:42px;display:grid;place-items:center;border:1px solid rgba(213,173,62,.26);border-radius:50%;color:var(--lux-gold-light);font-size:18px}
+.lux-trust strong{display:block;font-family:var(--lux-display);font-size:18px;font-weight:500;color:#e6cf85}
+.lux-trust p{margin:4px 0 0;color:#807d76;font-size:11px;line-height:1.45}
+
+/* Existing footer refined */
+.premium-footer{margin-top:52px!important;border-top:1px solid rgba(213,173,62,.13)!important;background:#040609!important}
+.premium-footer__grid{padding-top:52px!important}
+.premium-footer h3{color:#c9aa55!important}
+
+/* Loader aligned with logo reference */
+.cardoria-loader{background:radial-gradient(circle at 50% 38%,rgba(213,173,62,.09),transparent 32%),linear-gradient(160deg,#040609,#070a0f 52%,#020305)!important}
+.cardoria-loader__content{padding:34px;border:1px solid rgba(213,173,62,.19);border-radius:22px;background:linear-gradient(180deg,rgba(8,11,16,.22),rgba(4,6,9,.20));box-shadow:0 35px 90px rgba(0,0,0,.25)}
+.cardoria-loader__wordmark{font-size:clamp(1.9rem,4.4vw,2.8rem)!important;letter-spacing:.16em!important}
+.cardoria-loader__eyebrow{color:#a88b42!important}
+.cardoria-loader__progress{width:min(72vw,430px)!important}
+.cardoria-loader__track{height:3px!important;border:1px solid rgba(213,173,62,.18)!important;border-radius:999px!important;background:#080909!important;padding:1px!important}
+.cardoria-loader__bar{border-radius:999px!important;background:linear-gradient(90deg,#8e6720,#e6c15d 58%,#fff0ae)!important}
+
+@media(max-width:1180px){
+  .lux-hero__main{grid-template-columns:1fr 1fr;padding:56px 34px 40px}
+  .lux-univers{padding:0 34px 38px}
+  .lux-univers__grid{grid-template-columns:repeat(3,1fr)}
+  .lux-trust{grid-template-columns:1fr}
+  .lux-trust article{border-right:0;border-bottom:1px solid rgba(213,173,62,.11)}
+}
+@media(max-width:900px){
+  .lux-hero__shell{width:min(94vw,760px)}
+  .lux-hero__main{grid-template-columns:1fr;padding:50px 25px 18px}
+  .lux-stage{min-height:430px;margin-top:4px}
+  .lux-fan-card--one{left:13%}.lux-fan-card--two{right:12%}.lux-fan-card--three{right:22%}
+  .lux-univers{padding:0 25px 32px}
+  .premium-header__inner{width:min(94vw,760px)!important}
+}
+@media(max-width:640px){
+  .lux-hero{padding-top:24px}
+  .lux-hero__main{padding:38px 18px 12px}
+  .lux-hero h1{font-size:clamp(43px,15vw,63px)}
+  .lux-lead{font-size:14px}
+  .lux-btn{width:100%}
+  .lux-stage{min-height:360px;transform:scale(.86);margin:-18px -24px -28px}
+  .lux-pack{width:220px}.lux-fan-card{width:170px}.lux-stage::before{width:380px}
+  .lux-univers{padding:0 18px 24px}
+  .lux-univers__grid{grid-template-columns:repeat(2,1fr)}
+  .lux-universe{min-height:145px}
+  .lux-trust article{padding:18px}
+}
