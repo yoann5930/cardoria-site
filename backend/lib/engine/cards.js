@@ -37,7 +37,7 @@ function parseSearchQuery(q = "", explicitLanguage = "") {
   };
 }
 
-export function searchCards({ q = "", license = "", language = "", extension = "", rarity = "", hitFamily = "", variant = "", page = 1, limit = 24, sort = "name", activeOnly = true, maxLimit = 100 } = {}) {
+export function searchCards({ q = "", license = "", language = "", extension = "", rarity = "", hitFamily = "", variant = "", page = 1, limit = 24, sort = "name", activeOnly = true, requireImage = false, maxLimit = 100 } = {}) {
   const db = getDb();
   const cap = Math.min(Math.max(Number(maxLimit) || 100, 1), 500);
   const safeLimit = Math.min(Math.max(Number(limit) || 24, 1), cap);
@@ -47,6 +47,7 @@ export function searchCards({ q = "", license = "", language = "", extension = "
   const params = [];
   const parsedQuery = parseSearchQuery(q, language);
   if (activeOnly) conditions.push("c.active = 1");
+  if (requireImage) conditions.push("COALESCE(c.image_hd,'') <> '' AND COALESCE(c.image_thumb,'') <> ''");
   if (license) { conditions.push("c.license_slug = ?"); params.push(license); }
   if (parsedQuery.language) { conditions.push("c.language = ?"); params.push(parsedQuery.language); }
   if (extension) { conditions.push("c.extension LIKE ?"); params.push(`%${extension}%`); }
