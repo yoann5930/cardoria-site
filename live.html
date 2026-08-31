@@ -4,38 +4,49 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Live Cardoria</title>
-  <meta name="description" content="Retrouvez les lives Cardoria et les prochaines sessions en direct.">
+  <meta name="description" content="Regardez les lives Cardoria en direct depuis le Studio Cardoria.">
   <meta name="robots" content="index,follow">
   <meta name="theme-color" content="#020508">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/css/cardoria-brand-polish.css?v=20260831-1">
   <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
   <style>
-    body{margin:0;background:#020508;color:#fff;font-family:Arial,Helvetica,sans-serif}
-    .live-page{min-height:100vh;display:grid;place-items:center;padding:40px 20px;box-sizing:border-box;background:radial-gradient(circle at 50% 20%,rgba(214,174,67,.10),transparent 34%),#020508}
-    .live-card{width:min(920px,100%);padding:54px 42px;border:1px solid rgba(214,174,67,.38);border-radius:22px;background:#050a0f;box-shadow:0 24px 80px rgba(0,0,0,.45);text-align:center}
-    .live-badge{display:inline-flex;align-items:center;gap:10px;padding:9px 16px;border:1px solid rgba(255,68,68,.75);border-radius:999px;background:rgba(180,18,18,.18);color:#ff5757;font-weight:800;letter-spacing:.12em}
-    .live-dot{width:10px;height:10px;border-radius:50%;background:#ff3131;box-shadow:0 0 16px rgba(255,49,49,.9)}
-    h1{margin:22px 0 10px;font-family:Georgia,"Times New Roman",serif;font-size:clamp(34px,6vw,68px);color:#e6c25a}
-    p{margin:0 auto;color:#bbb;max-width:640px;font-size:18px;line-height:1.6}
-    .live-state{margin:34px auto 0;padding:24px;border:1px solid rgba(214,174,67,.18);border-radius:16px;background:#03070b;color:#ddd}
-    .live-actions{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:30px}
-    .live-actions a{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 22px;border-radius:10px;text-decoration:none;font-weight:800}
-    .primary{background:#d7b84f;color:#05070a}.secondary{border:1px solid rgba(214,174,67,.55);color:#e6c25a;background:transparent}
+    body{margin:0;background:#020508;color:#fff;font-family:Arial,Helvetica,sans-serif}.live-page{min-height:100vh;padding:28px 20px 54px;box-sizing:border-box;background:radial-gradient(circle at 50% 10%,rgba(214,174,67,.12),transparent 30%),#020508}.live-shell{width:min(1260px,100%);margin:0 auto}.live-top{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:22px}.live-brand{display:flex;align-items:center;gap:14px}.live-badge{display:inline-flex;align-items:center;gap:9px;padding:8px 13px;border:1px solid rgba(255,68,68,.7);border-radius:999px;background:rgba(180,18,18,.16);color:#ff6464;font-size:12px;font-weight:900;letter-spacing:.12em}.live-dot{width:9px;height:9px;border-radius:50%;background:#ff3131;box-shadow:0 0 14px rgba(255,49,49,.9)}h1{margin:0;font-family:Georgia,"Times New Roman",serif;font-size:clamp(28px,4vw,48px);color:#e6c25a}.live-back{display:inline-flex;align-items:center;min-height:42px;padding:0 16px;border:1px solid rgba(214,174,67,.45);border-radius:10px;color:#e6c25a;text-decoration:none;font-weight:800}.live-stage{position:relative;overflow:hidden;width:100%;aspect-ratio:16/9;border:1px solid rgba(214,174,67,.32);border-radius:22px;background:linear-gradient(145deg,#03070b,#080d12);box-shadow:0 26px 90px rgba(0,0,0,.5)}.live-stage video{width:100%;height:100%;display:block;object-fit:contain;background:#000}.live-offline{position:absolute;inset:0;display:grid;place-items:center;padding:30px;text-align:center;background:radial-gradient(circle at center,rgba(214,174,67,.08),transparent 45%),#03070b;transition:opacity .2s}.live-stage[data-live="true"] .live-offline{opacity:0;pointer-events:none}.live-offline strong{display:block;font:700 clamp(24px,4vw,44px) Georgia,"Times New Roman",serif;color:#e6c25a}.live-offline p{margin:12px auto 0;max-width:620px;color:#aaa;line-height:1.55}.live-meta{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:16px;padding:16px 18px;border:1px solid rgba(214,174,67,.18);border-radius:14px;background:#050a0f}.live-state{font-weight:800;color:#e6c25a}.live-viewers{color:#aaa;font-size:14px}.live-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.live-tools button,.live-tools a{min-height:40px;padding:0 14px;border-radius:9px;font:700 13px Arial,sans-serif;text-decoration:none}.live-tools button{border:1px solid rgba(214,174,67,.45);background:transparent;color:#e6c25a;cursor:pointer}.live-tools a{display:inline-flex;align-items:center;background:#d7b84f;color:#05070a}@media(max-width:720px){.live-page{padding:18px 12px 36px}.live-stage{border-radius:14px}.live-meta{align-items:flex-start;flex-direction:column}}
   </style>
 </head>
 <body>
   <main class="live-page">
-    <section class="live-card" aria-labelledby="liveTitle">
-      <span class="live-badge"><span class="live-dot" aria-hidden="true"></span> LIVE</span>
-      <h1 id="liveTitle">Lives Cardoria</h1>
-      <p>Retrouvez ici les ventes en direct, ouvertures et événements live de Cardoria.</p>
-      <div class="live-state" role="status">Aucun live public n’est actuellement annoncé.</div>
-      <div class="live-actions">
-        <a class="primary" href="/marketplace.html">Voir la Marketplace</a>
-        <a class="secondary" href="/">Retour à l’accueil</a>
-      </div>
-    </section>
+    <div class="live-shell">
+      <header class="live-top">
+        <div class="live-brand">
+          <span class="live-badge"><span class="live-dot" aria-hidden="true"></span> LIVE</span>
+          <h1>Cardoria en direct</h1>
+        </div>
+        <a class="live-back" href="/">← Accueil</a>
+      </header>
+
+      <section class="live-stage" id="cardoriaLiveStage" data-live="false" aria-label="Lecteur du live Cardoria">
+        <video id="cardoriaLiveVideo" autoplay muted playsinline></video>
+        <div class="live-offline">
+          <div>
+            <strong>Le direct commencera ici</strong>
+            <p>Quand le Studio Cardoria lance une diffusion, l’image et le son apparaissent automatiquement sur cette page.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="live-meta" aria-live="polite">
+        <div>
+          <div class="live-state" id="cardoriaLiveState">Connexion au service Live…</div>
+          <div class="live-viewers" id="cardoriaLiveViewers">0 spectateur</div>
+        </div>
+        <div class="live-tools">
+          <button id="cardoriaLiveSound" type="button" hidden>Activer le son</button>
+          <a href="/marketplace.html">Voir la Marketplace</a>
+        </div>
+      </section>
+    </div>
   </main>
+  <script src="/js/cardoria-live-viewer.js?v=20260901-1" defer></script>
 </body>
 </html>
