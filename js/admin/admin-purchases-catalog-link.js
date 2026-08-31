@@ -10,19 +10,20 @@
   function draft(){return Store.get();}
 
   function lotDescription(cards){
-    var counts={},order=[];
+    var seen={},names=[];
     (cards||[]).forEach(function(card){
       var name=String(card&&card.name||"Carte Pokémon").trim()||"Carte Pokémon",key=name.toLocaleLowerCase("fr-FR");
-      if(!counts[key]){counts[key]={name:name,count:0};order.push(key);}
-      counts[key].count+=1;
+      if(seen[key])return;
+      seen[key]=true;
+      names.push(name);
     });
-    var text=order.map(function(key){var item=counts[key];return item.name+(item.count>1?" x"+item.count:"");}).join(", ");
+    var text=names.join(", ");
     return text.length>240?text.slice(0,237)+"...":text;
   }
 
   function syncLotDescription(cards){
     var text=lotDescription(cards),input=qs("pDescription"),preview=qs("purchaseLotDescription");
-    if(input){input.value=text;input.readOnly=true;input.title="Description générée automatiquement à partir des cartes du lot.";}
+    if(input){input.value=text;input.readOnly=true;input.title="Description générée automatiquement à partir des noms de cartes, sans quantité.";}
     if(preview)preview.textContent=text||"La description apparaîtra automatiquement après l’ajout des cartes.";
     return text;
   }
