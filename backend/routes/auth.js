@@ -16,6 +16,7 @@ import { generateCsrfToken } from "../lib/security/csrf.js";
 import { logAudit } from "../lib/audit.js";
 
 const router = Router();
+const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;
 
 function normalizedEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -34,6 +35,10 @@ function secureStringEqual(a, b) {
 
 function publicUser(user) {
   return { id: user.id, email: user.email, role: user.role, name: user.name, totpEnabled: !!user.totpEnabled };
+}
+
+function rejectTemporaryCodeLogin(res) {
+  return res.status(503).json({ ok: false, error: "Connexion par code temporairement désactivée." });
 }
 
 function authenticateConfiguredAdmin(email, password) {
@@ -62,6 +67,7 @@ function completeSession(user, req) {
 }
 
 function beginAdmin2fa(user, req, origin = "password") {
+  if (ADMIN_CODE_LOGIN_TEMP_DISABLED) return null;
   const totp = getTotpSecret(user.id);
   const enabled = !!totp?.enabled && !!totp?.secret;
   const setupSecret = enabled ? "" : generateTotpSecret();
@@ -103,9 +109,6 @@ router.post("/register", authRateLimit, (req, res) => {
 
 router.post("/login", authRateLimit, (req, res) => {
   try {
-    // PostgreSQL peut restaurer un ancien snapshot auth après le démarrage.
-    // Réappliquer ici la configuration Render garantit que ADMIN_EMAIL et
-    // ADMIN_LOGIN_PASSWORD restent la source d'autorité au moment du login.
     migrateAuth();
 
     const email = normalizedEmail(req.body?.email);
@@ -127,6 +130,7 @@ router.post("/login", authRateLimit, (req, res) => {
 });
 
 router.post("/2fa/login/verify", authRateLimit, (req, res) => {
+  if (ADMIN_CODE_LOGIN_TEMP_DISABLED) return rejectTemporaryCodeLogin(res);
   try {
     const challengeToken = String(req.body?.challengeToken || "");
     const code = String(req.body?.totpCode || "").replace(/\s/g, "");
@@ -205,6 +209,7 @@ router.post("/password/confirm", authRateLimit, (req, res) => {
 });
 
 router.post("/2fa/setup", (req, res) => {
+  if (ADMIN_CODE_LOGIN_TEMP_DISABLED) return rejectTemporaryCodeLogin(res);
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
   const user = validateSession(token);
   if (!user || !ADMIN_ROLES.includes(user.role)) return res.status(401).json({ ok: false, error: "Session Admin requise." });
@@ -214,6 +219,7 @@ router.post("/2fa/setup", (req, res) => {
 });
 
 router.post("/2fa/enable", (req, res) => {
+  if (ADMIN_CODE_LOGIN_TEMP_DISABLED) return rejectTemporaryCodeLogin(res);
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
   const user = validateSession(token);
   if (!user || !ADMIN_ROLES.includes(user.role)) return res.status(401).json({ ok: false, error: "Session Admin requise." });
