@@ -6,6 +6,7 @@ import { getDb } from "../engine/database.js";
 import { hashToken, makeId, ADMIN_ROLES } from "./migrate.js";
 
 const SESSION_HOURS = Number(process.env.SESSION_HOURS || 12);
+const REQUIRE_ADMIN_2FA = String(process.env.ADMIN_REQUIRE_2FA || "false").trim().toLowerCase() === "true";
 
 export function createSession(userId, { ip = "", userAgent = "" } = {}) {
   const db = getDb();
@@ -36,7 +37,7 @@ export function validateSession(token) {
   `).get(hashToken(token), new Date().toISOString());
 
   if (!row || !row.active) return null;
-  if (ADMIN_ROLES.includes(row.role) && !row.totp_enabled) {
+  if (REQUIRE_ADMIN_2FA && ADMIN_ROLES.includes(row.role) && !row.totp_enabled) {
     db.prepare("DELETE FROM auth_sessions WHERE id = ?").run(row.sessionId);
     return null;
   }
