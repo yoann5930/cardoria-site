@@ -4,6 +4,7 @@ import { getDb } from "./database.js";
 const { Pool } = pg;
 const LANGUAGES = ["fr", "en", "ja", "ko"];
 const BATCH_SIZE = 250;
+const RESTORE_BATCH_SIZE = 500;
 let pool = null;
 
 function databaseUrl() { return String(process.env.MARKETPLACE_DATABASE_URL || "").trim(); }
@@ -28,11 +29,6 @@ async function ensureSchema(client) {
   )`);
   await client.query("CREATE INDEX IF NOT EXISTS idx_cardoria_multilingual_cards_language ON cardoria_multilingual_cards(language)");
 }
-function chunks(rows, size = BATCH_SIZE) {
-  const out = [];
-  for (let i = 0; i < rows.length; i += size) out.push(rows.slice(i, i + size));
-  return out;
-}
 async function writeBatch(client, rows) {
   if (!rows.length) return;
   const values = [];
@@ -55,15 +51,26 @@ export async function persistMultilingualCards(reason = "catalog-sync") {
     await ensureSchema(client);
     for (const language of LANGUAGES) {
       const startedAt = new Date().toISOString();
-      const rows = sqlite.prepare("SELECT * FROM cards WHERE license_slug='pokemon' AND language=? AND active=1 ORDER BY id").all(language);
-      for (const batch of chunks(rows)) await writeBatch(client, batch);
+      let afterId = "";
+      let count = 0;
+      const stmt = sqlite.prepare(`SELECT * FROM cards
+        WHERE license_slug='pokemon' AND language=? AND active=1 AND id>?
+        ORDER BY id LIMIT ?`);
+      while (true) {
+        const rows = stmt.all(language, afterId, BATCH_SIZE);
+        if (!rows.length) break;
+        await writeBatch(client, rows);
+        count += rows.length;
+        afterId = String(rows[rows.length - 1]?.id || afterId);
+        if (rows.length < BATCH_SIZE) break;
+      }
       try {
         await client.query("DELETE FROM cardoria_multilingual_cards WHERE language=$1 AND updated_at < $2::timestamptz", [language, startedAt]);
       } catch (error) {
         if (!/lock timeout|statement timeout/i.test(String(error?.message || ""))) throw error;
         console.warn(`[multilingual-persistence] stale-row cleanup skipped for ${language}: timeout`);
       }
-      counts[language] = rows.length;
+      counts[language] = count;
     }
     console.log(`[multilingual-persistence] saved FR=${counts.fr || 0} EN=${counts.en || 0} JA=${counts.ja || 0} KO=${counts.ko || 0} (${reason})`);
     return { ok: true, counts, reason };
@@ -110,11 +117,11 @@ export async function restoreMultilingualCards() {
     for (const language of LANGUAGES) {
       let afterId = "";
       while (true) {
-        const result = await client.query("SELECT id,payload FROM cardoria_multilingual_cards WHERE language=$1 AND id>$2 ORDER BY id LIMIT 1000", [language, afterId]);
+        const result = await client.query("SELECT id,payload FROM cardoria_multilingual_cards WHERE language=$1 AND id>$2 ORDER BY id LIMIT $3", [language, afterId, RESTORE_BATCH_SIZE]);
         if (!result.rows.length) break;
         counts[language] += insertRows(sqlite, result.rows.map((row) => row.payload));
         afterId = String(result.rows[result.rows.length - 1].id || "");
-        if (result.rows.length < 1000) break;
+        if (result.rows.length < RESTORE_BATCH_SIZE) break;
       }
     }
     try { sqlite.exec("DELETE FROM cards_fts; INSERT INTO cards_fts(rowid,name,extension,number,rarity,license_slug) SELECT rowid,name,extension,number,rarity,license_slug FROM cards;"); } catch {}
