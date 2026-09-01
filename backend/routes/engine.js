@@ -7,6 +7,7 @@ import { searchCards, getCardById, getCardBySlug, autocomplete, getSitemapCards,
 import { estimatePrice } from "../lib/engine/pricing.js";
 import { getCatalogAuditSummary, listCatalogAuditReferences, getImageHostAudit } from "../lib/engine/catalog-audit.js";
 import "../lib/engine/catalog-audit-log.js";
+import "../lib/engine/catalog-green-repair.js";
 import { cacheGet, cacheSet } from "../lib/cache.js";
 
 const router = Router();
