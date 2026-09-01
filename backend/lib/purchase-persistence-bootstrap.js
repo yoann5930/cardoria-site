@@ -17,7 +17,13 @@ const status = {
 
 function getPool() {
   if (!url) return null;
-  if (!pool) pool = new Pool({ connectionString: url, max: 2, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000 });
+  if (!pool) {
+    pool = new Pool({ connectionString: url, max: 2, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000, keepAlive: true });
+    pool.on("error", (error) => {
+      status.lastError = error?.message || String(error);
+      console.warn("[purchase-persistence] idle pool connection", status.lastError);
+    });
+  }
   return pool;
 }
 function localPurchases() {
@@ -36,11 +42,25 @@ function writeLocal(purchases) {
 async function ensureSchema(client) {
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_purchase_snapshot (id TEXT PRIMARY KEY,payload JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 }
+async function withClient(fn) {
+  const db = getPool();
+  if (!db) return null;
+  const client = await db.connect();
+  const onError = (error) => {
+    status.lastError = error?.message || String(error);
+    console.warn("[purchase-persistence] active client", status.lastError);
+  };
+  client.on("error", onError);
+  try { return await fn(client); }
+  finally {
+    client.off("error", onError);
+    client.release();
+  }
+}
 async function restore() {
   const db = getPool();
   if (!db) { console.log("[purchase-persistence] disabled: MARKETPLACE_DATABASE_URL absente"); return; }
-  const client = await db.connect();
-  try {
+  await withClient(async (client) => {
     await ensureSchema(client);
     const remote = await client.query("SELECT payload, updated_at FROM cardoria_purchase_snapshot WHERE id='primary' LIMIT 1");
     if (remote.rows[0]?.payload && Array.isArray(remote.rows[0].payload.purchases)) {
@@ -54,35 +74,35 @@ async function restore() {
     await client.query("INSERT INTO cardoria_purchase_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()", [JSON.stringify({ version: 1, purchases, capturedAt: new Date().toISOString() })]);
     Object.assign(status, { initialized: true, restored: false, remoteCount: purchases.length, localCount: purchases.length, lastSavedCount: purchases.length, lastSavedAt: new Date().toISOString(), lastError: "" });
     console.log(`[purchase-persistence] initialized PostgreSQL with ${purchases.length} local purchase(s)`);
-  } catch (error) { status.lastError = error?.message || String(error); throw error; }
-  finally { client.release(); }
+  });
 }
 async function persist(reason = "storage-write") {
   const db = getPool();
   if (!db) return { ok: false, skipped: true, reason: "not_configured" };
   if (writing) { queued = true; return { ok: true, queued: true }; }
   writing = true;
-  const client = await db.connect();
   try {
-    await ensureSchema(client);
-    const purchases = localPurchases();
-    await client.query("INSERT INTO cardoria_purchase_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()", [JSON.stringify({ version: 1, purchases, capturedAt: new Date().toISOString(), reason })]);
-    Object.assign(status, { initialized: true, remoteCount: purchases.length, localCount: purchases.length, lastSavedCount: purchases.length, lastSavedAt: new Date().toISOString(), lastError: "" });
-    console.log(`[purchase-persistence] saved ${purchases.length} purchase(s) (${reason})`);
-    return { ok: true, count: purchases.length };
+    return await withClient(async (client) => {
+      await ensureSchema(client);
+      const purchases = localPurchases();
+      await client.query("INSERT INTO cardoria_purchase_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()", [JSON.stringify({ version: 1, purchases, capturedAt: new Date().toISOString(), reason })]);
+      Object.assign(status, { initialized: true, remoteCount: purchases.length, localCount: purchases.length, lastSavedCount: purchases.length, lastSavedAt: new Date().toISOString(), lastError: "" });
+      console.log(`[purchase-persistence] saved ${purchases.length} purchase(s) (${reason})`);
+      return { ok: true, count: purchases.length };
+    });
   } catch (error) {
     status.lastError = error?.message || String(error);
     console.error("[purchase-persistence] save failed", status.lastError);
     return { ok: false, error: status.lastError };
   } finally {
-    client.release(); writing = false;
+    writing = false;
     if (queued) { queued = false; schedule("queued-write", 50); }
   }
 }
 function schedule(reason, delay = 120) {
   if (!url) return;
   if (timer) clearTimeout(timer);
-  timer = setTimeout(() => { timer = null; persist(reason); }, delay);
+  timer = setTimeout(() => { timer = null; persist(reason).catch(() => {}); }, delay);
   timer.unref?.();
 }
 process.on("cardoria:storage-write", (key) => { if (String(key) === "purchases") schedule("purchases-write"); });
