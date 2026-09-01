@@ -65,7 +65,7 @@ function restoreOfficialSourceNames() {
           AND source_extension NOT LIKE 'Extension japonaise%'
           AND source_extension NOT LIKE 'Extension coréenne%'
         THEN source_extension ELSE extension END,
-      translation_source='source-officielle-sans-equivalent-fr',
+      translation_source='source-officielle-verifiee',
       meta_title=source_name || ' — ' || CASE WHEN COALESCE(source_extension,'')<>'' THEN source_extension ELSE extension END || ' | Cardoria',
       meta_description='Référence Cardoria ' || source_name || ', numéro ' || COALESCE(number,'') || '.',
       updated_at=?
@@ -74,10 +74,13 @@ function restoreOfficialSourceNames() {
       AND source_name NOT LIKE 'Carte Pokémon anglaise%'
       AND source_name NOT LIKE 'Carte Pokémon japonaise%'
       AND source_name NOT LIKE 'Carte Pokémon coréenne%'
-      AND (translation_source='libelle-fr-sans-equivalent-officiel'
+      AND (
+        translation_source IN ('reference-fr-directe','dictionnaire-fr-cardoria','libelle-fr-sans-equivalent-officiel','source-officielle-sans-equivalent-fr')
         OR name LIKE 'Carte Pokémon anglaise%'
         OR name LIKE 'Carte Pokémon japonaise%'
-        OR name LIKE 'Carte Pokémon coréenne%')`).run(now).changes || 0;
+        OR name LIKE 'Carte Pokémon coréenne%'
+        OR name<>source_name
+      )`).run(now).changes || 0;
 }
 
 function clearWrongLanguageImages() {
@@ -133,7 +136,8 @@ function currentIntegrity() {
     SUM(CASE WHEN COALESCE(rarity,'')='' OR lower(rarity)='non renseignée' THEN 1 ELSE 0 END) AS missing_rarity,
     SUM(CASE WHEN COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='' THEN 1 ELSE 0 END) AS missing_image,
     SUM(CASE WHEN recommended_price<=0 THEN 1 ELSE 0 END) AS missing_price,
-    SUM(CASE WHEN COALESCE(image_language,'')<>'' AND image_language<>language THEN 1 ELSE 0 END) AS wrong_image_language
+    SUM(CASE WHEN COALESCE(image_language,'')<>'' AND image_language<>language THEN 1 ELSE 0 END) AS wrong_image_language,
+    SUM(CASE WHEN language IN ('en','ja','ko') AND translation_source IN ('reference-fr-directe','dictionnaire-fr-cardoria') THEN 1 ELSE 0 END) AS unsafe_identity
     FROM cards WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1`).get() || {};
   const generic = Number(db.prepare(`SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
     AND (name LIKE 'Carte Pokémon anglaise%' OR name LIKE 'Carte Pokémon japonaise%' OR name LIKE 'Carte Pokémon coréenne%')`).get()?.c || 0);
@@ -144,7 +148,8 @@ function currentIntegrity() {
     missingRarity: Number(row.missing_rarity || 0),
     missingImage: Number(row.missing_image || 0),
     missingPrice: Number(row.missing_price || 0),
-    wrongImageLanguage: Number(row.wrong_image_language || 0)
+    wrongImageLanguage: Number(row.wrong_image_language || 0),
+    unsafeIdentity: Number(row.unsafe_identity || 0)
   };
 }
 
