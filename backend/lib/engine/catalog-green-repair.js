@@ -207,8 +207,9 @@ async function runGreenPass() {
     const integrity = currentIntegrity();
     console.log(`[catalog-green-progress] counts=${JSON.stringify(state.counts)} integrity=${JSON.stringify(integrity)} changed=${changed}`);
 
-    if (changed > 0 || !lastPersistAt) {
-      const saved = await persistIfNeeded(!lastPersistAt);
+    const persistenceDue = !lastPersistAt || Date.now() - lastPersistAt >= PERSIST_RETRY_MS;
+    if (changed > 0 || persistenceDue) {
+      const saved = await persistIfNeeded(changed > 0 || !lastPersistAt);
       if (saved?.ok === false) console.error("[catalog-green-repair] persistence failed", saved.error || "unknown");
     }
   } catch (error) {
