@@ -2,7 +2,7 @@ import pg from "pg";
 import { getDb } from "./database.js";
 
 const { Pool } = pg;
-const LANGUAGES = ["en", "ja", "ko"];
+const LANGUAGES = ["fr", "en", "ja", "ko"];
 const BATCH_SIZE = 250;
 let pool = null;
 
@@ -65,7 +65,7 @@ export async function persistMultilingualCards(reason = "catalog-sync") {
       }
       counts[language] = rows.length;
     }
-    console.log(`[multilingual-persistence] saved EN=${counts.en || 0} JA=${counts.ja || 0} KO=${counts.ko || 0} (${reason})`);
+    console.log(`[multilingual-persistence] saved FR=${counts.fr || 0} EN=${counts.en || 0} JA=${counts.ja || 0} KO=${counts.ko || 0} (${reason})`);
     return { ok: true, counts, reason };
   } catch (error) {
     console.error("[multilingual-persistence] save failed", error?.message || String(error));
@@ -84,9 +84,6 @@ function insertRows(sqlite, rows) {
     const tx = sqlite.transaction(() => {
       for (const row of rows) {
         if (!row || typeof row !== "object" || !row.id) continue;
-        // Snapshots may contain fields introduced by a newer catalog provider.
-        // Restore every field the current SQLite schema knows instead of
-        // rejecting the whole card because one optional column is not migrated yet.
         const columns = Object.keys(row).filter((name) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name) && knownColumns.has(name));
         if (!columns.includes("id") || !columns.length) continue;
         const quoted = columns.map((name) => `"${name}"`).join(",");
@@ -104,10 +101,10 @@ function insertRows(sqlite, rows) {
 
 export async function restoreMultilingualCards() {
   const dbPool = getPool();
-  if (!dbPool) return { ok: true, skipped: true, reason: "database_not_configured", counts: { en: 0, ja: 0, ko: 0 } };
+  if (!dbPool) return { ok: true, skipped: true, reason: "database_not_configured", counts: { fr: 0, en: 0, ja: 0, ko: 0 } };
   const sqlite = getDb();
   const client = await dbPool.connect();
-  const counts = { en: 0, ja: 0, ko: 0 };
+  const counts = { fr: 0, en: 0, ja: 0, ko: 0 };
   try {
     await ensureSchema(client);
     for (const language of LANGUAGES) {
@@ -121,7 +118,7 @@ export async function restoreMultilingualCards() {
       }
     }
     try { sqlite.exec("DELETE FROM cards_fts; INSERT INTO cards_fts(rowid,name,extension,number,rarity,license_slug) SELECT rowid,name,extension,number,rarity,license_slug FROM cards;"); } catch {}
-    console.log(`[multilingual-persistence] restored EN=${counts.en} JA=${counts.ja} KO=${counts.ko}`);
+    console.log(`[multilingual-persistence] restored FR=${counts.fr} EN=${counts.en} JA=${counts.ja} KO=${counts.ko}`);
     return { ok: true, counts };
   } catch (error) {
     console.error("[multilingual-persistence] restore failed", error?.message || String(error));
