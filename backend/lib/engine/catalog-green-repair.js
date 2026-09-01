@@ -1,18 +1,20 @@
 import { getDb, normalizeText } from "./database.js";
 import { ensureCatalogFrenchLocalizationSchema } from "./catalog-french-localization.js";
 import { persistMultilingualCards } from "./multilingual-card-persistence.js";
-import { syncPokemonReferenceCatalog, pokemonHitFamily } from "./tcgdex-sync.js";
+import { pokemonHitFamily } from "./tcgdex-sync.js";
 import { syncKoreanCardmarketProxyPrices } from "./korean-official-backfill.js";
+import { repairPokemonRaritiesFast } from "./catalog-rarity-fast-repair.js";
 
 const MINIMUMS = { fr: 21000, en: 23000, ja: 12000, ko: 200 };
 const LANGUAGES = ["fr", "en", "ja", "ko"];
 const PERSIST_RETRY_MS = 5 * 60 * 1000;
-const PROVIDER_SETTLE_MS = 60 * 1000;
+const PROVIDER_SETTLE_MS = 150 * 1000;
+const RARITY_RETRY_MS = 10 * 60 * 1000;
 
-let initialized = false;
 let running = false;
-let raritySweepDone = false;
 let lastPersistAt = 0;
+let lastRarityAt = 0;
+let rarityHealthy = false;
 let readySince = 0;
 
 function ensureGreenSchema() {
@@ -25,9 +27,10 @@ function ensureGreenSchema() {
 function counts() {
   const db = getDb();
   const result = { fr: 0, en: 0, ja: 0, ko: 0 };
-  const rows = db.prepare(`SELECT language,COUNT(*) AS count FROM cards
-    WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1 GROUP BY language`).all();
-  for (const row of rows) if (Object.prototype.hasOwnProperty.call(result, row.language)) result[row.language] = Number(row.count || 0);
+  for (const row of db.prepare(`SELECT language,COUNT(*) AS count FROM cards
+    WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1 GROUP BY language`).all()) {
+    if (Object.prototype.hasOwnProperty.call(result, row.language)) result[row.language] = Number(row.count || 0);
+  }
   return result;
 }
 
@@ -114,24 +117,13 @@ function repairPeerRarities() {
   db.transaction(() => {
     for (const row of rows) {
       if (!isMissingRarity(row.rarity)) continue;
-      const ref = rawReference(row.id, row.language);
-      const source = byReference.get(ref);
+      const source = byReference.get(rawReference(row.id, row.language));
       if (!source || isMissingRarity(source.rarity)) continue;
       const rarity = String(source.rarity || "");
-      const hit = String(source.hit_family || pokemonHitFamily(rarity, "") || "");
-      repaired += update.run(rarity, rarity, hit, now, row.id).changes || 0;
+      repaired += update.run(rarity, rarity, String(source.hit_family || pokemonHitFamily(rarity, "") || ""), now, row.id).changes || 0;
     }
   })();
   return repaired;
-}
-
-function refreshSourceRarities() {
-  const db = ensureGreenSchema();
-  const now = new Date().toISOString();
-  return db.prepare(`UPDATE cards SET source_rarity=rarity,updated_at=?
-    WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
-      AND rarity<>'' AND lower(rarity)<>'non renseignée'
-      AND (COALESCE(source_rarity,'')='' OR lower(source_rarity)='non renseignée')`).run(now).changes || 0;
 }
 
 function currentIntegrity() {
@@ -156,22 +148,6 @@ function currentIntegrity() {
   };
 }
 
-async function runRaritySweep() {
-  const results = [];
-  for (const language of LANGUAGES) {
-    try {
-      const result = await syncPokemonReferenceCatalog({ language, priceLimit: 0, skipRarities: false });
-      results.push({ language, ok: true, rarityUpdated: Number(result.rarityUpdated || 0), detailed: Number(result.detailed || 0), priced: Number(result.priced || 0), imagesRepaired: Number(result.imagesRepaired || 0) });
-    } catch (error) {
-      results.push({ language, ok: false, error: error?.message || String(error) });
-      console.warn(`[catalog-green-repair] rarity sweep ${language} failed`, error?.message || String(error));
-    }
-  }
-  raritySweepDone = results.every((item) => item.ok);
-  console.log(`[catalog-green-rarities] ${JSON.stringify(results)}`);
-  return results;
-}
-
 async function persistIfNeeded(force = false) {
   const now = Date.now();
   if (!force && now - lastPersistAt < PERSIST_RETRY_MS) return { ok: true, skipped: true, reason: "recent" };
@@ -186,20 +162,18 @@ async function runGreenPass() {
   if (!state.settled) return;
   running = true;
   try {
+    ensureGreenSchema();
     let changed = 0;
-    if (!initialized) {
-      ensureGreenSchema();
-      initialized = true;
+    const rarityDue = !rarityHealthy || !lastRarityAt || Date.now() - lastRarityAt >= RARITY_RETRY_MS;
+    if (rarityDue) {
+      const rarity = await repairPokemonRaritiesFast({ languages: LANGUAGES });
+      lastRarityAt = Date.now();
+      rarityHealthy = Boolean(rarity.ok);
+      console.log(`[catalog-green-rarities] ok=${rarity.ok ? 'yes' : 'no'} missing=${rarity.missingTotal}`);
     }
 
     changed += restoreOfficialSourceNames();
     changed += clearWrongLanguageImages();
-
-    if (!raritySweepDone) {
-      await runRaritySweep();
-      changed += refreshSourceRarities();
-    }
-
     changed += repairPeerRarities();
     const koPrices = syncKoreanCardmarketProxyPrices();
     changed += Number(koPrices?.updated || 0);
@@ -228,8 +202,6 @@ if (process.env.NODE_ENV !== "test") {
   }, 15000);
   startupTimer.unref?.();
 
-  const maintenanceTimer = setInterval(() => {
-    runGreenPass().catch(() => {});
-  }, 2 * 60 * 1000);
+  const maintenanceTimer = setInterval(() => runGreenPass().catch(() => {}), 2 * 60 * 1000);
   maintenanceTimer.unref?.();
 }
