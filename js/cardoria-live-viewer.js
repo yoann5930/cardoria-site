@@ -1,5 +1,6 @@
 (() => {
   const API_BASE = "https://whatnot-live-studio-api-b3n5.onrender.com";
+  const CLOUDFLARE_MIME = "application/x-cloudflare-webrtc";
   const video = document.getElementById("cardoriaLiveVideo");
   const stateNode = document.getElementById("cardoriaLiveState");
   const viewersNode = document.getElementById("cardoriaLiveViewers");
@@ -18,6 +19,9 @@
   let liveActive = false;
   let eventSource = null;
   let directoryTimer = null;
+  let peerConnection = null;
+  let viewerId = null;
+  let heartbeatTimer = null;
 
   const setStatus = (message, active = false) => {
     stateNode.textContent = message;
@@ -29,6 +33,25 @@
     viewersNode.textContent = `${value} spectateur${value > 1 ? "s" : ""}`;
   };
 
+  const apiPost = async (path, body, keepalive = false) => {
+    const response = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      keepalive,
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message = payload?.error?.message || `Erreur Live (${response.status}).`;
+      throw new Error(message);
+    }
+    return payload;
+  };
+
   const base64ToBytes = (base64) => {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
@@ -36,25 +59,49 @@
     return bytes;
   };
 
-  const clearPlayer = () => {
+  const stopHeartbeat = () => {
+    if (heartbeatTimer) window.clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  };
+
+  const clearLegacyPlayer = () => {
     pendingChunks = [];
     sourceBuffer = null;
     if (mediaSource && mediaSource.readyState === "open") {
       try { mediaSource.endOfStream(); } catch {}
     }
     mediaSource = null;
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = null;
   };
 
-  const disconnectSession = () => {
+  const stopWebRtcViewer = async (notifyServer = true) => {
+    stopHeartbeat();
+    peerConnection?.close();
+    peerConnection = null;
+    const currentViewerId = viewerId;
+    viewerId = null;
+    if (notifyServer && currentViewerId) {
+      try {
+        await apiPost("/api/v1/live/webrtc/viewer/stop", { viewerId: currentViewerId }, true);
+      } catch {}
+    }
+  };
+
+  const clearPlayer = async () => {
     eventSource?.close();
     eventSource = null;
+    await stopWebRtcViewer(true);
+    clearLegacyPlayer();
+    video.pause();
+    video.srcObject = null;
+    video.removeAttribute("src");
+    video.load();
+  };
+
+  const disconnectSession = async () => {
     liveActive = false;
-    clearPlayer();
+    await clearPlayer();
   };
 
   const appendNext = () => {
@@ -68,8 +115,8 @@
     }
   };
 
-  const startPlayer = (sessionId, mimeType) => {
-    clearPlayer();
+  const startLegacyPlayer = (sessionId, mimeType) => {
+    clearLegacyPlayer();
     activeSessionId = sessionId;
     if (!window.MediaSource || !MediaSource.isTypeSupported(mimeType)) {
       setStatus("Ce navigateur ne peut pas lire ce format Live. Utilisez Edge ou Chrome récent.", false);
@@ -79,6 +126,7 @@
     mediaSource = new MediaSource();
     objectUrl = URL.createObjectURL(mediaSource);
     video.src = objectUrl;
+    video.srcObject = null;
     video.muted = true;
     soundButton?.removeAttribute("hidden");
 
@@ -100,11 +148,71 @@
     video.play().catch(() => {});
   };
 
-  const stopPlayer = () => {
+  const connectCloudflare = async (sessionId) => {
+    await stopWebRtcViewer(true);
+    clearLegacyPlayer();
+    setStatus("Connexion WebRTC au live…", false);
+
+    const start = await apiPost("/api/v1/live/webrtc/viewer/start", { liveSessionId: sessionId });
+    if (!start?.viewerId || !start?.offer?.sdp) throw new Error("Signal WebRTC incomplet.");
+    viewerId = start.viewerId;
+    setViewers(start.live?.viewerCount || 0);
+
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
+      bundlePolicy: "max-bundle",
+    });
+    peerConnection = pc;
+    const remoteStream = new MediaStream();
+
+    pc.addEventListener("track", (event) => {
+      if (activeSessionId !== sessionId) return;
+      remoteStream.addTrack(event.track);
+      video.srcObject = remoteStream;
+      video.removeAttribute("src");
+      video.muted = true;
+      soundButton?.removeAttribute("hidden");
+      liveActive = true;
+      setStatus("LIVE EN COURS", true);
+      video.play().catch(() => {});
+    });
+
+    pc.addEventListener("connectionstatechange", () => {
+      if (activeSessionId !== sessionId) return;
+      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+        setStatus("Connexion au live interrompue. Reconnexion…", false);
+      }
+    });
+
+    await pc.setRemoteDescription(start.offer);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await apiPost("/api/v1/live/webrtc/viewer/answer", {
+      viewerId,
+      answer: { type: "answer", sdp: answer.sdp || "" },
+    });
+
+    heartbeatTimer = window.setInterval(async () => {
+      if (!viewerId || activeSessionId !== sessionId) return;
+      try {
+        const heartbeat = await apiPost("/api/v1/live/webrtc/viewer/heartbeat", { viewerId });
+        if (heartbeat?.active === false) {
+          setStatus("Le live est terminé.", false);
+          liveActive = false;
+          await stopWebRtcViewer(false);
+          window.setTimeout(loadDirectory, 500);
+        }
+      } catch {
+        // A transient heartbeat error must not immediately stop media playback.
+      }
+    }, 30_000);
+  };
+
+  const stopPlayer = async () => {
     liveActive = false;
     setStatus("Le live est terminé.", false);
-    window.setTimeout(clearPlayer, 500);
-    window.setTimeout(loadDirectory, 700);
+    await clearPlayer();
+    window.setTimeout(loadDirectory, 500);
   };
 
   const enqueueChunk = (event) => {
@@ -124,13 +232,7 @@
     if (!live.active && !liveActive) setStatus("Ce live n’est plus en cours.", false);
   };
 
-  const connectSession = (sessionId) => {
-    if (!sessionId) return;
-    disconnectSession();
-    activeSessionId = sessionId;
-    setStatus("Connexion au live…", false);
-    setViewers(0);
-
+  const connectLegacy = (sessionId) => {
     eventSource = new EventSource(`${API_BASE}/api/v1/live/sessions/${encodeURIComponent(sessionId)}/events`);
     eventSource.addEventListener("state", (message) => {
       try { applyState(JSON.parse(message.data).state); } catch {}
@@ -138,7 +240,7 @@
     eventSource.addEventListener("stream-start", (message) => {
       try {
         const event = JSON.parse(message.data);
-        if (event.sessionId === activeSessionId) startPlayer(event.sessionId, event.mimeType);
+        if (event.sessionId === activeSessionId) startLegacyPlayer(event.sessionId, event.mimeType);
       } catch {
         setStatus("Impossible d’initialiser le direct.", false);
       }
@@ -149,12 +251,31 @@
     eventSource.addEventListener("stream-stop", (message) => {
       try {
         const event = JSON.parse(message.data);
-        if (event.sessionId === activeSessionId) stopPlayer();
+        if (event.sessionId === activeSessionId) void stopPlayer();
       } catch {}
     });
     eventSource.onerror = () => {
       if (!liveActive) setStatus("Connexion au live…", false);
     };
+  };
+
+  const connectSession = async (sessionId, mimeType) => {
+    if (!sessionId) return;
+    await disconnectSession();
+    activeSessionId = sessionId;
+    setStatus("Connexion au live…", false);
+    setViewers(0);
+
+    try {
+      if (mimeType === CLOUDFLARE_MIME) {
+        await connectCloudflare(sessionId);
+      } else {
+        connectLegacy(sessionId);
+      }
+    } catch (error) {
+      liveActive = false;
+      setStatus(error instanceof Error ? error.message : "Impossible de rejoindre ce live.", false);
+    }
 
     directoryNode.querySelectorAll("[data-session-id]").forEach((button) => {
       button.dataset.selected = button.dataset.sessionId === sessionId ? "true" : "false";
@@ -194,12 +315,12 @@
         ? started.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
         : "maintenant";
       button.innerHTML = `<span class="live-card-dot"></span><span><strong>Live ${index + 1}</strong><small>Démarré à ${timeLabel} · ${session.viewerCount || 0} spectateur${Number(session.viewerCount) > 1 ? "s" : ""}</small></span>`;
-      button.addEventListener("click", () => connectSession(session.sessionId));
+      button.addEventListener("click", () => void connectSession(session.sessionId, session.mimeType));
       directoryNode.appendChild(button);
     });
 
-    const currentStillExists = sessions.some((session) => session.sessionId === activeSessionId);
-    if (!currentStillExists) connectSession(sessions[0].sessionId);
+    const current = sessions.find((session) => session.sessionId === activeSessionId);
+    if (!current) void connectSession(sessions[0].sessionId, sessions[0].mimeType);
   };
 
   async function loadDirectory() {
@@ -223,6 +344,15 @@
   directoryTimer = window.setInterval(loadDirectory, 5000);
   window.addEventListener("beforeunload", () => {
     if (directoryTimer) window.clearInterval(directoryTimer);
-    disconnectSession();
+    stopHeartbeat();
+    if (viewerId) {
+      try {
+        navigator.sendBeacon?.(`${API_BASE}/api/v1/live/webrtc/viewer/stop`, new Blob([
+          JSON.stringify({ viewerId }),
+        ], { type: "application/json" }));
+      } catch {}
+    }
+    eventSource?.close();
+    peerConnection?.close();
   }, { once: true });
 })();
