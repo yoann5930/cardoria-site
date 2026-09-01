@@ -8,9 +8,10 @@ function sample(category, language = "", limit = 12) {
   }
 }
 
-const timer = setTimeout(() => {
+function emitAudit(label) {
   try {
     const report = {
+      label,
       summary: getCatalogAuditSummary(),
       imageHosts: getImageHostAudit(),
       samples: {
@@ -33,6 +34,9 @@ const timer = setTimeout(() => {
   } catch (error) {
     console.error("[catalog-full-audit] failed", error?.message || String(error));
   }
-}, 75000);
+}
 
-timer.unref?.();
+const earlyTimer = setTimeout(() => emitAudit("startup-early"), 75000);
+earlyTimer.unref?.();
+const settledTimer = setTimeout(() => emitAudit("startup-settled"), 210000);
+settledTimer.unref?.();
