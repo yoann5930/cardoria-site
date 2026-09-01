@@ -16,6 +16,7 @@ const RUNTIME_TABLES = ["auth_users","auth_sessions","auth_reset_tokens","auth_m
 // duplicates the whole table in memory. Cards are durably stored by multilingual-card-persistence.
 const ENGINE_TABLES = ["licenses","sealed_products"];
 const ENGINE_CHILD_FIRST = ["sealed_products","licenses"];
+const PG_RETRY_DELAY_MS = 800;
 
 let pool = null;
 let initialized = false;
@@ -34,6 +35,10 @@ function databaseUrl() { return String(process.env.MARKETPLACE_DATABASE_URL || "
 export function marketplacePersistenceConfigured() { return Boolean(databaseUrl()); }
 function quoteIdent(name) { if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) throw new Error("Identifiant SQL invalide."); return `"${name}"`; }
 function sqliteRows(table) { return getDb().prepare(`SELECT * FROM ${quoteIdent(table)}`).all(); }
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+function transientPgError(error) {
+  return /connection terminated|connection reset|econnreset|econnrefused|timeout|socket|57p01|57p02|57p03/i.test(String(error?.message || error || ""));
+}
 async function ensureRemoteSchema(client) {
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_runtime_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_engine_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
@@ -68,6 +73,8 @@ async function snapshotNow(reason = "runtime") {
   if (syncPromise) { dirty = true; return syncPromise; }
   syncPromise = (async () => {
     const client = await getPool().connect();
+    const onClientError = (error) => { lastError = error?.message || String(error); console.warn("[cardoria-persistence] active client:", lastError); };
+    client.on("error", onClientError);
     try {
       await client.query("BEGIN");
       await ensureRemoteSchema(client);
@@ -82,29 +89,42 @@ async function snapshotNow(reason = "runtime") {
     } catch (error) {
       try { await client.query("ROLLBACK"); } catch {}
       lastError = error?.message || String(error); console.error("[cardoria-persistence] snapshot:", lastError); throw error;
-    } finally { client.release(); }
+    } finally {
+      client.off("error", onClientError);
+      client.release();
+    }
   })();
   try { return await syncPromise; }
   finally { syncPromise = null; if (dirty) { dirty = false; scheduleMarketplaceSnapshot("queued-change", 100); } }
+}
+async function saveLightweightEngineOnce(reason) {
+  const dbPool = getPool();
+  const payload = enginePayload();
+  await dbPool.query(`CREATE TABLE IF NOT EXISTS cardoria_engine_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  await dbPool.query(`INSERT INTO cardoria_engine_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()`, [JSON.stringify(payload)]);
+  engineLastError = "";
+  engineLastSyncedAt = new Date().toISOString();
+  console.log(`[cardoria-engine-persistence] lightweight snapshot saved (${reason})`);
+  return { ok: true, reason, lastSyncedAt: engineLastSyncedAt };
 }
 async function snapshotEngineNow(reason = "engine") {
   if (!marketplacePersistenceConfigured()) return { ok: false, skipped: true, reason: "not_configured" };
   if (engineSyncPromise) { engineDirty = true; return engineSyncPromise; }
   engineSyncPromise = (async () => {
-    const client = await getPool().connect();
-    try {
-      await ensureRemoteSchema(client);
-      const payload = enginePayload();
-      await client.query(`INSERT INTO cardoria_engine_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()`, [JSON.stringify(payload)]);
-      engineLastError = "";
-      engineLastSyncedAt = new Date().toISOString();
-      console.log(`[cardoria-engine-persistence] lightweight snapshot saved (${reason})`);
-      return { ok: true, reason, lastSyncedAt: engineLastSyncedAt };
-    } catch (error) {
-      engineLastError = error?.message || String(error);
-      console.error("[cardoria-engine-persistence] snapshot:", engineLastError);
-      throw error;
-    } finally { client.release(); }
+    let last = null;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        return await saveLightweightEngineOnce(reason);
+      } catch (error) {
+        last = error;
+        engineLastError = error?.message || String(error);
+        if (attempt >= 2 || !transientPgError(error)) break;
+        console.warn(`[cardoria-engine-persistence] transient failure, retry ${attempt}/2`, engineLastError);
+        await sleep(PG_RETRY_DELAY_MS);
+      }
+    }
+    console.error("[cardoria-engine-persistence] snapshot:", engineLastError);
+    throw last || new Error(engineLastError || "engine persistence failed");
   })();
   try { return await engineSyncPromise; }
   finally { engineSyncPromise = null; if (engineDirty) { engineDirty = false; scheduleEngineSnapshot("queued-engine-change", 150); } }
@@ -112,8 +132,8 @@ async function snapshotEngineNow(reason = "engine") {
 function getPool() {
   if (pool) return pool;
   const url = databaseUrl(); if (!url) throw new Error("MARKETPLACE_DATABASE_URL absente.");
-  pool = new Pool({ connectionString: url, max: Math.max(1, Number(process.env.MARKETPLACE_DB_POOL_MAX) || 3), idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000 });
-  pool.on("error", (error) => { lastError = error?.message || String(error); console.error("[cardoria-persistence] pool:", lastError); });
+  pool = new Pool({ connectionString: url, max: Math.max(1, Number(process.env.MARKETPLACE_DB_POOL_MAX) || 2), idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000, keepAlive: true });
+  pool.on("error", (error) => { lastError = error?.message || String(error); console.warn("[cardoria-persistence] idle pool connection:", lastError); });
   return pool;
 }
 function restoreRuntime(payload) {
@@ -150,6 +170,8 @@ function restoreEngine(payload) {
 }
 async function restoreFromPostgres() {
   const client = await getPool().connect();
+  const onClientError = (error) => { lastError = error?.message || String(error); console.warn("[cardoria-persistence] restore client:", lastError); };
+  client.on("error", onClientError);
   try {
     await ensureRemoteSchema(client);
     const meta = await client.query("SELECT initialized,last_synced_at FROM marketplace_sync_meta WHERE id='primary' LIMIT 1");
@@ -189,7 +211,10 @@ async function restoreFromPostgres() {
     try { sqlite.exec("DELETE FROM mk_listings_fts; INSERT INTO mk_listings_fts(rowid,title,description,license_slug,card_condition) SELECT rowid,title,description,license_slug,card_condition FROM mk_listings;"); } catch {}
     lastSyncedAt = meta.rows[0].last_synced_at ? new Date(meta.rows[0].last_synced_at).toISOString() : ""; initialized = true; lastError = "";
     return { restored: true, engineRestored, lastSyncedAt };
-  } finally { client.release(); }
+  } finally {
+    client.off("error", onClientError);
+    client.release();
+  }
 }
 export async function initMarketplacePersistence() {
   if (!marketplacePersistenceConfigured()) { console.log("[cardoria-persistence] disabled: MARKETPLACE_DATABASE_URL absente"); return { ok: true, configured: false }; }
