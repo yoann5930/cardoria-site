@@ -14,6 +14,8 @@ const RUNTIME_TABLES = ["auth_users","auth_sessions","auth_reset_tokens","auth_m
 // IMPORTANT: never put cards / price history back in this monolithic JSON snapshot.
 // The Pokemon catalog is large enough to exceed the Render Node heap when JSON.stringify
 // duplicates the whole table in memory. Cards are durably stored by multilingual-card-persistence.
+// Purchases are also excluded here: they have their own durable snapshot and restoring them
+// from this legacy runtime payload caused valid boutique stock to be overwritten with [].
 const ENGINE_TABLES = ["licenses","sealed_products"];
 const ENGINE_CHILD_FIRST = ["sealed_products","licenses"];
 const PG_RETRY_DELAY_MS = 800;
@@ -49,12 +51,12 @@ function runtimePayload() {
   const tables = {};
   for (const table of RUNTIME_TABLES) { try { tables[table] = sqliteRows(table); } catch { tables[table] = []; } }
   return {
-    version: 2,
+    version: 3,
     tables,
     boutiqueOrders: readJson("orders", []),
-    purchases: readJson("purchases", []),
     rachatProposals: readJson("rachat-proposals", []),
-    capturedAt: new Date().toISOString()
+    capturedAt: new Date().toISOString(),
+    purchasePersistence: "cardoria_purchase_snapshot"
   };
 }
 function enginePayload() {
@@ -150,7 +152,8 @@ function restoreRuntime(payload) {
   });
   tx(); sqlite.pragma("foreign_keys = ON");
   if (Array.isArray(payload.boutiqueOrders)) writeJson("orders", payload.boutiqueOrders);
-  if (Array.isArray(payload.purchases)) writeJson("purchases", payload.purchases);
+  // purchases are intentionally NOT restored here. The dedicated purchase-persistence
+  // bootstrap owns them and is loaded before server.js.
   if (Array.isArray(payload.rachatProposals)) writeJson("rachat-proposals", payload.rachatProposals);
 }
 function restoreEngine(payload) {
