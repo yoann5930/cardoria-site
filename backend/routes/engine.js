@@ -5,6 +5,7 @@ import { Router } from "express";
 import { listLicenses, getLicense } from "../lib/engine/licenses.js";
 import { searchCards, getCardById, getCardBySlug, autocomplete, getSitemapCards, getCardCount } from "../lib/engine/cards.js";
 import { estimatePrice } from "../lib/engine/pricing.js";
+import { getCatalogAuditSummary, listCatalogAuditReferences, getImageHostAudit } from "../lib/engine/catalog-audit.js";
 import { cacheGet, cacheSet } from "../lib/cache.js";
 
 const router = Router();
@@ -21,6 +22,21 @@ router.get("/licenses/:slug", (req, res) => {
   const license = getLicense(req.params.slug);
   if (!license) return res.status(404).json({ ok: false, error: "Licence introuvable" });
   res.json({ ok: true, license });
+});
+
+router.get("/catalog-audit", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ok: true, ...getCatalogAuditSummary() });
+});
+
+router.get("/catalog-audit/references", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ok: true, ...listCatalogAuditReferences({ category: req.query.category, language: req.query.language, page: req.query.page, limit: req.query.limit }) });
+});
+
+router.get("/catalog-audit/images", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ok: true, ...getImageHostAudit() });
 });
 
 router.get("/cards", (req, res) => {
