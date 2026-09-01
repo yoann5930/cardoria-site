@@ -6,17 +6,21 @@ let timer = null;
 let startupCatchupTimer = null;
 let running = false;
 
+async function reconcileCatalog(reason) {
+  const catalog = await syncPokemonCatalog({ languages: ["fr", "en", "ja", "ko"] });
+  console.log(`[pokemon-catalog-daily] source=${catalog.totalSource || 0} created=${catalog.created || 0} updated=${catalog.updated || 0} unchanged=${catalog.unchanged || 0} failed=${catalog.failed || 0} total=${catalog.count || 0}`);
+  if (!catalog.skipped) {
+    const catalogSaved = await flushEnginePersistence(`${reason}-catalog`);
+    if (!catalogSaved.ok) console.error(`[pokemon-catalog-daily] persistence failed (${reason})`, catalogSaved.error || "unknown");
+  }
+  return catalog;
+}
+
 async function runMarketSweep(reason = "daily-market-sync-paris-noon") {
   if (running) return { ok: false, skipped: true, reason: "already_running" };
   running = true;
   try {
-    const catalog = await syncPokemonCatalog({ languages: ["fr", "en", "ja", "ko"] });
-    console.log(`[pokemon-catalog-daily] source=${catalog.totalSource || 0} created=${catalog.created || 0} updated=${catalog.updated || 0} unchanged=${catalog.unchanged || 0} failed=${catalog.failed || 0} total=${catalog.count || 0}`);
-    if (!catalog.skipped) {
-      const catalogSaved = await flushEnginePersistence(`${reason}-catalog`);
-      if (!catalogSaved.ok) console.error(`[pokemon-catalog-daily] persistence failed (${reason})`, catalogSaved.error || "unknown");
-    }
-
+    const catalog = await reconcileCatalog(reason);
     let totalChecked = 0;
     let totalPriced = 0;
     let totalUnavailable = 0;
@@ -51,6 +55,16 @@ async function runDailyMarketSync() {
 }
 
 async function runStartupMarketCatchup() {
+  if (running) return;
+  running = true;
+  try {
+    await reconcileCatalog("startup-catalog-retry");
+  } catch (error) {
+    console.error("[pokemon-catalog-startup] retry failed", error?.message || String(error));
+  } finally {
+    running = false;
+  }
+
   const status = getMarketPriceStatus({ language: "fr" });
   const missing = Math.max(0, Number(status.total || 0) - Number(status.priced || 0));
   if (!missing) {
@@ -80,9 +94,8 @@ export function stopDailyMarketSync() {
 
 if (process.env.NODE_ENV !== "test") {
   scheduleNextDailyMarketSync();
-  // Deploys around noon can replace an instance after the daily timer has
-  // elapsed. Audit current FR coverage shortly after startup and catch up the
-  // missed sweep instead of waiting until the following day.
+  // A second catalog reconciliation shortly after boot protects against a
+  // temporary provider/network failure during the first startup attempt.
   startupCatchupTimer = setTimeout(() => {
     startupCatchupTimer = null;
     runStartupMarketCatchup().catch((error) => console.error("[market-prices-startup] catch-up failed", error?.message || String(error)));
