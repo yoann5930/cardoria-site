@@ -4,6 +4,7 @@ import { flushEnginePersistence } from "../marketplace/persistence.js";
 
 let timer = null;
 let startupCatchupTimer = null;
+let catalogRetryTimer = null;
 let running = false;
 
 async function reconcileCatalog(reason) {
@@ -14,6 +15,20 @@ async function reconcileCatalog(reason) {
     if (!catalogSaved.ok) console.error(`[pokemon-catalog-daily] persistence failed (${reason})`, catalogSaved.error || "unknown");
   }
   return catalog;
+}
+
+async function runCatalogRetry(reason = "hourly-catalog-retry") {
+  if (running) return { ok: false, skipped: true, reason: "already_running" };
+  running = true;
+  try {
+    const catalog = await reconcileCatalog(reason);
+    return { ok: true, catalog };
+  } catch (error) {
+    console.error(`[pokemon-catalog-retry] failed (${reason})`, error?.message || String(error));
+    return { ok: false, error: error?.message || String(error) };
+  } finally {
+    running = false;
+  }
 }
 
 async function runMarketSweep(reason = "daily-market-sync-paris-noon") {
@@ -55,18 +70,15 @@ async function runDailyMarketSync() {
 }
 
 async function runStartupMarketCatchup() {
-  if (running) return;
-  running = true;
-  try {
-    await reconcileCatalog("startup-catalog-retry");
-  } catch (error) {
-    console.error("[pokemon-catalog-startup] retry failed", error?.message || String(error));
-  } finally {
-    running = false;
-  }
+  await runCatalogRetry("startup-catalog-retry");
 
   const status = getMarketPriceStatus({ language: "fr" });
-  const missing = Math.max(0, Number(status.total || 0) - Number(status.priced || 0));
+  const total = Number(status.total || 0);
+  const missing = Math.max(0, total - Number(status.priced || 0));
+  if (!total) {
+    console.warn("[market-prices-startup] FR catalog unavailable after retry");
+    return;
+  }
   if (!missing) {
     console.log(`[market-prices-startup] FR already complete ${status.priced}/${status.total}`);
     return;
@@ -88,8 +100,10 @@ export function scheduleNextDailyMarketSync(from = new Date()) {
 export function stopDailyMarketSync() {
   if (timer) clearTimeout(timer);
   if (startupCatchupTimer) clearTimeout(startupCatchupTimer);
+  if (catalogRetryTimer) clearInterval(catalogRetryTimer);
   timer = null;
   startupCatchupTimer = null;
+  catalogRetryTimer = null;
 }
 
 if (process.env.NODE_ENV !== "test") {
@@ -101,4 +115,12 @@ if (process.env.NODE_ENV !== "test") {
     runStartupMarketCatchup().catch((error) => console.error("[market-prices-startup] catch-up failed", error?.message || String(error)));
   }, 3 * 60 * 1000);
   startupCatchupTimer.unref?.();
+
+  // Keep reconciling the source even if TCGdex is temporarily unavailable.
+  // This prevents a provider outage around startup/noon from leaving Cardoria
+  // stale until the following day.
+  catalogRetryTimer = setInterval(() => {
+    runCatalogRetry("hourly-catalog-retry").catch((error) => console.error("[pokemon-catalog-retry] hourly failure", error?.message || String(error)));
+  }, 60 * 60 * 1000);
+  catalogRetryTimer.unref?.();
 }
