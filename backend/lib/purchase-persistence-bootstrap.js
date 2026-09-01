@@ -6,13 +6,17 @@ const { Pool } = pg;
 const dataDir = path.join(process.cwd(), "data");
 const purchasesFile = path.join(dataDir, "purchases.json");
 const url = String(process.env.MARKETPLACE_DATABASE_URL || "").trim();
+const STARTUP_GUARD_MS = 60 * 1000;
+const HISTORY_LIMIT = 50;
+const bootAt = Date.now();
 let pool = null;
 let timer = null;
 let writing = false;
 let queued = false;
+let durablePurchases = [];
 const status = {
   configured: Boolean(url), initialized: false, restored: false, remoteCount: null,
-  localCount: 0, lastSavedCount: null, lastSavedAt: "", lastError: ""
+  localCount: 0, lastSavedCount: null, lastSavedAt: "", lastError: "", protectedOverwriteCount: 0
 };
 
 function getPool() {
@@ -41,6 +45,13 @@ function writeLocal(purchases) {
 }
 async function ensureSchema(client) {
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_purchase_snapshot (id TEXT PRIMARY KEY,payload JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  await client.query(`CREATE TABLE IF NOT EXISTS cardoria_purchase_snapshot_history (
+    id BIGSERIAL PRIMARY KEY,
+    payload JSONB NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_cardoria_purchase_snapshot_history_created_at ON cardoria_purchase_snapshot_history(created_at DESC)`);
 }
 async function withClient(fn) {
   const db = getPool();
@@ -57,6 +68,35 @@ async function withClient(fn) {
     client.release();
   }
 }
+async function latestNonEmptyHistory(client) {
+  const result = await client.query(`
+    SELECT payload
+    FROM cardoria_purchase_snapshot_history
+    WHERE jsonb_typeof(payload->'purchases')='array'
+      AND jsonb_array_length(payload->'purchases') > 0
+    ORDER BY id DESC
+    LIMIT 1
+  `);
+  const purchases = result.rows[0]?.payload?.purchases;
+  return Array.isArray(purchases) ? purchases : [];
+}
+async function saveSnapshot(client, purchases, reason) {
+  const payload = {
+    version: 2,
+    purchases,
+    capturedAt: new Date().toISOString(),
+    reason
+  };
+  await client.query(
+    "INSERT INTO cardoria_purchase_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()",
+    [JSON.stringify(payload)]
+  );
+  await client.query(
+    "INSERT INTO cardoria_purchase_snapshot_history (payload,reason,created_at) VALUES ($1::jsonb,$2,NOW())",
+    [JSON.stringify(payload), String(reason || "")]
+  );
+  await client.query(`DELETE FROM cardoria_purchase_snapshot_history WHERE id NOT IN (SELECT id FROM cardoria_purchase_snapshot_history ORDER BY id DESC LIMIT $1)`, [HISTORY_LIMIT]);
+}
 async function restore() {
   const db = getPool();
   if (!db) { console.log("[purchase-persistence] disabled: MARKETPLACE_DATABASE_URL absente"); return; }
@@ -64,14 +104,24 @@ async function restore() {
     await ensureSchema(client);
     const remote = await client.query("SELECT payload, updated_at FROM cardoria_purchase_snapshot WHERE id='primary' LIMIT 1");
     if (remote.rows[0]?.payload && Array.isArray(remote.rows[0].payload.purchases)) {
-      const purchases = remote.rows[0].payload.purchases;
+      let purchases = remote.rows[0].payload.purchases;
+      if (!purchases.length) {
+        const historical = await latestNonEmptyHistory(client);
+        if (historical.length) {
+          purchases = historical;
+          await saveSnapshot(client, purchases, "automatic-history-recovery");
+          console.warn(`[purchase-persistence] recovered ${purchases.length} purchase(s) from durable history`);
+        }
+      }
+      durablePurchases = purchases.slice();
       writeLocal(purchases);
       Object.assign(status, { initialized: true, restored: true, remoteCount: purchases.length, localCount: purchases.length, lastError: "" });
       console.log(`[purchase-persistence] restored ${purchases.length} purchase(s) from PostgreSQL`);
       return;
     }
     const purchases = localPurchases();
-    await client.query("INSERT INTO cardoria_purchase_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()", [JSON.stringify({ version: 1, purchases, capturedAt: new Date().toISOString() })]);
+    durablePurchases = purchases.slice();
+    await saveSnapshot(client, purchases, "initial-local-export");
     Object.assign(status, { initialized: true, restored: false, remoteCount: purchases.length, localCount: purchases.length, lastSavedCount: purchases.length, lastSavedAt: new Date().toISOString(), lastError: "" });
     console.log(`[purchase-persistence] initialized PostgreSQL with ${purchases.length} local purchase(s)`);
   });
@@ -84,8 +134,26 @@ async function persist(reason = "storage-write") {
   try {
     return await withClient(async (client) => {
       await ensureSchema(client);
-      const purchases = localPurchases();
-      await client.query("INSERT INTO cardoria_purchase_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()", [JSON.stringify({ version: 1, purchases, capturedAt: new Date().toISOString(), reason })]);
+      let purchases = localPurchases();
+
+      // The general runtime snapshot is restored a few seconds after this dedicated
+      // purchase snapshot. Historically that stale snapshot could replace a valid
+      // purchases.json with [] and immediately persist the loss. During startup we
+      // reject any destructive drop below the already-restored durable count.
+      const startupWindow = Date.now() - bootAt < STARTUP_GUARD_MS;
+      if (startupWindow && durablePurchases.length > purchases.length) {
+        const rejectedCount = purchases.length;
+        purchases = durablePurchases.slice();
+        writeLocal(purchases);
+        status.protectedOverwriteCount += 1;
+        status.localCount = purchases.length;
+        status.remoteCount = durablePurchases.length;
+        console.warn(`[purchase-persistence] blocked stale startup overwrite ${durablePurchases.length}->${rejectedCount}; restored durable purchases`);
+        return { ok: true, protected: true, count: purchases.length };
+      }
+
+      await saveSnapshot(client, purchases, reason);
+      durablePurchases = purchases.slice();
       Object.assign(status, { initialized: true, remoteCount: purchases.length, localCount: purchases.length, lastSavedCount: purchases.length, lastSavedAt: new Date().toISOString(), lastError: "" });
       console.log(`[purchase-persistence] saved ${purchases.length} purchase(s) (${reason})`);
       return { ok: true, count: purchases.length };
@@ -111,7 +179,18 @@ catch (error) { status.lastError = error?.message || String(error); console.erro
 
 export function getPurchasePersistenceStatus() {
   const localCount = localPurchases().length; status.localCount = localCount;
-  return { configured: status.configured, initialized: status.initialized, restored: status.restored, remoteCount: status.remoteCount, localCount, countsMatch: status.remoteCount !== null && status.remoteCount === localCount, lastSavedCount: status.lastSavedCount, lastSavedAt: status.lastSavedAt, lastError: status.lastError ? "persistence_error" : "" };
+  return {
+    configured: status.configured,
+    initialized: status.initialized,
+    restored: status.restored,
+    remoteCount: status.remoteCount,
+    localCount,
+    countsMatch: status.remoteCount !== null && status.remoteCount === localCount,
+    lastSavedCount: status.lastSavedCount,
+    lastSavedAt: status.lastSavedAt,
+    protectedOverwriteCount: status.protectedOverwriteCount,
+    lastError: status.lastError ? "persistence_error" : ""
+  };
 }
 export async function flushPurchasePersistence(reason = "manual-flush") {
   if (timer) { clearTimeout(timer); timer = null; }
