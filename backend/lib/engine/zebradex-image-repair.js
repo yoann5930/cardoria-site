@@ -112,7 +112,7 @@ async function loadSeriesIndex() {
 }
 
 function chooseSeries(card, rows) {
-  const zebraLanguage = card.language === "ja" ? "ja" : (card.language === "fr" || card.language === "en") ? "fr" : "";
+  const zebraLanguage = card.language === "ja" ? "ja" : card.language === "fr" ? "fr" : "";
   if (!zebraLanguage) return null;
   const candidates = rows.filter((row) => row.language === zebraLanguage);
   if (!candidates.length) return null;
@@ -194,11 +194,11 @@ export function getZebraDexRepairStatus() {
   const db = ensureColumn(getDb());
   const retryBefore = new Date(Date.now() - RETRY_AFTER_MS).toISOString();
   const row = db.prepare(`SELECT COUNT(*) AS missing,
-    SUM(CASE WHEN language IN ('fr','en','ja') AND (COALESCE(zebradex_checked_at,'')='' OR zebradex_checked_at<?) THEN 1 ELSE 0 END) AS pending
+    SUM(CASE WHEN language IN ('fr','ja') AND (COALESCE(zebradex_checked_at,'')='' OR zebradex_checked_at<?) THEN 1 ELSE 0 END) AS pending
     FROM cards WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1
       AND (COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='')`).get(retryBefore);
   const byLanguage = db.prepare(`SELECT language,COUNT(*) AS missing,
-    SUM(CASE WHEN language IN ('fr','en','ja') AND (COALESCE(zebradex_checked_at,'')='' OR zebradex_checked_at<?) THEN 1 ELSE 0 END) AS pending
+    SUM(CASE WHEN language IN ('fr','ja') AND (COALESCE(zebradex_checked_at,'')='' OR zebradex_checked_at<?) THEN 1 ELSE 0 END) AS pending
     FROM cards WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1
       AND (COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='') GROUP BY language`).all(retryBefore);
   return {
@@ -212,11 +212,11 @@ export async function repairImagesWithZebraDex({ limit = 100 } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
   const retryBefore = new Date(Date.now() - RETRY_AFTER_MS).toISOString();
   const targets = db.prepare(`SELECT id,language,name,source_name,extension,source_extension,extension_code,number
-    FROM cards WHERE license_slug='pokemon' AND language IN ('fr','en','ja') AND active=1
+    FROM cards WHERE license_slug='pokemon' AND language IN ('fr','ja') AND active=1
       AND (COALESCE(image_hd,'')='' OR COALESCE(image_thumb,'')='')
       AND (language='fr' OR COALESCE(image_repair_checked_at,'')<>'')
       AND (COALESCE(zebradex_checked_at,'')='' OR zebradex_checked_at<?)
-    ORDER BY CASE language WHEN 'fr' THEN 0 WHEN 'ja' THEN 1 ELSE 2 END, id LIMIT ?`).all(retryBefore, safeLimit);
+    ORDER BY CASE language WHEN 'fr' THEN 0 ELSE 1 END, id LIMIT ?`).all(retryBefore, safeLimit);
   if (!targets.length) return { ok: true, requested: 0, repaired: 0, unresolved: 0, ...getZebraDexRepairStatus() };
 
   const seriesIndex = await loadSeriesIndex();
