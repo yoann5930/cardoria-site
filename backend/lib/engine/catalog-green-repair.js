@@ -1,5 +1,5 @@
 import { getDb, normalizeText } from "./database.js";
-import { ensureCatalogFrenchLocalizationSchema, localizeMultilingualCatalogToFrench } from "./catalog-french-localization.js";
+import { ensureCatalogFrenchLocalizationSchema } from "./catalog-french-localization.js";
 import { persistMultilingualCards } from "./multilingual-card-persistence.js";
 import { syncPokemonReferenceCatalog, pokemonHitFamily } from "./tcgdex-sync.js";
 import { syncKoreanCardmarketProxyPrices } from "./korean-official-backfill.js";
@@ -14,6 +14,13 @@ let initialized = false;
 let running = false;
 let raritySweepDone = false;
 let lastPersistAt = 0;
+
+function ensureGreenSchema() {
+  const db = ensureCatalogFrenchLocalizationSchema();
+  const columns = new Set(db.prepare("PRAGMA table_info(cards)").all().map((row) => String(row.name || "")));
+  if (!columns.has("image_source")) db.exec("ALTER TABLE cards ADD COLUMN image_source TEXT DEFAULT ''");
+  return db;
+}
 
 function counts() {
   const db = getDb();
@@ -41,7 +48,7 @@ function isMissingRarity(value) {
 }
 
 function restoreOfficialSourceNames() {
-  const db = ensureCatalogFrenchLocalizationSchema();
+  const db = ensureGreenSchema();
   const rows = db.prepare(`SELECT id,language,number,name,extension,source_name,source_extension,translation_source
     FROM cards WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
       AND COALESCE(source_name,'')<>''`).all();
@@ -69,7 +76,7 @@ function restoreOfficialSourceNames() {
 }
 
 function clearWrongLanguageImages() {
-  const db = ensureCatalogFrenchLocalizationSchema();
+  const db = ensureGreenSchema();
   const rows = db.prepare(`SELECT id,language,image_language,image_hd,image_thumb,source_image_hd,source_image_thumb
     FROM cards WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1
       AND COALESCE(image_language,'')<>'' AND image_language<>language`).all();
@@ -90,7 +97,7 @@ function clearWrongLanguageImages() {
 }
 
 function repairPeerRarities() {
-  const db = ensureCatalogFrenchLocalizationSchema();
+  const db = ensureGreenSchema();
   const rows = db.prepare(`SELECT id,language,rarity,source_rarity,hit_family FROM cards
     WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1`).all();
   const byReference = new Map();
@@ -120,7 +127,7 @@ function repairPeerRarities() {
 }
 
 function refreshSourceRarities() {
-  const db = ensureCatalogFrenchLocalizationSchema();
+  const db = ensureGreenSchema();
   const now = new Date().toISOString();
   const update = db.prepare(`UPDATE cards SET source_rarity=rarity,updated_at=?
     WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
@@ -130,7 +137,7 @@ function refreshSourceRarities() {
 }
 
 function currentIntegrity() {
-  const db = ensureCatalogFrenchLocalizationSchema();
+  const db = ensureGreenSchema();
   const row = db.prepare(`SELECT COUNT(*) AS total,
     SUM(CASE WHEN COALESCE(name,'')='' THEN 1 ELSE 0 END) AS missing_name,
     SUM(CASE WHEN COALESCE(rarity,'')='' OR lower(rarity)='non renseignée' THEN 1 ELSE 0 END) AS missing_rarity,
@@ -183,10 +190,8 @@ async function runGreenPass() {
   try {
     let changed = 0;
     if (!initialized) {
-      const localization = localizeMultilingualCatalogToFrench();
-      console.log(`[catalog-green-localization] ${JSON.stringify(localization)}`);
+      ensureGreenSchema();
       initialized = true;
-      changed += Number(localization?.total || 0) > 0 ? 1 : 0;
     }
 
     changed += restoreOfficialSourceNames();
