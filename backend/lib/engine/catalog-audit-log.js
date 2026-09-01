@@ -31,12 +31,35 @@ function emitAudit(label) {
       }
     };
     console.log(`[catalog-full-audit] ${JSON.stringify(report)}`);
+    return report;
   } catch (error) {
     console.error("[catalog-full-audit] failed", error?.message || String(error));
+    return null;
   }
 }
 
-const earlyTimer = setTimeout(() => emitAudit("startup-early"), 75000);
-earlyTimer.unref?.();
-const settledTimer = setTimeout(() => emitAudit("startup-settled"), 210000);
-settledTimer.unref?.();
+let attempts = 0;
+const readyTimer = setInterval(() => {
+  attempts += 1;
+  try {
+    const summary = getCatalogAuditSummary();
+    const expectedCore = Number(summary?.totals?.fr || 0) >= 21000
+      && Number(summary?.totals?.en || 0) >= 23000
+      && Number(summary?.totals?.ja || 0) >= 12000;
+    if (expectedCore) {
+      clearInterval(readyTimer);
+      emitAudit("catalog-ready");
+      return;
+    }
+    if (attempts >= 40) {
+      clearInterval(readyTimer);
+      emitAudit("catalog-not-ready-timeout");
+    }
+  } catch (error) {
+    if (attempts >= 40) {
+      clearInterval(readyTimer);
+      console.error("[catalog-full-audit] readiness failed", error?.message || String(error));
+    }
+  }
+}, 15000);
+readyTimer.unref?.();
