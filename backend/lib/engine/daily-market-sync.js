@@ -1,4 +1,4 @@
-import { syncPokemonReferenceCatalog, getMarketPriceStatus } from "./tcgdex-sync.js";
+import { syncPokemonCatalog, syncPokemonReferenceCatalog, getMarketPriceStatus } from "./tcgdex-sync.js";
 import { msUntilNextParisNoon, nextParisNoon } from "./market-schedule.js";
 import { flushEnginePersistence } from "../marketplace/persistence.js";
 
@@ -10,6 +10,13 @@ async function runMarketSweep(reason = "daily-market-sync-paris-noon") {
   if (running) return { ok: false, skipped: true, reason: "already_running" };
   running = true;
   try {
+    const catalog = await syncPokemonCatalog({ languages: ["fr", "en", "ja", "ko"] });
+    console.log(`[pokemon-catalog-daily] source=${catalog.totalSource || 0} created=${catalog.created || 0} updated=${catalog.updated || 0} unchanged=${catalog.unchanged || 0} failed=${catalog.failed || 0} total=${catalog.count || 0}`);
+    if (!catalog.skipped) {
+      const catalogSaved = await flushEnginePersistence(`${reason}-catalog`);
+      if (!catalogSaved.ok) console.error(`[pokemon-catalog-daily] persistence failed (${reason})`, catalogSaved.error || "unknown");
+    }
+
     let totalChecked = 0;
     let totalPriced = 0;
     let totalUnavailable = 0;
@@ -26,7 +33,7 @@ async function runMarketSweep(reason = "daily-market-sync-paris-noon") {
     if (!saved.ok) console.error(`[market-prices] persistence failed (${reason})`, saved.error || "unknown");
     const status = getMarketPriceStatus({ language: "fr" });
     console.log(`[market-prices-sweep:fr] complete checked=${totalChecked} priced=${totalPriced} unavailable=${totalUnavailable} coverage=${status.priced}/${status.total} missing=${Math.max(0, status.total - status.priced)}`);
-    return { ok: true, totalChecked, totalPriced, totalUnavailable, status };
+    return { ok: true, catalog, totalChecked, totalPriced, totalUnavailable, status };
   } catch (error) {
     console.error(`[market-prices] sync failed (${reason})`, error?.message || String(error));
     return { ok: false, error: error?.message || String(error) };
