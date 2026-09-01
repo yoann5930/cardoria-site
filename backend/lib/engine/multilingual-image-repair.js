@@ -43,27 +43,18 @@ async function fetchCard(language, rawId) {
   }
 }
 
-function fallbackLanguages(language) {
-  if (language === "ko") return ["ko", "ja", "en", "fr"];
-  if (language === "ja") return ["ja", "en", "fr"];
-  if (language === "en") return ["en", "fr"];
-  return ["fr", "en"];
-}
-
 async function resolveImage(card) {
   const rawId = rawCardId(card);
-  if (!rawId) return null;
-  for (const language of [...new Set(fallbackLanguages(card.language))]) {
-    const detail = await fetchCard(language, rawId);
-    if (!detail?.image) continue;
-    return {
-      imageHd: imageUrl(detail.image, "high"),
-      imageThumb: imageUrl(detail.image, "low"),
-      imageLanguage: language,
-      source: language === card.language ? "tcgdex-detail-source" : `tcgdex-detail-${language}`
-    };
-  }
-  return null;
+  const language = String(card.language || "").toLowerCase();
+  if (!rawId || !SUPPORTED.has(language)) return null;
+  const detail = await fetchCard(language, rawId);
+  if (!detail?.image) return null;
+  return {
+    imageHd: imageUrl(detail.image, "high"),
+    imageThumb: imageUrl(detail.image, "low"),
+    imageLanguage: language,
+    source: "tcgdex-detail-source"
+  };
 }
 
 function emptyLanguageCounts() {
@@ -117,8 +108,7 @@ export async function repairMultilingualImages({ limit = DEFAULT_BATCH } = {}) {
     const now = new Date().toISOString();
     const updateResolved = db.prepare(`UPDATE cards SET
       image_hd=?, image_thumb=?, image_language=?,
-      source_image_hd=CASE WHEN ?=language THEN ? ELSE source_image_hd END,
-      source_image_thumb=CASE WHEN ?=language THEN ? ELSE source_image_thumb END,
+      source_image_hd=?, source_image_thumb=?,
       translation_source=CASE WHEN COALESCE(translation_source,'')='' THEN ? ELSE translation_source END,
       image_repair_checked_at=?, updated_at=? WHERE id=?`);
     const markChecked = db.prepare("UPDATE cards SET image_repair_checked_at=? WHERE id=?");
@@ -127,8 +117,7 @@ export async function repairMultilingualImages({ limit = DEFAULT_BATCH } = {}) {
         if (image) {
           updateResolved.run(
             image.imageHd, image.imageThumb, image.imageLanguage,
-            image.imageLanguage, image.imageHd,
-            image.imageLanguage, image.imageThumb,
+            image.imageHd, image.imageThumb,
             image.source, now, now, card.id
           );
           repaired += 1;
