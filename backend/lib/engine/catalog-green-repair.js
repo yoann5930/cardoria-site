@@ -6,14 +6,14 @@ import { syncKoreanCardmarketProxyPrices } from "./korean-official-backfill.js";
 
 const MINIMUMS = { fr: 21000, en: 23000, ja: 12000, ko: 200 };
 const LANGUAGES = ["fr", "en", "ja", "ko"];
-const GENERIC_NAME = /^Carte Pokémon (?:anglaise|japonaise|coréenne|étrangère)(?: n° .*)?$/i;
-const GENERIC_EXTENSION = /^Extension (?:anglaise|japonaise|coréenne|étrangère)(?: .*)?$/i;
 const PERSIST_RETRY_MS = 5 * 60 * 1000;
+const PROVIDER_SETTLE_MS = 60 * 1000;
 
 let initialized = false;
 let running = false;
 let raritySweepDone = false;
 let lastPersistAt = 0;
+let readySince = 0;
 
 function ensureGreenSchema() {
   const db = ensureCatalogFrenchLocalizationSchema();
@@ -33,7 +33,10 @@ function counts() {
 
 function catalogReady() {
   const value = counts();
-  return { counts: value, ready: LANGUAGES.every((language) => value[language] >= MINIMUMS[language]) };
+  const ready = LANGUAGES.every((language) => value[language] >= MINIMUMS[language]);
+  if (ready && !readySince) readySince = Date.now();
+  if (!ready) readySince = 0;
+  return { counts: value, ready, settled: ready && Date.now() - readySince >= PROVIDER_SETTLE_MS };
 }
 
 function rawReference(id, language) {
@@ -49,51 +52,47 @@ function isMissingRarity(value) {
 
 function restoreOfficialSourceNames() {
   const db = ensureGreenSchema();
-  const rows = db.prepare(`SELECT id,language,number,name,extension,source_name,source_extension,translation_source
-    FROM cards WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
-      AND COALESCE(source_name,'')<>''`).all();
   const now = new Date().toISOString();
-  const update = db.prepare(`UPDATE cards SET name=?,name_normalized=?,extension=?,translation_source=?,meta_title=?,meta_description=?,updated_at=? WHERE id=?`);
-  let repaired = 0;
-  db.transaction(() => {
-    for (const row of rows) {
-      const currentName = String(row.name || "").trim();
-      const currentExtension = String(row.extension || "").trim();
-      const translationSource = String(row.translation_source || "");
-      const shouldRestore = translationSource === "libelle-fr-sans-equivalent-officiel" || GENERIC_NAME.test(currentName);
-      if (!shouldRestore) continue;
-      const sourceName = String(row.source_name || "").trim();
-      if (!sourceName || GENERIC_NAME.test(sourceName)) continue;
-      const sourceExtension = String(row.source_extension || "").trim();
-      const extension = sourceExtension && !GENERIC_EXTENSION.test(sourceExtension) ? sourceExtension : currentExtension;
-      const languageLabel = row.language === "en" ? "anglaise" : row.language === "ja" ? "japonaise" : "coréenne";
-      const metaTitle = `${sourceName} — ${extension} · version ${languageLabel} | Cardoria`;
-      const metaDescription = `Référence Cardoria ${sourceName}, ${extension}, numéro ${row.number || "non renseigné"}, carte ${languageLabel}.`;
-      repaired += update.run(sourceName, normalizeText(sourceName), extension, "source-officielle-sans-equivalent-fr", metaTitle, metaDescription, now, row.id).changes || 0;
-    }
-  })();
-  return repaired;
+  return db.prepare(`UPDATE cards SET
+      name=source_name,
+      name_normalized=lower(source_name),
+      extension=CASE
+        WHEN COALESCE(source_extension,'')<>''
+          AND source_extension NOT LIKE 'Extension anglaise%'
+          AND source_extension NOT LIKE 'Extension japonaise%'
+          AND source_extension NOT LIKE 'Extension coréenne%'
+        THEN source_extension ELSE extension END,
+      translation_source='source-officielle-sans-equivalent-fr',
+      meta_title=source_name || ' — ' || CASE WHEN COALESCE(source_extension,'')<>'' THEN source_extension ELSE extension END || ' | Cardoria',
+      meta_description='Référence Cardoria ' || source_name || ', numéro ' || COALESCE(number,'') || '.',
+      updated_at=?
+    WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
+      AND COALESCE(source_name,'')<>''
+      AND source_name NOT LIKE 'Carte Pokémon anglaise%'
+      AND source_name NOT LIKE 'Carte Pokémon japonaise%'
+      AND source_name NOT LIKE 'Carte Pokémon coréenne%'
+      AND (translation_source='libelle-fr-sans-equivalent-officiel'
+        OR name LIKE 'Carte Pokémon anglaise%'
+        OR name LIKE 'Carte Pokémon japonaise%'
+        OR name LIKE 'Carte Pokémon coréenne%')`).run(now).changes || 0;
 }
 
 function clearWrongLanguageImages() {
   const db = ensureGreenSchema();
-  const rows = db.prepare(`SELECT id,language,image_language,image_hd,image_thumb,source_image_hd,source_image_thumb
-    FROM cards WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1
-      AND COALESCE(image_language,'')<>'' AND image_language<>language`).all();
   const now = new Date().toISOString();
-  const update = db.prepare(`UPDATE cards SET image_hd=?,image_thumb=?,image_language=?,image_source='',updated_at=? WHERE id=?`);
-  let repaired = 0;
-  db.transaction(() => {
-    for (const row of rows) {
-      const nativeHd = String(row.source_image_hd || "");
-      const nativeThumb = String(row.source_image_thumb || "");
-      const nativePattern = new RegExp(`assets\\.tcgdex\\.net/${row.language}/`, "i");
-      const hd = nativePattern.test(nativeHd) ? nativeHd : "";
-      const thumb = nativePattern.test(nativeThumb) ? nativeThumb : hd;
-      repaired += update.run(hd, thumb, hd || thumb ? row.language : "", now, row.id).changes || 0;
-    }
-  })();
-  return repaired;
+  return db.prepare(`UPDATE cards SET
+      image_hd=CASE WHEN COALESCE(source_image_hd,'') LIKE '%assets.tcgdex.net/' || language || '/%' THEN source_image_hd ELSE '' END,
+      image_thumb=CASE
+        WHEN COALESCE(source_image_thumb,'') LIKE '%assets.tcgdex.net/' || language || '/%' THEN source_image_thumb
+        WHEN COALESCE(source_image_hd,'') LIKE '%assets.tcgdex.net/' || language || '/%' THEN source_image_hd
+        ELSE '' END,
+      image_language=CASE
+        WHEN COALESCE(source_image_hd,'') LIKE '%assets.tcgdex.net/' || language || '/%'
+          OR COALESCE(source_image_thumb,'') LIKE '%assets.tcgdex.net/' || language || '/%'
+        THEN language ELSE '' END,
+      image_source='',updated_at=?
+    WHERE license_slug='pokemon' AND language IN ('fr','en','ja','ko') AND active=1
+      AND COALESCE(image_language,'')<>'' AND image_language<>language`).run(now).changes || 0;
 }
 
 function repairPeerRarities() {
@@ -129,11 +128,10 @@ function repairPeerRarities() {
 function refreshSourceRarities() {
   const db = ensureGreenSchema();
   const now = new Date().toISOString();
-  const update = db.prepare(`UPDATE cards SET source_rarity=rarity,updated_at=?
+  return db.prepare(`UPDATE cards SET source_rarity=rarity,updated_at=?
     WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
       AND rarity<>'' AND lower(rarity)<>'non renseignée'
-      AND (COALESCE(source_rarity,'')='' OR lower(source_rarity)='non renseignée')`);
-  return update.run(now).changes || 0;
+      AND (COALESCE(source_rarity,'')='' OR lower(source_rarity)='non renseignée')`).run(now).changes || 0;
 }
 
 function currentIntegrity() {
@@ -185,7 +183,7 @@ async function persistIfNeeded(force = false) {
 async function runGreenPass() {
   if (running) return;
   const state = catalogReady();
-  if (!state.ready) return;
+  if (!state.settled) return;
   running = true;
   try {
     let changed = 0;
@@ -223,7 +221,7 @@ async function runGreenPass() {
 if (process.env.NODE_ENV !== "test") {
   const startupTimer = setInterval(() => {
     const state = catalogReady();
-    if (!state.ready) return;
+    if (!state.settled) return;
     clearInterval(startupTimer);
     runGreenPass().catch(() => {});
   }, 15000);
