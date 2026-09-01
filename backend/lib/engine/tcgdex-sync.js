@@ -6,10 +6,10 @@ const SOURCE = "tcgdex-multilingual";
 const MAX_PRICE_BATCH = 2000;
 const IMAGE_REPAIR_BATCH = 600;
 const LANGUAGE_CONFIG = [
-  { code: "fr", label: "Français", minimum: 1000 },
-  { code: "en", label: "Anglais", minimum: 1000 },
-  { code: "ja", label: "Japonais", minimum: 100 },
-  { code: "ko", label: "Coréen", minimum: 1 }
+  { code: "fr", label: "Français", minimumExpected: 1000 },
+  { code: "en", label: "Anglais", minimumExpected: 1000 },
+  { code: "ja", label: "Japonais", minimumExpected: 100 },
+  { code: "ko", label: "Coréen", minimumExpected: 1 }
 ];
 const SUPPORTED_LANGUAGES = new Set(LANGUAGE_CONFIG.map((item) => item.code));
 
@@ -85,32 +85,63 @@ function languageCounts(db) {
   return counts;
 }
 
+function sameText(left, right) { return String(left ?? "") === String(right ?? ""); }
+function catalogRowChanged(current, next) {
+  if (!current || Number(current.active || 0) !== 1) return true;
+  if (!sameText(current.language, next.language)) return true;
+  if (!sameText(current.slug, next.slug)) return true;
+  if (!sameText(current.name, next.name)) return true;
+  if (!sameText(current.name_normalized, next.name_normalized)) return true;
+  if (!sameText(current.extension, next.extension)) return true;
+  if (!sameText(current.extension_code, next.extension_code)) return true;
+  if (!sameText(current.number, next.number)) return true;
+  if (next.image_hd && !sameText(current.image_hd, next.image_hd)) return true;
+  if (next.image_thumb && !sameText(current.image_thumb, next.image_thumb)) return true;
+  if (!sameText(current.meta_title, next.meta_title)) return true;
+  if (!sameText(current.meta_description, next.meta_description)) return true;
+  return false;
+}
+
 async function syncLanguageCatalog(db, config, { force = false } = {}) {
   const language = config.code;
-  const existing = Number(db.prepare("SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND language=? AND active=1").get(language)?.c || 0);
-  if (!force && existing >= config.minimum) return { language, label: config.label, skipped: true, count: existing, imported: 0, sets: 0, withoutImage: 0 };
+  const beforeCount = Number(db.prepare("SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND language=? AND active=1").get(language)?.c || 0);
   const cards = await fetchJson(language, "/cards");
-  if (!Array.isArray(cards) || cards.length < config.minimum) throw new Error(`TCGdex ${language}: catalogue incomplet (${Array.isArray(cards) ? cards.length : 0} cartes)`);
+  if (!Array.isArray(cards) || cards.length < config.minimumExpected) throw new Error(`TCGdex ${language}: catalogue incomplet (${Array.isArray(cards) ? cards.length : 0} cartes)`);
   let sets = [];
   try { sets = await fetchJson(language, "/sets"); } catch { sets = []; }
   const setMap = new Map((Array.isArray(sets) ? sets : []).map((set) => [String(set.id || ""), set]));
+  const existingRows = db.prepare(`SELECT id,language,slug,name,name_normalized,extension,extension_code,number,image_hd,image_thumb,meta_title,meta_description,active
+    FROM cards WHERE license_slug='pokemon' AND language=?`).all(language);
+  const existingById = new Map(existingRows.map((row) => [String(row.id || ""), row]));
   const now = new Date().toISOString();
   const upsert = db.prepare(`INSERT INTO cards (id,license_slug,language,slug,name,name_normalized,extension,extension_code,number,rarity,hit_family,variants_json,illustration,image_hd,image_thumb,condition_note,avg_price,low_price,high_price,recommended_price,market_trend,trend_percent,sales_count,views,meta_title,meta_description,active,created_at,updated_at)
     VALUES (@id,'pokemon',@language,@slug,@name,@name_normalized,@extension,@extension_code,@number,'','','{}','',@image_hd,@image_thumb,'NM',0,0,0,0,'stable',0,0,0,@meta_title,@meta_description,1,@created_at,@updated_at)
-    ON CONFLICT(id) DO UPDATE SET language=excluded.language,name=excluded.name,name_normalized=excluded.name_normalized,extension=excluded.extension,extension_code=excluded.extension_code,number=excluded.number,image_hd=CASE WHEN excluded.image_hd<>'' THEN excluded.image_hd ELSE cards.image_hd END,image_thumb=CASE WHEN excluded.image_thumb<>'' THEN excluded.image_thumb ELSE cards.image_thumb END,meta_title=excluded.meta_title,meta_description=excluded.meta_description,active=1,updated_at=excluded.updated_at`);
-  let imported = 0, withoutImage = 0;
+    ON CONFLICT(id) DO UPDATE SET license_slug='pokemon',language=excluded.language,slug=excluded.slug,name=excluded.name,name_normalized=excluded.name_normalized,extension=excluded.extension,extension_code=excluded.extension_code,number=excluded.number,image_hd=CASE WHEN excluded.image_hd<>'' THEN excluded.image_hd ELSE cards.image_hd END,image_thumb=CASE WHEN excluded.image_thumb<>'' THEN excluded.image_thumb ELSE cards.image_thumb END,meta_title=excluded.meta_title,meta_description=excluded.meta_description,active=1,updated_at=excluded.updated_at`);
+  let existing = 0, created = 0, updated = 0, unchanged = 0, failed = 0, withoutImage = 0;
   db.transaction(() => {
     for (const raw of cards) {
-      if (!raw?.id || !raw?.name) continue;
+      if (!raw?.id || !raw?.name) { failed += 1; continue; }
       const setId = setIdFromCardId(raw.id), set = setMap.get(setId), extension = String(set?.name || setId || ""), localId = String(raw.localId ?? ""), baseImage = String(raw.image || "");
       if (!baseImage) withoutImage += 1;
       const prefix = language === "fr" ? "" : `${language}-`;
-      upsert.run({ id: catalogCardId(language, raw.id), language, slug: slugify(`${prefix}${raw.name}-${extension}-${localId}-${raw.id}`), name: String(raw.name), name_normalized: normalizeText(raw.name), extension, extension_code: setId, number: localId, image_hd: imageUrl(baseImage, "high"), image_thumb: imageUrl(baseImage, "low"), meta_title: `${raw.name} — ${extension} (${config.label}) | Cardoria`, meta_description: `Fiche de la carte Pokémon ${raw.name}${extension ? `, extension ${extension}` : ""}${localId ? `, numéro ${localId}` : ""}, langue ${config.label}.`, created_at: now, updated_at: now });
-      imported += 1;
+      const next = { id: catalogCardId(language, raw.id), language, slug: slugify(`${prefix}${raw.name}-${extension}-${localId}-${raw.id}`), name: String(raw.name), name_normalized: normalizeText(raw.name), extension, extension_code: setId, number: localId, image_hd: imageUrl(baseImage, "high"), image_thumb: imageUrl(baseImage, "low"), meta_title: `${raw.name} — ${extension} (${config.label}) | Cardoria`, meta_description: `Fiche de la carte Pokémon ${raw.name}${extension ? `, extension ${extension}` : ""}${localId ? `, numéro ${localId}` : ""}, langue ${config.label}.`, created_at: now, updated_at: now };
+      const current = existingById.get(next.id);
+      if (!current) {
+        upsert.run(next);
+        created += 1;
+        existingById.set(next.id, { ...next, active: 1 });
+        continue;
+      }
+      existing += 1;
+      if (!catalogRowChanged(current, next)) { unchanged += 1; continue; }
+      upsert.run(next);
+      updated += 1;
+      existingById.set(next.id, { ...current, ...next, active: 1 });
     }
   })();
   const count = Number(db.prepare("SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND language=? AND active=1").get(language)?.c || 0);
-  return { language, label: config.label, skipped: false, count, imported, sets: setMap.size, withoutImage, syncedAt: now };
+  const imported = created + updated;
+  return { language, label: config.label, skipped: imported === 0, forced: Boolean(force), count, beforeCount, totalSource: cards.length, existing, created, updated, unchanged, failed, imported, sets: setMap.size, withoutImage, syncedAt: now };
 }
 
 export async function syncPokemonCatalog({ force = false, languages = ["fr", "en", "ja", "ko"] } = {}) {
@@ -118,26 +149,29 @@ export async function syncPokemonCatalog({ force = false, languages = ["fr", "en
   const db = getDb();
   const requested = [...new Set((Array.isArray(languages) ? languages : [languages]).map((value) => normalizeLanguage(value)).filter(Boolean))];
   const summaries = [];
-  let imported = 0, sets = 0, withoutImage = 0;
+  let imported = 0, created = 0, updated = 0, unchanged = 0, existing = 0, failed = 0, totalSource = 0, sets = 0, withoutImage = 0;
   for (const config of LANGUAGE_CONFIG.filter((item) => requested.includes(item.code))) {
     try {
       const result = await syncLanguageCatalog(db, config, { force });
       summaries.push({ ...result, ok: true });
-      imported += Number(result.imported || 0); sets += Number(result.sets || 0); withoutImage += Number(result.withoutImage || 0);
-      if (!result.skipped) console.log(`[pokemon-catalog:${config.code}] ${result.count} ${config.label.toLowerCase()} card(s) synchronized`);
+      imported += Number(result.imported || 0); created += Number(result.created || 0); updated += Number(result.updated || 0); unchanged += Number(result.unchanged || 0); existing += Number(result.existing || 0); failed += Number(result.failed || 0); totalSource += Number(result.totalSource || 0); sets += Number(result.sets || 0); withoutImage += Number(result.withoutImage || 0);
+      console.log(`[pokemon-catalog:${config.code}] source=${result.totalSource} existing=${result.existing} created=${result.created} updated=${result.updated} unchanged=${result.unchanged} failed=${result.failed} total=${result.count}`);
     } catch (error) {
       const message = error?.message || String(error);
-      summaries.push({ language: config.code, label: config.label, ok: false, skipped: false, imported: 0, count: Number(db.prepare("SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND language=? AND active=1").get(config.code)?.c || 0), error: message });
-      console.warn(`[pokemon-catalog:${config.code}] optional sync skipped: ${message}`);
+      failed += 1;
+      summaries.push({ language: config.code, label: config.label, ok: false, skipped: false, forced: Boolean(force), totalSource: 0, existing: 0, created: 0, updated: 0, unchanged: 0, failed: 1, imported: 0, count: Number(db.prepare("SELECT COUNT(*) AS c FROM cards WHERE license_slug='pokemon' AND language=? AND active=1").get(config.code)?.c || 0), error: message });
+      console.warn(`[pokemon-catalog:${config.code}] reconciliation failed: ${message}`);
     }
   }
-  try { db.exec("DELETE FROM cards_fts; INSERT INTO cards_fts(rowid,name,extension,number,rarity,license_slug) SELECT rowid,name,extension,number,rarity,license_slug FROM cards;"); } catch {}
+  if (imported > 0) {
+    try { db.exec("DELETE FROM cards_fts; INSERT INTO cards_fts(rowid,name,extension,number,rarity,license_slug) SELECT rowid,name,extension,number,rarity,license_slug FROM cards;"); } catch {}
+  }
   const counts = languageCounts(db);
   const count = Object.values(counts).reduce((sum, value) => sum + Number(value || 0), 0);
   const failures = summaries.filter((item) => !item.ok);
   const hasUsableCatalog = counts.fr >= 1000 || count >= 1000;
   if (!hasUsableCatalog && failures.length) throw new Error(failures.map((item) => `${item.language}: ${item.error}`).join(" · "));
-  return { ok: true, skipped: imported === 0, partial: failures.length > 0, source: SOURCE, imported, count, sets, withoutImage, languageCounts: counts, languages: summaries, syncedAt: new Date().toISOString() };
+  return { ok: true, skipped: imported === 0, partial: failures.length > 0, forced: Boolean(force), source: SOURCE, totalSource, existing, created, updated, unchanged, failed, imported, count, sets, withoutImage, languageCounts: counts, languages: summaries, syncedAt: new Date().toISOString() };
 }
 
 export async function syncPokemonReferenceCatalog({ priceLimit = 120, skipRarities = false, language = "fr" } = {}) {
