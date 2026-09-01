@@ -1,6 +1,7 @@
 /**
  * Persistance durable Cardoria.
- * Marketplace + donnees runtime critiques + moteur cartes sont restaures depuis PostgreSQL.
+ * Marketplace + donnees runtime critiques + moteur leger sont restaures depuis PostgreSQL.
+ * Les cartes Pokemon sont persistees separement, ligne par ligne, par multilingual-card-persistence.
  */
 import pg from "pg";
 import { getDb } from "../engine/database.js";
@@ -10,8 +11,11 @@ const { Pool } = pg;
 const MARKET_TABLES = ["mk_sellers","mk_listings","mk_orders","mk_reviews","mk_favorites","mk_wishlist","mk_price_alerts","mk_cart_items","mk_invoices","mk_disputes"];
 const MARKET_CHILD_FIRST = [...MARKET_TABLES].reverse();
 const RUNTIME_TABLES = ["auth_users","auth_sessions","auth_reset_tokens","auth_magic_tokens","gdpr_consents","pay_transactions"];
-const ENGINE_TABLES = ["licenses","cards","price_sources","sales_history","card_price_history","sealed_products"];
-const ENGINE_CHILD_FIRST = ["card_price_history","sales_history","price_sources","cards","sealed_products","licenses"];
+// IMPORTANT: never put cards / price history back in this monolithic JSON snapshot.
+// The Pokemon catalog is large enough to exceed the Render Node heap when JSON.stringify
+// duplicates the whole table in memory. Cards are durably stored by multilingual-card-persistence.
+const ENGINE_TABLES = ["licenses","sealed_products"];
+const ENGINE_CHILD_FIRST = ["sealed_products","licenses"];
 
 let pool = null;
 let initialized = false;
@@ -29,13 +33,7 @@ let engineLastSyncedAt = "";
 function databaseUrl() { return String(process.env.MARKETPLACE_DATABASE_URL || "").trim(); }
 export function marketplacePersistenceConfigured() { return Boolean(databaseUrl()); }
 function quoteIdent(name) { if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) throw new Error("Identifiant SQL invalide."); return `"${name}"`; }
-function sqliteRows(table) {
-  if (table === "cards") {
-    try { return getDb().prepare(`SELECT * FROM "cards" WHERE COALESCE(language,'fr')='fr'`).all(); }
-    catch { return getDb().prepare(`SELECT * FROM "cards"`).all(); }
-  }
-  return getDb().prepare(`SELECT * FROM ${quoteIdent(table)}`).all();
-}
+function sqliteRows(table) { return getDb().prepare(`SELECT * FROM ${quoteIdent(table)}`).all(); }
 async function ensureRemoteSchema(client) {
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_runtime_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_engine_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
@@ -57,7 +55,7 @@ function runtimePayload() {
 function enginePayload() {
   const tables = {};
   for (const table of ENGINE_TABLES) { try { tables[table] = sqliteRows(table); } catch { tables[table] = []; } }
-  return { version: 4, tables, capturedAt: new Date().toISOString() };
+  return { version: 5, tables, capturedAt: new Date().toISOString(), catalogPersistence: "cardoria_multilingual_cards" };
 }
 async function writeRows(client, table, rows) {
   for (const row of rows) {
@@ -96,9 +94,11 @@ async function snapshotEngineNow(reason = "engine") {
     const client = await getPool().connect();
     try {
       await ensureRemoteSchema(client);
-      await client.query(`INSERT INTO cardoria_engine_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()`, [JSON.stringify(enginePayload())]);
+      const payload = enginePayload();
+      await client.query(`INSERT INTO cardoria_engine_snapshot (id,payload,updated_at) VALUES ('primary',$1::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=NOW()`, [JSON.stringify(payload)]);
       engineLastError = "";
       engineLastSyncedAt = new Date().toISOString();
+      console.log(`[cardoria-engine-persistence] lightweight snapshot saved (${reason})`);
       return { ok: true, reason, lastSyncedAt: engineLastSyncedAt };
     } catch (error) {
       engineLastError = error?.message || String(error);
@@ -146,7 +146,6 @@ function restoreEngine(payload) {
     }
   });
   tx(); sqlite.pragma("foreign_keys = ON");
-  try { sqlite.exec("DELETE FROM cards_fts; INSERT INTO cards_fts(rowid,name,extension,number,rarity,license_slug) SELECT rowid,name,extension,number,rarity,license_slug FROM cards;"); } catch {}
   return true;
 }
 async function restoreFromPostgres() {
@@ -170,7 +169,21 @@ async function restoreFromPostgres() {
     restoreMarket(); sqlite.pragma("foreign_keys = ON");
     const runtime = await client.query("SELECT payload FROM cardoria_runtime_snapshot WHERE id='primary' LIMIT 1");
     if (runtime.rows[0]?.payload) restoreRuntime(runtime.rows[0].payload);
-    const engine = await client.query("SELECT payload,updated_at FROM cardoria_engine_snapshot WHERE id='primary' LIMIT 1");
+
+    // Do not fetch the historical giant engine JSON. Extract only the two small
+    // tables inside PostgreSQL so old snapshots containing tens of thousands of
+    // cards can never be materialized in the Node heap during startup.
+    const engine = await client.query(`SELECT
+      jsonb_build_object(
+        'version',5,
+        'tables',jsonb_build_object(
+          'licenses',COALESCE(payload->'tables'->'licenses','[]'::jsonb),
+          'sealed_products',COALESCE(payload->'tables'->'sealed_products','[]'::jsonb)
+        ),
+        'catalogPersistence','cardoria_multilingual_cards'
+      ) AS payload,
+      updated_at
+      FROM cardoria_engine_snapshot WHERE id='primary' LIMIT 1`);
     const engineRestored = engine.rows[0]?.payload ? restoreEngine(engine.rows[0].payload) : false;
     if (engine.rows[0]?.updated_at) engineLastSyncedAt = new Date(engine.rows[0].updated_at).toISOString();
     try { sqlite.exec("DELETE FROM mk_listings_fts; INSERT INTO mk_listings_fts(rowid,title,description,license_slug,card_condition) SELECT rowid,title,description,license_slug,card_condition FROM mk_listings;"); } catch {}
@@ -183,12 +196,12 @@ export async function initMarketplacePersistence() {
   try {
     const restored = await restoreFromPostgres();
     if (restored.restored) {
-      console.log(`[cardoria-persistence] marketplace + runtime restored from PostgreSQL${restored.engineRestored ? " + engine" : ""}`);
+      console.log(`[cardoria-persistence] marketplace + runtime restored from PostgreSQL${restored.engineRestored ? " + lightweight-engine" : ""}`);
       return { ok: true, configured: true, restored: true, engineRestored: restored.engineRestored, lastSyncedAt: restored.lastSyncedAt };
     }
     const seeded = await snapshotNow("initial-sqlite-export");
     await snapshotEngineNow("initial-engine-export");
-    console.log("[cardoria-persistence] PostgreSQL initialized from runtime + engine");
+    console.log("[cardoria-persistence] PostgreSQL initialized from runtime + lightweight engine");
     return { ok: true, configured: true, restored: false, engineRestored: false, initialized: seeded.ok };
   } catch (error) { lastError = error?.message || String(error); console.error("[cardoria-persistence] init degraded:", lastError); return { ok: false, configured: true, error: lastError }; }
 }
