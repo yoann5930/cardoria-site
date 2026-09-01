@@ -8,6 +8,8 @@ const purchasesFile = path.join(dataDir, "purchases.json");
 const url = String(process.env.MARKETPLACE_DATABASE_URL || "").trim();
 const STARTUP_GUARD_MS = 60 * 1000;
 const HISTORY_LIMIT = 50;
+const INCIDENT_START = "2026-09-01T13:50:00.000Z";
+const INCIDENT_LOSS = "2026-09-01T14:12:46.000Z";
 const bootAt = Date.now();
 let pool = null;
 let timer = null;
@@ -80,6 +82,43 @@ async function latestNonEmptyHistory(client) {
   const purchases = result.rows[0]?.payload?.purchases;
   return Array.isArray(purchases) ? purchases : [];
 }
+async function probeIncidentDurableBackups(client) {
+  try {
+    const exists = await client.query("SELECT to_regclass('public.cardoria_backups') AS table_name");
+    if (!exists.rows[0]?.table_name) {
+      console.log("[purchase-recovery-probe] durable backup table absent");
+      return;
+    }
+    const incident = await client.query(`
+      SELECT id,label,created_at,
+        CASE WHEN jsonb_typeof(payload->'json'->'purchases')='array'
+          THEN jsonb_array_length(payload->'json'->'purchases') ELSE 0 END AS purchase_count
+      FROM cardoria_backups
+      WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
+      ORDER BY created_at DESC
+      LIMIT 30
+    `, [INCIDENT_START, INCIDENT_LOSS]);
+    if (!incident.rows.length) console.log("[purchase-recovery-probe] no backup in incident window");
+    for (const row of incident.rows) {
+      console.log(`[purchase-recovery-probe] incident id=${row.id} created=${new Date(row.created_at).toISOString()} purchases=${Number(row.purchase_count || 0)} label=${String(row.label || "").slice(0, 80)}`);
+    }
+    const latest = await client.query(`
+      SELECT id,label,created_at,jsonb_array_length(payload->'json'->'purchases') AS purchase_count
+      FROM cardoria_backups
+      WHERE created_at <= $1::timestamptz
+        AND jsonb_typeof(payload->'json'->'purchases')='array'
+        AND jsonb_array_length(payload->'json'->'purchases') > 0
+      ORDER BY created_at DESC
+      LIMIT 5
+    `, [INCIDENT_LOSS]);
+    if (!latest.rows.length) console.log("[purchase-recovery-probe] no non-empty durable backup before loss");
+    for (const row of latest.rows) {
+      console.log(`[purchase-recovery-probe] nonempty id=${row.id} created=${new Date(row.created_at).toISOString()} purchases=${Number(row.purchase_count || 0)} label=${String(row.label || "").slice(0, 80)}`);
+    }
+  } catch (error) {
+    console.warn("[purchase-recovery-probe] failed", error?.message || String(error));
+  }
+}
 async function saveSnapshot(client, purchases, reason) {
   const payload = {
     version: 2,
@@ -111,6 +150,8 @@ async function restore() {
           purchases = historical;
           await saveSnapshot(client, purchases, "automatic-history-recovery");
           console.warn(`[purchase-persistence] recovered ${purchases.length} purchase(s) from durable history`);
+        } else {
+          await probeIncidentDurableBackups(client);
         }
       }
       durablePurchases = purchases.slice();
@@ -135,11 +176,6 @@ async function persist(reason = "storage-write") {
     return await withClient(async (client) => {
       await ensureSchema(client);
       let purchases = localPurchases();
-
-      // The general runtime snapshot is restored a few seconds after this dedicated
-      // purchase snapshot. Historically that stale snapshot could replace a valid
-      // purchases.json with [] and immediately persist the loss. During startup we
-      // reject any destructive drop below the already-restored durable count.
       const startupWindow = Date.now() - bootAt < STARTUP_GUARD_MS;
       if (startupWindow && durablePurchases.length > purchases.length) {
         const rejectedCount = purchases.length;
@@ -151,7 +187,6 @@ async function persist(reason = "storage-write") {
         console.warn(`[purchase-persistence] blocked stale startup overwrite ${durablePurchases.length}->${rejectedCount}; restored durable purchases`);
         return { ok: true, protected: true, count: purchases.length };
       }
-
       await saveSnapshot(client, purchases, reason);
       durablePurchases = purchases.slice();
       Object.assign(status, { initialized: true, remoteCount: purchases.length, localCount: purchases.length, lastSavedCount: purchases.length, lastSavedAt: new Date().toISOString(), lastError: "" });
