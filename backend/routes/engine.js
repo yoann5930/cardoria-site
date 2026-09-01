@@ -6,7 +6,6 @@ import { listLicenses, getLicense } from "../lib/engine/licenses.js";
 import { searchCards, getCardById, getCardBySlug, autocomplete, getSitemapCards, getCardCount } from "../lib/engine/cards.js";
 import { estimatePrice } from "../lib/engine/pricing.js";
 import { getCatalogAuditSummary, listCatalogAuditReferences, getImageHostAudit } from "../lib/engine/catalog-audit.js";
-import "../lib/engine/catalog-audit-log.js";
 import "../lib/engine/catalog-green-repair.js";
 import { cacheGet, cacheSet } from "../lib/cache.js";
 
