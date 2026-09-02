@@ -93,8 +93,9 @@
         body: JSON.stringify({ ...customer, items, shipping: "Standard", successUrl: `${location.origin}/boutique.html?gamme=pokemon`, ...attribution })
       });
       const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || "Paiement SumUp indisponible.");
-      if (!data.url) throw new Error("Lien de paiement SumUp non reçu.");
+      if (!response.ok || !data.ok) throw new Error(data.error || "Paiement Revolut indisponible.");
+      if (!data.url) throw new Error("Lien de paiement Revolut non reçu.");
+      if (message) message.textContent = data.environment === "sandbox" ? "Ouverture du paiement Revolut Sandbox..." : "Ouverture du paiement Revolut...";
       location.href = data.url;
     } catch (error) {
       if (message) message.textContent = error.message || "Paiement impossible.";
@@ -102,6 +103,32 @@
       try { await loadProducts(); renderProducts(); renderCart(); } catch {}
     } finally {
       if (button) button.disabled = false;
+    }
+  }
+
+  async function confirmReturnedPayment() {
+    const params = new URLSearchParams(location.search);
+    const orderId = params.get("order");
+    if (params.get("paid") !== "1" || !orderId) return;
+    const message = qs("shopPayMsg");
+    try {
+      if (message) message.textContent = "Vérification du paiement Revolut...";
+      const response = await fetch(`${BACKEND_URL}/api/payments/revolut/confirm-order/${encodeURIComponent(orderId)}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "Vérification Revolut impossible.");
+      if (data.status === "paid") {
+        cart = [];
+        renderCart();
+        if (message) message.textContent = `Paiement Revolut confirmé. Commande ${orderId}.`;
+      } else if (data.status === "failed") {
+        if (message) message.textContent = "Le paiement Revolut a échoué ou a été annulé.";
+      } else if (data.status === "refunded") {
+        if (message) message.textContent = "Ce paiement Revolut a été remboursé.";
+      } else {
+        if (message) message.textContent = "Paiement Revolut en cours de confirmation.";
+      }
+    } catch (error) {
+      if (message) message.textContent = error.message || "Vérification du paiement impossible.";
     }
   }
 
@@ -118,6 +145,7 @@
     qs("products")?.addEventListener("click", (event) => { const button = event.target.closest("[data-add-product]"); if (button) addToCart(button.dataset.addProduct); });
     const range = new URLSearchParams(location.search).get("gamme");
     if (range === "pokemon") showPokemonRange(); else showRangeOverview();
+    confirmReturnedPayment();
     if (window.CardoriaAttribution) window.CardoriaAttribution.trackPageView?.();
   }
 
