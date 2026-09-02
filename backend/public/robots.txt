@@ -2,6 +2,7 @@ User-agent: *
 Allow: /
 Allow: /pages/
 Allow: /cartes/
+Allow: /extensions/
 
 Disallow: /admin
 Disallow: /admin-
@@ -26,4 +27,4 @@ Disallow: /favoris.html
 Disallow: /souhaits.html
 Disallow: /document-commande.html
 
-Sitemap: https://cardoria-site-f2cy.onrender.com/api/seo/sitemap.xml
+Sitemap: https://www.cardoriashop.fr/api/seo/sitemap.xml
