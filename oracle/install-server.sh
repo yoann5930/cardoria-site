@@ -21,6 +21,8 @@ chown -R cardoria:cardoria /opt/cardoria
 chmod 750 /etc/cardoria
 
 install -m 0644 oracle/cardoria.service /etc/systemd/system/cardoria.service
+install -m 0644 oracle/cardoria-backup.service /etc/systemd/system/cardoria-backup.service
+install -m 0644 oracle/cardoria-backup.timer /etc/systemd/system/cardoria-backup.timer
 install -m 0644 oracle/nginx-cardoria.conf /etc/nginx/sites-available/cardoria
 ln -sf /etc/nginx/sites-available/cardoria /etc/nginx/sites-enabled/cardoria
 rm -f /etc/nginx/sites-enabled/default
@@ -29,8 +31,9 @@ ufw allow OpenSSH
 ufw allow 'Nginx Full'
 ufw --force enable
 
-systemctl enable nginx postgresql cardoria
 systemctl daemon-reload
+systemctl enable nginx postgresql cardoria cardoria-backup.timer
+systemctl start cardoria-backup.timer
 nginx -t
 systemctl restart nginx
 
