@@ -56,7 +56,7 @@ jobs:
           grep -q 'revolut_admin_sync' backend/routes/payments-admin.js
           grep -q 'revolut_admin_refund' backend/routes/payments-admin.js
           grep -q 'provider: "revolut"' backend/routes/payments-admin.js
-          grep -q 'sync-sumup' backend/routes/payments.js
+          grep -Fq 'router.all("/sumup/*"' backend/routes/payments.js
           grep -q 'status(410)' backend/routes/payments.js
           grep -q 'listBoutiqueProducts' backend/lib/boutique/catalog.js
           grep -q 'from "./stock.js"' backend/lib/boutique/catalog.js
