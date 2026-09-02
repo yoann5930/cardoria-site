@@ -1,7 +1,10 @@
 (function () {
   "use strict";
 
-  const BACKEND = window.CARDORIA_BACKEND || (window.CARDORIA_SEO && window.CARDORIA_SEO.backendUrl) || "https://cardoria-site-f2cy.onrender.com";
+  // L'administration doit toujours joindre l'API Node/Render directement.
+  // Le domaine public CardoriaShop peut etre servi par une couche frontend qui
+  // renvoie du HTML pour /api/*, ce qui empecherait la creation de session.
+  const BACKEND = window.CARDORIA_ADMIN_BACKEND || "https://cardoria-site-f2cy.onrender.com";
   const ADMIN_ROLES = ["super_admin", "admin", "employee"];
 
   function qs(id) { return document.getElementById(id); }
@@ -23,6 +26,14 @@
     sessionStorage.removeItem("cardoria_admin_code");
     sessionStorage.removeItem("cardoria_2fa_challenge");
     location.href = "/admin.html";
+  }
+
+  async function readJson(response) {
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    if (!contentType.includes("application/json")) {
+      throw new Error("Le serveur d'authentification a renvoye une reponse invalide. Rechargez la page puis reessayez.");
+    }
+    return response.json();
   }
 
   async function loginWithPassword(event) {
@@ -47,27 +58,25 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await readJson(response);
 
       if (!response.ok || !data.ok) {
         throw new Error(data.error || "Connexion impossible.");
       }
       if (!ADMIN_ROLES.includes(data.user?.role)) {
-        throw new Error("Ce compte n'est pas autorisé à accéder à l'administration.");
+        throw new Error("Ce compte n'est pas autorise a acceder a l'administration.");
       }
 
-      // Le serveur crée désormais directement la session Admin après validation du mot de passe.
       if (data.token) {
         finalizeSession(data, email);
         return;
       }
 
-      // Compatibilité temporaire si une ancienne instance répond encore avec un challenge 2FA.
       if (data.requires2fa) {
         throw new Error("Une ancienne version de l'authentification est encore active. Rechargez la page dans quelques instants.");
       }
 
-      throw new Error("Session administrateur non créée par le serveur.");
+      throw new Error("Session administrateur non creee par le serveur.");
     } catch (error) {
       if (err) err.textContent = error.message || "Connexion impossible.";
     } finally {
@@ -97,9 +106,9 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await readJson(response);
       if (!response.ok || !data.ok) throw new Error(data.error || "Envoi du lien impossible.");
-      if (success) success.textContent = data.message || "Lien de connexion envoyé.";
+      if (success) success.textContent = data.message || "Lien de connexion envoye.";
     } catch (error) {
       if (err) err.textContent = error.message || "Envoi du lien impossible.";
     } finally {
