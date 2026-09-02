@@ -1,5 +1,6 @@
 name: Revolut purchase smoke test
 
+# One-shot production smoke check for the Revolut Sandbox checkout integration.
 on:
   push:
     paths:
