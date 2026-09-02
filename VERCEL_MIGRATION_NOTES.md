@@ -1,0 +1,1 @@
+Migration rule: deployment-only changes. Production stays on the current domain until preview checks and environment transfer are verified. The migration branch may contain Vercel configuration and validation documentation only; backend/frontend application code is intentionally unchanged.
