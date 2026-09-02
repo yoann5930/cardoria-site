@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { readJson, writeJson } from "../storage.js";
-import { createSumUpCheckout } from "../payments/sumup.js";
+import { createRevolutCheckout } from "../payments/revolut.js";
 import { listBoutiqueProducts } from "./stock.js";
 
 function money(value) {
@@ -82,16 +82,17 @@ export async function createLiveBoutiqueCheckout({ customerName, customerEmail, 
     address: fullAddress,
     shippingAddress: { address: street, postalCode: zip, city: locality, country: countryName },
     items: verifiedItems,
-    payment: "En attente SumUp",
+    payment: "En attente Revolut",
     paymentStatus: "pending",
-    status: "En attente SumUp",
+    status: "En attente Revolut",
     shipping: clean(shipping, 120) || "Standard",
     shippingCost,
     carrier: "",
     tracking: "",
     total,
-    sumupCheckoutId: "",
-    sumupTransactionId: "",
+    paymentProvider: "revolut",
+    paymentProviderOrderId: "",
+    paymentProviderTransactionId: "",
     trafficSource: trafficSource === "witnot" ? "witnot" : "",
     visitorId: clean(visitorId, 200)
   };
@@ -101,33 +102,41 @@ export async function createLiveBoutiqueCheckout({ customerName, customerEmail, 
   writeJson("orders", orders);
 
   const base = String(process.env.SITE_URL || process.env.FRONTEND_URL || "").replace(/\/$/, "");
-  const defaultSuccess = base ? `${base}/boutique.html` : "/boutique.html";
+  const defaultSuccess = base ? `${base}/boutique.html?gamme=pokemon` : "/boutique.html?gamme=pokemon";
   const target = successUrl || process.env.BOUTIQUE_SUCCESS_URL || defaultSuccess;
   const redirect = target + (target.includes("?") ? "&" : "?") + "paid=1&order=" + encodeURIComponent(orderId);
 
   try {
-    const session = await createSumUpCheckout({
+    const session = await createRevolutCheckout({
       orderId,
       amount: total,
-      description: `Boutique Cardoria — ${verifiedItems.length} article(s)`,
+      description: `Boutique CardoriaShop — ${verifiedItems.length} article(s)`,
+      customerName: order.client,
       customerEmail: order.email,
+      customerPhone: order.phone,
       redirectUrl: redirect,
       source: "boutique"
     });
     const updated = readJson("orders", []);
     const index = updated.findIndex((item) => item.id === orderId);
     if (index >= 0) {
-      updated[index].sumupCheckoutId = session.checkoutId;
+      updated[index].paymentProvider = "revolut";
+      updated[index].paymentProviderOrderId = session.providerOrderId;
+      updated[index].paymentMethod = "revolut_hosted";
       updated[index].updatedAt = new Date().toISOString();
       writeJson("orders", updated);
     }
-    return { order: { ...order, sumupCheckoutId: session.checkoutId }, ...session };
+    return {
+      order: { ...order, paymentProviderOrderId: session.providerOrderId },
+      ...session
+    };
   } catch (error) {
     const updated = readJson("orders", []);
     const index = updated.findIndex((item) => item.id === orderId);
     if (index >= 0) {
       updated[index].paymentStatus = "failed";
       updated[index].status = "Paiement échoué";
+      updated[index].paymentError = String(error?.message || "Paiement Revolut indisponible").slice(0, 500);
       updated[index].updatedAt = new Date().toISOString();
       writeJson("orders", updated);
     }
