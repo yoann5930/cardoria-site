@@ -20,9 +20,9 @@ function buildCardSeoMeta(card) {
   const language = normalizeLanguage(card.language || "fr");
   const languageLabel = LANGUAGE_LABELS[language] || language;
   const identity = `${card.name}${number ? " " + number : ""}`.trim();
-  const title = `${identity}${extension ? " — Prix & cote " + extension : " — Prix & cote"} | Cardoria`;
+  const title = `${identity}${extension ? " — Prix & cote " + extension : " — Prix & cote"} | CardoriaShop`;
   const details = [extension, rarity, language !== "fr" ? `version ${languageLabel}` : ""].filter(Boolean).join(", ");
-  const description = `Prix et cote de ${identity}${details ? ` (${details})` : ""}. Consultez la fiche, la rareté, l'image et les données de valeur disponibles sur Cardoria.`;
+  const description = `Prix et cote de ${identity}${details ? ` (${details})` : ""}. Consultez la fiche, la rareté, l'image et les données de valeur disponibles sur CardoriaShop.fr.`;
   return {
     title: title.slice(0, 180),
     description: description.slice(0, 158)
