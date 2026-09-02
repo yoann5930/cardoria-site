@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listBoutiqueProducts } from "../lib/boutique/stock.js";
+import { listBoutiqueProducts } from "../lib/boutique/catalog.js";
 
 const router = Router();
 
