@@ -9,7 +9,7 @@ import {
   syncRevolutOrderByCardoriaOrder,
   handleRevolutWebhook
 } from "../lib/payments/revolut.js";
-import { listBoutiqueProducts } from "../lib/boutique/stock.js";
+import { listBoutiqueProducts } from "../lib/boutique/catalog.js";
 import { createLiveBoutiqueCheckout } from "../lib/boutique/checkout.js";
 
 const router = Router();
@@ -105,9 +105,9 @@ router.post("/revolut/webhook", async (req, res) => {
   }
 });
 
-// Anciens endpoints volontairement retirés du parcours actif.
+// Anciens endpoints volontairement retirés du parcours actif Boutique.
 router.all("/sumup/*", (req, res) => {
-  res.status(410).json({ ok: false, provider: "revolut", error: "SumUp a été remplacé par Revolut sur CardoriaShop." });
+  res.status(410).json({ ok: false, provider: "revolut", error: "SumUp a été remplacé par Revolut sur la Boutique CardoriaShop." });
 });
 
 export default router;
