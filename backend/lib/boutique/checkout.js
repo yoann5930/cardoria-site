@@ -163,20 +163,35 @@ if (String(process.env.REVOLUT_SMOKE_TEST_ON_START || "").toLowerCase() === "tru
       const product = listBoutiqueProducts({ includeDisabled: false })
         .filter((item) => item.purchasable && Number(item.stock || 0) > 0 && Number(item.price || 0) > 0)
         .sort((a, b) => Number(a.price || 0) - Number(b.price || 0))[0];
-      if (!product) throw new Error("Aucun produit Boutique achetable pour le test");
-      const result = await createLiveBoutiqueCheckout({
-        customerName: "Test CardoriaShop Revolut",
-        customerEmail: "checkout-test@cardoriashop.fr",
-        customerPhone: "+33600000000",
-        address: "1 rue du Test",
-        postalCode: "75001",
-        city: "Paris",
-        country: "France",
-        items: [{ ref: product.id, qty: 1 }],
-        shipping: "Standard",
-        successUrl: "https://www.cardoriashop.fr/boutique.html?gamme=pokemon"
-      });
-      console.log(`[revolut-smoke] checkout_created=true order=${result.order.id} providerOrder=${result.providerOrderId} product=${product.id} amount=${Number(product.price || 0).toFixed(2)} environment=${result.environment}`);
+
+      if (product) {
+        const result = await createLiveBoutiqueCheckout({
+          customerName: "Test CardoriaShop Revolut",
+          customerEmail: "checkout-test@cardoriashop.fr",
+          customerPhone: "+33600000000",
+          address: "1 rue du Test",
+          postalCode: "75001",
+          city: "Paris",
+          country: "France",
+          items: [{ ref: product.id, qty: 1 }],
+          shipping: "Standard",
+          successUrl: "https://www.cardoriashop.fr/boutique.html?gamme=pokemon"
+        });
+        console.log(`[revolut-smoke] checkout_created=true order=${result.order.id} providerOrder=${result.providerOrderId} product=${product.id} amount=${Number(product.price || 0).toFixed(2)} environment=${result.environment} isolated=false`);
+      } else {
+        const testOrderId = `TEST-REVOLUT-${Date.now()}`;
+        const result = await createRevolutCheckout({
+          orderId: testOrderId,
+          amount: 1,
+          description: "Test technique Revolut Sandbox CardoriaShop",
+          customerName: "Test CardoriaShop Revolut",
+          customerEmail: "checkout-test@cardoriashop.fr",
+          customerPhone: "+33600000000",
+          redirectUrl: "https://www.cardoriashop.fr/boutique.html?revolut_test=1",
+          source: "boutique-test"
+        });
+        console.log(`[revolut-smoke] checkout_created=true order=${testOrderId} providerOrder=${result.providerOrderId} amount=1.00 environment=${result.environment} isolated=true`);
+      }
     } catch (error) {
       console.error(`[revolut-smoke] checkout_created=false error=${String(error?.message || error).slice(0, 500)}`);
     }
