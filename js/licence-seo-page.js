@@ -5,7 +5,7 @@
   if (!root) return;
 
   var slug = root.dataset.slug || new URLSearchParams(location.search).get("slug") || "pokemon";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-f2cy.onrender.com";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
   var licCfg = (window.CARDORIA_SEO && CARDORIA_SEO.licenses && CARDORIA_SEO.licenses[slug]) || { name: slug };
 
   window.CARDORIA_SEO_PAGE = {
@@ -63,7 +63,7 @@
   }
 
   function render(page, cards, extensions) {
-    var siteUrl = (window.CARDORIA_SEO && CARDORIA_SEO.siteUrl) || "https://cardoria-site-f2cy.onrender.com";
+    var siteUrl = (window.CARDORIA_SEO && CARDORIA_SEO.siteUrl) || "https://www.cardoriashop.fr";
     var pageUrl = siteUrl + "/pages/licences/" + slug + "/";
     var defaultImage = siteUrl + ((window.CARDORIA_SEO && CARDORIA_SEO.defaultImage) || "/assets/logo/cardoria-premium.png");
     updateSocialMeta(page.title, page.metaDescription, pageUrl, defaultImage);
@@ -83,14 +83,18 @@
       return '<a class="seo-card" href="/cartes/' + encodeURIComponent(c.license || slug) + "/" + encodeURIComponent(c.slug) + '">' + img + "<h3>" + escapeHtml(c.name) + "</h3><p>" + escapeHtml(c.extension) + "</p></a>";
     }).join("");
 
+    var pokemonGuides = slug === "pokemon"
+      ? '<a href="/pages/prix-carte-pokemon/">Prix carte Pokémon</a><a href="/pages/combien-vaut-ma-carte-pokemon/">Combien vaut ma carte Pokémon ?</a>'
+      : "";
+
     root.innerHTML =
       '<nav class="engine-breadcrumb" aria-label="Fil d\'Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/">Licences</a> › ' + escapeHtml(licCfg.name) + "</nav>" +
       "<h1>" + escapeHtml(page.h1 || page.title) + "</h1>" +
       '<p class="seo-lead">' + escapeHtml(page.content && page.content.intro || "") + "</p>" +
-      '<div class="seo-links">' +
-      '<a href="/pages/estimation/">Estimer une carte ' + escapeHtml(licCfg.name) + "</a>" +
+      '<div class="seo-links">' + pokemonGuides +
+      '<a href="/estimation.html">Estimer une carte ' + escapeHtml(licCfg.name) + "</a>" +
       '<a href="/rachat-cartes.html">Vendre à Cardoria</a>' +
-      '<a href="/licence.html?slug=' + encodeURIComponent(slug) + '">Catalogue complet</a>' +
+      '<a href="/licence.html?slug=' + encodeURIComponent(slug) + '">Recherche avancée</a>' +
       '<a href="/marketplace.html">Marketplace</a></div>' +
       '<section class="seo-section"><h2>Extensions ' + escapeHtml(licCfg.name) + "</h2><p>Parcourez les extensions référencées pour accéder directement aux listes de cartes, numéros et raretés.</p><div class=\"seo-links\">" + (extHtml || "<span>Catalogue en cours de référencement</span>") + "</div></section>" +
       '<section class="seo-section"><h2>Cartes ' + escapeHtml(licCfg.name) + " référencées</h2><div class=\"seo-grid\">" + cardsHtml + "</div></section>" +
