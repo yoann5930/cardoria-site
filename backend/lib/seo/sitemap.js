@@ -1,9 +1,6 @@
 /**
  * Générateurs de sitemaps Cardoria.
- *
- * Le catalogue peut contenir plusieurs dizaines de milliers de cartes :
- * on sépare donc les pages éditoriales et les cartes en plusieurs sitemaps
- * afin de rester largement sous la limite de 50 000 URL par fichier.
+ * Le catalogue est découpé afin de rester largement sous la limite de 50 000 URL.
  */
 import { listBlogPosts } from "./blog.js";
 import { listExtensions, listGeneratedPages, SITE } from "./generator.js";
@@ -14,6 +11,8 @@ export const CARD_SITEMAP_PAGE_SIZE = 10000;
 
 const STATIC_PAGES = [
   { loc: "/", priority: "1.0", changefreq: "weekly" },
+  { loc: "/pages/prix-carte-pokemon/", priority: "0.95", changefreq: "daily" },
+  { loc: "/pages/combien-vaut-ma-carte-pokemon/", priority: "0.95", changefreq: "weekly" },
   { loc: "/boutique.html", priority: "0.9", changefreq: "daily" },
   { loc: "/estimation.html", priority: "0.9", changefreq: "weekly" },
   { loc: "/marketplace.html", priority: "0.9", changefreq: "daily" },
@@ -21,9 +20,8 @@ const STATIC_PAGES = [
   { loc: "/tendances.html", priority: "0.8", changefreq: "daily" },
   { loc: "/comparateur.html", priority: "0.75", changefreq: "weekly" },
   { loc: "/licence.html", priority: "0.85", changefreq: "daily" },
-  { loc: "/referencement.html", priority: "0.8", changefreq: "monthly" },
   { loc: "/accessoires.html", priority: "0.75", changefreq: "weekly" },
-  { loc: "/contact.html", priority: "0.7", changefreq: "monthly" },
+  { loc: "/pages/contact/", priority: "0.7", changefreq: "monthly" },
   { loc: "/pages/faq/", priority: "0.8", changefreq: "monthly" },
   { loc: "/pages/a-propos/", priority: "0.7", changefreq: "monthly" },
   { loc: "/pages/mentions-legales/", priority: "0.3", changefreq: "yearly" },
@@ -94,13 +92,13 @@ export function generateCoreSitemapXml(siteUrl = SITE) {
     urls += urlEntry(base, `/pages/licences/${license.slug}/`, {
       lastmod: today,
       changefreq: "weekly",
-      priority: "0.88"
+      priority: license.slug === "pokemon" ? "0.95" : "0.88"
     });
   });
 
   listExtensions().forEach((extension) => {
     if (!extension?.url) return;
-    urls += urlEntry(base, extension.url, { lastmod: today, changefreq: "weekly", priority: "0.72" });
+    urls += urlEntry(base, extension.url, { lastmod: today, changefreq: "weekly", priority: extension.license === "pokemon" ? "0.8" : "0.72" });
   });
 
   listBlogPosts({ publishedOnly: true, limit: 5000 }).forEach((post) => {
@@ -128,7 +126,7 @@ export function generateCardsSitemapXml(siteUrl = SITE, page = 1, pageSize = CAR
     urls += urlEntry(base, cardUrl, {
       lastmod: String(card.updated_at || today).slice(0, 10),
       changefreq: "weekly",
-      priority: "0.68"
+      priority: card.license_slug === "pokemon" ? "0.72" : "0.66"
     });
   });
 
@@ -144,6 +142,9 @@ export function generateRobotsTxt(siteUrl = SITE) {
   return [
     "User-agent: *",
     "Allow: /",
+    "Allow: /pages/",
+    "Allow: /cartes/",
+    "Allow: /extensions/",
     "Disallow: /admin",
     "Disallow: /admin-",
     "Disallow: /admin.html",
