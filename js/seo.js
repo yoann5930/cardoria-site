@@ -17,7 +17,7 @@
     if (path.indexOf("/pages/blog") !== -1) return "blog.html";
     if (path.indexOf("/pages/licences/") !== -1 && !path.endsWith("/pages/licences")) return "licences.html";
     if (path.indexOf("/pages/licences") !== -1) return "licences.html";
-    if (path.indexOf("/pages/extension") !== -1) return "extension.html";
+    if (path.indexOf("/extensions/") !== -1 || path.indexOf("/pages/extension") !== -1) return "extension.html";
     if (path.indexOf("/pages/contact") !== -1) return "contact.html";
     var file = path.split("/").pop() || "index.html";
     return file.indexOf(".html") === -1 ? "index.html" : file;
@@ -31,10 +31,8 @@
     el.setAttribute("content", content);
   }
 
-  function upsertLink(rel, href, extra) {
-    var sel = 'link[rel="' + rel + '"]';
-    if (extra) sel += extra;
-    var el = document.querySelector(sel);
+  function upsertLink(rel, href) {
+    var el = document.querySelector('link[rel="' + rel + '"]');
     if (!el) { el = document.createElement("link"); el.setAttribute("rel", rel); document.head.appendChild(el); }
     el.setAttribute("href", href);
   }
@@ -67,7 +65,7 @@
         type: "collection"
       };
       custom.breadcrumbs = custom.breadcrumbs || [
-        { name: "Accueil", url: "/index.html" },
+        { name: "Accueil", url: "/" },
         { name: "Licences", url: "/pages/licences/" },
         { name: cfg.licenses[slugMatch[1]].name, url: "/pages/licences/" + slugMatch[1] + "/" }
       ];
@@ -83,7 +81,7 @@
   document.documentElement.lang = cfg.lang || "fr";
   document.title = title;
   upsertMeta("description", description);
-  upsertMeta("robots", custom.robots || "index,follow");
+  upsertMeta("robots", custom.robots || "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1");
   upsertMeta("author", cfg.siteName);
   upsertMeta("theme-color", "#080a0f");
   upsertLink("canonical", url);
@@ -95,10 +93,7 @@
   upsertMeta("og:locale", cfg.locale, "property");
   upsertMeta("og:site_name", cfg.siteName, "property");
   upsertMeta("og:image", image, "property");
-  upsertMeta("og:image:width", "1200", "property");
-  upsertMeta("og:image:height", "630", "property");
   upsertMeta("og:image:alt", title, "property");
-
   upsertMeta("twitter:card", "summary_large_image");
   upsertMeta("twitter:title", title);
   upsertMeta("twitter:description", description);
@@ -109,48 +104,25 @@
   injectJsonLd({
     "@context": "https://schema.org",
     "@type": "Organization",
+    "@id": cfg.siteUrl + "/#organization",
     name: org.name || cfg.siteName,
     legalName: org.legalName || cfg.siteName,
     url: cfg.siteUrl,
     logo: abs(org.logo || cfg.defaultImage),
     email: org.email || cfg.email,
     address: org.address ? { "@type": "PostalAddress", addressCountry: org.address.country || "FR" } : undefined,
-    sameAs: org.sameAs || [],
-    aggregateRating: cfg.aggregateRating ? {
-      "@type": "AggregateRating",
-      ratingValue: cfg.aggregateRating.ratingValue,
-      reviewCount: cfg.aggregateRating.reviewCount,
-      bestRating: cfg.aggregateRating.bestRating || "5"
-    } : undefined
+    sameAs: org.sameAs || []
   });
 
   injectJsonLd({
     "@context": "https://schema.org",
     "@type": "WebSite",
+    "@id": cfg.siteUrl + "/#website",
     name: cfg.siteName,
     url: cfg.siteUrl,
     inLanguage: "fr-FR",
-    publisher: { "@type": "Organization", name: cfg.siteName },
-    potentialAction: {
-      "@type": "SearchAction",
-      target: cfg.siteUrl + "/licence.html?q={search_term_string}",
-      "query-input": "required name=search_term_string"
-    }
+    publisher: { "@id": cfg.siteUrl + "/#organization" }
   });
-
-  if (cfg.reviews && cfg.reviews.length) {
-    cfg.reviews.forEach(function (r) {
-      injectJsonLd({
-        "@context": "https://schema.org",
-        "@type": "Review",
-        itemReviewed: { "@type": "Organization", name: cfg.siteName },
-        author: { "@type": "Person", name: r.author },
-        reviewRating: { "@type": "Rating", ratingValue: String(r.rating), bestRating: "5" },
-        datePublished: r.date,
-        reviewBody: r.body
-      });
-    });
-  }
 
   var crumbs = custom.breadcrumbs || cfg.breadcrumbs[key];
   if (crumbs && crumbs.length) {
@@ -163,7 +135,9 @@
     });
   }
 
-  if (type === "faq" || (type === "home" && cfg.faq && cfg.faq.length && !custom.skipFaq)) {
+  // FAQ schema uniquement lorsque la FAQ est réellement le contenu principal
+  // de la page (ou explicitement fournie par une page qui l'affiche).
+  if (type === "faq" || (custom.faq && custom.faq.length)) {
     var faqItems = custom.faq || cfg.faq;
     if (faqItems && faqItems.length) {
       injectJsonLd({
@@ -183,7 +157,7 @@
       name: title,
       description: description,
       url: url,
-      isPartOf: { "@type": "WebSite", name: cfg.siteName, url: cfg.siteUrl }
+      isPartOf: { "@id": cfg.siteUrl + "/#website" }
     });
   }
 
@@ -197,13 +171,7 @@
       image: p.image ? abs(p.image) : image,
       sku: p.sku || p.id,
       brand: { "@type": "Brand", name: p.brand || cfg.siteName },
-      offers: p.offers || {
-        "@type": "Offer",
-        price: p.price || "0",
-        priceCurrency: "EUR",
-        availability: "https://schema.org/InStock",
-        url: url
-      }
+      offers: p.offers
     });
   }
 
