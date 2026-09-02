@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { readJson, writeJson } from "../storage.js";
-import { createRevolutCheckout } from "../payments/revolut.js";
+import { createRevolutCheckout, isRevolutConfigured, getRevolutEnvironment } from "../payments/revolut.js";
 import { listBoutiqueProducts } from "./stock.js";
 
 function money(value) {
@@ -142,4 +142,43 @@ export async function createLiveBoutiqueCheckout({ customerName, customerEmail, 
     }
     throw error;
   }
+}
+
+// Test à usage unique, activé uniquement par variable Render.
+// Il crée un checkout Hosted Revolut en Sandbox, sans saisir de moyen de paiement ni débiter d'argent.
+if (String(process.env.REVOLUT_SMOKE_TEST_ON_START || "").toLowerCase() === "true") {
+  setTimeout(async () => {
+    const environment = getRevolutEnvironment();
+    const configured = isRevolutConfigured();
+    console.log(`[revolut-smoke] start environment=${environment} configured=${configured}`);
+    if (environment !== "sandbox") {
+      console.error("[revolut-smoke] aborted: sandbox required");
+      return;
+    }
+    if (!configured) {
+      console.error("[revolut-smoke] blocked: REVOLUT_SECRET_KEY missing");
+      return;
+    }
+    try {
+      const product = listBoutiqueProducts({ includeDisabled: false })
+        .filter((item) => item.purchasable && Number(item.stock || 0) > 0 && Number(item.price || 0) > 0)
+        .sort((a, b) => Number(a.price || 0) - Number(b.price || 0))[0];
+      if (!product) throw new Error("Aucun produit Boutique achetable pour le test");
+      const result = await createLiveBoutiqueCheckout({
+        customerName: "Test CardoriaShop Revolut",
+        customerEmail: "checkout-test@cardoriashop.fr",
+        customerPhone: "+33600000000",
+        address: "1 rue du Test",
+        postalCode: "75001",
+        city: "Paris",
+        country: "France",
+        items: [{ ref: product.id, qty: 1 }],
+        shipping: "Standard",
+        successUrl: "https://www.cardoriashop.fr/boutique.html?gamme=pokemon"
+      });
+      console.log(`[revolut-smoke] checkout_created=true order=${result.order.id} providerOrder=${result.providerOrderId} product=${product.id} amount=${Number(product.price || 0).toFixed(2)} environment=${result.environment}`);
+    } catch (error) {
+      console.error(`[revolut-smoke] checkout_created=false error=${String(error?.message || error).slice(0, 500)}`);
+    }
+  }, 8000).unref?.();
 }
