@@ -6,9 +6,27 @@ import { getLicense } from "./licenses.js";
 import { setPriceSources, recalculateCardPrices, getSalesHistory } from "./pricing.js";
 
 const CARD_LANGUAGES = new Set(["fr", "en", "ja", "ko"]);
+const LANGUAGE_LABELS = { fr: "française", en: "anglaise", ja: "japonaise", ko: "coréenne" };
+
 function normalizeLanguage(value, fallback = "fr") {
   const language = String(value || fallback).trim().toLowerCase();
   return CARD_LANGUAGES.has(language) ? language : fallback;
+}
+
+function buildCardSeoMeta(card) {
+  const number = String(card.number || "").trim();
+  const extension = String(card.extension || "").trim();
+  const rarity = String(card.rarity || card.hitFamily || "").trim();
+  const language = normalizeLanguage(card.language || "fr");
+  const languageLabel = LANGUAGE_LABELS[language] || language;
+  const identity = `${card.name}${number ? " " + number : ""}`.trim();
+  const title = `${identity}${extension ? " — Prix & cote " + extension : " — Prix & cote"} | Cardoria`;
+  const details = [extension, rarity, language !== "fr" ? `version ${languageLabel}` : ""].filter(Boolean).join(", ");
+  const description = `Prix et cote de ${identity}${details ? ` (${details})` : ""}. Consultez la fiche, la rareté, l'image et les données de valeur disponibles sur Cardoria.`;
+  return {
+    title: title.slice(0, 180),
+    description: description.slice(0, 158)
+  };
 }
 
 const SEARCH_LANGUAGE_HINTS = new Map([
@@ -111,7 +129,9 @@ export function getCardById(id, { trackView = false } = {}) {
   if (!row) return null;
   if (trackView) { db.prepare("UPDATE cards SET views = views + 1 WHERE id = ?").run(id); row.views += 1; }
   const license = getLicense(row.license_slug);
-  return rowToCard(row, { licenseName: license?.name, salesHistory: getSalesHistory(id, 30), priceSources: db.prepare("SELECT source, price, fetched_at AS fetchedAt FROM price_sources WHERE card_id = ?").all(id) });
+  const card = rowToCard(row, { licenseName: license?.name, salesHistory: getSalesHistory(id, 30), priceSources: db.prepare("SELECT source, price, fetched_at AS fetchedAt FROM price_sources WHERE card_id = ?").all(id) });
+  card.meta = buildCardSeoMeta(card);
+  return card;
 }
 
 export function getCardBySlug(licenseSlug, slug, opts) {
@@ -127,7 +147,9 @@ export function createCard(data) {
   const slug = data.slug || slugify(`${language === "fr" ? "" : language + "-"}${data.name}-${data.extension}-${data.number}`);
   const id = data.id || makeCardId(licenseSlug, slug);
   const now = new Date().toISOString();
-  const card = { id, license_slug: licenseSlug, language, slug, name: data.name, name_normalized: normalizeText(data.name), extension: data.extension || "", extension_code: data.extensionCode || "", number: data.number || "", rarity: data.rarity || "", hit_family: data.hitFamily || "", variants_json: JSON.stringify(data.variants || {}), illustration: data.illustration || "", image_hd: data.imageHd || data.image_hd || "", image_thumb: data.imageThumb || data.image_thumb || data.imageHd || "", condition_note: data.condition || "NM", meta_title: data.metaTitle || `${data.name} — ${data.extension} | Cardoria`, meta_description: data.metaDescription || `Prix et fiche ${data.name} (${data.extension}). Estimation et achat Cardoria.`, created_at: now, updated_at: now };
+  const previewCard = { name: data.name, number: data.number || "", extension: data.extension || "", rarity: data.rarity || "", hitFamily: data.hitFamily || "", language };
+  const seo = buildCardSeoMeta(previewCard);
+  const card = { id, license_slug: licenseSlug, language, slug, name: data.name, name_normalized: normalizeText(data.name), extension: data.extension || "", extension_code: data.extensionCode || "", number: data.number || "", rarity: data.rarity || "", hit_family: data.hitFamily || "", variants_json: JSON.stringify(data.variants || {}), illustration: data.illustration || "", image_hd: data.imageHd || data.image_hd || "", image_thumb: data.imageThumb || data.image_thumb || data.imageHd || "", condition_note: data.condition || "NM", meta_title: data.metaTitle || seo.title, meta_description: data.metaDescription || seo.description, created_at: now, updated_at: now };
   db.prepare(`INSERT INTO cards (id,license_slug,language,slug,name,name_normalized,extension,extension_code,number,rarity,hit_family,variants_json,illustration,image_hd,image_thumb,condition_note,meta_title,meta_description,active,created_at,updated_at) VALUES (@id,@license_slug,@language,@slug,@name,@name_normalized,@extension,@extension_code,@number,@rarity,@hit_family,@variants_json,@illustration,@image_hd,@image_thumb,@condition_note,@meta_title,@meta_description,1,@created_at,@updated_at)`).run(card);
   const rowid = db.prepare("SELECT rowid FROM cards WHERE id = ?").get(id)?.rowid; syncFts(rowid, card);
   if (data.priceSources?.length) setPriceSources(id, data.priceSources); else if (data.avgPrice != null) setPriceSources(id, [{ source: "cardoria", price: data.avgPrice }]); else recalculateCardPrices(id);
