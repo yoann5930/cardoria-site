@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { readJson, writeJson } from "../storage.js";
 import { createRevolutCheckout, isRevolutConfigured, getRevolutEnvironment } from "../payments/revolut.js";
-import { listBoutiqueProducts } from "./stock.js";
+import { listBoutiqueProducts } from "./catalog.js";
 
 function money(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
