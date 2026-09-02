@@ -1,10 +1,14 @@
-/** Admin paiements SumUp et commandes Boutique. */
+/** Admin paiements Revolut et commandes Boutique Cardoria. */
 import { Router } from "express";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logAudit } from "../lib/audit.js";
-import { listPayments, getPayment, PAYMENT_STATUSES } from "../lib/payments/ledger.js";
-import { isSumUpConfigured, syncPaymentFromCheckout } from "../lib/payments/sumup.js";
-import { refundSumUpTransaction } from "../lib/payments/sumup-refund.js";
+import { listPayments, getPayment, getPaymentByOrderId, PAYMENT_STATUSES } from "../lib/payments/ledger.js";
+import {
+  isRevolutConfigured,
+  getRevolutEnvironment,
+  syncRevolutOrder,
+  refundRevolutOrder
+} from "../lib/payments/revolut.js";
 import { listBoutiqueInventory } from "../lib/boutique/stock.js";
 import { getOrder as getMarketplaceOrder } from "../lib/marketplace/orders.js";
 import { readJson, writeJson } from "../lib/storage.js";
@@ -81,6 +85,10 @@ function paymentsSummary(payments) {
   return summary;
 }
 
+function isRevolutPayment(payment) {
+  return String(payment?.provider || "").toLowerCase() === "revolut";
+}
+
 router.use(requireAdmin);
 router.use((req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); });
 
@@ -88,19 +96,21 @@ router.get("/", (req, res) => {
   const payments = listPayments({ status: req.query.status, source: req.query.source, limit: req.query.limit || 500 });
   const enriched = payments.map((payment) => {
     const reconciliation = paymentReconciliation(payment);
+    const revolut = isRevolutPayment(payment);
     return {
       ...payment,
       reconciliation: { state: reconciliation.state, label: reconciliation.label },
       orderStatus: reconciliation.order?.status || "",
       orderPaymentStatus: reconciliation.order?.paymentStatus || "",
-      canSync: !!payment.sumupCheckoutId,
-      canRefund: payment.status === "paid" && !!(payment.sumupTransactionId || payment.sumupCheckoutId)
+      canSync: revolut && !!payment.providerOrderId,
+      canRefund: revolut && payment.status === "paid" && !!payment.providerOrderId
     };
   });
   res.json({
     ok: true,
-    provider: "sumup",
-    configured: isSumUpConfigured(),
+    provider: "revolut",
+    configured: isRevolutConfigured(),
+    environment: getRevolutEnvironment(),
     statuses: PAYMENT_STATUSES,
     summary: paymentsSummary(payments),
     payments: enriched
@@ -109,18 +119,25 @@ router.get("/", (req, res) => {
 
 router.get("/summary", (req, res) => {
   const payments = listPayments({ limit: 5000 });
-  res.json({ ok: true, configured: isSumUpConfigured(), summary: paymentsSummary(payments) });
+  res.json({
+    ok: true,
+    provider: "revolut",
+    configured: isRevolutConfigured(),
+    environment: getRevolutEnvironment(),
+    summary: paymentsSummary(payments)
+  });
 });
 
 router.post("/:id/sync", WRITE_ADMIN, async (req, res) => {
   const payment = getPayment(req.params.id);
   if (!payment) return res.status(404).json({ ok: false, error: "Paiement introuvable." });
-  if (!payment.sumupCheckoutId) return res.status(409).json({ ok: false, error: "Checkout SumUp introuvable pour ce paiement." });
+  if (!isRevolutPayment(payment)) return res.status(409).json({ ok: false, error: "Ce paiement historique n'utilise pas Revolut et ne peut plus être synchronisé ici." });
+  if (!payment.providerOrderId) return res.status(409).json({ ok: false, error: "Référence de commande Revolut introuvable pour ce paiement." });
   try {
-    const result = await syncPaymentFromCheckout(payment.sumupCheckoutId);
+    const result = await syncRevolutOrder(payment.providerOrderId);
     const refreshed = getPayment(payment.id);
     const reconciliation = paymentReconciliation(refreshed);
-    logAudit({ type: "payment", action: "sumup_admin_sync", user: req.authUser?.email || "admin", detail: `${payment.id} — ${payment.sumupCheckoutId} → ${result.status}` });
+    logAudit({ type: "payment", action: "revolut_admin_sync", user: req.authUser?.email || "admin", detail: `${payment.id} — ${payment.providerOrderId} → ${result.status}` });
     res.json({ ok: true, status: result.status, payment: refreshed, reconciliation: { state: reconciliation.state, label: reconciliation.label }, order: reconciliation.order });
   } catch (e) {
     res.status(e.status || 502).json({ ok: false, error: e.message });
@@ -128,32 +145,27 @@ router.post("/:id/sync", WRITE_ADMIN, async (req, res) => {
 });
 
 router.post("/:id/refund", FINANCE_ADMIN, async (req, res) => {
-  let payment = getPayment(req.params.id);
+  const payment = getPayment(req.params.id);
   if (!payment) return res.status(404).json({ ok: false, error: "Paiement introuvable." });
-  if (payment.status !== "paid") return res.status(409).json({ ok: false, error: "Seul un paiement SumUp payé peut être remboursé." });
-  if (!isSumUpConfigured()) return res.status(503).json({ ok: false, error: "SumUp n'est pas configuré." });
+  if (!isRevolutPayment(payment)) return res.status(409).json({ ok: false, error: "Ce paiement historique n'utilise pas Revolut et ne peut plus être remboursé depuis ce parcours." });
+  if (payment.status !== "paid") return res.status(409).json({ ok: false, error: "Seul un paiement Revolut payé peut être remboursé." });
+  if (!isRevolutConfigured()) return res.status(503).json({ ok: false, error: "Revolut n'est pas configuré." });
+  if (!payment.providerOrderId) return res.status(409).json({ ok: false, error: "Référence de commande Revolut introuvable." });
+
+  const requestedAmount = req.body?.amount == null || req.body?.amount === "" ? null : Number(req.body.amount);
+  if (requestedAmount != null && (!Number.isFinite(requestedAmount) || requestedAmount <= 0 || requestedAmount > Number(payment.amount || 0))) {
+    return res.status(400).json({ ok: false, error: "Montant de remboursement invalide." });
+  }
 
   try {
-    if (!payment.sumupTransactionId && payment.sumupCheckoutId) {
-      await syncPaymentFromCheckout(payment.sumupCheckoutId);
-      payment = getPayment(payment.id);
-    }
-    if (!payment?.sumupTransactionId) return res.status(409).json({ ok: false, error: "Transaction SumUp introuvable après synchronisation." });
-
-    const requestedAmount = req.body?.amount == null || req.body?.amount === "" ? null : Number(req.body.amount);
-    if (requestedAmount != null && (!Number.isFinite(requestedAmount) || requestedAmount <= 0 || requestedAmount > Number(payment.amount || 0))) {
-      return res.status(400).json({ ok: false, error: "Montant de remboursement invalide." });
-    }
-
-    await refundSumUpTransaction(payment.sumupTransactionId, { amount: requestedAmount, orderId: payment.orderId, user: req.authUser?.email || "admin" });
-    let sync = null;
-    if (payment.sumupCheckoutId) {
-      try { sync = await syncPaymentFromCheckout(payment.sumupCheckoutId); } catch {}
-    }
+    const result = await refundRevolutOrder(payment.providerOrderId, {
+      amount: requestedAmount,
+      description: `Remboursement Cardoria ${payment.orderId || payment.id}`
+    });
     const refreshed = getPayment(payment.id);
     const reconciliation = paymentReconciliation(refreshed);
-    logAudit({ type: "payment", action: "sumup_admin_refund", user: req.authUser?.email || "admin", detail: `${payment.id} — ${requestedAmount == null ? "total" : `${requestedAmount} EUR`}` });
-    res.json({ ok: true, refundRequested: true, status: sync?.status || refreshed?.status || "pending", payment: refreshed, reconciliation: { state: reconciliation.state, label: reconciliation.label }, order: reconciliation.order });
+    logAudit({ type: "payment", action: "revolut_admin_refund", user: req.authUser?.email || "admin", detail: `${payment.id} — ${requestedAmount == null ? "total" : `${requestedAmount} EUR`}` });
+    res.json({ ok: true, refundRequested: true, status: result.status || refreshed?.status || "pending", payment: refreshed, reconciliation: { state: reconciliation.state, label: reconciliation.label }, order: reconciliation.order });
   } catch (e) {
     res.status(e.status || 502).json({ ok: false, error: e.message });
   }
@@ -191,7 +203,7 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
     return res.status(400).json({ ok: false, error: "Statut de commande non autorisé." });
   }
   if (!canProcessPaidOrder(current, nextStatus)) {
-    return res.status(409).json({ ok: false, error: "Le paiement SumUp doit être confirmé avant de préparer ou expédier la commande." });
+    return res.status(409).json({ ok: false, error: "Le paiement Revolut doit être confirmé avant de préparer ou expédier la commande." });
   }
   if (nextCarrier && !BOUTIQUE_CARRIERS.includes(nextCarrier) && nextCarrier !== clean(current.carrier, 120)) {
     return res.status(400).json({ ok: false, error: "Transporteur non autorisé. Choisissez La Poste, Mondial Relay ou Relais Colis." });
@@ -227,13 +239,14 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
   res.json({ ok: true, order: current });
 });
 
-router.post("/boutique-orders/:id/sync-sumup", WRITE_ADMIN, async (req, res) => {
+router.post("/boutique-orders/:id/sync-payment", WRITE_ADMIN, async (req, res) => {
   const order = findBoutiqueOrder(req.params.id);
   if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
-  if (!order.sumupCheckoutId) return res.status(409).json({ ok: false, error: "Cette commande n'a pas de checkout SumUp associé." });
+  const payment = getPaymentByOrderId(order.id, "revolut");
+  if (!payment?.providerOrderId) return res.status(409).json({ ok: false, error: "Cette commande n'a pas de paiement Revolut associé." });
 
   try {
-    const result = await syncPaymentFromCheckout(order.sumupCheckoutId);
+    const result = await syncRevolutOrder(payment.providerOrderId);
     const refreshed = findBoutiqueOrder(order.id);
     if (refreshed && refreshed.paymentStatus === "refunded" && refreshed.paymentReviewRequired) {
       const orders = readJson("orders", []);
@@ -244,41 +257,49 @@ router.post("/boutique-orders/:id/sync-sumup", WRITE_ADMIN, async (req, res) => 
         writeJson("orders", orders);
       }
     }
-    logAudit({ type: "boutique_order", action: "sumup_sync", user: req.authUser?.email || "admin", detail: `${order.id} — ${result.status}` });
+    logAudit({ type: "boutique_order", action: "revolut_sync", user: req.authUser?.email || "admin", detail: `${order.id} — ${result.status}` });
     res.json({ ok: true, status: result.status, payment: result.payment, order: findBoutiqueOrder(order.id) });
   } catch (e) {
     res.status(e.status || 500).json({ ok: false, error: e.message });
   }
 });
 
+router.all("/boutique-orders/:id/sync-sumup", (req, res) => {
+  res.status(410).json({ ok: false, error: "SumUp a été supprimé. Utilisez la synchronisation Revolut." });
+});
+
 router.post("/boutique-orders/:id/refund", FINANCE_ADMIN, async (req, res) => {
-  let order = findBoutiqueOrder(req.params.id);
+  const order = findBoutiqueOrder(req.params.id);
   if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
-  if (order.paymentStatus !== "paid") return res.status(409).json({ ok: false, error: "Seule une commande SumUp payée peut être remboursée." });
+  if (order.paymentStatus !== "paid") return res.status(409).json({ ok: false, error: "Seule une commande Revolut payée peut être remboursée." });
+
+  const payment = getPaymentByOrderId(order.id, "revolut");
+  if (!payment?.providerOrderId) return res.status(409).json({ ok: false, error: "Paiement Revolut introuvable pour cette commande." });
+
+  const requestedAmount = req.body?.amount == null || req.body?.amount === "" ? null : Number(req.body.amount);
+  if (requestedAmount != null && (!Number.isFinite(requestedAmount) || requestedAmount <= 0 || requestedAmount > Number(payment.amount || 0))) {
+    return res.status(400).json({ ok: false, error: "Montant de remboursement invalide." });
+  }
 
   try {
-    if (!order.sumupTransactionId && order.sumupCheckoutId) {
-      await syncPaymentFromCheckout(order.sumupCheckoutId);
-      order = findBoutiqueOrder(order.id);
-    }
-    if (!order?.sumupTransactionId) return res.status(409).json({ ok: false, error: "Transaction SumUp introuvable après synchronisation." });
-
-    await refundSumUpTransaction(order.sumupTransactionId, { orderId: order.id, user: req.authUser?.email || "admin" });
+    const result = await refundRevolutOrder(payment.providerOrderId, {
+      amount: requestedAmount,
+      description: `Remboursement Boutique ${order.id}`
+    });
 
     const orders = readJson("orders", []);
     const index = orders.findIndex((item) => String(item.id) === String(order.id));
     if (index >= 0) {
-      orders[index].status = "Annulée";
-      orders[index].paymentReviewRequired = true;
+      if (result.status === "refunded") orders[index].status = "Annulée";
+      orders[index].paymentReviewRequired = result.status !== "refunded";
       orders[index].refundRequestedAt = new Date().toISOString();
       orders[index].updatedAt = new Date().toISOString();
       writeJson("orders", orders);
     }
 
-    let sync = null;
-    try { sync = await syncPaymentFromCheckout(order.sumupCheckoutId); } catch {}
     const refreshed = findBoutiqueOrder(order.id);
-    res.json({ ok: true, refundRequested: true, status: sync?.status || refreshed?.paymentStatus || "pending", order: refreshed });
+    logAudit({ type: "boutique_order", action: "revolut_refund", user: req.authUser?.email || "admin", detail: `${order.id} — ${requestedAmount == null ? "total" : `${requestedAmount} EUR`}` });
+    res.json({ ok: true, refundRequested: true, status: result.status || refreshed?.paymentStatus || "pending", order: refreshed });
   } catch (e) {
     res.status(e.status || 500).json({ ok: false, error: e.message });
   }
@@ -291,12 +312,8 @@ router.get("/:id", (req, res) => {
   res.json({ ok: true, payment: { ...payment, reconciliation: { state: reconciliation.state, label: reconciliation.label }, orderStatus: reconciliation.order?.status || "", orderPaymentStatus: reconciliation.order?.paymentStatus || "" } });
 });
 
-router.post("/sync/:checkoutId", WRITE_ADMIN, async (req, res) => {
-  try {
-    res.json({ ok: true, ...(await syncPaymentFromCheckout(req.params.checkoutId)) });
-  } catch (e) {
-    res.status(e.status || 500).json({ ok: false, error: e.message });
-  }
+router.all("/sync/:checkoutId", (req, res) => {
+  res.status(410).json({ ok: false, error: "L'ancien endpoint SumUp a été supprimé. Utilisez /:id/sync pour Revolut." });
 });
 
 export default router;
