@@ -1,0 +1,1 @@
+CUTOVER FORBIDDEN until preview validation is complete and all required production environment variables are present in Vercel. Do not merge migration branch or move cardoriashop.fr earlier.
