@@ -49,7 +49,6 @@ jobs:
         working-directory: .
         run: |
           node -e "const c=require('fs').readFileSync('vercel.json','utf8'); const j=JSON.parse(c); if(!j.services?.cardoria || j.services.cardoria.root!=='backend/' || j.services.cardoria.framework!=='express') process.exit(1)"
-          CHANGED=$(git diff --name-only origin/main...HEAD -- backend | grep -v -E '^backend/(package.json|scripts/security-2fa-e2e.mjs|scripts/marketplace-admin-e2e.mjs|routes/auth.js)$' || true)
+          CHANGED=$(git diff --name-only origin/main...HEAD -- backend | grep -v -E '^backend/(package.json|scripts/security-2fa-e2e.mjs|scripts/marketplace-admin-e2e.mjs)$' || true)
           if [ -n "$CHANGED" ]; then echo "Unexpected backend changes:"; echo "$CHANGED"; exit 1; fi
           node -e "const p=require('./backend/package.json'); if(p.dependencies?.express!=='4.22.2' || p.overrides?.qs!=='6.16.0') process.exit(1)"
-          grep -q 'CARDORIA_TEST_2FA' backend/routes/auth.js
