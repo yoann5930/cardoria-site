@@ -164,7 +164,7 @@ router.post("/wishlist", (req, res) => {
 });
 
 router.delete("/wishlist/:userId/:itemId", (req, res) => {
-  removeWishlistItem(req.body.userId, req.body.itemId);
+  removeWishlistItem(req.params.userId, req.params.itemId);
   res.json({ ok: true });
 });
 
