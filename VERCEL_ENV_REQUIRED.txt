@@ -1,0 +1,32 @@
+Required production variables for Cardoria on Vercel. Values must be copied securely from the current production environment; never commit secret values.
+
+NODE_ENV=production
+SITE_URL=https://www.cardoriashop.fr
+FRONTEND_URL=https://www.cardoriashop.fr
+CORS_ORIGINS=https://www.cardoriashop.fr,https://cardoriashop.fr
+LEGACY_ADMIN_CODE=false
+ADMIN_AUTH_DISABLED=false
+ADMIN_EMAIL=cardoria59330@gmail.com
+MARKETPLACE_DEMO_MODE=false
+MARKETPLACE_COMMISSION_PERCENT=5
+MARKETPLACE_COMMISSION_INCLUDE_SHIPPING=false
+PAYPAL_ENV=sandbox
+PAYPAL_DISBURSEMENT_MODE=INSTANT
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=cardoria59330@gmail.com
+MAIL_FROM=cardoria59330@gmail.com
+MAIL_TO=cardoria59330@gmail.com
+
+Secrets required (values intentionally absent):
+ADMIN_LOGIN_PASSWORD
+MARKETPLACE_DATABASE_URL
+PAYPAL_CLIENT_ID
+PAYPAL_CLIENT_SECRET
+PAYPAL_PARTNER_MERCHANT_ID
+PAYPAL_PARTNER_ATTRIBUTION_ID
+PAYPAL_WEBHOOK_ID
+REVOLUT_SECRET_KEY
+REVOLUT_WEBHOOK_SECRET
+SMTP_PASS
