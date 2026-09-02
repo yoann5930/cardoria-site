@@ -2,7 +2,14 @@
  * API publique SEO Cardoria — sitemap, robots, blog, pages générées.
  */
 import { Router } from "express";
-import { generateSitemapXml, generateRobotsTxt, getSitemapStats } from "../lib/seo/sitemap.js";
+import {
+  generateSitemapXml,
+  generateCoreSitemapXml,
+  generateCardsSitemapXml,
+  generateRobotsTxt,
+  getSitemapStats,
+  getCardSitemapPageCount
+} from "../lib/seo/sitemap.js";
 import { listBlogPosts, getBlogPost } from "../lib/seo/blog.js";
 import { getLicenseSeoContent, listExtensions, getGeneratedPage } from "../lib/seo/generator.js";
 import { readJson } from "../lib/storage.js";
@@ -10,15 +17,33 @@ import { readJson } from "../lib/storage.js";
 const router = Router();
 const SITE = process.env.SITE_URL || "https://cardoria-site-f2cy.onrender.com";
 
-router.get("/sitemap.xml", (req, res) => {
-  const xml = generateSitemapXml(SITE);
+function sendXml(res, xml, maxAge = 3600) {
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.setHeader("Cache-Control", `public, max-age=${maxAge}`);
   res.send(xml);
+}
+
+// Index principal : référence le sitemap éditorial + tous les sitemaps cartes.
+router.get("/sitemap.xml", (req, res) => {
+  sendXml(res, generateSitemapXml(SITE));
+});
+
+router.get("/core.xml", (req, res) => {
+  sendXml(res, generateCoreSitemapXml(SITE));
+});
+
+router.get("/cards-:page.xml", (req, res) => {
+  const page = Number(req.params.page);
+  const maxPage = getCardSitemapPageCount();
+  if (!Number.isInteger(page) || page < 1 || page > maxPage) {
+    return res.status(404).type("text/plain").send("Sitemap introuvable");
+  }
+  return sendXml(res, generateCardsSitemapXml(SITE, page));
 });
 
 router.get("/robots.txt", (req, res) => {
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600");
   res.send(generateRobotsTxt(SITE));
 });
 
