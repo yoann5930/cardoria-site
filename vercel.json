@@ -1,3 +1,15 @@
 {
-  "version": 2
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "cardoria": {
+      "root": "backend/",
+      "framework": "express"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": { "service": "cardoria" }
+    }
+  ]
 }
