@@ -21,13 +21,15 @@ import marketplaceModerationAdminRoutes from "./routes/marketplace-moderation-ad
 import paymentsRoutes from "./routes/payments.js";
 import paymentsAdminRoutes from "./routes/payments-admin.js";
 import { seedEngineIfEmpty } from "./lib/engine/seed.js";
-import { getCardBySlug } from "./lib/engine/cards.js";
+import { getCardBySlug, searchCards } from "./lib/engine/cards.js";
+import { getLicense } from "./lib/engine/licenses.js";
 import { syncPokemonCatalog, syncPokemonReferenceCatalog } from "./lib/engine/tcgdex-sync.js";
 import { initMarketplace } from "./lib/marketplace/index.js";
 import { initMarketplacePersistence, marketplacePersistenceMiddleware, enginePersistenceMiddleware, flushMarketplacePersistence, flushEnginePersistence, closeMarketplacePersistence } from "./lib/marketplace/persistence.js";
 import { emptyPublicCatalogOnce } from "./lib/marketplace/empty-catalog.js";
 import { initAi } from "./lib/ai/index.js";
 import { initSeo } from "./lib/seo/index.js";
+import { getLicenseSeoContent, listExtensions } from "./lib/seo/generator.js";
 import { initMarketData } from "./lib/market/index.js";
 import { initScanner } from "./lib/scanner/index.js";
 import { initAiEnterprise } from "./lib/ai-enterprise/index.js";
@@ -130,6 +132,35 @@ function absoluteSiteUrl(req) {
   return `${req.protocol}://${req.get("host")}`;
 }
 
+function seoHead({ title, description, canonical, image, type = "website", jsonLd = [], bootstrap = "" }) {
+  const parts = [
+    `<link rel="canonical" href="${escapeHtml(canonical)}">`,
+    `<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">`,
+    `<meta property="og:type" content="${escapeHtml(type)}">`,
+    `<meta property="og:site_name" content="Cardoria">`,
+    `<meta property="og:locale" content="fr_FR">`,
+    `<meta property="og:title" content="${escapeHtml(title)}">`,
+    `<meta property="og:description" content="${escapeHtml(description)}">`,
+    `<meta property="og:url" content="${escapeHtml(canonical)}">`,
+    `<meta property="og:image" content="${escapeHtml(image)}">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:title" content="${escapeHtml(title)}">`,
+    `<meta name="twitter:description" content="${escapeHtml(description)}">`
+  ];
+  if (bootstrap) parts.push(`<script>${bootstrap}</script>`);
+  for (const item of jsonLd) parts.push(`<script type="application/ld+json">${safeJson(item)}</script>`);
+  return parts.join("\n");
+}
+
+function injectSeoIntoTemplate(template, { title, description, head, mainHtml, mainPattern }) {
+  let html = template
+    .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`)
+    .replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?\s*>/i, `<meta name="description" content="${escapeHtml(description)}">`)
+    .replace("</head>", `${head}\n</head>`);
+  if (mainPattern && mainHtml) html = html.replace(mainPattern, mainHtml);
+  return html;
+}
+
 function buildCardSeoHtml(req, card) {
   const template = fs.readFileSync(path.join(PUBLIC_ROOT, "carte.html"), "utf8");
   const siteUrl = absoluteSiteUrl(req);
@@ -151,13 +182,11 @@ function buildCardSeoHtml(req, card) {
     sku: card.number || card.id,
     brand: { "@type": "Brand", name: card.licenseName || licenseSlug },
     category: "Carte à collectionner",
-    offers: {
-      "@type": "AggregateOffer",
-      priceCurrency: "EUR",
-      lowPrice: Number(prices.low || prices.recommended || 0),
-      highPrice: Number(prices.high || prices.recommended || 0),
-      offerCount: Math.max(1, Number(card.salesCount || 1))
-    }
+    additionalProperty: [
+      { "@type": "PropertyValue", name: "Extension", value: extension },
+      { "@type": "PropertyValue", name: "Rareté", value: card.rarity || "Non renseignée" },
+      { "@type": "PropertyValue", name: "Prix conseillé", value: Number(prices.recommended || 0), unitText: "EUR" }
+    ]
   };
   const breadcrumbs = {
     "@context": "https://schema.org",
@@ -168,36 +197,181 @@ function buildCardSeoHtml(req, card) {
       { "@type": "ListItem", position: 3, name: card.name, item: canonical }
     ]
   };
-  const seoHead = [
-    `<link rel="canonical" href="${escapeHtml(canonical)}">`,
-    `<meta property="og:type" content="product">`,
-    `<meta property="og:title" content="${escapeHtml(title)}">`,
-    `<meta property="og:description" content="${escapeHtml(description)}">`,
-    `<meta property="og:url" content="${escapeHtml(canonical)}">`,
-    `<meta property="og:image" content="${escapeHtml(image)}">`,
-    `<meta name="twitter:card" content="summary_large_image">`,
-    `<meta name="twitter:title" content="${escapeHtml(title)}">`,
-    `<meta name="twitter:description" content="${escapeHtml(description)}">`,
-    `<script>window.CARDORIA_CARD_ROUTE=${safeJson({ license: licenseSlug, slug: card.slug })};</script>`,
-    `<script type="application/ld+json">${safeJson(product)}</script>`,
-    `<script type="application/ld+json">${safeJson(breadcrumbs)}</script>`
-  ].join("\n");
-
-  return template
-    .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`)
-    .replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?\s*>/i, `<meta name="description" content="${escapeHtml(description)}">`)
-    .replace("</head>", `${seoHead}\n</head>`);
+  const head = seoHead({
+    title,
+    description,
+    canonical,
+    image,
+    type: "product",
+    bootstrap: `window.CARDORIA_CARD_ROUTE=${safeJson({ license: licenseSlug, slug: card.slug })};`,
+    jsonLd: [product, breadcrumbs]
+  });
+  return injectSeoIntoTemplate(template, { title, description, head });
 }
 
 function sendCardSeoPage(req, res, next) {
   try {
     const card = getCardBySlug(req.params.license, req.params.slug);
-    if (!card) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Carte introuvable | Cardoria</title></head><body><h1>Carte introuvable</h1><p><a href=\"/licence.html\">Retour au catalogue</a></p></body></html>");
+    if (!card) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Carte introuvable | Cardoria</title></head><body><h1>Carte introuvable</h1><p><a href=\"/pages/licences/\">Retour au catalogue</a></p></body></html>");
     return res
       .status(200)
       .set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600")
       .type("text/html; charset=utf-8")
       .send(buildCardSeoHtml(req, card));
+  } catch (error) {
+    return next(error);
+  }
+}
+
+function buildLicenseSeoHtml(req, licenseSlug) {
+  if (!/^[a-z0-9-]+$/.test(licenseSlug)) return null;
+  const templatePath = path.join(PUBLIC_ROOT, "pages", "licences", licenseSlug, "index.html");
+  if (!fs.existsSync(templatePath)) return null;
+  const license = getLicense(licenseSlug);
+  if (!license) return null;
+  const template = fs.readFileSync(templatePath, "utf8");
+  const siteUrl = absoluteSiteUrl(req);
+  const canonical = `${siteUrl}/pages/licences/${encodeURIComponent(licenseSlug)}/`;
+  const page = getLicenseSeoContent(licenseSlug);
+  const title = page.title || `${license.name} TCG — Prix, cote & catalogue | Cardoria`;
+  const description = page.metaDescription || `Catalogue ${license.name} : cartes, extensions, prix, cote et estimation sur Cardoria.`;
+  const image = `${siteUrl}/assets/logo/cardoria-premium.png`;
+  const cards = searchCards({ license: licenseSlug, page: 1, limit: 12, sort: "views", maxLimit: 50 }).cards;
+  const extensions = listExtensions(licenseSlug).slice(0, 40);
+  const extensionLinks = extensions.map((ext) => `<a href="/extensions/${encodeURIComponent(licenseSlug)}/${encodeURIComponent(ext.slug)}">${escapeHtml(ext.extension)} (${Number(ext.cardCount || 0)})</a>`).join("");
+  const cardLinks = cards.map((card) => {
+    const alt = `${card.name} — ${card.extension} ${card.number || ""}`.trim();
+    const visual = card.imageThumb ? `<img src="${escapeHtml(card.imageThumb)}" alt="${escapeHtml(alt)}" loading="lazy" width="200" height="280">` : "<span aria-hidden=\"true\">🃏</span>";
+    return `<a class="seo-card" href="/cartes/${encodeURIComponent(card.license || licenseSlug)}/${encodeURIComponent(card.slug)}">${visual}<h3>${escapeHtml(card.name)}</h3><p>${escapeHtml(card.extension)}</p></a>`;
+  }).join("");
+  const mainHtml = `<main class="container seo-page" id="licenceSeoRoot" data-slug="${escapeHtml(licenseSlug)}">
+    <nav class="engine-breadcrumb" aria-label="Fil d'Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/">Licences</a> › ${escapeHtml(license.name)}</nav>
+    <h1>${escapeHtml(page.h1 || `Cartes ${license.name}`)}</h1>
+    <p class="seo-lead">${escapeHtml(page.content?.intro || description)}</p>
+    <div class="seo-links"><a href="/pages/estimation/">Estimer une carte ${escapeHtml(license.name)}</a><a href="/rachat-cartes.html">Vendre à Cardoria</a><a href="/marketplace.html">Marketplace</a></div>
+    <section class="seo-section"><h2>Extensions ${escapeHtml(license.name)}</h2><p>Parcourez les extensions pour accéder aux listes de cartes, numéros, raretés et fiches détaillées.</p><div class="seo-links">${extensionLinks || "<span>Catalogue en cours de référencement.</span>"}</div></section>
+    <section class="seo-section"><h2>Cartes ${escapeHtml(license.name)} référencées</h2><div class="seo-grid">${cardLinks || "<p>Catalogue en cours de synchronisation.</p>"}</div></section>
+    <section class="seo-section"><h2>Prix, cote et estimation</h2><p>Les fiches Cardoria regroupent les informations disponibles pour identifier une carte, son extension, son numéro, sa rareté et ses données de prix. Utilisez ensuite l'espace estimation pour analyser une carte que vous possédez.</p></section>
+  </main>`;
+  const breadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Accueil", item: `${siteUrl}/` },
+      { "@type": "ListItem", position: 2, name: "Licences", item: `${siteUrl}/pages/licences/` },
+      { "@type": "ListItem", position: 3, name: license.name, item: canonical }
+    ]
+  };
+  const collection = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: page.h1 || title,
+    description,
+    url: canonical,
+    inLanguage: "fr-FR",
+    isPartOf: { "@type": "WebSite", name: "Cardoria", url: siteUrl }
+  };
+  const head = seoHead({ title, description, canonical, image, jsonLd: [collection, breadcrumbs] });
+  return injectSeoIntoTemplate(template, {
+    title,
+    description,
+    head,
+    mainHtml,
+    mainPattern: /<main class="container seo-page" id="licenceSeoRoot"[^>]*>[\s\S]*?<\/main>/i
+  });
+}
+
+function sendLicenseSeoPage(req, res, next) {
+  try {
+    const html = buildLicenseSeoHtml(req, req.params.license);
+    if (!html) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Licence introuvable | Cardoria</title></head><body><h1>Licence introuvable</h1></body></html>");
+    return res.status(200).set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600").type("text/html; charset=utf-8").send(html);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+function buildExtensionSeoHtml(req, licenseSlug, extensionSlug) {
+  if (!/^[a-z0-9-]+$/.test(licenseSlug) || !/^[a-z0-9-]+$/.test(extensionSlug)) return null;
+  const license = getLicense(licenseSlug);
+  if (!license) return null;
+  const extension = listExtensions(licenseSlug).find((item) => item.slug === extensionSlug);
+  if (!extension) return null;
+  const templatePath = path.join(PUBLIC_ROOT, "pages", "extension", "index.html");
+  if (!fs.existsSync(templatePath)) return null;
+  const template = fs.readFileSync(templatePath, "utf8");
+  const siteUrl = absoluteSiteUrl(req);
+  const canonical = `${siteUrl}/extensions/${encodeURIComponent(licenseSlug)}/${encodeURIComponent(extensionSlug)}`;
+  const title = `${extension.extension} — cartes, prix & liste ${license.name} | Cardoria`;
+  const description = `Découvrez les cartes ${extension.extension} (${license.name}) : liste, numéros, raretés et données de prix. ${extension.cardCount} cartes référencées sur Cardoria.`;
+  const image = `${siteUrl}/assets/logo/cardoria-premium.png`;
+  const cards = searchCards({ license: licenseSlug, extension: extension.extension, page: 1, limit: 36, sort: "extension", maxLimit: 50 }).cards;
+  const cardLinks = cards.map((card) => {
+    const alt = `${card.name} — ${card.extension} ${card.number || ""}`.trim();
+    const visual = card.imageThumb ? `<img src="${escapeHtml(card.imageThumb)}" alt="${escapeHtml(alt)}" loading="lazy" width="200" height="280">` : "<span aria-hidden=\"true\">🃏</span>";
+    return `<a class="seo-card" href="/cartes/${encodeURIComponent(card.license || licenseSlug)}/${encodeURIComponent(card.slug)}">${visual}<h3>${escapeHtml(card.name)}</h3><p>${escapeHtml(card.number || "")}</p></a>`;
+  }).join("");
+  const mainHtml = `<main class="container seo-page" id="extensionRoot">
+    <nav class="engine-breadcrumb" aria-label="Fil d'Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/${encodeURIComponent(licenseSlug)}/">${escapeHtml(license.name)}</a> › ${escapeHtml(extension.extension)}</nav>
+    <h1>Cartes ${escapeHtml(extension.extension)} — ${escapeHtml(license.name)}</h1>
+    <p class="seo-lead">Liste des cartes de l'extension ${escapeHtml(extension.extension)} : numéros, raretés, visuels et données de prix disponibles sur Cardoria. ${Number(extension.cardCount || 0)} cartes sont actuellement référencées.</p>
+    <div class="seo-links"><a href="/pages/licences/${encodeURIComponent(licenseSlug)}/">Toutes les extensions ${escapeHtml(license.name)}</a><a href="/pages/estimation/">Estimer une carte</a><a href="/marketplace.html">Marketplace</a></div>
+    <section class="seo-section"><h2>Liste des cartes ${escapeHtml(extension.extension)}</h2><div class="seo-grid">${cardLinks || "<p>Catalogue en cours de synchronisation.</p>"}</div></section>
+    <section class="seo-section"><h2>Prix et cote de l'extension ${escapeHtml(extension.extension)}</h2><p>Ouvrez une fiche carte pour consulter les informations disponibles sur son numéro, sa rareté, son image et ses données de prix. Les valeurs peuvent évoluer avec le marché et l'état réel de la carte.</p></section>
+  </main>`;
+  const breadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Accueil", item: `${siteUrl}/` },
+      { "@type": "ListItem", position: 2, name: license.name, item: `${siteUrl}/pages/licences/${encodeURIComponent(licenseSlug)}/` },
+      { "@type": "ListItem", position: 3, name: extension.extension, item: canonical }
+    ]
+  };
+  const collection = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: `Cartes ${extension.extension} — ${license.name}`,
+    description,
+    url: canonical,
+    inLanguage: "fr-FR",
+    numberOfItems: Number(extension.cardCount || cards.length),
+    isPartOf: { "@type": "WebSite", name: "Cardoria", url: siteUrl }
+  };
+  const itemList = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: `Cartes ${extension.extension}`,
+    numberOfItems: Number(extension.cardCount || cards.length),
+    itemListElement: cards.slice(0, 36).map((card, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: card.name,
+      url: `${siteUrl}/cartes/${encodeURIComponent(card.license || licenseSlug)}/${encodeURIComponent(card.slug)}`
+    }))
+  };
+  const head = seoHead({
+    title,
+    description,
+    canonical,
+    image,
+    bootstrap: `window.CARDORIA_EXTENSION_ROUTE=${safeJson({ license: licenseSlug, ext: extensionSlug })};`,
+    jsonLd: [collection, breadcrumbs, itemList]
+  });
+  return injectSeoIntoTemplate(template, {
+    title,
+    description,
+    head,
+    mainHtml,
+    mainPattern: /<main class="container seo-page" id="extensionRoot">[\s\S]*?<\/main>/i
+  });
+}
+
+function sendExtensionSeoPage(req, res, next) {
+  try {
+    const html = buildExtensionSeoHtml(req, req.params.license, req.params.slug);
+    if (!html) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Extension introuvable | Cardoria</title></head><body><h1>Extension introuvable</h1></body></html>");
+    return res.status(200).set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600").type("text/html; charset=utf-8").send(html);
   } catch (error) {
     return next(error);
   }
@@ -223,11 +397,20 @@ function sendPublicFile(req, res, next) {
 }
 
 app.get(["/boutique", "/boutique/", "/pages/boutique", "/pages/boutique/"], (req, res) => res.redirect(308, "/boutique.html"));
+app.get("/index.html", (req, res) => res.redirect(301, "/"));
 app.get("/cartes/:license/:slug", sendCardSeoPage);
 app.get("/carte.html", (req, res, next) => {
   if (!req.query.license || !req.query.slug) return next();
   return res.redirect(301, `/cartes/${encodeURIComponent(req.query.license)}/${encodeURIComponent(req.query.slug)}`);
 });
+app.get("/pages/licences/:license", (req, res) => res.redirect(308, `/pages/licences/${encodeURIComponent(req.params.license)}/`));
+app.get("/pages/licences/:license/", sendLicenseSeoPage);
+app.get("/extensions/:license/:slug", sendExtensionSeoPage);
+app.get(["/pages/extension", "/pages/extension/"], (req, res, next) => {
+  if (!req.query.license || !req.query.ext) return next();
+  return res.redirect(301, `/extensions/${encodeURIComponent(req.query.license)}/${encodeURIComponent(req.query.ext)}`);
+});
+app.get(["/sitemap.xml", "/sitemap-index.xml"], (req, res) => res.redirect(301, "/api/seo/sitemap.xml"));
 app.get("/script.js", (req, res, next) => sendRewrittenJs("script.js", res, next));
 app.get("/js/seo-config.js", (req, res, next) => sendRewrittenJs("js/seo-config.js", res, next));
 app.use((req, res, next) => {
