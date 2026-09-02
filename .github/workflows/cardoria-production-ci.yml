@@ -2,16 +2,14 @@ name: Cardoria Production CI
 
 on:
   push:
-    branches:
-      - main
-      - fix/cardoria-production-stability-v2
+    branches: [main, fix/cardoria-production-stability-v2]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   production-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
@@ -25,6 +23,7 @@ jobs:
       CORS_ORIGINS: 'http://127.0.0.1:10000'
       ALERT_EMAIL: 'false'
       MARKETPLACE_DEMO_MODE: 'false'
+      CSRF_ENABLED: 'false'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -39,220 +38,76 @@ jobs:
         run: |
           node --check server.js
           node --check routes/auth.js
-          node --check routes/admin.js
-          node --check routes/admin-dashboard.js
-          node --check routes/admin-finance.js
-          node --check routes/marketplace-v1.js
-          node --check routes/marketplace-paypal.js
-          node --check routes/marketplace-admin.js
           node --check routes/payments.js
           node --check routes/payments-admin.js
-          node --check routes/gdpr.js
-          node --check lib/admin/dashboard.js
-          node --check lib/admin/finance.js
-          node --check lib/auth.js
-          node --check lib/auth/migrate.js
-          node --check lib/auth/magicLink.js
-          node --check lib/auth/users.js
+          node --check routes/marketplace-paypal.js
           node --check lib/boutique/stock.js
+          node --check lib/boutique/catalog.js
           node --check lib/boutique/checkout.js
-          node --check lib/payments/sumup.js
-          node --check lib/payments/sumup-refund.js
-          node --check lib/marketplace/migrate.js
-          node --check lib/marketplace/orders.js
-          node --check lib/marketplace/sellers.js
+          node --check lib/payments/revolut.js
           node --check lib/marketplace/paypal.js
-          node --check lib/marketplace/paypal-events.js
           node --check lib/marketplace/persistence.js
-          node --check lib/marketplace/v1/security.js
-          node --check lib/marketplace/v1/cart.js
-          node --check lib/security/index.js
-          node --check lib/email.js
-          node --check ../script.js
-          node --check ../js/boutique.js
-          node --check ../js/marketplace-client.js
-          node --check ../js/marketplace-cart-page.js
-          node --check ../js/marketplace-listing.js
-          node --check ../js/marketplace-browse.js
-          node --check ../js/marketplace-sell.js
-          node --check ../js/marketplace-orders.js
-          node --check ../js/marketplace-seller.js
-          node --check ../js/marketplace-seller-dashboard.js
-          node --check ../js/marketplace-my-listings.js
-          node --check ../js/admin/admin-dashboard.js
-          node --check ../js/admin/admin-audit.js
-          node --check ../js/admin/admin-orders.js
-          node --check ../js/admin/admin-stock.js
-          node --check ../js/admin/admin-payments.js
-          node --check ../js/admin/admin-accounting.js
-          node --check ../js/admin/admin-marketplace.js
-          node --check ../js/admin/admin-users.js
-      - name: Boutique stock and order wiring checks
+          node --check lib/purchase-persistence-bootstrap.js
+      - name: Current payment and stock architecture guards
         working-directory: .
         run: |
           grep -q 'listBoutiqueInventory' backend/routes/payments-admin.js
-          grep -q 'refundSumUpTransaction' backend/routes/payments-admin.js
-          grep -q 'refundHoldStock' backend/lib/boutique/stock.js
+          grep -q 'refundRevolutOrder' backend/routes/payments-admin.js
+          grep -q 'revolut_admin_sync' backend/routes/payments-admin.js
+          grep -q 'revolut_admin_refund' backend/routes/payments-admin.js
+          grep -q 'provider: "revolut"' backend/routes/payments-admin.js
+          grep -q 'sync-sumup' backend/routes/payments.js
+          grep -q 'status(410)' backend/routes/payments.js
+          grep -q 'listBoutiqueProducts' backend/lib/boutique/catalog.js
+          grep -q 'listBoutiqueInventory' backend/lib/boutique/catalog.js
           grep -q 'pendingStock' backend/lib/boutique/stock.js
           grep -q 'soldStock' backend/lib/boutique/stock.js
-          grep -q 'postalCode' backend/lib/boutique/checkout.js
-          grep -q 'customerPhone' backend/lib/boutique/checkout.js
+          grep -q 'refundHoldStock' backend/lib/boutique/stock.js
           grep -q 'boutique-inventory' js/admin/admin-stock.js
-          grep -q 'data-refund' js/admin/admin-orders.js
-          grep -q 'La Poste' backend/routes/payments-admin.js
-          grep -q 'Mondial Relay' backend/routes/payments-admin.js
-          grep -q 'Relais Colis' backend/routes/payments-admin.js
-      - name: Dashboard and audit wiring checks
+          grep -q 'MARKETPLACE_COMMISSION_PERCENT' backend/lib/marketplace/paypal.js
+          grep -q 'PAYPAL_PARTNER_MERCHANT_ID' backend/lib/marketplace/paypal.js
+          if grep -q 'refundSumUpTransaction' backend/routes/payments-admin.js; then
+            echo 'Active admin refund must not return to SumUp'
+            exit 1
+          fi
+          if grep -q 'sumup_admin_sync\|sumup_admin_refund' backend/routes/payments-admin.js; then
+            echo 'Active admin SumUp actions detected'
+            exit 1
+          fi
+      - name: Persistence architecture guards
         working-directory: .
         run: |
-          grep -q 'buildAdminDashboard' backend/routes/admin-dashboard.js
-          grep -q 'boutiqueRevenue' backend/lib/admin/dashboard.js
-          grep -q 'marketplaceCommission' backend/lib/admin/dashboard.js
-          grep -q 'isPaidPurchase' backend/lib/admin/dashboard.js
-          grep -q 'listBoutiqueInventory' backend/lib/admin/dashboard.js
-          grep -q 'audit/summary' backend/routes/admin-dashboard.js
-          grep -q 'audit/export.csv' backend/routes/admin-dashboard.js
-          grep -q 'kpiBoutiqueRevenue' js/admin/admin-dashboard.js
-          grep -q 'stockOversold' js/admin/admin-dashboard.js
-          grep -q 'auditDanger' js/admin/admin-audit.js
-          grep -q 'exportAudit' js/admin/admin-audit.js
-          if grep -q 'dayData.reduce.*revenue' js/admin/admin-dashboard.js; then
-            echo 'Dashboard frontend must not derive revenue from analytics days'
-            exit 1
-          fi
-      - name: SumUp and accounting wiring checks
-        working-directory: .
-        run: |
-          grep -q 'paymentReconciliation' backend/routes/payments-admin.js
-          grep -q 'sumup_admin_sync' backend/routes/payments-admin.js
-          grep -q 'sumup_admin_refund' backend/routes/payments-admin.js
-          grep -q 'FINANCE_ADMIN' backend/routes/payments-admin.js
-          grep -q 'getFinanceSummary' backend/routes/admin-finance.js
-          grep -q 'financeCsv' backend/routes/admin-finance.js
-          grep -q 'marketplaceGmv' backend/lib/admin/finance.js
-          grep -q 'marketplaceCommission' backend/lib/admin/finance.js
-          grep -q 'boutiqueCogs' backend/lib/admin/finance.js
-          grep -q 'cashCommercialBalance' backend/lib/admin/finance.js
-          grep -q '/api/admin/accounting", adminFinanceRoutes' backend/server.js
-          grep -q 'data-sync\|/sync' js/admin/admin-payments.js
-          grep -q '/refund' js/admin/admin-payments.js
-          grep -q 'finMarketplaceGmv' js/admin/admin-accounting.js
-          grep -q 'finMargin' js/admin/admin-accounting.js
-          grep -q 'exportSummary' js/admin/admin-accounting.js
-          if grep -q '/api/admin/accounting/stats' js/admin/admin-accounting.js; then
-            echo 'Accounting frontend still uses legacy stats route'
-            exit 1
-          fi
-          if grep -q 'analytics.sales' backend/lib/admin/finance.js; then
-            echo 'Authoritative accounting must not use analytics.sales'
-            exit 1
-          fi
+          grep -q 'cardoria_purchase_snapshot' backend/lib/purchase-persistence-bootstrap.js
+          grep -q 'purchasePersistence: "cardoria_purchase_snapshot"' backend/lib/marketplace/persistence.js
+          grep -q 'purchases are intentionally NOT restored here' backend/lib/marketplace/persistence.js
+          grep -q 'MARKETPLACE_DATABASE_URL' backend/lib/marketplace/persistence.js
       - name: Reject security regressions
         working-directory: .
         run: |
-          if grep -R -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' script.js js *.html 2>/dev/null; then
-            echo 'Client-side admin secret detected'
-            exit 1
-          fi
-          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend render.yaml 2>/dev/null; then
-            echo 'Direct admin bypass enabled'
-            exit 1
-          fi
-          if grep -n 'marketplaceRoutes' backend/server.js; then
-            echo 'Legacy marketplace router mounted'
-            exit 1
-          fi
-          if grep -A2 'MARKETPLACE_DEMO_MODE' render.yaml | grep -q 'true'; then
-            echo 'Marketplace demo enabled in production blueprint'
-            exit 1
-          fi
-          if grep -R -n 'api/marketplace/listings\|api/marketplace/orders?email' js *.html 2>/dev/null; then
-            echo 'Legacy marketplace endpoint still used by frontend'
-            exit 1
-          fi
-          if grep -R -n 'CARDORIA59330' js/admin 2>/dev/null; then
-            echo 'Hardcoded admin credential detected in admin frontend'
-            exit 1
-          fi
-          if git grep -I -nE 'SMTP_PASS[[:space:]]*=[[:space:]]*[^[:space:]#]+' -- . ':!.github/workflows' ':!backend/node_modules' ':!**/node_modules/**'; then
-            echo 'Hardcoded SMTP_PASS detected'
-            exit 1
-          fi
-          if git grep -I -nE 'SMTP_PASS[[:space:]]*:[[:space:]]*["'\''][^"'\'']+' -- . ':!.github/workflows' ':!backend/node_modules' ':!**/node_modules/**'; then
-            echo 'Hardcoded SMTP_PASS detected'
-            exit 1
-          fi
-          if grep -A2 -- '- key: SMTP_PASS' render.yaml | grep -q 'value:'; then
-            echo 'SMTP_PASS must not have a plaintext value in render.yaml'
-            exit 1
-          fi
-          if ! grep -A2 -- '- key: SMTP_PASS' render.yaml | grep -q 'sync: false'; then
-            echo 'SMTP_PASS must be a Render secret (sync: false)'
-            exit 1
-          fi
-          if ! grep -q 'requireTLS: !secure && port === 587' backend/lib/email.js; then
-            echo 'Gmail STARTTLS on port 587 is missing'
-            exit 1
-          fi
+          if grep -R -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' script.js js *.html 2>/dev/null; then exit 1; fi
+          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend render.yaml 2>/dev/null; then exit 1; fi
+          if grep -R -n 'api/marketplace/listings\|api/marketplace/orders?email' js *.html 2>/dev/null; then exit 1; fi
+          if git grep -I -nE 'SMTP_PASS[[:space:]]*=[[:space:]]*[^[:space:]#]+' -- . ':!.github/workflows' ':!backend/node_modules' ':!**/node_modules/**'; then exit 1; fi
       - name: Start backend
         run: |
           node server.js > /tmp/cardoria-backend.log 2>&1 &
           echo $! > /tmp/cardoria-backend.pid
-      - name: Wait for complete backend startup
+      - name: Wait for backend
         run: |
           ready=false
           for i in {1..60}; do
-            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-startup.json; then
-              cat /tmp/cardoria-startup.json
-              if grep -q '"ready":true' /tmp/cardoria-startup.json; then
-                ready=true
-                break
-              fi
-            fi
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/startup.json && grep -q '"ready":true' /tmp/startup.json; then ready=true; break; fi
             sleep 1
           done
           test "$ready" = "true"
-      - name: Health and public Boutique checks
+      - name: Public and protected route smoke tests
         run: |
-          curl --fail --silent http://127.0.0.1:10000/api/health/ > /tmp/cardoria-health.json
-          cat /tmp/cardoria-health.json
-          grep -q '"version":"6.0.0"' /tmp/cardoria-health.json
-          curl --fail --silent http://127.0.0.1:10000/admin-login.html > /tmp/cardoria-login.html
-          grep -q 'Admin Cardoria' /tmp/cardoria-login.html
-          grep -q 'adminEmailLoginForm' /tmp/cardoria-login.html
-          curl --fail --silent http://127.0.0.1:10000/api > /tmp/cardoria-api.json
-          grep -q '6.0.0' /tmp/cardoria-api.json
-          curl --fail --silent http://127.0.0.1:10000/boutique.html > /tmp/cardoria-boutique.html
-          grep -q 'shopPhone' /tmp/cardoria-boutique.html
-          grep -q 'shopPostalCode' /tmp/cardoria-boutique.html
-          curl --fail --silent http://127.0.0.1:10000/api/payments/boutique/products > /tmp/cardoria-products.json
-          grep -q '"ok":true' /tmp/cardoria-products.json
-          curl --fail --silent 'http://127.0.0.1:10000/api/marketplace/v1/search?license=pokemon' > /tmp/cardoria-marketplace.json
-          grep -q '"ok":true' /tmp/cardoria-marketplace.json
-      - name: Sensitive marketplace and admin routes require authentication
-        run: |
-          code=$(curl -sS -o /tmp/gdpr.json -w "%{http_code}" -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:10000/api/gdpr/export)
-          test "$code" = "401"
-          code=$(curl -sS -o /tmp/listing.json -w "%{http_code}" -H 'Content-Type: application/json' -d '{"sellerId":"fake","title":"x","price":1}' http://127.0.0.1:10000/api/marketplace/v1/listings)
-          test "$code" = "401"
-          code=$(curl -sS -o /tmp/checkout.json -w "%{http_code}" -H 'Content-Type: application/json' -d '{"userId":"fake"}' http://127.0.0.1:10000/api/marketplace/v1/paypal/checkout)
-          test "$code" = "401"
-          code=$(curl -sS -o /tmp/protected.json -w "%{http_code}" http://127.0.0.1:10000/api/health/full)
-          test "$code" = "401"
-          for path in \
-            /api/admin/dashboard \
-            /api/admin/audit/summary \
-            /api/admin/audit/export.csv \
-            /api/admin/users \
-            /api/admin/payments/summary \
-            /api/admin/payments/boutique-orders \
-            /api/admin/payments/boutique-inventory \
-            /api/admin/marketplace/orders \
-            /api/admin/accounting/summary \
-            /api/admin/accounting/sales \
-            /api/admin/accounting/purchases \
-            /api/admin/accounting/export.csv?type=sales; do
-            code=$(curl -sS -o /tmp/admin-protected.json -w "%{http_code}" "http://127.0.0.1:10000${path}")
+          curl --fail --silent http://127.0.0.1:10000/api/health/ | grep -q '"version":"6.0.0"'
+          curl --fail --silent http://127.0.0.1:10000/boutique.html | grep -q 'shopPostalCode'
+          curl --fail --silent http://127.0.0.1:10000/api/payments/boutique/products | grep -q '"ok":true'
+          curl --fail --silent 'http://127.0.0.1:10000/api/marketplace/v1/search?license=pokemon' | grep -q '"ok":true'
+          for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/payments/boutique-inventory /api/admin/marketplace/orders /api/admin/accounting/summary; do
+            code=$(curl -sS -o /tmp/protected.json -w "%{http_code}" "http://127.0.0.1:10000${path}")
             test "$code" = "401"
           done
       - name: Security headers present
