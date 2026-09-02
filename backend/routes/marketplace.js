@@ -6,7 +6,6 @@ import { searchListings, getListing, createListing, updateListing, deleteListing
 import { registerSeller, getSeller, getSellerReviews } from "../lib/marketplace/sellers.js";
 import { createOrder, getOrder, getOrdersByBuyer, getInvoiceHtml } from "../lib/marketplace/orders.js";
 import { getShippingOptions, calculateShipping, generateShippingLabel } from "../lib/marketplace/shipping.js";
-import { createCheckoutSession, isSumUpConfigured } from "../lib/marketplace/payments.js";
 import { addFavorite, removeFavorite, getFavorites, addWishlistItem, getWishlist, removeWishlistItem, createPriceAlert, getPriceAlerts, deletePriceAlert } from "../lib/marketplace/social.js";
 import { comparePrices } from "../lib/marketplace/compare.js";
 import { addReview } from "../lib/marketplace/sellers.js";
@@ -118,23 +117,14 @@ router.get("/orders/:id/invoice", (req, res) => {
   res.send(html);
 });
 
-router.post("/checkout", async (req, res) => {
-  try {
-    if (!isSumUpConfigured()) {
-      return res.status(503).json({ ok: false, error: "Paiement SumUp non configuré. Définir SUMUP_API_KEY et SUMUP_MERCHANT_CODE." });
-    }
-    const { orderId, successUrl, cancelUrl } = req.body || {};
-    const order = getOrder(orderId);
-    if (!order) return res.status(404).json({ ok: false, error: "Commande introuvable" });
-    const session = await createCheckoutSession(
-      order,
-      successUrl || process.env.MARKETPLACE_SUCCESS_URL || "https://cardoria-site-f2cy.onrender.com/mes-commandes.html",
-      cancelUrl || process.env.MARKETPLACE_CANCEL_URL || "https://cardoria-site-f2cy.onrender.com/marketplace.html"
-    );
-    res.json({ ok: true, ...session });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
-  }
+// Ancien checkout Marketplace désactivé : les achats Marketplace passent exclusivement
+// par le flux PayPal multi-vendeurs / multi-acheteurs sous /api/marketplace/v1/paypal/checkout.
+router.post("/checkout", (req, res) => {
+  res.status(410).json({
+    ok: false,
+    provider: "paypal",
+    error: "Ancien checkout désactivé. Utiliser le checkout PayPal Marketplace multi-vendeurs."
+  });
 });
 
 router.post("/reviews", (req, res) => {
@@ -174,7 +164,7 @@ router.post("/wishlist", (req, res) => {
 });
 
 router.delete("/wishlist/:userId/:itemId", (req, res) => {
-  removeWishlistItem(req.params.userId, req.params.itemId);
+  removeWishlistItem(req.body.userId, req.body.itemId);
   res.json({ ok: true });
 });
 
