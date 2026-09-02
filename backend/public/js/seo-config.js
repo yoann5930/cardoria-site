@@ -39,7 +39,7 @@ window.CARDORIA_SEO = {
     sports: { name: "Sports", icon: "⚽", path: "/pages/licences/sports/", catalog: "/licence.html?slug=sports" }
   },
   pages: {
-    "index.html": { title: "Cartes Pokémon : prix, cote, estimation, achat & vente | CardoriaShop", description: "CardoriaShop.fr, site officiel Cardoria, référence les cartes Pokémon et TCG : prix, cote, estimation, catalogue par extension, achat, vente et marketplace entre collectionneurs en France.", path: "/", type: "home" },
+    "index.html": { title: "CardoriaShop — Cartes Pokémon : prix, cote, estimation & marketplace", description: "CardoriaShop.fr est le site officiel de Cardoria : catalogue de cartes Pokémon et TCG, prix, cote, estimation, achat, vente et marketplace en France.", path: "/", type: "home" },
     "boutique.html": { title: "Boutique cartes Pokémon & TCG | CardoriaShop", description: "Découvrez la boutique CardoriaShop : cartes Pokémon et autres TCG, collectibles et produits pour collectionneurs.", path: "/boutique.html" },
     "estimation.html": { title: "Estimation carte Pokémon & TCG — Prix et valeur | CardoriaShop", description: "Estimez une carte Pokémon ou TCG sur CardoriaShop : identification, état, rareté et données de marché pour mieux comprendre sa valeur.", path: "/estimation.html", type: "service" },
     "rachat-cartes.html": { title: "Vendre et faire racheter ses cartes Pokémon & TCG | CardoriaShop", description: "Faites estimer puis proposez vos cartes Pokémon, Yu-Gi-Oh!, One Piece et autres TCG au service de rachat CardoriaShop.", path: "/rachat-cartes.html" },
