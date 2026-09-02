@@ -1,0 +1,54 @@
+name: Vercel Migration CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "vercel.json"
+      - "backend/**"
+      - "VERCEL_MIGRATION_CHECKLIST.md"
+      - ".github/workflows/vercel-migration-ci.yml"
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: 10000
+      ADMIN_EMAIL: cardoria59330@gmail.com
+      ADMIN_INITIAL_PASSWORD: Cardoria-CI-Temporary-Password-2026!
+      LEGACY_ADMIN_CODE: "false"
+      ADMIN_AUTH_DISABLED: "false"
+      CSRF_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+      - name: Install backend
+        run: npm install --omit=dev
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=low
+      - name: Syntax
+        run: |
+          node --check server.js
+          node --check routes/auth.js
+          node --check lib/marketplace/persistence.js
+          node --check lib/engine/database.js
+          node --check lib/payments/revolut.js
+          node --check scripts/security-2fa-e2e.mjs
+          node --check scripts/marketplace-admin-e2e.mjs
+      - name: Verify migration invariants
+        working-directory: .
+        run: |
+          node -e "const c=require('fs').readFileSync('vercel.json','utf8'); const j=JSON.parse(c); if(!j.services?.cardoria || j.services.cardoria.root!=='backend/' || j.services.cardoria.framework!=='express') process.exit(1)"
+          CHANGED=$(git diff --name-only origin/main...HEAD -- backend | grep -v -E '^backend/(package.json|scripts/security-2fa-e2e.mjs|scripts/marketplace-admin-e2e.mjs)$' || true)
+          if [ -n "$CHANGED" ]; then echo "Unexpected backend changes:"; echo "$CHANGED"; exit 1; fi
+          node -e "const p=require('./backend/package.json'); if(p.dependencies?.express!=='4.22.2' || p.overrides?.qs!=='6.16.0') process.exit(1)"

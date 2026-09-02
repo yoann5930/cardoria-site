@@ -9,6 +9,7 @@ on:
 jobs:
   rachat-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
@@ -38,14 +39,18 @@ jobs:
           node --check lib/rachat/workflow.js
           node --check lib/storage.js
           node --check lib/marketplace/persistence.js
+          node --check lib/purchase-persistence-bootstrap.js
           node --check ../js/admin/admin-rachat.js
-      - name: Rachat architecture guards
+      - name: Current Rachat persistence and stock guards
         working-directory: .
         run: |
           grep -q 'rachat-proposals' backend/lib/storage.js
           grep -q 'rachatProposals: readJson("rachat-proposals"' backend/lib/marketplace/persistence.js
-          grep -q 'purchases: readJson("purchases"' backend/lib/marketplace/persistence.js
           grep -q 'writeJson("rachat-proposals", payload.rachatProposals)' backend/lib/marketplace/persistence.js
+          grep -q 'purchases are intentionally NOT restored here' backend/lib/marketplace/persistence.js
+          grep -q 'cardoria_purchase_snapshot' backend/lib/purchase-persistence-bootstrap.js
+          grep -q 'process.on("cardoria:storage-write"' backend/lib/purchase-persistence-bootstrap.js
+          grep -q 'String(key) === "purchases"' backend/lib/purchase-persistence-bootstrap.js
           grep -q 'app.use("/api/rachat", marketplacePersistenceMiddleware' backend/server.js
           grep -q 'app.use("/api/admin/rachat", marketplacePersistenceMiddleware' backend/server.js
           grep -q 'createPurchaseFromProposal' backend/lib/rachat/workflow.js
@@ -54,7 +59,7 @@ jobs:
           grep -q 'admin-rachat.html' js/admin/admin-estimations.js
           grep -q 'Paiement enregistré + envoyer au stock' js/admin/admin-rachat.js
           if grep -A80 'router.post("/propositions"' backend/routes/rachat.js | grep -q 'writeJson("purchases"'; then
-            echo 'A Rachat proposal must not be stored as an accounting purchase'
+            echo 'A Rachat proposal must not be stored as a purchase before validation'
             exit 1
           fi
       - name: Full Rachat to Boutique stock E2E
@@ -67,9 +72,7 @@ jobs:
         run: |
           ready=false
           for i in {1..60}; do
-            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/startup.json; then
-              if grep -q '"ready":true' /tmp/startup.json; then ready=true; break; fi
-            fi
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/startup.json && grep -q '"ready":true' /tmp/startup.json; then ready=true; break; fi
             sleep 1
           done
           test "$ready" = "true"
