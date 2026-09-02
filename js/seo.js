@@ -101,25 +101,32 @@
   if (cfg.twitterHandle) upsertMeta("twitter:site", cfg.twitterHandle);
 
   var org = cfg.organization || {};
-  injectJsonLd({
+  var orgSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
     "@id": cfg.siteUrl + "/#organization",
     name: org.name || cfg.siteName,
-    legalName: org.legalName || cfg.siteName,
+    alternateName: org.alternateName || cfg.alternateNames || [],
     url: cfg.siteUrl,
     logo: abs(org.logo || cfg.defaultImage),
     email: org.email || cfg.email,
+    description: org.description || cfg.disambiguatingDescription,
+    disambiguatingDescription: org.disambiguatingDescription || cfg.disambiguatingDescription,
+    brand: { "@type": "Brand", name: org.brandName || cfg.brandName || "Cardoria" },
     address: org.address ? { "@type": "PostalAddress", addressCountry: org.address.country || "FR" } : undefined,
     sameAs: org.sameAs || []
-  });
+  };
+  if (org.legalName) orgSchema.legalName = org.legalName;
+  injectJsonLd(orgSchema);
 
   injectJsonLd({
     "@context": "https://schema.org",
     "@type": "WebSite",
     "@id": cfg.siteUrl + "/#website",
     name: cfg.siteName,
+    alternateName: cfg.alternateNames || [cfg.brandName || "Cardoria"],
     url: cfg.siteUrl,
+    description: cfg.disambiguatingDescription,
     inLanguage: "fr-FR",
     publisher: { "@id": cfg.siteUrl + "/#organization" }
   });
@@ -135,8 +142,6 @@
     });
   }
 
-  // FAQ schema uniquement lorsque la FAQ est réellement le contenu principal
-  // de la page (ou explicitement fournie par une page qui l'affiche).
   if (type === "faq" || (custom.faq && custom.faq.length)) {
     var faqItems = custom.faq || cfg.faq;
     if (faqItems && faqItems.length) {
@@ -170,7 +175,7 @@
       description: p.description || description,
       image: p.image ? abs(p.image) : image,
       sku: p.sku || p.id,
-      brand: { "@type": "Brand", name: p.brand || cfg.siteName },
+      brand: { "@type": "Brand", name: p.brand || cfg.brandName || cfg.siteName },
       offers: p.offers
     });
   }
