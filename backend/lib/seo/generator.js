@@ -9,53 +9,53 @@ const SITE = process.env.SITE_URL || "https://cardoria-site-f2cy.onrender.com";
 
 const LICENSE_SEO = {
   pokemon: {
-    h1: "Cartes Pokémon TCG — Estimation, achat & vente",
-    intro: "Cardoria expertises les cartes Pokémon : Set de Base, Écarlate et Violet, cartes promo et japonaises. Estimation IA, rachat express et marketplace premium.",
-    keywords: ["cartes pokemon", "pokemon tcg france", "estimation pokemon"]
+    h1: "Cartes Pokémon TCG — Prix, cote, estimation, achat & vente",
+    intro: "Explorez le catalogue Pokémon TCG sur Cardoria : cartes françaises, anglaises, japonaises ou coréennes selon disponibilité, extensions, raretés, prix, cote et estimation.",
+    keywords: ["cartes pokemon", "prix carte pokemon", "cote carte pokemon", "estimation carte pokemon", "pokemon tcg france"]
   },
   yugioh: {
-    h1: "Cartes Yu-Gi-Oh! — Expertise & prix du marché",
-    intro: "Du Légend of Blue Eyes White Dragon aux dernières extensions, Cardoria estime et rachète vos cartes Yu-Gi-Oh! avec transparence.",
-    keywords: ["yu-gi-oh france", "cartes yugioh prix"]
+    h1: "Cartes Yu-Gi-Oh! — Catalogue, cote & prix du marché",
+    intro: "Explorez les cartes Yu-Gi-Oh! référencées sur Cardoria, leurs extensions et leurs données de prix pour identifier, estimer et collectionner vos cartes.",
+    keywords: ["yu-gi-oh france", "cartes yugioh prix", "cote carte yugioh"]
   },
   onepiece: {
-    h1: "One Piece Card Game — Catalogue & estimation",
-    intro: "Luffy, Zoro, cartes Leader et SEC : Cardoria référence le One Piece Card Game avec estimation multi-sources et annonces marketplace.",
-    keywords: ["one piece tcg", "cartes one piece"]
+    h1: "One Piece Card Game — Catalogue, prix & estimation",
+    intro: "Explorez le One Piece Card Game sur Cardoria : cartes, extensions, raretés et informations de prix pour suivre votre collection et préparer vos achats ou ventes.",
+    keywords: ["one piece tcg", "cartes one piece", "prix carte one piece"]
   },
   lorcana: {
-    h1: "Disney Lorcana — Cartes & collectibles",
-    intro: "Explorez le catalogue Lorcana sur Cardoria : prix conseillés, tendances et rachat de cartes Disney Lorcana en France.",
-    keywords: ["lorcana france", "cartes disney lorcana"]
+    h1: "Disney Lorcana — Catalogue, cartes, prix & estimation",
+    intro: "Explorez le catalogue Disney Lorcana sur Cardoria : cartes, extensions, tendances et données de prix pour les collectionneurs en France.",
+    keywords: ["lorcana france", "cartes disney lorcana", "prix carte lorcana"]
   },
   magic: {
-    h1: "Magic: The Gathering — Fiches cartes & prix",
-    intro: "Magic The Gathering sur Cardoria : cartes rares, éditions limitées, estimation professionnelle et comparateur de prix.",
-    keywords: ["magic the gathering france", "cartes magic prix"]
+    h1: "Magic: The Gathering — Catalogue de cartes & prix",
+    intro: "Retrouvez les cartes Magic: The Gathering référencées sur Cardoria avec leurs extensions, informations de collection et données de prix disponibles.",
+    keywords: ["magic the gathering france", "cartes magic prix", "cote carte magic"]
   },
   dragonball: {
-    h1: "Dragon Ball Super Card Game",
-    intro: "Cardoria référence les cartes Dragon Ball Super : leaders, rares et alternatives. Estimation et vente entre collectionneurs.",
-    keywords: ["dragon ball super card game"]
+    h1: "Dragon Ball Card Game — Cartes, extensions & prix",
+    intro: "Cardoria référence les cartes Dragon Ball : extensions, raretés, informations de collection et données de prix disponibles.",
+    keywords: ["dragon ball card game", "cartes dragon ball", "prix carte dragon ball"]
   },
   sports: {
     h1: "Cartes sportives — Panini, Topps & collectibles",
-    intro: "Football, NBA, F1 : Cardoria estime vos cartes sportives Panini Prizm, Topps Chrome et autres éditions premium.",
-    keywords: ["cartes sportives", "panini prizm france"]
+    intro: "Football, NBA, F1 : explorez les cartes sportives référencées sur Cardoria, notamment Panini et Topps, avec leurs informations de collection et de prix.",
+    keywords: ["cartes sportives", "panini prizm france", "topps france"]
   }
 };
 
 export function listExtensions(licenseSlug) {
   const db = getDb();
   const rows = licenseSlug
-    ? db.prepare("SELECT DISTINCT extension, license_slug, COUNT(*) AS card_count FROM cards WHERE active = 1 AND license_slug = ? GROUP BY extension ORDER BY extension").all(licenseSlug)
-    : db.prepare("SELECT DISTINCT extension, license_slug, COUNT(*) AS card_count FROM cards WHERE active = 1 GROUP BY extension, license_slug ORDER BY license_slug, extension").all();
+    ? db.prepare("SELECT DISTINCT extension, license_slug, COUNT(*) AS card_count FROM cards WHERE active = 1 AND license_slug = ? AND extension <> '' GROUP BY extension ORDER BY extension").all(licenseSlug)
+    : db.prepare("SELECT DISTINCT extension, license_slug, COUNT(*) AS card_count FROM cards WHERE active = 1 AND extension <> '' GROUP BY extension, license_slug ORDER BY license_slug, extension").all();
   return rows.map((r) => ({
     extension: r.extension,
     license: r.license_slug,
     cardCount: r.card_count,
     slug: slugifyExt(r.extension),
-    url: `/pages/extension/?license=${r.license_slug}&ext=${encodeURIComponent(slugifyExt(r.extension))}`
+    url: `/extensions/${encodeURIComponent(r.license_slug)}/${encodeURIComponent(slugifyExt(r.extension))}`
   }));
 }
 
@@ -84,8 +84,8 @@ export function generateLicensePages() {
         h1 = excluded.h1, content_json = excluded.content_json, url_path = excluded.url_path, updated_at = excluded.updated_at
     `).run(
       id, lic.slug, lic.slug,
-      `${lic.name} TCG — Estimation & catalogue | Cardoria`,
-      `${seo.intro.slice(0, 155)}…`,
+      `${lic.name} TCG — Prix, cote & catalogue | Cardoria`,
+      seo.intro.slice(0, 158),
       seo.h1,
       JSON.stringify({ intro: seo.intro, keywords: seo.keywords, icon: lic.icon, cardCount: lic.cardCount }),
       urlPath, now
@@ -109,12 +109,12 @@ export function generateExtensionPages() {
       INSERT INTO seo_generated_pages (id, page_type, slug, license_slug, extension_name, title, meta_description, h1, content_json, url_path, updated_at)
       VALUES (?, 'extension', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET title = excluded.title, meta_description = excluded.meta_description,
-        h1 = excluded.h1, content_json = excluded.content_json, updated_at = excluded.updated_at
+        h1 = excluded.h1, content_json = excluded.content_json, url_path = excluded.url_path, updated_at = excluded.updated_at
     `).run(
       id, ext.slug, ext.license, ext.extension,
-      `${ext.extension} — ${lic?.name || ext.license} | Cardoria`,
-      `Prix et fiches cartes ${ext.extension} (${lic?.name || ext.license}). ${ext.cardCount} cartes référencées sur Cardoria.`,
-      `Extension ${ext.extension}`,
+      `${ext.extension} — cartes, prix & liste ${lic?.name || ext.license} | Cardoria`,
+      `Découvrez les cartes ${ext.extension} (${lic?.name || ext.license}) : liste, numéros, raretés et données de prix. ${ext.cardCount} cartes référencées sur Cardoria.`,
+      `Cartes ${ext.extension} — ${lic?.name || ext.license}`,
       JSON.stringify({ extension: ext.extension, cardCount: ext.cardCount }),
       ext.url, now
     );
@@ -180,7 +180,7 @@ export function getLicenseSeoContent(slug) {
     type: "license",
     slug,
     license: slug,
-    title: `${lic?.name || slug} TCG | Cardoria`,
+    title: `${lic?.name || slug} TCG — Prix, cote & catalogue | Cardoria`,
     metaDescription: seo.intro || "",
     h1: seo.h1 || `Cartes ${lic?.name || slug}`,
     content: { intro: seo.intro, icon: lic?.icon, cardCount: lic?.cardCount },
