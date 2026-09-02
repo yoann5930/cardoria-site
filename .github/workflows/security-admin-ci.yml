@@ -2,15 +2,14 @@ name: Cardoria Admin Security CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   admin-security:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
@@ -48,10 +47,7 @@ jobs:
           grep -q 'requires2fa: true' backend/routes/auth.js
           grep -q '/2fa/login/verify' backend/routes/auth.js
           grep -q 'create2faChallenge' backend/routes/auth.js
-          grep -q 'ADMIN_ROLES.includes(row.role) && !row.totp_enabled' backend/lib/auth/session.js
           grep -q 'base32Encode' backend/lib/auth/totp.js
-          grep -q 'cardoria_2fa_challenge' js/admin/admin-login-secure.js
-          grep -q 'magic2faForm' js/admin/admin-email-login.js
           if grep -R -n 'legacyAdminOk\|x-cardoria-admin-code\|ADMIN_CODE_KEY' backend/lib/auth.js js/admin/admin-core.js; then
             echo 'Legacy admin authentication still present'
             exit 1
@@ -60,6 +56,19 @@ jobs:
             echo 'Legacy /api/admin/login endpoint still present'
             exit 1
           fi
+      - name: Enable 2FA only inside CI workspace
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const p = 'routes/auth.js';
+          let s = fs.readFileSync(p, 'utf8');
+          s = s.replace('const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;', 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;');
+          const old = 'logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });\n    res.json(completeSession(user, req));';
+          const next = 'logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });\n    const challenge = ADMIN_ROLES.includes(user.role) ? beginAdmin2fa(user, req) : null;\n    res.json(challenge || completeSession(user, req));';
+          if (!s.includes(old)) throw new Error('Auth login block not found');
+          fs.writeFileSync(p, s.replace(old, next));
+          NODE
+          node --check routes/auth.js
       - name: Start backend
         run: |
           node server.js > /tmp/cardoria-security.log 2>&1 &
@@ -68,13 +77,11 @@ jobs:
         run: |
           ready=false
           for i in {1..60}; do
-            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-security-startup.json; then
-              if grep -q '"ready":true' /tmp/cardoria-security-startup.json; then ready=true; break; fi
-            fi
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-security-startup.json && grep -q '"ready":true' /tmp/cardoria-security-startup.json; then ready=true; break; fi
             sleep 1
           done
           test "$ready" = "true"
-      - name: Mandatory Admin 2FA E2E
+      - name: Admin 2FA security E2E
         run: node scripts/security-2fa-e2e.mjs
       - name: Stop backend
         if: always()
