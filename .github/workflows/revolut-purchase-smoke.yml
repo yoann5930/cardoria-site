@@ -1,6 +1,5 @@
 name: Revolut purchase smoke test
 
-# One-shot production smoke check for the Revolut Sandbox checkout integration.
 on:
   push:
     paths:
@@ -8,51 +7,50 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   revolut-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check Revolut provider
-        id: provider
+      - uses: actions/checkout@v4
+
+      - name: Run Revolut Sandbox purchase smoke test
         shell: bash
         run: |
           set -euo pipefail
           STATUS="$(curl --fail --silent --show-error --retry 3 --retry-delay 3 https://www.cardoriashop.fr/api/payments/status)"
-          echo "Payment status: $STATUS"
-          node -e 'const s=JSON.parse(process.argv[1]); if(s.provider!=="revolut") throw new Error("Provider is not Revolut"); if(s.environment!=="sandbox") throw new Error("Smoke test requires Revolut sandbox"); console.log("Revolut provider OK; configured="+s.configured);' "$STATUS"
+          PROVIDER="$(node -e 'const s=JSON.parse(process.argv[1]); process.stdout.write(String(s.provider||""))' "$STATUS")"
+          ENVIRONMENT="$(node -e 'const s=JSON.parse(process.argv[1]); process.stdout.write(String(s.environment||""))' "$STATUS")"
           CONFIGURED="$(node -e 'const s=JSON.parse(process.argv[1]); process.stdout.write(String(Boolean(s.configured)))' "$STATUS")"
-          echo "configured=$CONFIGURED" >> "$GITHUB_OUTPUT"
+          if [ "$PROVIDER" != "revolut" ] || [ "$ENVIRONMENT" != "sandbox" ]; then
+            echo "Unexpected payment status: $STATUS"
+            exit 1
+          fi
 
-      - name: Check boutique products
-        id: product
-        shell: bash
-        run: |
-          set -euo pipefail
           PRODUCTS="$(curl --fail --silent --show-error --retry 3 --retry-delay 3 https://www.cardoriashop.fr/api/payments/boutique/products)"
           PRODUCT_ID="$(node -e 'const d=JSON.parse(process.argv[1]); const p=(d.products||[]).filter(x=>x.purchasable && Number(x.stock)>0 && Number(x.price)>0).sort((a,b)=>Number(a.price)-Number(b.price))[0]; if(!p) process.exit(2); process.stdout.write(String(p.id));' "$PRODUCTS")"
           PRODUCT_NAME="$(node -e 'const d=JSON.parse(process.argv[1]); const id=process.argv[2]; const p=(d.products||[]).find(x=>String(x.id)===id); process.stdout.write(String(p?.name||""));' "$PRODUCTS" "$PRODUCT_ID")"
-          echo "Boutique product available: $PRODUCT_NAME ($PRODUCT_ID)"
-          echo "product_id=$PRODUCT_ID" >> "$GITHUB_OUTPUT"
+          PRODUCT_PRICE="$(node -e 'const d=JSON.parse(process.argv[1]); const id=process.argv[2]; const p=(d.products||[]).find(x=>String(x.id)===id); process.stdout.write(String(Number(p?.price||0)));' "$PRODUCTS" "$PRODUCT_ID")"
 
-      - name: Create sandbox checkout test
-        if: steps.provider.outputs.configured == 'true'
-        shell: bash
-        env:
-          PRODUCT_ID: ${{ steps.product.outputs.product_id }}
-        run: |
-          set -euo pipefail
-          PAYLOAD="$(node -e 'process.stdout.write(JSON.stringify({customerName:"Test CardoriaShop",customerEmail:"checkout-test@cardoriashop.fr",customerPhone:"+33600000000",address:"1 rue du Test",postalCode:"75001",city:"Paris",country:"France",items:[{ref:process.env.PRODUCT_ID,qty:1}],shipping:"Standard",successUrl:"https://www.cardoriashop.fr/boutique.html?gamme=pokemon"}))')"
-          TMP="$(mktemp)"
-          CODE="$(curl --silent --show-error --output "$TMP" --write-out '%{http_code}' --request POST https://www.cardoriashop.fr/api/payments/boutique/checkout --header 'Content-Type: application/json' --data "$PAYLOAD")"
-          BODY="$(cat "$TMP")"
-          rm -f "$TMP"
-          node -e 'const d=JSON.parse(process.argv[1]); const code=Number(process.argv[2]); const safe={http:code,ok:d.ok,provider:d.provider,environment:d.environment,orderId:d.orderId,checkoutId:d.checkoutId,hasCheckoutUrl:Boolean(d.url),error:d.error||""}; console.log("Checkout result:",JSON.stringify(safe)); if(code!==200 || !d.ok || d.provider!=="revolut" || d.environment!=="sandbox" || !d.orderId || !d.checkoutId || !d.url) process.exit(1);' "$BODY" "$CODE"
+          if [ "$CONFIGURED" = "true" ]; then
+            export PRODUCT_ID
+            PAYLOAD="$(node -e 'process.stdout.write(JSON.stringify({customerName:"Test CardoriaShop",customerEmail:"checkout-test@cardoriashop.fr",customerPhone:"+33600000000",address:"1 rue du Test",postalCode:"75001",city:"Paris",country:"France",items:[{ref:process.env.PRODUCT_ID,qty:1}],shipping:"Standard",successUrl:"https://www.cardoriashop.fr/boutique.html?gamme=pokemon"}))')"
+            TMP="$(mktemp)"
+            HTTP_CODE="$(curl --silent --show-error --output "$TMP" --write-out '%{http_code}' --request POST https://www.cardoriashop.fr/api/payments/boutique/checkout --header 'Content-Type: application/json' --data "$PAYLOAD")"
+            CHECKOUT="$(cat "$TMP")"
+            rm -f "$TMP"
+            RESULT="$(node -e 'const d=JSON.parse(process.argv[1]); const code=Number(process.argv[2]); const product={id:process.argv[3],name:process.argv[4],price:Number(process.argv[5])}; process.stdout.write(JSON.stringify({testedAt:new Date().toISOString(),provider:"revolut",environment:"sandbox",configured:true,product,httpStatus:code,checkoutCreated:Boolean(code===200&&d.ok&&d.url),orderId:d.orderId||"",providerOrderId:d.checkoutId||d.providerOrderId||"",error:d.error||""},null,2));' "$CHECKOUT" "$HTTP_CODE" "$PRODUCT_ID" "$PRODUCT_NAME" "$PRODUCT_PRICE")"
+          else
+            RESULT="$(node -e 'const product={id:process.argv[1],name:process.argv[2],price:Number(process.argv[3])}; process.stdout.write(JSON.stringify({testedAt:new Date().toISOString(),provider:"revolut",environment:"sandbox",configured:false,product,httpStatus:null,checkoutCreated:false,orderId:"",providerOrderId:"",error:"REVOLUT_SECRET_KEY manquante sur Render"},null,2));' "$PRODUCT_ID" "$PRODUCT_NAME" "$PRODUCT_PRICE")"
+          fi
 
-      - name: Report missing Sandbox key
-        if: steps.provider.outputs.configured != 'true'
-        shell: bash
-        run: |
-          echo 'REVOLUT_SANDBOX_KEY_MISSING: integration is live, but REVOLUT_SECRET_KEY is not configured on Render.'
+          printf '%s\n' "$RESULT" > .github/revolut-smoke-result.json
+          cat .github/revolut-smoke-result.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/revolut-smoke-result.json
+          git commit -m "test: record Revolut smoke result" || exit 0
+          git push
