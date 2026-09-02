@@ -8,7 +8,7 @@
 
   function qs(id) { return document.getElementById(id); }
   function euro(value) { return Number(value || 0).toFixed(2).replace(".", ",") + " €"; }
-  function esc(value) { return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+  function esc(value) { return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;"); }
   function toggleMenu() { qs("menu")?.classList.toggle("open"); }
 
   async function loadProducts() {
@@ -36,8 +36,10 @@
     box.innerHTML = list.map((product) => {
       const image = product.image || POKEMON_LOGO;
       const meta = [product.extension, product.number ? `#${product.number}` : "", product.rarity].filter(Boolean).join(" · ");
-      const canBuy = !!product.purchasable && Number(product.stock || 0) > 0 && Number(product.price || 0) > 0;
-      return `<article class="product"><div class="product-img pokemon-product-visual"><img src="${esc(image)}" alt="${esc(product.name || "Produit Pokémon")}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${POKEMON_LOGO}'"></div><h3>${esc(product.name)}</h3>${meta ? `<p>${esc(meta)}</p>` : ""}<p>${esc(product.condition || "Non renseigné")} • Stock disponible : ${Number(product.stock || 0)}</p><div class="price">${Number(product.price || 0) > 0 ? euro(product.price) : "Prix à définir"}</div><button class="primary" type="button" data-add-product="${esc(product.id)}" ${canBuy ? "" : "disabled"}>${canBuy ? "Ajouter au panier" : "Indisponible"}</button></article>`;
+      const stock = Math.max(0, Number(product.stock || 0));
+      const canBuy = !!product.purchasable && stock > 0 && Number(product.price || 0) > 0;
+      const stockLabel = stock > 0 ? `En stock : ${stock}` : "Rupture de stock";
+      return `<article class="product"><div class="product-img pokemon-product-visual"><img src="${esc(image)}" alt="${esc(product.name || "Produit Pokémon")}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${POKEMON_LOGO}'"></div><h3 class="product-name">${esc(product.name)}</h3>${meta ? `<p class="product-meta">${esc(meta)}</p>` : ""}<div class="product-stock-row"><span class="product-condition">État : ${esc(product.condition || "Non renseigné")}</span><span class="product-stock ${stock > 0 ? "is-available" : "is-empty"}">${stockLabel}</span></div><div class="price">${Number(product.price || 0) > 0 ? euro(product.price) : "Prix à définir"}</div><button class="primary" type="button" data-add-product="${esc(product.id)}" ${canBuy ? "" : "disabled"}>${canBuy ? "Ajouter au panier" : "Indisponible"}</button></article>`;
     }).join("");
   }
 
