@@ -1,0 +1,45 @@
+name: Vercel Migration CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "vercel.json"
+      - "backend/**"
+      - "VERCEL_MIGRATION_CHECKLIST.md"
+      - ".github/workflows/vercel-migration-ci.yml"
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: 10000
+      ADMIN_EMAIL: cardoria59330@gmail.com
+      ADMIN_INITIAL_PASSWORD: Cardoria-CI-Temporary-Password-2026!
+      LEGACY_ADMIN_CODE: "false"
+      ADMIN_AUTH_DISABLED: "false"
+      CSRF_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+      - name: Install backend
+        run: npm install --omit=dev
+      - name: Syntax
+        run: |
+          node --check server.js
+          node --check lib/marketplace/persistence.js
+          node --check lib/engine/database.js
+          node --check lib/payments/revolut.js
+      - name: Verify migration invariants
+        working-directory: .
+        run: |
+          node -e "const c=require('fs').readFileSync('vercel.json','utf8'); const j=JSON.parse(c); if(!j.services?.cardoria || j.services.cardoria.root!=='backend/' || j.services.cardoria.framework!=='express') process.exit(1)"
+          git diff --exit-code origin/main...HEAD -- backend || { echo 'Backend changed during hosting-only migration'; exit 1; }
