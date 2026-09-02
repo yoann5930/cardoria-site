@@ -97,7 +97,7 @@
     '<button data-period="day">Jour</button><button data-period="week">Semaine</button><button data-period="month" class="active">Mois</button><button data-period="year">Année</button></div>' +
     '<div class="admin-kpi-grid">' +
     '<div class="admin-kpi"><label>Revenu Cardoria</label><strong id="kpiRevenue">0 €</strong><small>Boutique + commission Marketplace</small></div>' +
-    '<div class="admin-kpi"><label>CA Boutique SumUp</label><strong id="kpiBoutiqueRevenue">0 €</strong></div>' +
+    '<div class="admin-kpi"><label>CA Boutique Revolut</label><strong id="kpiBoutiqueRevenue">0 €</strong></div>' +
     '<div class="admin-kpi"><label>GMV Marketplace</label><strong id="kpiMarketplaceGmv">0 €</strong><small>Volume vendu, pas revenu Cardoria</small></div>' +
     '<div class="admin-kpi"><label>Commission Marketplace</label><strong id="kpiMarketplaceCommission">0 €</strong></div>' +
     '<div class="admin-kpi"><label>Ventes payées</label><strong id="kpiSales">0</strong></div>' +
