@@ -3,8 +3,9 @@
 
   var E = window.CardoriaEngine;
   var params = new URLSearchParams(location.search);
-  var license = params.get("license");
-  var slug = params.get("slug");
+  var routeCard = window.CARDORIA_CARD_ROUTE || {};
+  var license = routeCard.license || params.get("license");
+  var slug = routeCard.slug || params.get("slug");
   var id = params.get("id");
   var root = document.getElementById("cardPage");
   var currentCardId = null;
@@ -53,9 +54,7 @@
         var box = document.getElementById("aiTrendsBox");
         if (!box || !d.trends) return;
         var mine = d.trends.filter(function (t) { return t.cardId === currentCardId; })[0];
-        if (mine) {
-          box.innerHTML = "<p style='margin-top:12px'>" + trendLabel(mine.direction, mine.changePercent) + " sur 30 jours</p>";
-        }
+        if (mine) box.innerHTML = "<p style='margin-top:12px'>" + trendLabel(mine.direction, mine.changePercent) + " sur 30 jours</p>";
       });
   }
 
@@ -76,7 +75,7 @@
     }).join("") || "<tr><td colspan='4'>Aucune vente enregistrée</td></tr>";
 
     root.innerHTML =
-      '<nav class="engine-breadcrumb"><a href="index.html">Accueil</a> › <a href="licence.html?slug=' + card.license + '">' + (card.licenseName || card.license) + '</a> › ' + card.name + "</nav>" +
+      '<nav class="engine-breadcrumb"><a href="/">Accueil</a> › <a href="/pages/licences/' + card.license + '/">' + (card.licenseName || card.license) + '</a> › ' + card.name + "</nav>" +
       "<h1>" + card.name + "</h1>" +
       '<div class="engine-card-layout">' +
       '<div class="engine-card-visual">' + img + "</div>" +
@@ -93,7 +92,7 @@
       "</div>" +
       trendLabel(card.marketTrend, card.trendPercent) +
       '<div id="cardIntelligenceBox" style="margin-top:18px"></div>' +
-      '<div class="actions" style="margin-top:18px"><a class="btn btn-primary" href="estimation.html?card=' + encodeURIComponent(card.id) + '">Faire estimer cette carte</a> <a class="btn btn-secondary" href="rachat-cartes.html">Vendre à Cardoria</a></div>' +
+      '<div class="actions" style="margin-top:18px"><a class="btn btn-primary" href="/estimation.html?card=' + encodeURIComponent(card.id) + '">Faire estimer cette carte</a> <a class="btn btn-secondary" href="/rachat-cartes.html">Vendre à Cardoria</a></div>' +
       '<section class="engine-section"><h2>Historique des ventes</h2><div class="table-wrap"><table class="engine-sales-table"><thead><tr><th>Date</th><th>Prix</th><th>État</th><th>Canal</th></tr></thead><tbody>' + sales + "</tbody></table></div></section>" +
       '<section class="engine-section" id="aiHistorySection"><h2>Évolution des prix</h2><div class="admin-periods" id="historyPeriods"><button data-period="7">7 j</button><button data-period="30" class="active">30 j</button><button data-period="90">90 j</button><button data-period="365">1 an</button></div><canvas class="ai-chart" id="priceHistoryChart" width="900" height="220"></canvas><div id="aiTrendsBox"></div></section>' +
       "</div></div>";
@@ -126,17 +125,18 @@
   function applySeo(card) {
     var title = card.meta?.title || card.name + " — " + card.extension + " | Cardoria";
     var desc = card.meta?.description || "Prix " + E.euro(card.prices.recommended) + " pour " + card.name + ". Fiche complète Cardoria.";
-    var url = (window.CARDORIA_SEO?.siteUrl || "") + "/carte.html?license=" + card.license + "&slug=" + card.slug;
+    var siteUrl = window.CARDORIA_SEO?.siteUrl || location.origin || "https://cardoria-site-f2cy.onrender.com";
+    var url = siteUrl.replace(/\/$/, "") + "/cartes/" + encodeURIComponent(card.license) + "/" + encodeURIComponent(card.slug);
     document.title = title;
     setMeta("description", desc);
     setMeta("og:title", title, "property");
     setMeta("og:description", desc, "property");
+    setMeta("og:url", url, "property");
     setMeta("twitter:title", title);
     setMeta("twitter:description", desc);
     setLink("canonical", url);
     if (card.imageHd) setMeta("og:image", card.imageHd, "property");
 
-    var siteUrl = window.CARDORIA_SEO?.siteUrl || "https://cardoria-site-f2cy.onrender.com";
     var ldProduct = document.createElement("script");
     ldProduct.type = "application/ld+json";
     ldProduct.textContent = JSON.stringify({
@@ -147,6 +147,7 @@
       image: card.imageHd || undefined,
       brand: { "@type": "Brand", name: card.licenseName || card.license },
       sku: card.number,
+      url: url,
       offers: {
         "@type": "AggregateOffer",
         priceCurrency: "EUR",
@@ -163,7 +164,7 @@
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
       itemListElement: [
-        { "@type": "ListItem", position: 1, name: "Accueil", item: siteUrl + "/index.html" },
+        { "@type": "ListItem", position: 1, name: "Accueil", item: siteUrl + "/" },
         { "@type": "ListItem", position: 2, name: card.licenseName || card.license, item: siteUrl + "/pages/licences/" + card.license + "/" },
         { "@type": "ListItem", position: 3, name: card.name, item: url }
       ]
@@ -189,7 +190,7 @@
   function load() {
     var promise = id ? E.getCard(id) : (license && slug ? E.getCardBySlug(license, slug) : Promise.resolve(null));
     promise.then(function (card) {
-      if (!card) { root.innerHTML = "<div class='panel'><h1>Carte introuvable</h1><p><a href='licence.html'>Retour au catalogue</a></p></div>"; return; }
+      if (!card) { root.innerHTML = "<div class='panel'><h1>Carte introuvable</h1><p><a href='/licence.html'>Retour au catalogue</a></p></div>"; return; }
       renderCard(card);
     }).catch(function () {
       root.innerHTML = "<div class='panel'><h1>Erreur de chargement</h1><p>Vérifiez la connexion au moteur Cardoria.</p></div>";
