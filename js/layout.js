@@ -1,9 +1,7 @@
 (function () {
   "use strict";
 
-  var A = window.CARDORIA_ASSETS || {
-    logo: "/assets/logo/cardoria-premium.png"
-  };
+  var A = window.CARDORIA_ASSETS || { logo: "/assets/logo/cardoria-premium.png" };
 
   function pageBase() {
     return location.pathname.indexOf("/pages/") !== -1 ? "../../" : "";
@@ -15,7 +13,7 @@
     if (!slot) return;
     slot.innerHTML =
       '<header class="header"><div class="container nav">' +
-      '<a class="brand" href="' + base + 'index.html"><img src="' + A.logo + '" alt="Cardoria — cartes TCG premium" width="58" height="42" loading="eager" decoding="async"><span>CARDORIA</span></a>' +
+      '<a class="brand" href="' + base + 'index.html" aria-label="CardoriaShop.fr — site officiel Cardoria"><img src="' + A.logo + '" alt="CardoriaShop.fr — site officiel Cardoria" width="58" height="42" loading="eager" decoding="async"><span>CARDORIA</span></a>' +
       '<button class="burger" type="button" aria-label="Ouvrir le menu" onclick="toggleMenu()">Menu</button>' +
       '<nav class="menu" id="menu" aria-label="Navigation principale">' +
       '<a href="' + base + 'index.html">Accueil</a>' +
@@ -42,8 +40,8 @@
       '<footer class="footer-premium">' +
       '<div class="container footer-grid">' +
       '<div class="footer-brand">' +
-      '<img src="' + A.logo + '" alt="Cardoria logo" width="90" height="65" loading="lazy" decoding="async">' +
-      "<p>Plateforme premium française : estimation, boutique, marketplace et expertise cartes TCG.</p>" +
+      '<img src="' + A.logo + '" alt="CardoriaShop.fr — logo Cardoria" width="90" height="65" loading="lazy" decoding="async">' +
+      '<p><strong>CardoriaShop.fr</strong> est le site officiel de Cardoria : catalogue, estimation, boutique et marketplace de cartes TCG.</p>' +
       '<p class="footer-email"><a href="mailto:Cardoria59330@gmail.com">Cardoria59330@gmail.com</a></p>' +
       "</div>" +
       '<div class="footer-col"><h4>Navigation</h4><ul>' +
@@ -54,7 +52,7 @@
       '<li><a href="' + base + 'tendances.html">Tendances</a></li>' +
       "</ul></div>" +
       '<div class="footer-col"><h4>Informations</h4><ul>' +
-      '<li><a href="' + base + 'pages/a-propos/">À propos</a></li>' +
+      '<li><a href="' + base + 'pages/a-propos/">À propos de CardoriaShop</a></li>' +
       '<li><a href="' + base + 'pages/faq/">FAQ</a></li>' +
       '<li><a href="' + base + 'pages/blog/">Blog TCG</a></li>' +
       '<li><a href="' + base + 'referencement.html">Référencement</a></li>' +
@@ -69,11 +67,11 @@
       '<div class="footer-col"><h4>Licences TCG</h4><ul>' + licLinks + "</ul></div>" +
       "</div>" +
       '<div class="footer-bottom"><div class="container footer-cta">' +
-      '<div class="footer-cta-text"><h3>Estimez vos cartes avec l\'IA Cardoria</h3><p>Photos + analyse multi-sources — sans engagement.</p></div>' +
+      '<div class="footer-cta-text"><h3>Estimez vos cartes avec CardoriaShop</h3><p>Photos + analyse multi-sources — sans engagement.</p></div>' +
       '<a class="btn btn-primary" href="' + base + 'pages/estimation/">Faire estimer une carte</a></div>' +
       '<div class="container footer-bottom-inner">' +
-      '<p class="small">© ' + new Date().getFullYear() + " Cardoria — Trading cards • Collectibles • Premium</p>" +
-      '<p class="small"><a href="' + base + 'sitemap.xml">Sitemap</a> • Paiement SumUp sécurisé</p></div></div></footer>';
+      '<p class="small">© ' + new Date().getFullYear() + ' CardoriaShop.fr — Site officiel Cardoria</p>' +
+      '<p class="small"><a href="' + base + 'pages/a-propos/">Identité CardoriaShop</a> • <a href="' + base + 'sitemap.xml">Sitemap</a></p></div></div></footer>';
   }
 
   document.addEventListener("DOMContentLoaded", function () {
