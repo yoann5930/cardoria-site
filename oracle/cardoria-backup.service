@@ -1,0 +1,8 @@
+[Unit]
+Description=Cardoria PostgreSQL and data backup
+
+[Service]
+Type=oneshot
+User=cardoria
+Group=cardoria
+ExecStart=/bin/bash /opt/cardoria/current/oracle/backup.sh
