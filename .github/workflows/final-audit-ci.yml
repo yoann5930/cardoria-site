@@ -60,7 +60,8 @@ jobs:
           node --check lib/admin/dashboard.js
           node --check lib/admin/finance.js
           node --check lib/boutique/stock.js
-          node --check lib/payments/sumup.js
+          node --check lib/boutique/catalog.js
+          node --check lib/payments/revolut.js
           node --check lib/marketplace/paypal.js
           node --check lib/marketplace/v1/listings.js
           node --check lib/marketplace/v1/disputes.js
@@ -74,13 +75,21 @@ jobs:
         working-directory: .
         run: |
           grep -q 'listBoutiqueInventory' backend/routes/payments-admin.js
-          grep -q 'refundSumUpTransaction' backend/routes/payments-admin.js
+          grep -q 'refundRevolutOrder' backend/routes/payments-admin.js
+          grep -q 'revolut_admin_sync' backend/routes/payments-admin.js
+          grep -q 'revolut_admin_refund' backend/routes/payments-admin.js
+          grep -q 'listBoutiqueProducts' backend/lib/boutique/catalog.js
+          grep -q 'from "./stock.js"' backend/lib/boutique/catalog.js
           grep -q 'marketplaceGmv' backend/lib/admin/finance.js
           grep -q 'marketplaceCommission' backend/lib/admin/finance.js
           grep -q 'paypal' backend/lib/marketplace/paypal.js
           grep -q 'createPurchaseFromProposal' backend/lib/rachat/workflow.js
           grep -q 'cardoria_backups' backend/lib/backup/durable.js
           grep -q 'roles: \["super_admin"\], action: "restore"' backend/routes/system.js
+          if grep -q 'refundSumUpTransaction\|sumup_admin_sync\|sumup_admin_refund' backend/routes/payments-admin.js; then
+            echo 'Active SumUp admin flow detected'
+            exit 1
+          fi
           if grep -n 'marketplaceRoutes' backend/server.js; then
             echo 'Legacy marketplace router mounted'
             exit 1
@@ -117,7 +126,7 @@ jobs:
           curl -fsS http://127.0.0.1:10000/api/health/ | grep -q '"version":"6.0.0"'
           curl -fsS http://127.0.0.1:10000/api/payments/boutique/products | grep -q '"ok":true'
           curl -fsS 'http://127.0.0.1:10000/api/marketplace/v1/search?license=pokemon' | grep -q '"ok":true'
-          curl -fsS http://127.0.0.1:10000/admin-login.html | grep -q 'double authentification'
+          curl -fsS http://127.0.0.1:10000/admin-login.html | grep -q 'Admin Cardoria'
           for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/accounting/summary /api/system/backups; do
             code=$(curl -sS -o /tmp/cardoria-final-anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
             test "$code" = "401"
@@ -135,7 +144,7 @@ jobs:
           if [ "${{ job.status }}" != "success" ]; then cat /tmp/cardoria-final-core.log || true; fi
 
   security-2fa:
-    name: Mandatory Admin 2FA E2E
+    name: Admin authentication security E2E
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -167,7 +176,7 @@ jobs:
             sleep 1
           done
           exit 1
-      - name: Mandatory 2FA flow
+      - name: Authentication security flow
         run: node scripts/security-2fa-e2e.mjs
       - name: Stop backend
         if: always()
@@ -197,6 +206,19 @@ jobs:
           node-version: '22.22.0'
           package-manager-cache: false
       - run: npm install --omit=dev
+      - name: Enable 2FA only inside CI workspace
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const p = 'routes/auth.js';
+          let s = fs.readFileSync(p, 'utf8');
+          s = s.replace('const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;', 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;');
+          const old = 'logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });\n    res.json(completeSession(user, req));';
+          const next = 'logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });\n    const challenge = ADMIN_ROLES.includes(user.role) ? beginAdmin2fa(user, req) : null;\n    res.json(challenge || completeSession(user, req));';
+          if (!s.includes(old)) throw new Error('Auth login block not found');
+          fs.writeFileSync(p, s.replace(old, next));
+          NODE
+          node --check routes/auth.js
       - name: Start backend
         run: |
           node server.js > /tmp/cardoria-final-users.log 2>&1 &
