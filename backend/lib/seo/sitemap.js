@@ -90,7 +90,6 @@ export function generateCoreSitemapXml(siteUrl = SITE) {
     urls += urlEntry(base, page.loc, { lastmod: today, changefreq: page.changefreq, priority: page.priority });
   });
 
-  // Une seule URL canonique par licence : pas de doublon /licence.html?slug=...
   listLicenses().forEach((license) => {
     urls += urlEntry(base, `/pages/licences/${license.slug}/`, {
       lastmod: today,
@@ -125,9 +124,7 @@ export function generateCardsSitemapXml(siteUrl = SITE, page = 1, pageSize = CAR
   let urls = "";
 
   getSitemapCards(safePageSize, offset).forEach((card) => {
-    // Tant que la route historique est la route publique de la fiche, elle reste
-    // l'unique URL canonique afin d'éviter de créer des doublons indexables.
-    const cardUrl = `/carte.html?license=${encodeURIComponent(card.license_slug)}&slug=${encodeURIComponent(card.slug)}`;
+    const cardUrl = `/cartes/${encodeURIComponent(card.license_slug)}/${encodeURIComponent(card.slug)}`;
     urls += urlEntry(base, cardUrl, {
       lastmod: String(card.updated_at || today).slice(0, 10),
       changefreq: "weekly",
@@ -138,8 +135,6 @@ export function generateCardsSitemapXml(siteUrl = SITE, page = 1, pageSize = CAR
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}</urlset>`;
 }
 
-// Compatibilité avec les anciens appels internes : le sitemap principal est
-// désormais un index, ce qui permet de couvrir tout le catalogue.
 export function generateSitemapXml(siteUrl = SITE) {
   return generateSitemapIndexXml(siteUrl);
 }
