@@ -1,9 +1,10 @@
 /**
- * Configuration SEO entreprise Cardoria — pages, licences, avis, analytics.
+ * Configuration SEO publique Cardoria.
+ * Les données structurées doivent rester factuelles et vérifiables.
  */
 window.CARDORIA_SEO = {
-  siteUrl: "https://cardoria-site-f2cy.onrender.com",
-  backendUrl: "https://cardoria-site-f2cy.onrender.com",
+  siteUrl: "https://www.cardoriashop.fr",
+  backendUrl: "https://www.cardoriashop.fr",
   siteName: "Cardoria",
   locale: "fr_FR",
   lang: "fr",
@@ -16,23 +17,12 @@ window.CARDORIA_SEO = {
   organization: {
     name: "Cardoria",
     legalName: "Cardoria",
-    url: "https://cardoria-site-f2cy.onrender.com",
-    logo: "https://cardoria-site-f2cy.onrender.com/assets/logo/cardoria-premium.png",
+    url: "https://www.cardoriashop.fr",
+    logo: "https://www.cardoriashop.fr/assets/logo/cardoria-premium.png",
     email: "Cardoria59330@gmail.com",
-    address: { street: "", city: "France", country: "FR" },
+    address: { country: "FR" },
     sameAs: []
   },
-  aggregateRating: {
-    ratingValue: "4.9",
-    reviewCount: "127",
-    bestRating: "5",
-    worstRating: "1"
-  },
-  reviews: [
-    { author: "Sophie R.", rating: 5, date: "2026-05-12", body: "Estimation rapide et transparente sur ma collection Pokémon. Paiement SumUp reçu en quelques jours.", license: "Pokémon" },
-    { author: "Marc D.", rating: 5, date: "2026-04-28", body: "J'ai vendu un lot Yu-Gi-Oh! et One Piece. L'équipe Cardoria a vérifié chaque carte avec soin.", license: "Yu-Gi-Oh!" },
-    { author: "Julien P.", rating: 5, date: "2026-06-02", body: "Marketplace premium, annonce vendue rapidement. Service sérieux et professionnel.", license: "One Piece" }
-  ],
   licenses: {
     pokemon: { name: "Pokémon", icon: "⚡", path: "/pages/licences/pokemon/", catalog: "/licence.html?slug=pokemon" },
     yugioh: { name: "Yu-Gi-Oh!", icon: "🔷", path: "/pages/licences/yugioh/", catalog: "/licence.html?slug=yugioh" },
@@ -43,43 +33,38 @@ window.CARDORIA_SEO = {
     sports: { name: "Sports", icon: "⚽", path: "/pages/licences/sports/", catalog: "/licence.html?slug=sports" }
   },
   pages: {
-    "index.html": { title: "Cardoria — Estimation & rachat de cartes TCG premium", description: "Cardoria, plateforme premium française : estimation IA, expertise, rachat et vente de cartes Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, Dragon Ball et Sports.", path: "/", type: "home" },
-    "boutique.html": { title: "Boutique Cardoria — Cartes TCG & collectibles premium", description: "Achetez des cartes Pokémon, Yu-Gi-Oh!, One Piece, Lorcana et Magic sur la boutique Cardoria. Paiement SumUp sécurisé.", path: "/boutique.html" },
-    "estimation.html": { title: "Estimation carte TCG — IA Premium Cardoria", description: "Analyse IA Cardoria : reconnaissance automatique, état de la carte, estimation multi-sources. Sans engagement.", path: "/estimation.html", type: "service" },
-    "rachat-cartes.html": { title: "Rachat de cartes TCG — Cardoria", description: "Vendez vos cartes Pokémon, Yu-Gi-Oh!, One Piece et autres TCG. Rachat express, offre transparente et paiement SumUp.", path: "/rachat-cartes.html" },
-    "referencement.html": { title: "Référencement cartes TCG — Cardoria", description: "Référencement et visibilité pour vendeurs de cartes à collectionner. Cardoria accompagne votre activité TCG en France.", path: "/referencement.html" },
-    "contact.html": { title: "Contact Cardoria — Experts cartes TCG", description: "Contactez Cardoria pour une estimation, un rachat ou une question sur vos cartes TCG. Réponse sous 48 h.", path: "/pages/contact/", type: "contact" },
-    "accessoires.html": { title: "Accessoires cartes TCG — Cardoria", description: "Sleeves, top loaders et classeurs premium pour protéger vos cartes Pokémon, Yu-Gi-Oh!, One Piece et Magic.", path: "/accessoires.html" },
-    "carte.html": { title: "Fiche carte TCG — Cardoria", description: "Prix, rareté, extension et historique des ventes. Fiche carte optimisée Cardoria.", path: "/carte.html", type: "product" },
-    "licence.html": { title: "Catalogue cartes TCG — Cardoria", description: "Parcourez le catalogue Cardoria par licence : Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, Dragon Ball et Sports.", path: "/licence.html", type: "collection" },
-    "scanner.html": { title: "Scanner Intelligent Cardoria — Scan cartes TCG", description: "Scannez vos cartes Pokémon, Yu-Gi-Oh!, One Piece et TCG avec l'IA Cardoria.", path: "/scanner.html" },
-    "marketplace.html": { title: "Marketplace TCG — Acheter & vendre | Cardoria", description: "Marketplace Cardoria : achetez et vendez des cartes TCG entre particuliers et pros. Paiement sécurisé.", path: "/marketplace.html" },
-    "vendre.html": { title: "Vendre une carte TCG — Cardoria Marketplace", description: "Publiez votre annonce sur Cardoria : photos, état, prix. Vendeurs particuliers et professionnels.", path: "/vendre.html" },
-    "comparateur.html": { title: "Comparateur de prix cartes TCG — Cardoria", description: "Comparez les prix marketplace, moteur Cardoria et tendances marché.", path: "/comparateur.html" },
-    "annonce.html": { title: "Annonce carte TCG — Cardoria Marketplace", description: "Détail annonce marketplace. Achat sécurisé, profil vendeur vérifié.", path: "/annonce.html", type: "product" },
-    "tendances.html": { title: "Tendances marché TCG — Cardoria IA", description: "Cartes Pokémon et TCG en hausse ou en baisse. Analyse IA Cardoria.", path: "/tendances.html" },
-    "faq.html": { title: "FAQ Cardoria — Estimation, rachat & vente TCG", description: "Questions fréquentes sur l'estimation, le rachat et la vente de cartes Pokémon, Yu-Gi-Oh!, One Piece et TCG.", path: "/pages/faq/", type: "faq" },
-    "a-propos.html": { title: "À propos de Cardoria — Experts cartes TCG", description: "Cardoria, plateforme premium française dédiée aux cartes à collectionner : expertise, IA, marketplace et rachat.", path: "/pages/a-propos/", type: "about" },
-    "mentions-legales.html": { title: "Mentions légales — Cardoria", description: "Mentions légales du site Cardoria, plateforme TCG premium.", path: "/pages/mentions-legales/", type: "legal" },
-    "confidentialite.html": { title: "Politique de confidentialité — Cardoria", description: "Politique de confidentialité et protection des données personnelles Cardoria (RGPD).", path: "/pages/confidentialite/", type: "legal" },
-    "cgv.html": { title: "Conditions générales de vente — Cardoria", description: "CGV Cardoria : conditions de vente boutique, marketplace et services d'estimation.", path: "/pages/cgv/", type: "legal" },
-    "blog.html": { title: "Blog TCG Cardoria — Guides & tendances", description: "Articles SEO Cardoria : guides estimation, tendances Pokémon, Yu-Gi-Oh!, marketplace.", path: "/pages/blog/", type: "blog" },
-    "blog-article.html": { title: "Article — Blog Cardoria", description: "Article du blog Cardoria sur les cartes à collectionner.", path: "/pages/blog/article.html", type: "article" },
-    "licences.html": { title: "Toutes les licences TCG — Cardoria", description: "Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, Dragon Ball, Sports : pages SEO par licence.", path: "/pages/licences/", type: "collection" },
-    "extension.html": { title: "Extension TCG — Cardoria", description: "Cartes par extension : prix, rareté et fiches détaillées Cardoria.", path: "/pages/extension/", type: "collection" }
+    "index.html": { title: "Cartes Pokémon : prix, cote, estimation, achat & vente | Cardoria", description: "Cardoria référence les cartes Pokémon et TCG : prix, cote, estimation, catalogue par extension, achat, vente et marketplace entre collectionneurs en France.", path: "/", type: "home" },
+    "boutique.html": { title: "Boutique cartes Pokémon & TCG | Cardoria", description: "Découvrez la boutique Cardoria : cartes Pokémon et autres TCG, collectibles et produits pour collectionneurs.", path: "/boutique.html" },
+    "estimation.html": { title: "Estimation carte Pokémon & TCG — Prix et valeur | Cardoria", description: "Estimez une carte Pokémon ou TCG sur Cardoria : identification, état, rareté et données de marché pour mieux comprendre sa valeur.", path: "/estimation.html", type: "service" },
+    "rachat-cartes.html": { title: "Vendre et faire racheter ses cartes Pokémon & TCG | Cardoria", description: "Faites estimer puis proposez vos cartes Pokémon, Yu-Gi-Oh!, One Piece et autres TCG au service de rachat Cardoria.", path: "/rachat-cartes.html" },
+    "referencement.html": { title: "Référencement cartes TCG — Cardoria", description: "Référencement et visibilité pour vendeurs de cartes à collectionner sur Cardoria.", path: "/referencement.html" },
+    "contact.html": { title: "Contact Cardoria — Cartes Pokémon & TCG", description: "Contactez Cardoria pour une question sur le catalogue, une estimation, un achat ou une vente de cartes à collectionner.", path: "/pages/contact/", type: "contact" },
+    "accessoires.html": { title: "Accessoires cartes Pokémon & TCG | Cardoria", description: "Accessoires pour protéger et ranger vos cartes Pokémon et TCG : sleeves, top loaders, classeurs et protections.", path: "/accessoires.html" },
+    "carte.html": { title: "Prix et fiche carte TCG | Cardoria", description: "Consultez la fiche d'une carte : prix, cote, rareté, extension, numéro et informations disponibles sur Cardoria.", path: "/carte.html", type: "product" },
+    "licence.html": { title: "Catalogue cartes Pokémon & TCG par licence | Cardoria", description: "Parcourez le catalogue Cardoria par licence, extension, nom ou numéro de carte.", path: "/licence.html", type: "collection" },
+    "scanner.html": { title: "Scanner de cartes Pokémon & TCG | Cardoria", description: "Scannez et identifiez vos cartes Pokémon et TCG avec les outils Cardoria.", path: "/scanner.html" },
+    "marketplace.html": { title: "Marketplace cartes Pokémon & TCG — Acheter & vendre | Cardoria", description: "Marketplace Cardoria : découvrez des cartes Pokémon et TCG proposées à la vente et publiez vos annonces.", path: "/marketplace.html" },
+    "vendre.html": { title: "Vendre une carte Pokémon ou TCG | Cardoria", description: "Publiez une annonce Cardoria avec photos, état et prix pour vendre une carte à collectionner.", path: "/vendre.html" },
+    "comparateur.html": { title: "Comparateur de prix cartes Pokémon & TCG | Cardoria", description: "Comparez les données de prix disponibles pour vos cartes Pokémon et TCG sur Cardoria.", path: "/comparateur.html" },
+    "annonce.html": { title: "Annonce carte TCG — Cardoria Marketplace", description: "Consultez le détail d'une annonce de carte à collectionner sur Cardoria.", path: "/annonce.html", type: "product" },
+    "tendances.html": { title: "Prix et tendances du marché des cartes TCG | Cardoria", description: "Suivez les tendances et évolutions de prix des cartes Pokémon et autres TCG référencées sur Cardoria.", path: "/tendances.html" },
+    "faq.html": { title: "FAQ Cardoria — Estimation, achat & vente de cartes TCG", description: "Réponses aux questions fréquentes sur Cardoria, le catalogue, l'estimation et la vente de cartes Pokémon et TCG.", path: "/pages/faq/", type: "faq" },
+    "a-propos.html": { title: "À propos de Cardoria — Plateforme cartes Pokémon & TCG", description: "Découvrez Cardoria, plateforme française consacrée au catalogue, aux prix, à l'estimation et à la marketplace de cartes à collectionner.", path: "/pages/a-propos/", type: "about" },
+    "mentions-legales.html": { title: "Mentions légales — Cardoria", description: "Mentions légales du site Cardoria.", path: "/pages/mentions-legales/", type: "legal" },
+    "confidentialite.html": { title: "Politique de confidentialité — Cardoria", description: "Politique de confidentialité et protection des données personnelles Cardoria.", path: "/pages/confidentialite/", type: "legal" },
+    "cgv.html": { title: "Conditions générales de vente — Cardoria", description: "Conditions générales applicables aux services et ventes Cardoria.", path: "/pages/cgv/", type: "legal" },
+    "blog.html": { title: "Blog cartes Pokémon & TCG — Guides, prix et collection | Cardoria", description: "Guides Cardoria sur les cartes Pokémon et TCG : collection, identification, prix, estimation et tendances.", path: "/pages/blog/", type: "blog" },
+    "blog-article.html": { title: "Guide cartes Pokémon & TCG | Cardoria", description: "Guide Cardoria consacré aux cartes à collectionner.", path: "/pages/blog/article.html", type: "article" },
+    "licences.html": { title: "Catalogues Pokémon, Yu-Gi-Oh!, One Piece, Lorcana & Magic | Cardoria", description: "Explorez les catalogues Cardoria par licence et accédez aux extensions et fiches cartes.", path: "/pages/licences/", type: "collection" },
+    "extension.html": { title: "Extension TCG — Liste des cartes, prix et raretés | Cardoria", description: "Consultez les cartes d'une extension TCG avec leurs numéros, raretés et données de prix disponibles.", path: "/pages/extension/", type: "collection" }
   },
   faq: [
-    { question: "Comment faire estimer une carte Pokémon ou TCG ?", answer: "Envoyez des photos nettes (recto, verso, coins) via notre formulaire d'estimation IA. Cardoria analyse l'état, la rareté et le marché, puis vous transmet une estimation fiable sous 48 h." },
-    { question: "Quelles licences de cartes acceptez-vous ?", answer: "Cardoria expertises Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, Dragon Ball et cartes Sports. Toutes les extensions et éditions sont acceptées." },
-    { question: "Combien de temps pour recevoir une estimation ?", answer: "La plupart des demandes reçoivent une estimation sous 24 à 48 h ouvrées. Les collections volumineuses peuvent nécessiter un délai supplémentaire." },
-    { question: "Proposez-vous le rachat de cartes à collectionner ?", answer: "Oui. Après estimation, Cardoria peut vous faire une offre de rachat express. Vous êtes libre d'accepter ou de refuser, sans engagement." },
-    { question: "Comment vendre ma collection de cartes TCG ?", answer: "Contactez Cardoria via le formulaire d'estimation ou la page rachat. Listez vos cartes ou envoyez des photos de lot : nous vous proposons une offre transparente." },
-    { question: "Les estimations Cardoria sont-elles fiables ?", answer: "Chaque carte est analysée par des experts et l'IA Cardoria. L'estimation croise plusieurs sources marché et tient compte de l'état, la rareté et les tendances." },
-    { question: "Quels moyens de paiement acceptez-vous ?", answer: "La Boutique Cardoria utilise SumUp pour les paiements par carte bancaire sécurisés. La Marketplace utilise son flux de paiement dédié." },
-    { question: "Comment fonctionne la marketplace Cardoria ?", answer: "Publiez une annonce avec photos, état et prix. Les ventes Marketplace restent séparées du stock et des paiements de la Boutique Cardoria." }
+    { question: "Comment faire estimer une carte Pokémon ou TCG ?", answer: "Utilisez la page d'estimation Cardoria avec des photos nettes et les informations disponibles sur la carte. L'analyse prend notamment en compte son identification, son état, sa rareté et les données de marché accessibles." },
+    { question: "Quelles licences sont référencées sur Cardoria ?", answer: "Cardoria référence notamment Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, Dragon Ball et des cartes sportives selon les données disponibles au catalogue." },
+    { question: "Puis-je rechercher une carte par extension ?", answer: "Oui. Les catalogues Cardoria sont organisés par licence puis par extension, avec des fiches individuelles accessibles par carte." },
+    { question: "Cardoria permet-il d'acheter et de vendre des cartes ?", answer: "Oui. Cardoria propose une boutique, une marketplace et des parcours dédiés à la vente et au rachat selon les services disponibles." }
   ],
   breadcrumbs: {}
 };
 
-/** URL API backend Render — utilisée par tous les modules client */
 window.CARDORIA_BACKEND = window.CARDORIA_SEO.backendUrl;
