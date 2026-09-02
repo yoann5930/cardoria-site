@@ -2,7 +2,17 @@
 import { sanitizeObject } from "./sanitize.js";
 import { logError } from "../monitoring/errors.js";
 
-const PUBLIC_RELEASE = "cardoria-premium-20260828-1";
+const PUBLIC_RELEASE = "cardoria-seo-20260902-1";
+
+function isPrivateIndexPath(pathname = "") {
+  const path = String(pathname || "").toLowerCase();
+  return path.startsWith("/admin") ||
+    path.startsWith("/mes-commandes") ||
+    path.startsWith("/favoris") ||
+    path.startsWith("/souhaits") ||
+    path.startsWith("/document-commande") ||
+    path.startsWith("/api/");
+}
 
 export function applySecurityMiddleware(app) {
   app.set("trust proxy", 1);
@@ -15,18 +25,28 @@ export function applySecurityMiddleware(app) {
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(self)");
 
-    // Les pages publiques doivent toujours refléter le dernier déploiement.
-    // Les anciens écrans Cardoria ont été longtemps servis avec des URLs stables,
-    // donc on interdit explicitement aux navigateurs/proxies de conserver le HTML.
+    const publicPath = String(req.path || "");
+    const host = String(req.hostname || req.headers.host || "").split(":")[0].toLowerCase();
+    const technicalHost = host.endsWith(".onrender.com") || host === "cardoria.vercel.app";
+
+    // Une seule version publique doit être indexée : www.cardoriashop.fr.
+    // Le sous-domaine technique Render reste utilisable par l'exploitation mais ne
+    // doit jamais concurrencer le domaine officiel dans l'index Google.
+    if (technicalHost || isPrivateIndexPath(publicPath)) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
+    } else {
+      res.setHeader("X-Robots-Tag", "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1");
+    }
+
+    // Cache court pour le HTML afin de conserver des pages fraîches tout en évitant
+    // un re-téléchargement complet à chaque navigation/crawl.
     if (req.method === "GET" || req.method === "HEAD") {
-      const publicPath = String(req.path || "");
       if (publicPath === "/" || publicPath.endsWith(".html") || publicPath.endsWith("/")) {
-        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
-        res.setHeader("Pragma", "no-cache");
-        res.setHeader("Expires", "0");
-        res.setHeader("Surrogate-Control", "no-store");
+        res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
       } else if (publicPath.endsWith(".css") || publicPath.endsWith(".js")) {
-        res.setHeader("Cache-Control", "no-cache, max-age=0, must-revalidate");
+        res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+      } else if (/\.(png|jpe?g|webp|svg|ico|woff2?|ttf)$/i.test(publicPath)) {
+        res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=2592000");
       }
     }
 
