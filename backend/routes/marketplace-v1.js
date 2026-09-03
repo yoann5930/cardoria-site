@@ -12,6 +12,8 @@ import { createInvoiceForOrder, getInvoiceHtmlByOrder } from "../lib/marketplace
 import { createDispute } from "../lib/marketplace/v1/disputes.js";
 import { getMarketplaceStats } from "../lib/marketplace/v1/index.js";
 import { isMarketplaceDemoMode } from "../lib/marketplace/demo-mode.js";
+import { listSellerPlans } from "../lib/subscriptions/plans.js";
+import { assertActiveSellerPlan, getSellerPlanState } from "../lib/subscriptions/seller-plans.js";
 import paypalMarketplaceRoutes from "./marketplace-paypal.js";
 
 const router = Router();
@@ -20,13 +22,14 @@ router.use(paypalMarketplaceRoutes);
 function fail(res, e, fallback = 400) { return res.status(e?.code || e?.status || fallback).json({ ok: false, error: e?.message || "Erreur Marketplace" }); }
 function publicSeller(seller) {
   if (!seller) return null;
-  return { id: seller.id, displayName: seller.displayName, sellerType: seller.sellerType, verified: seller.verified, avatar: seller.avatar || "", bio: seller.bio || "", ratingAvg: seller.ratingAvg, ratingCount: seller.ratingCount, salesCount: seller.salesCount, satisfactionRate: seller.satisfactionRate, createdAt: seller.createdAt };
+  return { id: seller.id, displayName: seller.displayName, sellerType: seller.sellerType, verified: seller.verified, avatar: seller.avatar || "", bio: seller.bio || "", ratingAvg: seller.ratingAvg, ratingCount: seller.ratingCount, salesCount: seller.salesCount, satisfactionRate: seller.satisfactionRate, planId: seller.planId, subscriptionActive: seller.subscriptionActive, createdAt: seller.createdAt };
 }
 function publicListingOrNull(listing) {
   if (!listing || listing.status !== "active" || listing.moderationLocked || Number(listing.stock || 0) <= 0) return null;
   return listing;
 }
 
+router.get("/v1/plans", (req, res) => res.json({ ok: true, currency: "EUR", billingPeriod: "month", plans: listSellerPlans() }));
 router.get("/v1/stats", (req, res) => res.json({ ok: true, stats: getMarketplaceStats() }));
 router.get("/v1/search", (req, res) => {
   try { const started = Date.now(); const result = searchListings(req.query || {}); res.json({ ok: true, ...result, ms: Date.now() - started }); }
@@ -38,6 +41,10 @@ router.get("/v1/sellers/:id/public", (req, res) => {
   const listings = searchListings({ sellerId: seller.id, page: 1, limit: 100, sort: "recent" }).listings;
   const reviews = getSellerReviews(seller.id, 20).map((review) => ({ rating: review.rating, comment: review.comment || "", createdAt: review.createdAt }));
   res.json({ ok: true, seller: publicSeller(seller), listings, reviews });
+});
+router.get("/v1/sellers/:id/subscription", (req, res) => {
+  try { const seller = assertSellerSession(req, req.params.id); res.json({ ok: true, subscription: getSellerPlanState(seller.id) }); }
+  catch (e) { fail(res, e, 403); }
 });
 router.get("/v1/sitemap/listings", (req, res) => res.json({ ok: true, entries: getListingsSitemapEntries(Number(req.query.limit) || 5000) }));
 router.get("/v1/sitemap.xml", (req, res) => {
@@ -60,6 +67,7 @@ router.get("/v1/listings/:id", (req, res) => {
 router.post("/v1/listings", (req, res) => {
   try {
     const seller = assertSellerSession(req, req.body?.sellerId || "");
+    if (req.body?.status !== "draft") assertActiveSellerPlan(seller.id);
     if (req.body?.status !== "draft" && !seller.paypalReady && !isMarketplaceDemoMode()) throw new MarketplaceAuthError("Activez d'abord votre compte vendeur PayPal avant de publier une annonce.", 409);
     const listing = createListingV1({ ...(req.body || {}), sellerId: seller.id, sellerEmail: seller.email });
     res.status(201).json({ ok: true, listing, seller, demoMode: isMarketplaceDemoMode() });
@@ -68,6 +76,7 @@ router.post("/v1/listings", (req, res) => {
 router.put("/v1/listings/:id", (req, res) => {
   try {
     const { seller } = assertSellerOwnsListing(req, req.params.id);
+    if (req.body?.status === "active") assertActiveSellerPlan(seller.id);
     if (req.body?.status === "active" && !seller.paypalReady && !isMarketplaceDemoMode()) throw new MarketplaceAuthError("Activez d'abord votre compte vendeur PayPal avant de publier l'annonce.", 409);
     const listing = updateListingV1(req.params.id, seller.id, req.body || {});
     res.json({ ok: true, listing, demoMode: isMarketplaceDemoMode() });
@@ -78,7 +87,7 @@ router.delete("/v1/listings/:id", (req, res) => {
   catch (e) { fail(res, e); }
 });
 router.get("/v1/sellers/:id/listings", (req, res) => {
-  try { const seller = assertSellerSession(req, req.params.id); res.json({ ok: true, seller: { id: seller.id, displayName: seller.displayName, sellerType: seller.sellerType, paypalReady: seller.paypalReady }, listings: listSellerListings(seller.id, req.query) }); }
+  try { const seller = assertSellerSession(req, req.params.id); res.json({ ok: true, seller: { id: seller.id, displayName: seller.displayName, sellerType: seller.sellerType, paypalReady: seller.paypalReady, planId: seller.planId, subscriptionActive: seller.subscriptionActive }, listings: listSellerListings(seller.id, req.query) }); }
   catch (e) { fail(res, e, 403); }
 });
 router.get("/v1/sellers/:id/orders", (req, res) => {
