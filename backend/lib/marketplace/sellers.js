@@ -1,5 +1,6 @@
 /** Profils vendeurs — identite Cardoria, evaluations et statut PayPal. */
 import { getDb } from "../engine/database.js";
+import { getSellerPlanState } from "../subscriptions/seller-plans.js";
 import { makeMarketId } from "./migrate.js";
 
 export function getSeller(id) {
@@ -31,7 +32,7 @@ export function registerSeller({ email, displayName, sellerType, bio, authUserId
   }
   const id = makeMarketId("SLR");
   const now = new Date().toISOString();
-  db.prepare(`INSERT INTO mk_sellers (id,email,auth_user_id,display_name,seller_type,bio,plan_id,plan_status,plan_started_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)`).run(id, normalizedEmail, ownerId, displayName || normalizedEmail.split("@")[0], sellerType || "individual", bio || "", "starter", "inactive", "", now);
+  db.prepare(`INSERT INTO mk_sellers (id,email,auth_user_id,display_name,seller_type,bio,created_at) VALUES (?,?,?,?,?,?,?)`).run(id, normalizedEmail, ownerId, displayName || normalizedEmail.split("@")[0], sellerType || "individual", bio || "", now);
   return getSeller(id);
 }
 
@@ -65,6 +66,7 @@ export function setSellerVerified(sellerId, verified) {
   return getSeller(sellerId);
 }
 function toSeller(row) {
+  const subscription = getSellerPlanState(row.id);
   return {
     id: row.id,
     email: row.email,
@@ -78,10 +80,10 @@ function toSeller(row) {
     ratingCount: row.rating_count,
     salesCount: row.sales_count,
     satisfactionRate: row.satisfaction_rate,
-    planId: row.plan_id || "starter",
-    planStatus: row.plan_status || "inactive",
-    planStartedAt: row.plan_started_at || "",
-    subscriptionActive: row.plan_status === "active",
+    planId: subscription.planId,
+    planStatus: subscription.status,
+    planStartedAt: subscription.planStartedAt,
+    subscriptionActive: subscription.active,
     paypalMerchantId: row.paypal_merchant_id || "",
     paypalTrackingId: row.paypal_tracking_id || "",
     paypalOnboardingStatus: row.paypal_onboarding_status || "",
