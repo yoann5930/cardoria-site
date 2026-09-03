@@ -15,7 +15,7 @@ import { getLicenseSeoContent, listExtensions, getGeneratedPage } from "../lib/s
 import { readJson } from "../lib/storage.js";
 
 const router = Router();
-const SITE = process.env.SITE_URL || "https://www.cardoriashop.fr";
+const SITE = "https://www.cardoriashop.fr";
 
 function sendXml(res, xml, maxAge = 3600) {
   res.setHeader("Content-Type", "application/xml; charset=utf-8");

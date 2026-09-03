@@ -130,7 +130,7 @@ function safeJson(value) {
 }
 
 function absoluteSiteUrl() {
-  return String(process.env.SITE_URL || "https://www.cardoriashop.fr").replace(/\/$/, "");
+  return "https://www.cardoriashop.fr";
 }
 
 function seoHead({ title, description, canonical, image, type = "website", jsonLd = [], bootstrap = "" }) {
