@@ -26,7 +26,7 @@ redact() {
 
 require_action() {
   case "$1" in
-    status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback) return 0 ;;
+    status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check) return 0 ;;
     *) echo "FORBIDDEN action"; exit 1 ;;
   esac
 }
@@ -34,7 +34,7 @@ require_action() {
 validate_branch() {
   local branch=$1
   case "$branch" in
-    main|migration/oracle-free-20260902|migration/ovh-ops-20260903) return 0 ;;
+    main|migration/oracle-free-20260902|migration/ovh-ops-20260903|migration/ovh-chatgpt-access-20260903) return 0 ;;
     *) echo "FORBIDDEN branch"; exit 1 ;;
   esac
 }
@@ -156,6 +156,51 @@ cmd_backup() {
   echo "BACKUP OK"
 }
 
+cmd_report() {
+  echo "=== CARDORIA OPS REPORT ==="
+  cmd_status
+}
+
+cmd_backup_check() {
+  echo "=== BACKUP CHECK ==="
+  local dump tarfile dump_bytes tar_bytes
+  dump=$(find "$BACKUP_DIR" -type f -name 'cardoria-postgres-*.dump' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n 1 | awk '{print $2}')
+  tarfile=$(find "$BACKUP_DIR" -type f -name 'cardoria-data-*.tar.gz' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n 1 | awk '{print $2}')
+  if [ -z "$dump" ] || [ ! -f "$dump" ]; then
+    echo "postgres_dump: missing"
+    return 1
+  fi
+  dump_bytes=$(stat -c '%s' "$dump")
+  echo "postgres_dump: $(basename "$dump")"
+  echo "postgres_dump_bytes: $dump_bytes"
+  if [ "$dump_bytes" -le 0 ]; then
+    echo "postgres_dump: empty"
+    return 1
+  fi
+  if ! pg_restore -l "$dump" >/dev/null 2>&1; then
+    echo "postgres_dump: unreadable"
+    return 1
+  fi
+  echo "postgres_dump: readable"
+  if [ -z "$tarfile" ] || [ ! -f "$tarfile" ]; then
+    echo "data_archive: missing"
+    return 1
+  fi
+  tar_bytes=$(stat -c '%s' "$tarfile")
+  echo "data_archive: $(basename "$tarfile")"
+  echo "data_archive_bytes: $tar_bytes"
+  if [ "$tar_bytes" -le 0 ]; then
+    echo "data_archive: empty"
+    return 1
+  fi
+  if ! tar -tzf "$tarfile" >/dev/null 2>&1; then
+    echo "data_archive: unreadable"
+    return 1
+  fi
+  echo "data_archive: readable"
+  echo "BACKUP CHECK OK"
+}
+
 cmd_restart() {
   echo "=== RESTART ==="
   systemctl restart cardoria
@@ -229,4 +274,6 @@ case "$ACTION" in
     cmd_deploy "$BRANCH"
     ;;
   rollback) cmd_rollback ;;
+  report) cmd_report ;;
+  backup-check) cmd_backup_check ;;
 esac

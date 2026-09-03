@@ -26,6 +26,12 @@ case "$cmd" in
   rollback)
     exec sudo -n /usr/local/bin/cardoria-ops rollback
     ;;
+  report)
+    exec sudo -n /usr/local/bin/cardoria-ops report
+    ;;
+  backup-check)
+    exec sudo -n /usr/local/bin/cardoria-ops backup-check
+    ;;
   deploy)
     exec sudo -n /usr/local/bin/cardoria-ops deploy
     ;;
@@ -37,6 +43,9 @@ case "$cmd" in
     ;;
   "deploy migration/ovh-ops-20260903")
     exec sudo -n /usr/local/bin/cardoria-ops deploy migration/ovh-ops-20260903
+    ;;
+  "deploy migration/ovh-chatgpt-access-20260903")
+    exec sudo -n /usr/local/bin/cardoria-ops deploy migration/ovh-chatgpt-access-20260903
     ;;
   *)
     echo "FORBIDDEN"
