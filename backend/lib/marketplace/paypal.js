@@ -3,11 +3,13 @@
  * Les secrets PayPal restent exclusivement côté serveur via variables d'environnement.
  */
 import { getDb } from "../engine/database.js";
+import { getMarketplaceFeeQuote, recordMarketplaceCapture } from "../subscriptions/seller-plans.js";
 import { getSeller, updateSellerPayPal } from "./sellers.js";
 import { getOrder, updateOrderStatus } from "./orders.js";
 import { consumePaidCartItems } from "./v1/cart.js";
 
 const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
+const STANDARD_MARKETPLACE_COMMISSION_PERCENT = 5;
 
 function environment() {
   return String(process.env.PAYPAL_ENV || "sandbox").toLowerCase() === "live" ? "live" : "sandbox";
@@ -18,9 +20,7 @@ function apiBase() {
 }
 
 function commissionPercent() {
-  if (process.env.MARKETPLACE_COMMISSION_PERCENT == null || process.env.MARKETPLACE_COMMISSION_PERCENT === "") return null;
-  const value = Number(process.env.MARKETPLACE_COMMISSION_PERCENT);
-  return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+  return STANDARD_MARKETPLACE_COMMISSION_PERCENT;
 }
 
 function delayedDisbursementEnabled() {
@@ -175,7 +175,6 @@ export async function syncSellerPayPalStatus(sellerId, paypalMerchantId = "") {
     const lookupIntegration = normalizeMerchantIntegration(lookup);
     merchantId = String(lookupIntegration?.merchant_id || "").trim();
     if (merchantId) {
-      // Le lookup par tracking_id peut être partiel : demander immédiatement la fiche complète.
       integration = await getMerchantIntegration(partnerMerchantId, merchantId);
     } else {
       integration = lookupIntegration;
@@ -203,17 +202,22 @@ export async function syncSellerPayPalStatus(sellerId, paypalMerchantId = "") {
   });
 }
 
-function platformFeeFor(order) {
-  const pct = commissionPercent();
-  if (pct == null) throw new Error("Commission Marketplace non configurée. Définir MARKETPLACE_COMMISSION_PERCENT.");
+function platformFeeFor(order, additionalCapturedSales = 0) {
   const includeShipping = String(process.env.MARKETPLACE_COMMISSION_INCLUDE_SHIPPING || "false").toLowerCase() === "true";
-  const base = includeShipping ? Number(order.total) : Math.max(0, Number(order.total) - Number(order.shippingCost || 0));
-  return round2(base * pct / 100);
+  return getMarketplaceFeeQuote({
+    sellerId: order.sellerId,
+    grossAmountEur: Number(order.total),
+    shippingCostEur: Number(order.shippingCost || 0),
+    includeShipping,
+    capturedAt: new Date(),
+    additionalCapturedSales
+  });
 }
 
 function ensureSellerCanReceive(order) {
   const seller = getSeller(order.sellerId);
   if (!seller) throw new Error(`Vendeur ${order.sellerId} introuvable.`);
+  if (!seller.subscriptionActive) throw new Error(`Le vendeur ${seller.displayName || seller.id} doit avoir un abonnement Cardoria actif avant la vente.`);
   if (!seller.paypalMerchantId || !seller.paypalPaymentsReceivable || seller.paypalOnboardingStatus !== "ready") {
     throw new Error(`Le vendeur ${seller.displayName || seller.id} doit terminer l'activation PayPal avant la vente.`);
   }
@@ -227,11 +231,23 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
 
   const fees = [];
   const sellers = [];
+  const sameCheckoutOffsets = new Map();
   const purchaseUnits = orders.map((order) => {
     const seller = ensureSellerCanReceive(order);
     sellers.push(seller);
-    const fee = platformFeeFor(order);
-    fees.push({ orderId: order.id, platformFee: fee, sellerNet: round2(Number(order.total) - fee) });
+    const offset = sameCheckoutOffsets.get(order.sellerId) || 0;
+    const quote = platformFeeFor(order, offset);
+    sameCheckoutOffsets.set(order.sellerId, offset + 1);
+    const fee = quote.platformFee;
+    fees.push({
+      orderId: order.id,
+      sellerId: order.sellerId,
+      planId: quote.planId,
+      capturedSaleNumber: quote.capturedSaleNumber,
+      commissionPercent: quote.commissionPercent,
+      platformFee: fee,
+      sellerNet: round2(Number(order.total) - fee)
+    });
     return {
       reference_id: order.id,
       custom_id: order.id,
@@ -310,6 +326,7 @@ export async function captureMarketplacePayPalOrder(paypalOrderId) {
     if (captureStatus === "COMPLETED") {
       const wasAlreadyPaid = ["paid", "preparing", "shipped", "delivered"].includes(order.status);
       const updated = updateOrderStatus(internalOrderId, "paid", { paymentStatus: "paid", paymentMethod: "paypal" });
+      recordMarketplaceCapture({ orderId: internalOrderId, sellerId: order.sellerId, capturedAt: new Date() });
       if (!wasAlreadyPaid && updated?.buyerId) {
         consumePaidCartItems(updated.buyerId, updated.items?.length ? updated.items : [{ listingId: updated.listingId, qty: updated.qty }]);
       }
