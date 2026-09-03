@@ -121,6 +121,9 @@ router.post("/login", authRateLimit, (req, res) => {
     }
     console.log(`[auth] login_success role=${user.role}`);
     logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });
+    if (ADMIN_ROLES.includes(user.role)) {
+      return res.json(beginAdmin2fa(user, req, "password"));
+    }
     res.json(completeSession(user, req));
   } catch (e) {
     console.warn(`[auth] login_failed status=${e.status || 500} reason=${e.message || "unknown"}`);
