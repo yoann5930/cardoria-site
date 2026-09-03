@@ -12,7 +12,9 @@ const FILES = {
   analytics: "site-analytics.json",
   settings: "settings.json",
   "witnot-attribution": "witnot-attribution.json",
-  "rachat-proposals": "rachat-proposals.json"
+  "rachat-proposals": "rachat-proposals.json",
+  "seller-subscriptions": "seller-subscriptions.json",
+  "marketplace-captured-sales": "marketplace-captured-sales.json"
 };
 
 function ensureDir() {
