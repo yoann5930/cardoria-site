@@ -8,10 +8,10 @@ cd "$APP_DIR"
 PREV=$(git rev-parse HEAD 2>/dev/null || true)
 [ -n "$PREV" ] && echo "$PREV" | sudo tee /opt/cardoria/previous-commit >/dev/null
 
-git fetch --all --prune
-# Create or reset the local deployment branch from the exact remote branch.
-# This also works when the requested branch (for example main) does not yet
-# exist locally on the VPS.
+# Fetch the requested branch explicitly. The VPS clone may have a narrow
+# remote fetch refspec (for example only the oracle migration branch), so a
+# generic `git fetch --all` is not enough to guarantee origin/main exists.
+git fetch --prune origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
 git checkout -B "$BRANCH" "origin/$BRANCH"
 git reset --hard "origin/$BRANCH"
 
@@ -22,9 +22,6 @@ node --check server.js
 sudo systemctl daemon-reload
 sudo systemctl restart cardoria
 
-# Do not declare a deployment healthy just because the basic health endpoint
-# has started answering. Wait until the complete Cardoria smoke test passes,
-# including Boutique, Marketplace and the protected admin endpoint contract.
 CHECK_LOG=$(mktemp)
 trap 'rm -f "$CHECK_LOG"' EXIT
 for i in $(seq 1 45); do
