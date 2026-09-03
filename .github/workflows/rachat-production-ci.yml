@@ -44,7 +44,7 @@ jobs:
         run: |
           grep -q 'rachat-proposals' backend/lib/storage.js
           grep -q 'rachatProposals: readJson("rachat-proposals"' backend/lib/marketplace/persistence.js
-          grep -q 'purchases: readJson("purchases"' backend/lib/marketplace/persistence.js
+          grep -q 'purchases are intentionally NOT restored here' backend/lib/marketplace/persistence.js
           grep -q 'writeJson("rachat-proposals", payload.rachatProposals)' backend/lib/marketplace/persistence.js
           grep -q 'app.use("/api/rachat", marketplacePersistenceMiddleware' backend/server.js
           grep -q 'app.use("/api/admin/rachat", marketplacePersistenceMiddleware' backend/server.js
