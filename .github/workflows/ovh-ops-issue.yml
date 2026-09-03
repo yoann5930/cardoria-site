@@ -9,7 +9,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: ovh-ops
+  group: ovh-ops-issue-${{ github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:

@@ -33,7 +33,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ovh-ops
+  group: ovh-ops-dispatch
   cancel-in-progress: false
 
 jobs:
