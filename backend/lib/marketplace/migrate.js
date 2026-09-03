@@ -24,9 +24,6 @@ export function migrateMarketplace() {
       rating_count INTEGER DEFAULT 0,
       sales_count INTEGER DEFAULT 0,
       satisfaction_rate REAL DEFAULT 100,
-      plan_id TEXT NOT NULL DEFAULT 'starter',
-      plan_status TEXT NOT NULL DEFAULT 'inactive',
-      plan_started_at TEXT DEFAULT '',
       created_at TEXT NOT NULL
     );
 
@@ -70,7 +67,6 @@ export function migrateMarketplace() {
       shipping_tracking TEXT DEFAULT '',
       shipping_label_url TEXT DEFAULT '',
       shipping_address TEXT DEFAULT '',
-      payment_captured_at TEXT DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (seller_id) REFERENCES mk_sellers(id),
@@ -118,13 +114,8 @@ export function migrateMarketplace() {
   `);
 
   ensureColumn(db, "mk_sellers", "auth_user_id", "TEXT DEFAULT ''");
-  ensureColumn(db, "mk_sellers", "plan_id", "TEXT NOT NULL DEFAULT 'starter'");
-  ensureColumn(db, "mk_sellers", "plan_status", "TEXT NOT NULL DEFAULT 'inactive'");
-  ensureColumn(db, "mk_sellers", "plan_started_at", "TEXT DEFAULT ''");
-  ensureColumn(db, "mk_orders", "payment_captured_at", "TEXT DEFAULT ''");
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_mk_sellers_auth_user ON mk_sellers(auth_user_id);
-    CREATE INDEX IF NOT EXISTS idx_mk_sellers_plan ON mk_sellers(plan_id, plan_status);
     CREATE INDEX IF NOT EXISTS idx_mk_listings_seller ON mk_listings(seller_id, status);
     CREATE INDEX IF NOT EXISTS idx_mk_listings_license ON mk_listings(license_slug, status);
     CREATE INDEX IF NOT EXISTS idx_mk_listings_price ON mk_listings(price);
@@ -132,7 +123,6 @@ export function migrateMarketplace() {
     CREATE INDEX IF NOT EXISTS idx_mk_orders_buyer ON mk_orders(buyer_email);
     CREATE INDEX IF NOT EXISTS idx_mk_orders_buyer_id ON mk_orders(buyer_id);
     CREATE INDEX IF NOT EXISTS idx_mk_orders_seller ON mk_orders(seller_id);
-    CREATE INDEX IF NOT EXISTS idx_mk_orders_seller_capture ON mk_orders(seller_id, payment_captured_at);
     CREATE INDEX IF NOT EXISTS idx_mk_favorites_user ON mk_favorites(user_id);
     CREATE INDEX IF NOT EXISTS idx_mk_wishlist_user ON mk_wishlist(user_id);
     CREATE INDEX IF NOT EXISTS idx_mk_alerts_user ON mk_price_alerts(user_id, active);
