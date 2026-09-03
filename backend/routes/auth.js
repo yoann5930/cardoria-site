@@ -16,7 +16,7 @@ import { generateCsrfToken } from "../lib/security/csrf.js";
 import { logAudit } from "../lib/audit.js";
 
 const router = Router();
-const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;
+const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;
 
 function normalizedEmail(value) {
   return String(value || "").trim().toLowerCase();
