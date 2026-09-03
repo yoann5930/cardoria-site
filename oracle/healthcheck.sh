@@ -24,6 +24,26 @@ check() {
   exit 1
 }
 
+check_plans() {
+  local path=/api/marketplace/v1/plans
+  check "$path" 200
+  grep -Fq '"id":"starter"' "$OUT"
+  grep -Fq '"monthlyPriceEur":19.9' "$OUT"
+  grep -Fq '"liveCommissionRate":0.06' "$OUT"
+  grep -Fq '"id":"pro"' "$OUT"
+  grep -Fq '"monthlyPriceEur":49.9' "$OUT"
+  grep -Fq '"liveCommissionRate":0.045' "$OUT"
+  grep -Fq '"liveCardoriaShippingBuyerLimit":6' "$OUT"
+  grep -Fq '"id":"elite"' "$OUT"
+  grep -Fq '"monthlyPriceEur":129.9' "$OUT"
+  grep -Fq '"liveCommissionRate":0.03' "$OUT"
+  grep -Fq '"liveCardoriaShippingBuyerLimit":15' "$OUT"
+  grep -Fq '"marketplaceFreeCapturedSalesPerMonth":15' "$OUT"
+  grep -Fq '"livePriority":true' "$OUT"
+  grep -Fq '"badge":true' "$OUT"
+  echo "OK $path canonical Starter/Pro/Elite"
+}
+
 check / 200
 check /boutique.html 200
 check /marketplace.html 200
@@ -34,6 +54,7 @@ check /api/health/ 200
 check /api/health/startup 200
 check /api/payments/boutique/products 200
 check '/api/marketplace/v1/search?license=pokemon' 200
+check_plans
 check /api/admin/dashboard 401
 
 echo "Cardoria smoke tests OK"
