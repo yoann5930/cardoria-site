@@ -8,7 +8,9 @@ cd "$APP_DIR"
 PREV=$(git rev-parse HEAD 2>/dev/null || true)
 [ -n "$PREV" ] && echo "$PREV" | sudo tee /opt/cardoria/previous-commit >/dev/null
 
-git fetch --all --prune
+# Fetch the requested branch explicitly. The VPS clone may have a narrow
+# remote fetch refspec, so a generic fetch does not guarantee origin/main.
+git fetch --prune origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
 git checkout -B "$BRANCH" "origin/$BRANCH"
 git reset --hard "origin/$BRANCH"
 
