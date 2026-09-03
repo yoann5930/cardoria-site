@@ -8,14 +8,14 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const SITE = process.env.SITE_URL || "https://cardoria.vercel.app";
-const BACKEND = process.env.BACKEND_URL || "https://cardoria-backend.onrender.com";
+const SITE = (process.env.SITE_URL || "https://www.cardoriashop.fr").replace(/\/$/, "");
+const BACKEND = (process.env.BACKEND_URL || SITE).replace(/\/$/, "");
 const today = new Date().toISOString().slice(0, 10);
 
 const sitemaps = [
-  `${SITE.replace(/\/$/, "")}/sitemap.xml`,
-  `${BACKEND.replace(/\/$/, "")}/api/seo/sitemap.xml`,
-  `${BACKEND.replace(/\/$/, "")}/api/marketplace/v1/sitemap.xml`
+  `${SITE}/sitemap.xml`,
+  `${BACKEND}/api/seo/sitemap.xml`,
+  `${BACKEND}/api/marketplace/v1/sitemap.xml`
 ];
 
 const xml = `<?xml version="1.0" encoding="UTF-8"?>

@@ -8,8 +8,8 @@ import { dirname, join } from "path";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const root = join(__dir, "..");
-const BACKEND = process.env.CARDORIA_BACKEND || "https://cardoria-backend.onrender.com";
-const SITE = process.env.SITE_URL || "https://cardoria.vercel.app";
+const SITE = (process.env.SITE_URL || "https://www.cardoriashop.fr").replace(/\/$/, "");
+const BACKEND = (process.env.CARDORIA_BACKEND || SITE).replace(/\/$/, "");
 
 async function main() {
   let xml;

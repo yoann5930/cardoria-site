@@ -91,7 +91,7 @@ jobs:
         working-directory: .
         run: |
           grep -q 'listBoutiqueInventory' backend/routes/payments-admin.js
-          grep -q 'refundSumUpTransaction' backend/routes/payments-admin.js
+          grep -q 'refundRevolutOrder' backend/routes/payments-admin.js
           grep -q 'refundHoldStock' backend/lib/boutique/stock.js
           grep -q 'pendingStock' backend/lib/boutique/stock.js
           grep -q 'soldStock' backend/lib/boutique/stock.js

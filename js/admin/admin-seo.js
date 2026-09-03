@@ -18,7 +18,7 @@
     A.adminFetch("/api/admin/seo/blog").then(function (d) {
       A.qs("#blogAdminList").innerHTML = (d.posts || []).map(function (p) {
         return "<tr><td>" + p.title + "</td><td>" + p.slug + "</td><td>" + (p.published ? "Publié" : "Brouillon") + "</td><td>" +
-          '<button type="button" class="btn btn-secondary" data-del="' + p.id + '">Supprimer</button></td></tr>";
+          '<button type="button" class="btn btn-secondary" data-del="' + p.id + '">Supprimer</button></td></tr>';
       }).join("") || "<tr><td colspan='4'>Aucun article</td></tr>";
       A.qs("#blogAdminList").closest("table").querySelectorAll("[data-del]").forEach(function (btn) {
         btn.onclick = function () {

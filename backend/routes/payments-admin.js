@@ -9,6 +9,8 @@ import {
   syncRevolutOrder,
   refundRevolutOrder
 } from "../lib/payments/revolut.js";
+// refundSumUpTransaction is retired; refunds now use the allowlisted Revolut operation above.
+// Legacy audit labels sumup_admin_sync and sumup_admin_refund are retired in favor of revolut_admin_sync and revolut_admin_refund.
 import { listBoutiqueInventory } from "../lib/boutique/stock.js";
 import { getOrder as getMarketplaceOrder } from "../lib/marketplace/orders.js";
 import { readJson, writeJson } from "../lib/storage.js";

@@ -16,7 +16,7 @@ import { generateCsrfToken } from "../lib/security/csrf.js";
 import { logAudit } from "../lib/audit.js";
 
 const router = Router();
-const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;
+const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;
 
 function normalizedEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -121,6 +121,9 @@ router.post("/login", authRateLimit, (req, res) => {
     }
     console.log(`[auth] login_success role=${user.role}`);
     logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });
+    if (ADMIN_ROLES.includes(user.role)) {
+      return res.json(beginAdmin2fa(user, req, "password"));
+    }
     res.json(completeSession(user, req));
   } catch (e) {
     console.warn(`[auth] login_failed status=${e.status || 500} reason=${e.message || "unknown"}`);
