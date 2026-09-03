@@ -5,7 +5,7 @@ import { getDb } from "../engine/database.js";
 import { listLicenses } from "../engine/licenses.js";
 import { getSitemapCards, getCardCount } from "../engine/cards.js";
 
-const SITE = process.env.SITE_URL || "https://www.cardoriashop.fr";
+const SITE = "https://www.cardoriashop.fr";
 const SITE_NAME = "CardoriaShop";
 
 const LICENSE_SEO = {
