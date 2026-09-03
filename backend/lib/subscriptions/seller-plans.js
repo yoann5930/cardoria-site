@@ -1,6 +1,8 @@
-import { getDb } from "../engine/database.js";
+import { readJson, writeJson } from "../storage.js";
 import { DEFAULT_SELLER_PLAN, assertSellerPlan, capturedSaleCalendarMonthKey, getSellerPlanEntitlements, marketplaceCommissionAmount, marketplaceCommissionRate } from "./plans.js";
 
+const PLAN_STORE = "seller-subscriptions";
+const CAPTURE_STORE = "marketplace-captured-sales";
 const PLAN_STATUSES = new Set(["inactive", "active", "canceled"]);
 
 function sellerIdValue(sellerId) {
@@ -15,27 +17,29 @@ function normalizeStatus(status) {
   return value;
 }
 
-function monthBounds(value = new Date()) {
-  const month = capturedSaleCalendarMonthKey(value);
-  const start = `${month}-01T00:00:00.000Z`;
-  const [year, monthNumber] = month.split("-").map(Number);
-  const end = new Date(Date.UTC(year, monthNumber, 1)).toISOString();
-  return { month, start, end };
+function subscriptions() {
+  const rows = readJson(PLAN_STORE, []);
+  return Array.isArray(rows) ? rows : [];
+}
+
+function captures() {
+  const rows = readJson(CAPTURE_STORE, []);
+  return Array.isArray(rows) ? rows : [];
 }
 
 export function getSellerPlanState(sellerId) {
   const id = sellerIdValue(sellerId);
-  const row = getDb().prepare("SELECT id, plan_id, plan_status, plan_started_at FROM mk_sellers WHERE id=?").get(id);
-  if (!row) throw Object.assign(new Error("Vendeur introuvable."), { code: 404, status: 404 });
-  const planId = String(row.plan_id || DEFAULT_SELLER_PLAN).trim().toLowerCase();
+  const row = subscriptions().find((item) => item && item.sellerId === id) || null;
+  const planId = String(row?.planId || DEFAULT_SELLER_PLAN).trim().toLowerCase();
   const plan = assertSellerPlan(planId);
-  const status = PLAN_STATUSES.has(String(row.plan_status || "").toLowerCase()) ? String(row.plan_status).toLowerCase() : "inactive";
+  const status = PLAN_STATUSES.has(String(row?.status || "").toLowerCase()) ? String(row.status).toLowerCase() : "inactive";
   return {
     sellerId: id,
     planId: plan.id,
     status,
     active: status === "active",
-    planStartedAt: row.plan_started_at || "",
+    planStartedAt: row?.startedAt || "",
+    updatedAt: row?.updatedAt || "",
     entitlements: status === "active" ? getSellerPlanEntitlements(plan.id) : null
   };
 }
@@ -52,25 +56,32 @@ export function setSellerPlan(sellerId, planId, { status = "active", startedAt =
   const planStatus = normalizeStatus(status);
   const date = startedAt instanceof Date ? startedAt : new Date(startedAt);
   if (Number.isNaN(date.getTime())) throw Object.assign(new Error("Date de debut d'abonnement invalide."), { code: 400, status: 400 });
-  const started = planStatus === "active" ? date.toISOString() : "";
-  const result = getDb().prepare("UPDATE mk_sellers SET plan_id=?, plan_status=?, plan_started_at=? WHERE id=?").run(plan.id, planStatus, started, id);
-  if (!result.changes) throw Object.assign(new Error("Vendeur introuvable."), { code: 404, status: 404 });
+  const now = new Date().toISOString();
+  const rows = subscriptions().filter((item) => item && item.sellerId !== id);
+  rows.push({ sellerId: id, planId: plan.id, status: planStatus, startedAt: planStatus === "active" ? date.toISOString() : "", updatedAt: now });
+  writeJson(PLAN_STORE, rows);
   return getSellerPlanState(id);
+}
+
+export function recordMarketplaceCapture({ orderId, sellerId, capturedAt = new Date() }) {
+  const order = String(orderId || "").trim();
+  const seller = sellerIdValue(sellerId);
+  if (!order) throw Object.assign(new Error("Commande Marketplace requise."), { code: 400, status: 400 });
+  const date = capturedAt instanceof Date ? capturedAt : new Date(capturedAt);
+  if (Number.isNaN(date.getTime())) throw Object.assign(new Error("Date de capture Marketplace invalide."), { code: 400, status: 400 });
+  const rows = captures();
+  const existing = rows.find((item) => item && item.orderId === order);
+  if (existing) return { ...existing, duplicate: true };
+  const entry = { orderId: order, sellerId: seller, capturedAt: date.toISOString() };
+  rows.push(entry);
+  writeJson(CAPTURE_STORE, rows);
+  return { ...entry, duplicate: false };
 }
 
 export function countCapturedMarketplaceSalesForMonth(sellerId, value = new Date()) {
   const id = sellerIdValue(sellerId);
-  const { start, end } = monthBounds(value);
-  const row = getDb().prepare(`
-    SELECT COUNT(*) AS count
-    FROM mk_orders
-    WHERE seller_id=?
-      AND payment_provider='paypal'
-      AND payment_status='paid'
-      AND payment_captured_at>=?
-      AND payment_captured_at<?
-  `).get(id, start, end);
-  return Number(row?.count || 0);
+  const month = capturedSaleCalendarMonthKey(value);
+  return captures().filter((item) => item && item.sellerId === id && capturedSaleCalendarMonthKey(item.capturedAt) === month).length;
 }
 
 export function getMarketplaceFeeQuote({ sellerId, grossAmountEur, shippingCostEur = 0, includeShipping = false, capturedAt = new Date(), additionalCapturedSales = 0 }) {
