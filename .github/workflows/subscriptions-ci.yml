@@ -1,0 +1,51 @@
+name: Cardoria Subscriptions CI
+
+on:
+  push:
+    branches:
+      - feature/subscriptions-100-green-20260903
+      - main
+    paths:
+      - 'backend/lib/subscriptions/**'
+      - 'backend/lib/marketplace/paypal.js'
+      - 'backend/lib/marketplace/sellers.js'
+      - 'backend/routes/marketplace-v1.js'
+      - 'backend/lib/storage.js'
+      - 'backend/tests/subscriptions-plans.test.mjs'
+      - '.github/workflows/subscriptions-ci.yml'
+  pull_request:
+    paths:
+      - 'backend/lib/subscriptions/**'
+      - 'backend/lib/marketplace/paypal.js'
+      - 'backend/lib/marketplace/sellers.js'
+      - 'backend/routes/marketplace-v1.js'
+      - 'backend/lib/storage.js'
+      - 'backend/tests/subscriptions-plans.test.mjs'
+      - '.github/workflows/subscriptions-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  subscriptions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --no-audit --no-fund
+      - name: Syntax check subscription integration
+        working-directory: backend
+        run: |
+          node --check lib/subscriptions/plans.js
+          node --check lib/subscriptions/seller-plans.js
+          node --check lib/marketplace/paypal.js
+          node --check lib/marketplace/sellers.js
+          node --check routes/marketplace-v1.js
+      - name: Run subscription tests
+        working-directory: backend
+        run: node --test tests/subscriptions-plans.test.mjs

@@ -1,5 +1,6 @@
 /** Profils vendeurs — identite Cardoria, evaluations et statut PayPal. */
 import { getDb } from "../engine/database.js";
+import { getSellerPlanState } from "../subscriptions/seller-plans.js";
 import { makeMarketId } from "./migrate.js";
 
 export function getSeller(id) {
@@ -65,6 +66,7 @@ export function setSellerVerified(sellerId, verified) {
   return getSeller(sellerId);
 }
 function toSeller(row) {
+  const subscription = getSellerPlanState(row.id);
   return {
     id: row.id,
     email: row.email,
@@ -78,6 +80,10 @@ function toSeller(row) {
     ratingCount: row.rating_count,
     salesCount: row.sales_count,
     satisfactionRate: row.satisfaction_rate,
+    planId: subscription.planId,
+    planStatus: subscription.status,
+    planStartedAt: subscription.planStartedAt,
+    subscriptionActive: subscription.active,
     paypalMerchantId: row.paypal_merchant_id || "",
     paypalTrackingId: row.paypal_tracking_id || "",
     paypalOnboardingStatus: row.paypal_onboarding_status || "",
