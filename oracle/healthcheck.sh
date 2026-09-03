@@ -6,12 +6,16 @@ check() {
   local path=$1
   local expected=${2:-200}
   local code
-  code=$(curl -sS -o /tmp/cardoria-check.out -w '%{http_code}' "$BASE$path")
+  local out
+  out=$(mktemp)
+  code=$(curl -sS -o "$out" -w '%{http_code}' "$BASE$path")
   if [ "$code" != "$expected" ]; then
     echo "FAIL $path HTTP $code expected $expected"
-    cat /tmp/cardoria-check.out || true
+    cat "$out" || true
+    rm -f "$out"
     exit 1
   fi
+  rm -f "$out"
   echo "OK $path HTTP $code"
 }
 

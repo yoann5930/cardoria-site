@@ -41,6 +41,7 @@ validate_branch() {
 
 run_healthcheck() {
   local base=${1:-http://127.0.0.1:10000}
+  rm -f /tmp/cardoria-check.out
   bash "$APP_DIR/oracle/healthcheck.sh" "$base" | redact
 }
 
