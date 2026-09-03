@@ -129,10 +129,8 @@ function safeJson(value) {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-function absoluteSiteUrl(req) {
-  const configured = String(process.env.SITE_URL || "").replace(/\/$/, "");
-  if (configured) return configured;
-  return `${req.protocol}://${req.get("host")}`;
+function absoluteSiteUrl() {
+  return String(process.env.SITE_URL || "https://www.cardoriashop.fr").replace(/\/$/, "");
 }
 
 function seoHead({ title, description, canonical, image, type = "website", jsonLd = [], bootstrap = "" }) {
