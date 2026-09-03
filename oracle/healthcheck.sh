@@ -49,6 +49,8 @@ check /boutique.html 200
 check /marketplace.html 200
 check /estimation.html 200
 check /scanner.html 200
+check /robots.txt 200
+check /sitemap.xml 200
 check /admin-login.html 200
 check /api/health/ 200
 check /api/health/startup 200

@@ -30,6 +30,7 @@ import { emptyPublicCatalogOnce } from "./lib/marketplace/empty-catalog.js";
 import { initAi } from "./lib/ai/index.js";
 import { initSeo } from "./lib/seo/index.js";
 import { getLicenseSeoContent, listExtensions } from "./lib/seo/generator.js";
+import { generateSitemapXml, generateRobotsTxt } from "./lib/seo/sitemap.js";
 import { initMarketData } from "./lib/market/index.js";
 import { initScanner } from "./lib/scanner/index.js";
 import { initAiEnterprise } from "./lib/ai-enterprise/index.js";
@@ -69,7 +70,9 @@ const PUBLIC_EXTENSIONS = new Set([".html", ".css", ".js", ".json", ".xml", ".tx
 const SERVED_SITE_HOSTS = [
   "https://cardoria-site-2.onrender.com",
   "https://cardoria-site-f2cy.onrender.com",
-  "https://cardoria.vercel.app"
+  "https://cardoria.vercel.app",
+  "https://www.cardoriashop.fr",
+  "https://cardoriashop.fr"
 ];
 const app = express();
 const startup = { ok: true, ready: false, degraded: [], startedAt: new Date().toISOString() };
@@ -410,7 +413,16 @@ app.get(["/pages/extension", "/pages/extension/"], (req, res, next) => {
   if (!req.query.license || !req.query.ext) return next();
   return res.redirect(301, `/extensions/${encodeURIComponent(req.query.license)}/${encodeURIComponent(req.query.ext)}`);
 });
-app.get(["/sitemap.xml", "/sitemap-index.xml"], (req, res) => res.redirect(301, "/api/seo/sitemap.xml"));
+app.get("/robots.txt", (req, res) => {
+  res.type("text/plain; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.send(generateRobotsTxt(absoluteSiteUrl(req)));
+});
+app.get(["/sitemap.xml", "/sitemap-index.xml"], (req, res) => {
+  res.type("application/xml; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.send(generateSitemapXml(absoluteSiteUrl(req)));
+});
 app.get("/script.js", (req, res, next) => sendRewrittenJs("script.js", res, next));
 app.get("/js/seo-config.js", (req, res, next) => sendRewrittenJs("js/seo-config.js", res, next));
 app.use((req, res, next) => {

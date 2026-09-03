@@ -4,7 +4,7 @@
 (function (global) {
   "use strict";
 
-  var BACKEND = global.CARDORIA_BACKEND || "https://cardoria-site-f2cy.onrender.com";
+  var BACKEND = global.CARDORIA_BACKEND || "https://www.cardoriashop.fr";
   var cache = { licenses: null, licensesAt: 0 };
 
   function fetchJson(path) {

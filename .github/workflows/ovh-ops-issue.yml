@@ -36,13 +36,16 @@ jobs:
               'ovh-ops:logs': 'logs',
               'ovh-ops:rollback': 'rollback',
               'ovh-ops:report': 'report',
-              'ovh-ops:backup-check': 'backup-check'
+              'ovh-ops:backup-check': 'backup-check',
+              'ovh-ops:dns-check': 'dns-check',
+              'ovh-ops:https-enable': 'https-enable'
             };
             const branchMap = {
               'ovh-branch:main': 'main',
               'ovh-branch:oracle-free': 'migration/oracle-free-20260902',
               'ovh-branch:ovh-ops': 'migration/ovh-ops-20260903',
-              'ovh-branch:ovh-chatgpt': 'migration/ovh-chatgpt-access-20260903'
+              'ovh-branch:ovh-chatgpt': 'migration/ovh-chatgpt-access-20260903',
+              'ovh-branch:ovh-https': 'migration/ovh-https-cutover-20260903'
             };
             const owner = context.payload.repository.owner.login;
             const author = context.payload.issue.user.login;
@@ -114,6 +117,7 @@ jobs:
                 '`ovh-branch:oracle-free`',
                 '`ovh-branch:ovh-ops`',
                 '`ovh-branch:ovh-chatgpt`',
+                '`ovh-branch:ovh-https`',
                 'Issue body is never executed.',
                 `Logs: ${runUrl}`
               ].join('\n')

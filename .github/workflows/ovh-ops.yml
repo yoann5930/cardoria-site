@@ -18,16 +18,19 @@ on:
           - rollback
           - report
           - backup-check
+          - dns-check
+          - https-enable
       branch:
         description: Authorized branch for deploy only
         required: false
         type: choice
-        default: migration/oracle-free-20260902
+        default: main
         options:
           - main
           - migration/oracle-free-20260902
           - migration/ovh-ops-20260903
           - migration/ovh-chatgpt-access-20260903
+          - migration/ovh-https-cutover-20260903
 
 permissions:
   contents: read

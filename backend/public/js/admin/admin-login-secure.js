@@ -1,10 +1,8 @@
 (function () {
   "use strict";
 
-  // L'administration doit toujours joindre l'API Node/Render directement.
-  // Le domaine public CardoriaShop peut etre servi par une couche frontend qui
-  // renvoie du HTML pour /api/*, ce qui empecherait la creation de session.
-  const BACKEND = window.CARDORIA_ADMIN_BACKEND || "https://cardoria-site-f2cy.onrender.com";
+  // L'administration doit joindre l'API locale du même hôte.
+  const BACKEND = window.CARDORIA_ADMIN_BACKEND || (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "";
   const ADMIN_ROLES = ["super_admin", "admin", "employee"];
 
   function qs(id) { return document.getElementById(id); }

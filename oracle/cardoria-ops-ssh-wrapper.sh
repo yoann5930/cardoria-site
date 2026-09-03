@@ -32,6 +32,12 @@ case "$cmd" in
   backup-check)
     exec sudo -n /usr/local/bin/cardoria-ops backup-check
     ;;
+  dns-check)
+    exec sudo -n /usr/local/bin/cardoria-ops dns-check
+    ;;
+  https-enable)
+    exec sudo -n /usr/local/bin/cardoria-ops https-enable
+    ;;
   deploy)
     exec sudo -n /usr/local/bin/cardoria-ops deploy
     ;;
@@ -46,6 +52,9 @@ case "$cmd" in
     ;;
   "deploy migration/ovh-chatgpt-access-20260903")
     exec sudo -n /usr/local/bin/cardoria-ops deploy migration/ovh-chatgpt-access-20260903
+    ;;
+  "deploy migration/ovh-https-cutover-20260903")
+    exec sudo -n /usr/local/bin/cardoria-ops deploy migration/ovh-https-cutover-20260903
     ;;
   *)
     echo "FORBIDDEN"

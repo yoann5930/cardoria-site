@@ -125,7 +125,7 @@
   function applySeo(card) {
     var title = card.meta?.title || card.name + " — " + card.extension + " | Cardoria";
     var desc = card.meta?.description || "Prix " + E.euro(card.prices.recommended) + " pour " + card.name + ". Fiche complète Cardoria.";
-    var siteUrl = window.CARDORIA_SEO?.siteUrl || location.origin || "https://cardoria-site-f2cy.onrender.com";
+    var siteUrl = window.CARDORIA_SEO?.siteUrl || location.origin || "https://www.cardoriashop.fr";
     var url = siteUrl.replace(/\/$/, "") + "/cartes/" + encodeURIComponent(card.license) + "/" + encodeURIComponent(card.slug);
     document.title = title;
     setMeta("description", desc);

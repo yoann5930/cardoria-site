@@ -11,7 +11,7 @@
 
   var BACKEND = global.CARDORIA_BACKEND ||
     (global.CARDORIA_SEO && global.CARDORIA_SEO.backendUrl) ||
-    "https://cardoria-site-f2cy.onrender.com";
+    "https://www.cardoriashop.fr";
 
   function detectWitnotFromUrl() {
     try {

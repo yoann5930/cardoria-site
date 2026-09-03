@@ -1,7 +1,7 @@
 
 (function(){
 "use strict";
-const BACKEND_URL=window.CARDORIA_BACKEND||"https://cardoria-site-f2cy.onrender.com";
+const BACKEND_URL=window.CARDORIA_BACKEND||"https://www.cardoriashop.fr";
 let allProducts=[], allOrders=[], cart=[], productFilter="all", orderFilter="all";
 function qs(id){return document.getElementById(id)}
 function euro(n){return Number(n||0).toFixed(2).replace(".",",")+" €"}

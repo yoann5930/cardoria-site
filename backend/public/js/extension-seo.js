@@ -4,7 +4,7 @@
   var route = window.CARDORIA_EXTENSION_ROUTE || {};
   var license = route.license || params.get("license") || "pokemon";
   var extSlug = route.ext || params.get("ext") || "";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://cardoria-site-f2cy.onrender.com";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
   var root = document.getElementById("extensionRoot");
   var E = window.CardoriaEngine;
 
@@ -38,7 +38,7 @@
       if (!ext) throw new Error("extension_not_found");
       var name = ext.extension;
       var licName = (window.CARDORIA_SEO.licenses[license] || {}).name || license;
-      var siteUrl = (window.CARDORIA_SEO && CARDORIA_SEO.siteUrl) || "https://cardoria-site-f2cy.onrender.com";
+      var siteUrl = (window.CARDORIA_SEO && CARDORIA_SEO.siteUrl) || "https://www.cardoriashop.fr";
       var canonical = siteUrl + "/extensions/" + encodeURIComponent(license) + "/" + encodeURIComponent(extSlug);
       var title = name + " — cartes, prix & liste " + licName + " | Cardoria";
       var description = "Découvrez les cartes " + name + " (" + licName + ") : liste, numéros, raretés et données de prix. " + Number(ext.cardCount || 0) + " cartes référencées sur Cardoria.";
