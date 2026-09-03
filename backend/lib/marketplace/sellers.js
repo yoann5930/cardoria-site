@@ -31,7 +31,7 @@ export function registerSeller({ email, displayName, sellerType, bio, authUserId
   }
   const id = makeMarketId("SLR");
   const now = new Date().toISOString();
-  db.prepare(`INSERT INTO mk_sellers (id,email,auth_user_id,display_name,seller_type,bio,created_at) VALUES (?,?,?,?,?,?,?)`).run(id, normalizedEmail, ownerId, displayName || normalizedEmail.split("@")[0], sellerType || "individual", bio || "", now);
+  db.prepare(`INSERT INTO mk_sellers (id,email,auth_user_id,display_name,seller_type,bio,plan_id,plan_status,plan_started_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)`).run(id, normalizedEmail, ownerId, displayName || normalizedEmail.split("@")[0], sellerType || "individual", bio || "", "starter", "inactive", "", now);
   return getSeller(id);
 }
 
@@ -78,6 +78,10 @@ function toSeller(row) {
     ratingCount: row.rating_count,
     salesCount: row.sales_count,
     satisfactionRate: row.satisfaction_rate,
+    planId: row.plan_id || "starter",
+    planStatus: row.plan_status || "inactive",
+    planStartedAt: row.plan_started_at || "",
+    subscriptionActive: row.plan_status === "active",
     paypalMerchantId: row.paypal_merchant_id || "",
     paypalTrackingId: row.paypal_tracking_id || "",
     paypalOnboardingStatus: row.paypal_onboarding_status || "",
