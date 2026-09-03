@@ -6,6 +6,9 @@ const PUBLIC_RELEASE = "cardoria-seo-20260902-1";
 
 function isPrivateIndexPath(pathname = "") {
   const path = String(pathname || "").toLowerCase();
+  if (path === "/robots.txt" || path === "/sitemap.xml" || path === "/sitemap-index.xml" || /^\/api\/seo\/.+\.xml$/.test(path)) {
+    return false;
+  }
   return path.startsWith("/admin") ||
     path.startsWith("/mes-commandes") ||
     path.startsWith("/favoris") ||
@@ -30,8 +33,6 @@ export function applySecurityMiddleware(app) {
     const technicalHost = host.endsWith(".onrender.com") || host === "cardoria.vercel.app";
 
     // Une seule version publique doit être indexée : www.cardoriashop.fr.
-    // Le sous-domaine technique Render reste utilisable par l'exploitation mais ne
-    // doit jamais concurrencer le domaine officiel dans l'index Google.
     if (technicalHost || isPrivateIndexPath(publicPath)) {
       res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
     } else {

@@ -27,4 +27,4 @@ Disallow: /favoris.html
 Disallow: /souhaits.html
 Disallow: /document-commande.html
 
-Sitemap: https://www.cardoriashop.fr/api/seo/sitemap.xml
+Sitemap: https://www.cardoriashop.fr/sitemap.xml

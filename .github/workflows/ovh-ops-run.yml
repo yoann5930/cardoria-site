@@ -40,11 +40,11 @@ jobs:
           test -n "${OVH_VPS_HOST_FINGERPRINT:-}"
 
           case "$OP" in
-            status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check) ;;
+            status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable) ;;
             *) echo "FORBIDDEN action"; exit 1 ;;
           esac
           case "$BRANCH" in
-            main|migration/oracle-free-20260902|migration/ovh-ops-20260903|migration/ovh-chatgpt-access-20260903) ;;
+            main|migration/oracle-free-20260902|migration/ovh-ops-20260903|migration/ovh-chatgpt-access-20260903|migration/ovh-https-cutover-20260903) ;;
             *) echo "FORBIDDEN branch"; exit 1 ;;
           esac
 

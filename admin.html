@@ -10,8 +10,8 @@
 <link rel="icon" href="/assets/logo/cardoria-premium.png">
 <script src="/js/seo-config.js"></script>
 <script>
-window.CARDORIA_ADMIN_BACKEND = "https://cardoria-site-f2cy.onrender.com";
-if (window.CARDORIA_SEO) window.CARDORIA_SEO.backendUrl = window.CARDORIA_ADMIN_BACKEND;
+window.CARDORIA_ADMIN_BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "";
+if (window.CARDORIA_SEO && window.CARDORIA_ADMIN_BACKEND) window.CARDORIA_SEO.backendUrl = window.CARDORIA_ADMIN_BACKEND;
 window.CARDORIA_BACKEND = window.CARDORIA_ADMIN_BACKEND;
 </script>
 </head>

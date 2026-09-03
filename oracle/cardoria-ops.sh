@@ -26,7 +26,7 @@ redact() {
 
 require_action() {
   case "$1" in
-    status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check) return 0 ;;
+    status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable) return 0 ;;
     *) echo "FORBIDDEN action"; exit 1 ;;
   esac
 }
@@ -34,7 +34,7 @@ require_action() {
 validate_branch() {
   local branch=$1
   case "$branch" in
-    main|migration/oracle-free-20260902|migration/ovh-ops-20260903|migration/ovh-chatgpt-access-20260903) return 0 ;;
+    main|migration/oracle-free-20260902|migration/ovh-ops-20260903|migration/ovh-chatgpt-access-20260903|migration/ovh-https-cutover-20260903) return 0 ;;
     *) echo "FORBIDDEN branch"; exit 1 ;;
   esac
 }
@@ -220,6 +220,45 @@ install_ops_from_repo() {
   if [ -f "$APP_DIR/oracle/cardoria-ops-ssh-wrapper.sh" ]; then
     install -m 0755 -o root -g root "$APP_DIR/oracle/cardoria-ops-ssh-wrapper.sh" /usr/local/bin/cardoria-ops-ssh-wrapper
   fi
+  if [ -f "$APP_DIR/oracle/sudoers-cardoria-ops" ]; then
+    tmp=$(mktemp)
+    cp "$APP_DIR/oracle/sudoers-cardoria-ops" "$tmp"
+    chmod 0440 "$tmp"
+    if visudo -cf "$tmp"; then
+      install -m 0440 -o root -g root "$APP_DIR/oracle/sudoers-cardoria-ops" /etc/sudoers.d/cardoria-ops
+    else
+      echo "sudoers update skipped: visudo rejected the repo file"
+    fi
+    rm -f "$tmp"
+  fi
+}
+
+cmd_dns_check() {
+  echo "=== DNS CHECK ==="
+  local expected=51.89.174.191
+  local apex www
+  apex=$(getent ahostsv4 cardoriashop.fr 2>/dev/null | awk '/STREAM/ {print $1; exit}')
+  www=$(getent ahostsv4 www.cardoriashop.fr 2>/dev/null | awk '/STREAM/ {print $1; exit}')
+  echo "expected_ipv4: $expected"
+  echo "apex_ipv4: ${apex:-unresolved}"
+  echo "www_ipv4: ${www:-unresolved}"
+  if [ "$apex" = "$expected" ] && [ "$www" = "$expected" ]; then
+    echo "dns_on_vps: yes"
+    return 0
+  fi
+  echo "dns_on_vps: no"
+  return 1
+}
+
+cmd_https_enable() {
+  echo "=== HTTPS ENABLE ==="
+  if ! cmd_dns_check; then
+    echo "Refusing HTTPS until public DNS points to this VPS"
+    return 1
+  fi
+  bash "$APP_DIR/oracle/enable-https.sh" | redact
+  echo "=== POST-HTTPS LOCAL HEALTHCHECK ==="
+  run_healthcheck http://127.0.0.1:10000
 }
 
 cmd_deploy() {
@@ -258,6 +297,7 @@ cmd_rollback() {
 ACTION=${1:-}
 require_action "$ACTION"
 shift || true
+install_ops_from_repo
 
 case "$ACTION" in
   status) cmd_status ;;
@@ -276,4 +316,6 @@ case "$ACTION" in
   rollback) cmd_rollback ;;
   report) cmd_report ;;
   backup-check) cmd_backup_check ;;
+  dns-check) cmd_dns_check ;;
+  https-enable) cmd_https_enable ;;
 esac

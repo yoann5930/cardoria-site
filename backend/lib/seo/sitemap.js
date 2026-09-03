@@ -149,12 +149,26 @@ export function generateRobotsTxt(siteUrl = SITE) {
     "Disallow: /admin-",
     "Disallow: /admin.html",
     "Disallow: /admin-login.html",
+    "Disallow: /admin-seo.html",
+    "Disallow: /admin-paiements.html",
+    "Disallow: /admin-ia.html",
+    "Disallow: /admin-system.html",
+    "Disallow: /admin-catalogue.html",
+    "Disallow: /admin-comptabilite.html",
+    "Disallow: /admin-utilisateurs.html",
+    "Disallow: /admin-statistiques.html",
+    "Disallow: /admin-journal.html",
+    "Disallow: /admin-integrations.html",
+    "Disallow: /admin-commandes.html",
+    "Disallow: /admin-stock.html",
+    "Disallow: /admin-estimations.html",
+    "Disallow: /admin-analytics.html",
     "Disallow: /mes-commandes.html",
     "Disallow: /favoris.html",
     "Disallow: /souhaits.html",
     "Disallow: /document-commande.html",
     "",
-    "Sitemap: " + base + "/api/seo/sitemap.xml"
+    "Sitemap: " + base + "/sitemap.xml"
   ].join("\n");
 }
 
