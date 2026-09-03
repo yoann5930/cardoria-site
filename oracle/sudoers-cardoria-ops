@@ -1,0 +1,12 @@
+# Cardoria OVH ops — exact commands only. Never NOPASSWD: ALL.
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops status
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops healthcheck
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops restart
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops backup
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops nginx-test
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops logs
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops rollback
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops deploy
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops deploy main
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops deploy migration/oracle-free-20260902
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops deploy migration/ovh-ops-20260903

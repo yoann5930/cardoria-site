@@ -1,0 +1,90 @@
+name: OVH Ops
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Allowlisted VPS operation
+        required: true
+        type: choice
+        options:
+          - status
+          - healthcheck
+          - deploy
+          - restart
+          - backup
+          - nginx-test
+          - logs
+          - rollback
+      branch:
+        description: Authorized branch for deploy only
+        required: false
+        type: choice
+        default: migration/oracle-free-20260902
+        options:
+          - main
+          - migration/oracle-free-20260902
+          - migration/ovh-ops-20260903
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ovh-ops
+  cancel-in-progress: false
+
+jobs:
+  ovh-ops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Run allowlisted VPS operation
+        env:
+          OVH_VPS_HOST: ${{ secrets.OVH_VPS_HOST }}
+          OVH_VPS_USER: ${{ secrets.OVH_VPS_USER }}
+          OVH_VPS_SSH_KEY: ${{ secrets.OVH_VPS_SSH_KEY }}
+          OVH_VPS_HOST_FINGERPRINT: ${{ secrets.OVH_VPS_HOST_FINGERPRINT }}
+          OP: ${{ inputs.action }}
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "${OVH_VPS_HOST:-}"
+          test -n "${OVH_VPS_USER:-}"
+          test -n "${OVH_VPS_SSH_KEY:-}"
+          test -n "${OVH_VPS_HOST_FINGERPRINT:-}"
+
+          case "$OP" in
+            status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback) ;;
+            *) echo "FORBIDDEN action"; exit 1 ;;
+          esac
+          case "$BRANCH" in
+            main|migration/oracle-free-20260902|migration/ovh-ops-20260903) ;;
+            *) echo "FORBIDDEN branch"; exit 1 ;;
+          esac
+
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$OVH_VPS_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          unset OVH_VPS_SSH_KEY
+
+          ssh-keyscan -t ed25519 -T 10 "$OVH_VPS_HOST" > "$HOME/.ssh/known_hosts"
+          got=$(ssh-keygen -lf "$HOME/.ssh/known_hosts" | awk '{print $2}')
+          if [ "$got" != "$OVH_VPS_HOST_FINGERPRINT" ]; then
+            echo "Host fingerprint mismatch"
+            exit 1
+          fi
+          echo "host_fingerprint: match"
+
+          remote_cmd=$OP
+          if [ "$OP" = deploy ]; then
+            remote_cmd="deploy $BRANCH"
+          fi
+
+          ssh -i "$HOME/.ssh/id_ed25519" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o PreferredAuthentications=publickey \
+            -o ConnectTimeout=15 \
+            "${OVH_VPS_USER}@${OVH_VPS_HOST}" \
+            "$remote_cmd"
