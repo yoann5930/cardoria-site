@@ -1,0 +1,24 @@
+[Unit]
+Description=Cardoria Node.js Application
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cardoria
+Group=cardoria
+WorkingDirectory=/opt/cardoria/current/backend
+EnvironmentFile=/etc/cardoria/cardoria.env
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/cardoria /tmp
+
+[Install]
+WantedBy=multi-user.target

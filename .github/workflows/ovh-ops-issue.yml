@@ -1,0 +1,151 @@
+name: OVH Ops Issue
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ovh-ops
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    if: github.event.issue.state == 'open'
+    runs-on: ubuntu-latest
+    outputs:
+      action: ${{ steps.map.outputs.action }}
+      branch: ${{ steps.map.outputs.branch }}
+      skip: ${{ steps.map.outputs.skip }}
+    steps:
+      - name: Map allowlisted label only
+        id: map
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const allowed = {
+              'ovh-ops:status': 'status',
+              'ovh-ops:healthcheck': 'healthcheck',
+              'ovh-ops:deploy': 'deploy',
+              'ovh-ops:restart': 'restart',
+              'ovh-ops:backup': 'backup',
+              'ovh-ops:nginx-test': 'nginx-test',
+              'ovh-ops:logs': 'logs',
+              'ovh-ops:rollback': 'rollback',
+              'ovh-ops:report': 'report',
+              'ovh-ops:backup-check': 'backup-check'
+            };
+            const branchMap = {
+              'ovh-branch:main': 'main',
+              'ovh-branch:oracle-free': 'migration/oracle-free-20260902',
+              'ovh-branch:ovh-ops': 'migration/ovh-ops-20260903',
+              'ovh-branch:ovh-chatgpt': 'migration/ovh-chatgpt-access-20260903'
+            };
+            const owner = context.payload.repository.owner.login;
+            const author = context.payload.issue.user.login;
+            if (context.payload.action === 'labeled') {
+              const added = context.payload.label && context.payload.label.name;
+              if (added === 'ovh-ops:done') {
+                core.setOutput('skip', 'done-label');
+                core.setOutput('action', '');
+                core.setOutput('branch', '');
+                return;
+              }
+            }
+            const labels = (context.payload.issue.labels || []).map((item) => item.name);
+            const ops = labels.filter((name) => Object.prototype.hasOwnProperty.call(allowed, name));
+            if (ops.length !== 1) {
+              core.setOutput('skip', 'no-single-ops-label');
+              core.setOutput('action', '');
+              core.setOutput('branch', '');
+              return;
+            }
+            if (author !== owner) {
+              core.setOutput('skip', 'unauthorized-author');
+              core.setOutput('action', '');
+              core.setOutput('branch', '');
+              return;
+            }
+            const action = allowed[ops[0]];
+            let branch = 'migration/oracle-free-20260902';
+            const branchLabels = labels.filter((name) => Object.prototype.hasOwnProperty.call(branchMap, name));
+            if (action === 'deploy') {
+              if (branchLabels.length !== 1) {
+                core.setOutput('skip', 'deploy-requires-one-branch-label');
+                core.setOutput('action', '');
+                core.setOutput('branch', '');
+                return;
+              }
+              branch = branchMap[branchLabels[0]];
+            }
+            core.setOutput('skip', '');
+            core.setOutput('action', action);
+            core.setOutput('branch', branch);
+
+  run:
+    needs: resolve
+    if: needs.resolve.outputs.skip == ''
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: ${{ needs.resolve.outputs.action }}
+      branch: ${{ needs.resolve.outputs.branch }}
+    secrets: inherit
+
+  explain-deploy:
+    needs: resolve
+    if: needs.resolve.outputs.skip == 'deploy-requires-one-branch-label'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain missing branch label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                'OVH Ops ignored. deploy requires exactly one branch label:',
+                '`ovh-branch:main`',
+                '`ovh-branch:oracle-free`',
+                '`ovh-branch:ovh-ops`',
+                '`ovh-branch:ovh-chatgpt`',
+                'Issue body is never executed.',
+                `Logs: ${runUrl}`
+              ].join('\n')
+            });
+
+  finish:
+    needs: [resolve, run]
+    if: always() && needs.resolve.outputs.skip == ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment and close issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const action = '${{ needs.resolve.outputs.action }}';
+            const runStatus = '${{ needs.run.result }}';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `OVH Ops finished. action=\`${action}\` result=\`${runStatus || 'skipped'}\`.\nIssue body is never executed.\nLogs: ${runUrl}`
+            });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['ovh-ops:done']
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
