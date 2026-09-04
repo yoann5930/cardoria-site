@@ -12,6 +12,7 @@ BACKUP_DIR=/opt/cardoria/backups
 PREV_FILE=/opt/cardoria/previous-commit
 LAST_DEPLOY=/opt/cardoria/last-deploy
 DB_NAME=cardoria
+ENV_FILE=/etc/cardoria/cardoria.env
 redact() {
   sed -E \
     -e 's/[Aa]uthorization:[[:space:]]*[^[:cntrl:]]+/Authorization: ***/g' \
@@ -26,7 +27,7 @@ redact() {
 
 require_action() {
   case "$1" in
-    status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable) return 0 ;;
+    status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure) return 0 ;;
     *) echo "FORBIDDEN action"; exit 1 ;;
   esac
 }
@@ -261,6 +262,67 @@ cmd_https_enable() {
   run_healthcheck http://127.0.0.1:10000
 }
 
+cmd_smtp_configure() {
+  echo "=== SMTP CONFIGURE ==="
+  local smtp_pass tmp rc
+  IFS= read -r smtp_pass || true
+  smtp_pass=${smtp_pass//[[:space:]]/}
+  if [[ ! "$smtp_pass" =~ ^[A-Za-z0-9]{16,128}$ ]]; then
+    echo "smtp_secret: invalid"
+    return 1
+  fi
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "env_file: missing"
+    return 1
+  fi
+  tmp=$(mktemp)
+  awk -F= '$1 != "SMTP_HOST" && $1 != "SMTP_PORT" && $1 != "SMTP_SECURE" && $1 != "SMTP_USER" && $1 != "SMTP_PASS" && $1 != "MAIL_FROM"' "$ENV_FILE" > "$tmp"
+  {
+    printf 'SMTP_HOST=smtp.gmail.com\n'
+    printf 'SMTP_PORT=587\n'
+    printf 'SMTP_SECURE=false\n'
+    printf 'SMTP_USER=Cardoria59330@gmail.com\n'
+    printf 'SMTP_PASS=%s\n' "$smtp_pass"
+    printf 'MAIL_FROM=Cardoria59330@gmail.com\n'
+  } >> "$tmp"
+  install -m 0600 -o root -g root "$tmp" "$ENV_FILE"
+  rm -f "$tmp"
+  unset smtp_pass
+
+  systemctl restart cardoria
+  if ! wait_health; then
+    echo "smtp_restart_health: fail"
+    return 1
+  fi
+  set +e
+  (
+    set -a
+    . "$ENV_FILE"
+    set +a
+    cd "$APP_DIR/backend"
+    node --input-type=module <<'NODE'
+import { sendEmail } from "./lib/email.js";
+const sent = await sendEmail({
+  to: "Cardoria59330@gmail.com",
+  subject: "Cardoria - SMTP OVH opérationnel",
+  text: "Le service sécurisé d'envoi d'e-mail Cardoria sur le VPS OVH est opérationnel."
+});
+process.exit(sent ? 0 : 1);
+NODE
+  ) >/tmp/cardoria-ops-smtp.out 2>&1
+  rc=$?
+  set -e
+  redact < /tmp/cardoria-ops-smtp.out
+  rm -f /tmp/cardoria-ops-smtp.out
+  if [ "$rc" -ne 0 ]; then
+    echo "smtp_test: fail"
+    return 1
+  fi
+  echo "smtp_config: installed"
+  echo "smtp_test: success"
+  echo "SMTP CONFIGURE OK"
+}
+
 cmd_deploy() {
   local branch=$1
   validate_branch "$branch"
@@ -318,4 +380,5 @@ case "$ACTION" in
   backup-check) cmd_backup_check ;;
   dns-check) cmd_dns_check ;;
   https-enable) cmd_https_enable ;;
+  smtp-configure) cmd_smtp_configure ;;
 esac
