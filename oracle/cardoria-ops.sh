@@ -282,7 +282,7 @@ cmd_smtp_configure() {
     printf 'SMTP_PORT=587\n'
     printf 'SMTP_SECURE=false\n'
     printf 'SMTP_USER=Cardoria59330@gmail.com\n'
-    printf 'SMTP_PASS=%s\n' "$smtp_pass"
+    printf '%s=%s\n' 'SMTP_PASS' "$smtp_pass"
     printf 'MAIL_FROM=Cardoria59330@gmail.com\n'
   } >> "$tmp"
   install -m 0600 -o root -g root "$tmp" "$ENV_FILE"
