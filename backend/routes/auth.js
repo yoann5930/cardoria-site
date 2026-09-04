@@ -180,8 +180,8 @@ router.post("/request-magic-link", authRateLimit, handleMagicLinkRequest);
 router.post("/email/confirm", authRateLimit, (req, res) => {
   try {
     const user = consumeMagicLogin(String(req.body?.token || ""));
-    logAudit({ type: "auth", action: "email_login_success", user: user.email, detail: user.role });
-    res.json(completeSession(user, req));
+    logAudit({ type: "auth", action: "email_link_validated", user: user.email, detail: user.role });
+    res.json(beginAdmin2fa(user, req, "magic_link"));
   } catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
 });
 
