@@ -38,6 +38,9 @@ case "$cmd" in
   https-enable)
     exec sudo -n /usr/local/bin/cardoria-ops https-enable
     ;;
+  smtp-configure)
+    exec sudo -n /usr/local/bin/cardoria-ops smtp-configure
+    ;;
   deploy)
     exec sudo -n /usr/local/bin/cardoria-ops deploy
     ;;
