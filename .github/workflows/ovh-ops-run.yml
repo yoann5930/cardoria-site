@@ -29,6 +29,7 @@ jobs:
           OVH_VPS_USER: ${{ secrets.OVH_VPS_USER }}
           OVH_VPS_SSH_KEY: ${{ secrets.OVH_VPS_SSH_KEY }}
           OVH_VPS_HOST_FINGERPRINT: ${{ secrets.OVH_VPS_HOST_FINGERPRINT }}
+          SMTP_PASS: ${{ secrets.OVH_SMTP_PASS }}
           OP: ${{ inputs.action }}
           BRANCH: ${{ inputs.branch }}
         run: |
@@ -40,7 +41,7 @@ jobs:
           test -n "${OVH_VPS_HOST_FINGERPRINT:-}"
 
           case "$OP" in
-            status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable) ;;
+            status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure) ;;
             *) echo "FORBIDDEN action"; exit 1 ;;
           esac
           case "$BRANCH" in
@@ -67,10 +68,18 @@ jobs:
             remote_cmd="deploy $BRANCH"
           fi
 
-          ssh -i "$HOME/.ssh/id_ed25519" \
-            -o IdentitiesOnly=yes \
-            -o BatchMode=yes \
-            -o PreferredAuthentications=publickey \
-            -o ConnectTimeout=15 \
-            "${OVH_VPS_USER}@${OVH_VPS_HOST}" \
-            "$remote_cmd"
+          ssh_args=(
+            -i "$HOME/.ssh/id_ed25519"
+            -o IdentitiesOnly=yes
+            -o BatchMode=yes
+            -o PreferredAuthentications=publickey
+            -o ConnectTimeout=15
+          )
+          if [ "$OP" = smtp-configure ]; then
+            test -n "${SMTP_PASS:-}"
+            printf '%s' "$SMTP_PASS" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
+            unset SMTP_PASS
+          else
+            unset SMTP_PASS
+            ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
+          fi
