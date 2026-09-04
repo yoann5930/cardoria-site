@@ -38,7 +38,8 @@ jobs:
               'ovh-ops:report': 'report',
               'ovh-ops:backup-check': 'backup-check',
               'ovh-ops:dns-check': 'dns-check',
-              'ovh-ops:https-enable': 'https-enable'
+              'ovh-ops:https-enable': 'https-enable',
+              'ovh-ops:smtp-configure': 'smtp-configure'
             };
             const branchMap = {
               'ovh-branch:main': 'main',
