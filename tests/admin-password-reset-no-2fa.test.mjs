@@ -9,6 +9,8 @@ const users = read("../backend/lib/auth/users.js");
 const passwordReset = read("../backend/lib/auth/passwordReset.js");
 const validation = read("../backend/lib/security/validate.js");
 const loginPages = [read("../admin-login.html"), read("../backend/public/admin-login.html")];
+const resetPages = [read("../admin-reset-password.html"), read("../backend/public/admin-reset-password.html")];
+const resetScripts = [read("../js/admin/admin-password-reset.js"), read("../backend/public/js/admin/admin-password-reset.js")];
 
 test("admin login creates a normal session when production 2FA is disabled", () => {
   assert.match(auth, /const REQUIRE_ADMIN_2FA = [^;]+ADMIN_REQUIRE_2FA/);
@@ -35,4 +37,17 @@ test("login pages replace the magic link with password reset", () => {
     assert.match(page, /Réinitialiser mon mot de passe/);
     assert.doesNotMatch(page, /<form[^>]+id="adminEmailLoginForm"|Recevoir un lien par e-mail/);
   }
+});
+
+test("password reset uses an external same-origin script", () => {
+  for (const page of resetPages) {
+    assert.match(page, /src="\/js\/admin\/admin-password-reset\.js\?v=20260905-password-reset-2"/);
+    assert.doesNotMatch(page, /BACKEND|fetch\(/);
+  }
+  for (const script of resetScripts) {
+    assert.match(script, /postJson\("\/api\/auth\/password\/request"/);
+    assert.match(script, /postJson\("\/api\/auth\/password\/confirm"/);
+    assert.doesNotMatch(script, /CARDORIA_SEO|CARDORIA_BACKEND|https:\/\//);
+  }
+  assert.equal(resetScripts[0], resetScripts[1]);
 });
