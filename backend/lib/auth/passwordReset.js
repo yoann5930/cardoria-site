@@ -9,6 +9,7 @@ import { revokeAllUserSessions } from "./session.js";
 import { sendEmail } from "../email.js";
 
 const RESET_HOURS = Number(process.env.RESET_TOKEN_HOURS || 2);
+const RESET_PUBLIC_ORIGIN = "https://www.cardoriashop.fr";
 
 export async function requestPasswordReset(email) {
   const user = getUserByEmail(email);
@@ -24,8 +25,10 @@ export async function requestPasswordReset(email) {
     VALUES (?, ?, ?, ?, ?)
   `).run(makeId("rst"), user.id, tokenHash, expiresAt, now.toISOString());
 
-  const siteUrl = String(process.env.SITE_URL || "https://www.cardoriashop.fr").replace(/\/$/, "");
-  const link = `${siteUrl}/admin-reset-password.html?token=${token}`;
+  // Ne jamais utiliser SITE_URL ici : sur le VPS cette variable peut contenir
+  // l'adresse technique HTTP. Les liens d'authentification doivent rester sur
+  // l'origine publique HTTPS canonique.
+  const link = `${RESET_PUBLIC_ORIGIN}/admin-reset-password.html?token=${token}`;
 
   const sent = await sendEmail({
     to: user.email,
