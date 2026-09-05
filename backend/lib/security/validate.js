@@ -72,7 +72,7 @@ export const SCHEMAS = {
   },
   passwordResetConfirm: {
     token: { type: "string", required: true, minLength: 20, maxLength: 128, allowNewlines: false },
-    password: { type: "string", required: true, minLength: 8, maxLength: 128, allowNewlines: false }
+    password: { type: "string", required: true, minLength: 10, maxLength: 128, allowNewlines: false }
   },
   gdprExport: {
     email: { type: "email", required: true }

@@ -24,19 +24,25 @@ export async function requestPasswordReset(email) {
     VALUES (?, ?, ?, ?, ?)
   `).run(makeId("rst"), user.id, tokenHash, expiresAt, now.toISOString());
 
-  const siteUrl = process.env.SITE_URL || "https://cardoria.fr";
+  const siteUrl = String(process.env.SITE_URL || "https://www.cardoriashop.fr").replace(/\/$/, "");
   const link = `${siteUrl}/admin-reset-password.html?token=${token}`;
 
-  await sendEmail({
+  const sent = await sendEmail({
+    to: user.email,
     subject: "Cardoria — Réinitialisation de mot de passe",
     text: `Bonjour,\n\nCliquez sur le lien suivant pour réinitialiser votre mot de passe (valide ${RESET_HOURS}h) :\n${link}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\nCardoria`
   });
+
+  if (!sent) {
+    getDb().prepare("DELETE FROM auth_reset_tokens WHERE token_hash = ?").run(tokenHash);
+    throw Object.assign(new Error("Service d'envoi d'e-mail indisponible."), { status: 503 });
+  }
 
   return { ok: true, message: "Si le compte existe, un e-mail a été envoyé." };
 }
 
 export function confirmPasswordReset(token, newPassword) {
-  if (!token || !newPassword || newPassword.length < 8) {
+  if (!token || !newPassword || newPassword.length < 10 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
     throw Object.assign(new Error("Token ou mot de passe invalide."), { status: 400 });
   }
 

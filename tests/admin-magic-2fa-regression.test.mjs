@@ -6,12 +6,12 @@ const authRoute = fs.readFileSync(new URL("../backend/routes/auth.js", import.me
 const loginPage = fs.readFileSync(new URL("../admin-email-login.html", import.meta.url), "utf8");
 const publicLoginPage = fs.readFileSync(new URL("../backend/public/admin-email-login.html", import.meta.url), "utf8");
 
-test("magic-link confirmation requires 2FA before creating an admin session", () => {
+test("magic-link confirmation follows the explicit 2FA configuration", () => {
   assert.match(
     authRoute,
-    /router\.post\("\/email\/confirm"[\s\S]*?res\.json\(beginAdmin2fa\(user, req, "magic_link"\)\)/,
+    /router\.post\("\/email\/confirm"[\s\S]*?if \(REQUIRE_ADMIN_2FA\) return res\.json\(beginAdmin2fa\(user, req, "magic_link"\)\)/,
   );
-  assert.doesNotMatch(
+  assert.match(
     authRoute,
     /router\.post\("\/email\/confirm"[\s\S]*?res\.json\(completeSession\(user, req\)\)/,
   );

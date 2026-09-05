@@ -1,7 +1,6 @@
 /**
  * Gestion utilisateurs et rôles Cardoria.
  */
-import crypto from "crypto";
 import { getDb } from "../engine/database.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { makeId, ADMIN_ROLES, ROLES } from "./migrate.js";
@@ -31,12 +30,6 @@ export function createUser({ email, password, role = "client", name = "" }) {
   return getUserById(id);
 }
 
-function safeSecretEqual(left, right) {
-  const a = Buffer.from(String(left || ""), "utf8");
-  const b = Buffer.from(String(right || ""), "utf8");
-  return a.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-
 export function authenticateUser(email, password) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const lock = getBruteForceLock(normalizedEmail);
@@ -46,28 +39,9 @@ export function authenticateUser(email, password) {
   const row = db.prepare("SELECT * FROM auth_users WHERE email = ? AND active = 1").get(normalizedEmail);
   const databasePasswordValid = Boolean(row && verifyPassword(password, row.password_hash));
 
-  // PostgreSQL restaure le snapshot runtime après la migration d'authentification.
-  // Si ce snapshot contient encore l'ancien hash admin, le secret Render doit rester
-  // la source d'autorité pour le compte ADMIN_EMAIL uniquement.
-  const configuredAdminEmail = String(process.env.ADMIN_EMAIL || "Cardoria59330@gmail.com").trim().toLowerCase();
-  const configuredAdminPassword = String(process.env.ADMIN_LOGIN_PASSWORD || "");
-  const renderAdminPasswordValid = Boolean(
-    row &&
-    ADMIN_ROLES.includes(row.role) &&
-    normalizedEmail === configuredAdminEmail &&
-    configuredAdminPassword &&
-    safeSecretEqual(password, configuredAdminPassword)
-  );
-
-  if (!row || (!databasePasswordValid && !renderAdminPasswordValid)) {
+  if (!row || !databasePasswordValid) {
     recordFailedLogin(normalizedEmail);
     return null;
-  }
-
-  if (renderAdminPasswordValid && !databasePasswordValid) {
-    db.prepare("UPDATE auth_users SET password_hash = ?, updated_at = ? WHERE id = ?")
-      .run(hashPassword(configuredAdminPassword), new Date().toISOString(), row.id);
-    row.password_hash = db.prepare("SELECT password_hash FROM auth_users WHERE id = ?").get(row.id)?.password_hash || row.password_hash;
   }
 
   clearFailedLogin(normalizedEmail);

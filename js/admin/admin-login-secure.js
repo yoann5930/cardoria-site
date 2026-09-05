@@ -82,42 +82,9 @@
     }
   }
 
-  async function requestAdminEmailLink(event) {
-    event?.preventDefault();
-    clearMessages();
-
-    const err = qs("loginError");
-    const success = qs("loginSuccess");
-    const email = qs("adminEmail")?.value?.trim();
-    const button = qs("adminEmailLoginForm")?.querySelector("button[type='submit']");
-
-    if (!email) {
-      if (err) err.textContent = "Indiquez votre adresse e-mail.";
-      return;
-    }
-
-    if (button) button.disabled = true;
-
-    try {
-      const response = await fetch(`${BACKEND}/api/auth/email/request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-      const data = await readJson(response);
-      if (!response.ok || !data.ok) throw new Error(data.error || "Envoi du lien impossible.");
-      if (success) success.textContent = data.message || "Lien de connexion envoye.";
-    } catch (error) {
-      if (err) err.textContent = error.message || "Envoi du lien impossible.";
-    } finally {
-      if (button) button.disabled = false;
-    }
-  }
-
   document.addEventListener("DOMContentLoaded", function () {
     sessionStorage.removeItem("cardoria_admin_code");
     sessionStorage.removeItem("cardoria_2fa_challenge");
     qs("adminPasswordLoginForm")?.addEventListener("submit", loginWithPassword);
-    qs("adminEmailLoginForm")?.addEventListener("submit", requestAdminEmailLink);
   });
 })();
