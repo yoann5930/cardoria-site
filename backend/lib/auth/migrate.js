@@ -79,20 +79,14 @@ export function migrateAuth() {
 }
 
 function seedDefaultAdmin(db) {
-  const email = String(process.env.ADMIN_EMAIL || "Cardoria59330@gmail.com").trim().toLowerCase();
+  const email = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
   if (!email) return;
 
   const configuredPassword = String(process.env.ADMIN_LOGIN_PASSWORD || "").trim();
-  const existing = db.prepare("SELECT id, role, active FROM auth_users WHERE email = ?").get(email);
-  if (existing) {
-    // ADMIN_LOGIN_PASSWORD est un secret Render. S'il est defini, il devient le mot de passe
-    // de connexion directe de l'admin existant sans jamais etre stocke en clair en base.
-    if (configuredPassword && ADMIN_ROLES.includes(existing.role) && existing.active) {
-      db.prepare("UPDATE auth_users SET password_hash = ?, updated_at = ? WHERE id = ?")
-        .run(hashPassword(configuredPassword), new Date().toISOString(), existing.id);
-    }
-    return;
-  }
+  const existing = db.prepare("SELECT id FROM auth_users WHERE email = ?").get(email);
+  // Une fois le compte créé, la base devient l'unique source d'autorité du mot de passe.
+  // Cela permet à la réinitialisation par e-mail de rester effective après un redémarrage.
+  if (existing) return;
 
   // Pour un nouveau compte, preferer le secret de connexion directe, sinon l'ancien secret
   // d'initialisation. Sans aucun secret fourni, conserver un mot de passe aleatoire impraticable.

@@ -75,6 +75,7 @@
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.ok) throw new Error(data.error || "Lien de connexion invalide ou expiré.");
     if (!ADMIN_ROLES.includes(data.user?.role)) throw new Error("Compte non autorisé pour l'administration.");
+    if (data.token) return finalizeSession(data);
     if (!data.requires2fa) throw new Error("La double authentification Admin n'a pas été demandée par le serveur.");
     show2fa(data);
   } catch (e) {

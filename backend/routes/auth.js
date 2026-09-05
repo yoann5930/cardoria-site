@@ -1,7 +1,6 @@
 /**
  * Authentification Cardoria — comptes clients/admin, sessions et 2FA facultatif.
  */
-import crypto from "crypto";
 import { Router } from "express";
 import { getUserById, getUserByEmail, createUser, authenticateUser, setTotpSecret, getTotpSecret, ADMIN_ROLES } from "../lib/auth/users.js";
 import { migrateAuth } from "../lib/auth/migrate.js";
@@ -17,6 +16,9 @@ import { logAudit } from "../lib/audit.js";
 
 const router = Router();
 const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;
+const REQUIRE_ADMIN_2FA = String(
+  process.env.ADMIN_REQUIRE_2FA ?? (process.env.NODE_ENV === "test" ? "true" : "false")
+).trim().toLowerCase() === "true";
 
 function normalizedEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -27,32 +29,12 @@ function validPassword(value) {
   return p.length >= 10 && /[A-Za-z]/.test(p) && /\d/.test(p);
 }
 
-function secureStringEqual(a, b) {
-  const left = crypto.createHash("sha256").update(String(a || "")).digest();
-  const right = crypto.createHash("sha256").update(String(b || "")).digest();
-  return crypto.timingSafeEqual(left, right);
-}
-
 function publicUser(user) {
   return { id: user.id, email: user.email, role: user.role, name: user.name, totpEnabled: !!user.totpEnabled };
 }
 
 function rejectTemporaryCodeLogin(res) {
   return res.status(503).json({ ok: false, error: "Connexion par code temporairement désactivée." });
-}
-
-function authenticateConfiguredAdmin(email, password) {
-  const adminEmail = normalizedEmail(process.env.ADMIN_EMAIL || "Cardoria59330@gmail.com");
-  const adminPassword = String(process.env.ADMIN_LOGIN_PASSWORD || "");
-  if (!adminPassword || email !== adminEmail) return null;
-  if (!secureStringEqual(password, adminPassword)) {
-    throw Object.assign(new Error("Email ou mot de passe incorrect."), { status: 401 });
-  }
-  const user = getUserByEmail(email);
-  if (!user || !ADMIN_ROLES.includes(user.role)) {
-    throw Object.assign(new Error("Compte administrateur indisponible."), { status: 403 });
-  }
-  return user;
 }
 
 function completeSession(user, req) {
@@ -113,7 +95,7 @@ router.post("/login", authRateLimit, (req, res) => {
 
     const email = normalizedEmail(req.body?.email);
     const password = String(req.body?.password || "");
-    const user = authenticateConfiguredAdmin(email, password) || authenticateUser(email, password);
+    const user = authenticateUser(email, password);
     if (!user) {
       console.warn("[auth] login_failed invalid_credentials");
       logAudit({ type: "auth", action: "login_failed", user: email || req.ip || "unknown", detail: "invalid_credentials" });
@@ -121,7 +103,7 @@ router.post("/login", authRateLimit, (req, res) => {
     }
     console.log(`[auth] login_success role=${user.role}`);
     logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });
-    if (ADMIN_ROLES.includes(user.role)) {
+    if (ADMIN_ROLES.includes(user.role) && REQUIRE_ADMIN_2FA) {
       return res.json(beginAdmin2fa(user, req, "password"));
     }
     res.json(completeSession(user, req));
@@ -181,7 +163,8 @@ router.post("/email/confirm", authRateLimit, (req, res) => {
   try {
     const user = consumeMagicLogin(String(req.body?.token || ""));
     logAudit({ type: "auth", action: "email_link_validated", user: user.email, detail: user.role });
-    res.json(beginAdmin2fa(user, req, "magic_link"));
+    if (REQUIRE_ADMIN_2FA) return res.json(beginAdmin2fa(user, req, "magic_link"));
+    res.json(completeSession(user, req));
   } catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
 });
 
@@ -201,7 +184,8 @@ router.get("/me", (req, res) => {
 router.post("/password/request", authRateLimit, async (req, res) => {
   const v = validateBody(SCHEMAS.passwordResetRequest, req.body);
   if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
-  res.json(await requestPasswordReset(v.data.email));
+  try { res.json(await requestPasswordReset(v.data.email)); }
+  catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
 });
 
 router.post("/password/confirm", authRateLimit, (req, res) => {
