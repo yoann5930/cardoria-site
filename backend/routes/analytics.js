@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { Router } from "express";
 import { readJson, writeJson } from "../lib/storage.js";
 import {
@@ -11,24 +12,51 @@ import {
 } from "../lib/attribution/witnot.js";
 
 const router = Router();
+const ANALYTICS_SCHEMA_VERSION = 2;
+const VISITOR_KEY_RETENTION_DAYS = 31;
+const LEGACY_SOURCE_BASELINE = { google: 42, facebook: 18, instagram: 12, direct: 28, witnot: 0 };
+const LEGACY_DEVICE_BASELINE = { mobile: 55, desktop: 38, tablet: 7 };
 
 const DEFAULT_ANALYTICS = {
+  schemaVersion: ANALYTICS_SCHEMA_VERSION,
   days: [],
-  sources: { google: 42, facebook: 18, instagram: 12, direct: 28, witnot: 0 },
-  devices: { mobile: 55, desktop: 38, tablet: 7 },
-  avgSessionSeconds: 184,
+  sources: { google: 0, facebook: 0, instagram: 0, direct: 0, witnot: 0 },
+  devices: { mobile: 0, desktop: 0, tablet: 0 },
+  avgSessionSeconds: 0,
   topPages: [],
   topSearches: [],
   topCards: [],
   sales: []
 };
 
-function normalizeAnalytics(value) {
+function removeLegacyDemoBaseline(values, baseline) {
+  const cleaned = {};
+  for (const [key, seed] of Object.entries(baseline)) {
+    cleaned[key] = Math.max(0, Number(values?.[key] || 0) - seed);
+  }
+  return cleaned;
+}
+
+function migrateLegacyAnalytics(value) {
   const raw = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  if (Number(raw.schemaVersion || 0) >= ANALYTICS_SCHEMA_VERSION) return raw;
+
+  return {
+    ...raw,
+    schemaVersion: ANALYTICS_SCHEMA_VERSION,
+    sources: removeLegacyDemoBaseline(raw.sources, LEGACY_SOURCE_BASELINE),
+    devices: removeLegacyDemoBaseline(raw.devices, LEGACY_DEVICE_BASELINE),
+    avgSessionSeconds: Number(raw.avgSessionSeconds || 0) === 184 ? 0 : Number(raw.avgSessionSeconds || 0)
+  };
+}
+
+function normalizeAnalytics(value) {
+  const raw = migrateLegacyAnalytics(value);
   return {
     ...DEFAULT_ANALYTICS,
     ...raw,
-    days: Array.isArray(raw.days) ? raw.days : [],
+    schemaVersion: ANALYTICS_SCHEMA_VERSION,
+    days: Array.isArray(raw.days) ? raw.days.filter((day) => day && typeof day === "object") : [],
     sources: { ...DEFAULT_ANALYTICS.sources, ...(raw.sources && typeof raw.sources === "object" ? raw.sources : {}) },
     devices: { ...DEFAULT_ANALYTICS.devices, ...(raw.devices && typeof raw.devices === "object" ? raw.devices : {}) },
     topPages: Array.isArray(raw.topPages) ? raw.topPages : [],
@@ -36,6 +64,22 @@ function normalizeAnalytics(value) {
     topCards: Array.isArray(raw.topCards) ? raw.topCards : [],
     sales: Array.isArray(raw.sales) ? raw.sales : []
   };
+}
+
+function visitorKey(visitorId) {
+  const id = String(visitorId || "").trim();
+  if (!id) return "";
+  return crypto.createHash("sha256").update(id).digest("hex").slice(0, 24);
+}
+
+function cleanupVisitorKeys(days) {
+  const cutoff = Date.now() - VISITOR_KEY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  return days.slice(0, 365).map((day) => {
+    const timestamp = Date.parse(`${String(day?.date || "")}T00:00:00Z`);
+    if (!Number.isFinite(timestamp) || timestamp >= cutoff) return day;
+    const { visitorKeys, ...cleaned } = day;
+    return cleaned;
+  });
 }
 
 router.post("/track", (req, res) => {
@@ -47,11 +91,20 @@ router.post("/track", (req, res) => {
   const today = new Date().toISOString().slice(0, 10);
   let day = analytics.days.find((d) => d && d.date === today);
   if (!day) {
-    day = { date: today, visitors: 0, views: 0, revenue: 0, sales: 0 };
+    day = { date: today, visitors: 0, views: 0, revenue: 0, sales: 0, visitorKeys: [] };
     analytics.days.unshift(day);
   }
   day.views = Number(day.views || 0) + 1;
-  day.visitors = Number(day.visitors || 0) + 1;
+
+  const key = visitorKey(visitorId);
+  if (key) {
+    const keys = Array.isArray(day.visitorKeys) ? day.visitorKeys : [];
+    if (!keys.includes(key)) {
+      keys.push(key);
+      day.visitors = Number(day.visitors || 0) + 1;
+    }
+    day.visitorKeys = keys;
+  }
 
   const ref = String(referrer || "direct").toLowerCase();
   if (resolvedSource === "witnot" || ref.includes("witnot.com")) {
@@ -87,7 +140,7 @@ router.post("/track", (req, res) => {
     analytics.topCards.sort((a, b) => Number(b?.views || 0) - Number(a?.views || 0));
   }
 
-  analytics.days = analytics.days.slice(0, 365);
+  analytics.days = cleanupVisitorKeys(analytics.days);
   writeJson("analytics", analytics);
 
   if (resolvedSource === "witnot") {

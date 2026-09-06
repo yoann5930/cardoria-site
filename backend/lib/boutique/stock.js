@@ -10,6 +10,13 @@ function money(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
+function normalizeStockQuantity(value, fallback = 1) {
+  if (value === null || value === undefined || value === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.trunc(parsed));
+}
+
 function normalizeCondition(value) {
   const raw = String(value || "").trim();
   if (!raw || /non renseign/i.test(raw)) return "";
@@ -160,7 +167,8 @@ function addPurchaseId(line, purchaseId) {
 }
 
 function addLine(map, item) {
-  const qty = Math.max(1, Math.trunc(Number(item.stock) || 1));
+  const qty = normalizeStockQuantity(item.stock, 1);
+  if (qty <= 0) return;
   const unitCost = Math.max(0, Number(item.unitCost) || 0);
   const pref = item.preference || { condition: "", boutiqueEnabled: true, boutiquePrice: null, stockBase: null, removed: false, explicit: false };
   const catalogPrice = catalogReferencePrice(item.card);
@@ -218,7 +226,8 @@ function buildBaseStock() {
   const cardCache = Object.create(null);
 
   for (const purchase of purchases) {
-    const qty = Math.max(1, Math.trunc(Number(purchase.quantity) || 1));
+    const qty = normalizeStockQuantity(purchase.quantity, 1);
+    if (qty <= 0) continue;
     const amount = Math.max(0, Number(purchase.amount) || 0);
     const unitCost = qty ? amount / qty : amount;
     const packaging = String(purchase.packaging || "carte_unite");
