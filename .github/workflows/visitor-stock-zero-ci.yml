@@ -1,0 +1,46 @@
+name: Visitor Stock Zero CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/routes/analytics.js"
+      - "backend/lib/boutique/stock.js"
+      - "backend/public/js/attribution.js"
+      - "backend/tests/visitor-stock-zero-regression.test.mjs"
+      - ".github/workflows/visitor-stock-zero-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/routes/analytics.js"
+      - "backend/lib/boutique/stock.js"
+      - "backend/public/js/attribution.js"
+      - "backend/tests/visitor-stock-zero-regression.test.mjs"
+      - ".github/workflows/visitor-stock-zero-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  visitor-stock-zero:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+
+      - name: Syntax checks
+        run: |
+          node --check backend/routes/analytics.js
+          node --check backend/lib/boutique/stock.js
+          node --check backend/public/js/attribution.js
+          node --check backend/tests/visitor-stock-zero-regression.test.mjs
+
+      - name: Visitor and zero-stock regression tests
+        run: node --test backend/tests/visitor-stock-zero-regression.test.mjs
