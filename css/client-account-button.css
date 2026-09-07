@@ -1,0 +1,43 @@
+/* CardoriaShop — accès client toujours visible dans l'en-tête Boutique */
+body.shop-v1 .shop-client-account{
+  display:inline-flex!important;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  flex:0 0 auto;
+  min-height:42px;
+  padding:10px 15px;
+  border:1px solid rgba(243,216,115,.72);
+  border-radius:12px;
+  background:linear-gradient(180deg,#f3d873,#d7b24a);
+  color:#181204!important;
+  font-size:12px;
+  font-weight:900;
+  line-height:1;
+  white-space:nowrap;
+  box-shadow:0 8px 24px rgba(215,178,74,.15);
+}
+
+body.shop-v1 .shop-client-account:hover,
+body.shop-v1 .shop-client-account:focus-visible{
+  transform:translateY(-1px);
+  filter:brightness(1.06);
+  box-shadow:0 10px 28px rgba(215,178,74,.24);
+  outline:none;
+}
+
+@media(max-width:1050px){
+  body.shop-v1 .shop-nav-action.shop-client-account{display:inline-flex!important}
+}
+
+@media(max-width:900px){
+  body.shop-v1 .shop-nav{gap:10px}
+  body.shop-v1 .shop-menu-btn{margin-left:auto}
+  body.shop-v1 .shop-client-account{order:4;margin-left:0;padding:10px 12px}
+}
+
+@media(max-width:620px){
+  body.shop-v1 .shop-client-account{min-width:42px;width:42px;height:42px;padding:0;border-radius:50%}
+  body.shop-v1 .shop-client-account span:last-child{display:none}
+  body.shop-v1 .shop-client-account span:first-child{font-size:18px;line-height:1}
+}
