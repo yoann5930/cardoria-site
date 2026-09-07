@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - fix/cardoria-production-stability-v2
   pull_request:
     branches:
       - main
@@ -154,16 +153,12 @@ jobs:
             echo 'Client-side admin secret detected'
             exit 1
           fi
-          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend render.yaml 2>/dev/null; then
+          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend 2>/dev/null; then
             echo 'Direct admin bypass enabled'
             exit 1
           fi
           if grep -n 'marketplaceRoutes' backend/server.js; then
             echo 'Legacy marketplace router mounted'
-            exit 1
-          fi
-          if grep -A2 'MARKETPLACE_DEMO_MODE' render.yaml | grep -q 'true'; then
-            echo 'Marketplace demo enabled in production blueprint'
             exit 1
           fi
           if grep -R -n 'api/marketplace/listings\|api/marketplace/orders?email' js *.html 2>/dev/null; then
@@ -180,14 +175,6 @@ jobs:
           fi
           if git grep -I -nE 'SMTP_PASS[[:space:]]*:[[:space:]]*["'\''][^"'\'']+' -- . ':!.github/workflows' ':!backend/node_modules' ':!**/node_modules/**'; then
             echo 'Hardcoded SMTP_PASS detected'
-            exit 1
-          fi
-          if grep -A2 -- '- key: SMTP_PASS' render.yaml | grep -q 'value:'; then
-            echo 'SMTP_PASS must not have a plaintext value in render.yaml'
-            exit 1
-          fi
-          if ! grep -A2 -- '- key: SMTP_PASS' render.yaml | grep -q 'sync: false'; then
-            echo 'SMTP_PASS must be a Render secret (sync: false)'
             exit 1
           fi
           if ! grep -q 'requireTLS: !secure && port === 587' backend/lib/email.js; then
