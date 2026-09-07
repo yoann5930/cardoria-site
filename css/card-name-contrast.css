@@ -1,17 +1,31 @@
 /* Cardoria — lisibilite renforcee des noms de cartes */
+body.shop-v1 .product .product-img{
+  margin-bottom:0!important;
+}
+
 body.shop-v1 .product h3,
 body.shop-v1 .product .product-name{
+  position:static!important;
+  inset:auto!important;
+  display:block;
+  margin:0 0 10px!important;
+  padding:13px 10px 12px;
+  border-top:1px solid rgba(255,225,138,.18);
+  border-bottom:1px solid rgba(255,255,255,.055);
+  background:linear-gradient(180deg,rgba(255,225,138,.055),rgba(255,255,255,.018));
   color:#fffbe8;
   font-size:22px;
   font-weight:800;
   line-height:1.22;
   letter-spacing:.008em;
+  text-align:center;
   text-shadow:0 1px 1px rgba(0,0,0,.92),0 0 14px rgba(255,225,138,.28),0 0 3px rgba(255,255,255,.18);
 }
 
 body.shop-v1 .product:hover h3,
 body.shop-v1 .product:hover .product-name{
   color:#ffe99b;
+  background:linear-gradient(180deg,rgba(255,225,138,.085),rgba(255,255,255,.022));
   text-shadow:0 1px 1px rgba(0,0,0,.96),0 0 18px rgba(255,225,138,.38),0 0 4px rgba(255,255,255,.22);
 }
 
@@ -41,6 +55,7 @@ body.card-preview-open{overflow:hidden}
 @media(max-width:620px){
   body.shop-v1 .product h3,
   body.shop-v1 .product .product-name{
+    padding:12px 8px 11px;
     font-size:21px;
   }
 }
