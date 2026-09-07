@@ -6,6 +6,7 @@ import { listBlogPosts } from "./blog.js";
 import { listExtensions, listGeneratedPages, SITE } from "./generator.js";
 import { listLicenses } from "../engine/licenses.js";
 import { getSitemapCards, getCardCount } from "../engine/cards.js";
+import { getDb } from "../engine/database.js";
 
 export const CARD_SITEMAP_PAGE_SIZE = 10000;
 
@@ -51,6 +52,12 @@ function urlEntry(base, path, opts = {}) {
   if (opts.lastmod) xml += "    <lastmod>" + xmlEscape(opts.lastmod) + "</lastmod>\n";
   if (opts.changefreq) xml += "    <changefreq>" + opts.changefreq + "</changefreq>\n";
   if (opts.priority) xml += "    <priority>" + opts.priority + "</priority>\n";
+  if (opts.image) {
+    xml += "    <image:image>\n";
+    xml += "      <image:loc>" + xmlEscape(opts.image) + "</image:loc>\n";
+    if (opts.imageTitle) xml += "      <image:title>" + xmlEscape(opts.imageTitle) + "</image:title>\n";
+    xml += "    </image:image>\n";
+  }
   xml += "  </url>\n";
   return xml;
 }
@@ -62,6 +69,20 @@ function sitemapEntry(base, path, lastmod) {
   return xml;
 }
 
+function getCardSitemapRows(limit, offset) {
+  try {
+    return getDb().prepare(`
+      SELECT id, license_slug, language, slug, name, extension, number, image_hd, image_thumb, updated_at
+      FROM cards
+      WHERE active = 1
+      ORDER BY views DESC, sales_count DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+  } catch {
+    return getSitemapCards(limit, offset);
+  }
+}
+
 export function getCardSitemapPageCount(pageSize = CARD_SITEMAP_PAGE_SIZE) {
   const size = Math.max(1, Number(pageSize) || CARD_SITEMAP_PAGE_SIZE);
   const count = getCardCount();
@@ -70,11 +91,10 @@ export function getCardSitemapPageCount(pageSize = CARD_SITEMAP_PAGE_SIZE) {
 
 export function generateSitemapIndexXml(siteUrl = SITE) {
   const base = normalizeBase(siteUrl);
-  const today = new Date().toISOString().slice(0, 10);
-  let maps = sitemapEntry(base, "/api/seo/core.xml", today);
+  let maps = sitemapEntry(base, "/api/seo/core.xml");
   const cardPages = getCardSitemapPageCount();
   for (let page = 1; page <= cardPages; page += 1) {
-    maps += sitemapEntry(base, `/api/seo/cards-${page}.xml`, today);
+    maps += sitemapEntry(base, `/api/seo/cards-${page}.xml`);
   }
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${maps}</sitemapindex>`;
 }
@@ -85,12 +105,11 @@ export function generateCoreSitemapXml(siteUrl = SITE) {
   let urls = "";
 
   STATIC_PAGES.forEach((page) => {
-    urls += urlEntry(base, page.loc, { lastmod: today, changefreq: page.changefreq, priority: page.priority });
+    urls += urlEntry(base, page.loc, { changefreq: page.changefreq, priority: page.priority });
   });
 
   listLicenses().forEach((license) => {
     urls += urlEntry(base, `/pages/licences/${license.slug}/`, {
-      lastmod: today,
       changefreq: "weekly",
       priority: license.slug === "pokemon" ? "0.95" : "0.88"
     });
@@ -98,7 +117,7 @@ export function generateCoreSitemapXml(siteUrl = SITE) {
 
   listExtensions().forEach((extension) => {
     if (!extension?.url) return;
-    urls += urlEntry(base, extension.url, { lastmod: today, changefreq: "weekly", priority: extension.license === "pokemon" ? "0.8" : "0.72" });
+    urls += urlEntry(base, extension.url, { changefreq: "weekly", priority: extension.license === "pokemon" ? "0.8" : "0.72" });
   });
 
   listBlogPosts({ publishedOnly: true, limit: 5000 }).forEach((post) => {
@@ -121,16 +140,20 @@ export function generateCardsSitemapXml(siteUrl = SITE, page = 1, pageSize = CAR
   const today = new Date().toISOString().slice(0, 10);
   let urls = "";
 
-  getSitemapCards(safePageSize, offset).forEach((card) => {
+  getCardSitemapRows(safePageSize, offset).forEach((card) => {
     const cardUrl = `/cartes/${encodeURIComponent(card.license_slug)}/${encodeURIComponent(card.slug)}`;
+    const image = String(card.image_hd || card.image_thumb || "").trim();
+    const imageTitle = [card.name, card.extension, card.number].filter(Boolean).join(" — ");
     urls += urlEntry(base, cardUrl, {
       lastmod: String(card.updated_at || today).slice(0, 10),
       changefreq: "weekly",
-      priority: card.license_slug === "pokemon" ? "0.72" : "0.66"
+      priority: card.license_slug === "pokemon" ? "0.72" : "0.66",
+      image,
+      imageTitle
     });
   });
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}</urlset>`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${urls}</urlset>`;
 }
 
 export function generateSitemapXml(siteUrl = SITE) {
