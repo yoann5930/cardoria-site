@@ -5,6 +5,7 @@
   const POKEMON_LOGO = "https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg";
   let products = [];
   let cart = [];
+  let lastPreviewTrigger = null;
 
   function qs(id) { return document.getElementById(id); }
   function euro(value) { return Number(value || 0).toFixed(2).replace(".", ",") + " €"; }
@@ -39,8 +40,55 @@
       const stock = Math.max(0, Number(product.stock || 0));
       const canBuy = !!product.purchasable && stock > 0 && Number(product.price || 0) > 0;
       const stockLabel = stock > 0 ? `En stock : ${stock}` : "Rupture de stock";
-      return `<article class="product"><div class="product-img pokemon-product-visual"><img src="${esc(image)}" alt="${esc(product.name || "Produit Pokémon")}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${POKEMON_LOGO}'"></div><h3 class="product-name">${esc(product.name)}</h3>${meta ? `<p class="product-meta">${esc(meta)}</p>` : ""}<div class="product-stock-row"><span class="product-condition">État : ${esc(product.condition || "Non renseigné")}</span><span class="product-stock ${stock > 0 ? "is-available" : "is-empty"}">${stockLabel}</span></div><div class="price">${Number(product.price || 0) > 0 ? euro(product.price) : "Prix à définir"}</div><button class="primary" type="button" data-add-product="${esc(product.id)}" ${canBuy ? "" : "disabled"}>${canBuy ? "Ajouter au panier" : "Indisponible"}</button></article>`;
+      return `<article class="product" data-preview-product="${esc(product.id)}"><div class="product-img pokemon-product-visual" data-preview-product="${esc(product.id)}" role="button" tabindex="0" aria-label="Agrandir ${esc(product.name || "ce produit Pokémon")}"><img src="${esc(image)}" alt="${esc(product.name || "Produit Pokémon")}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${POKEMON_LOGO}'"></div><h3 class="product-name">${esc(product.name)}</h3>${meta ? `<p class="product-meta">${esc(meta)}</p>` : ""}<div class="product-stock-row"><span class="product-condition">État : ${esc(product.condition || "Non renseigné")}</span><span class="product-stock ${stock > 0 ? "is-available" : "is-empty"}">${stockLabel}</span></div><div class="price">${Number(product.price || 0) > 0 ? euro(product.price) : "Prix à définir"}</div><button class="primary" type="button" data-add-product="${esc(product.id)}" ${canBuy ? "" : "disabled"}>${canBuy ? "Ajouter au panier" : "Indisponible"}</button></article>`;
     }).join("");
+  }
+
+  function ensurePreviewModal() {
+    if (qs("cardPreviewModal")) return;
+    const modal = document.createElement("div");
+    modal.id = "cardPreviewModal";
+    modal.className = "card-preview-modal";
+    modal.hidden = true;
+    modal.innerHTML = `<div class="card-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="cardPreviewTitle"><button class="card-preview-close" id="cardPreviewClose" type="button" aria-label="Fermer l'aperçu">×</button><div class="card-preview-visual"><img id="cardPreviewImage" src="" alt=""></div><div class="card-preview-copy"><p class="card-preview-kicker">Aperçu de la carte</p><h2 id="cardPreviewTitle"></h2><p id="cardPreviewMeta" class="card-preview-meta"></p><p id="cardPreviewCondition" class="card-preview-condition"></p><p id="cardPreviewPrice" class="card-preview-price"></p></div></div>`;
+    document.body.appendChild(modal);
+    qs("cardPreviewClose")?.addEventListener("click", closeCardPreview);
+    modal.addEventListener("click", (event) => { if (event.target === modal) closeCardPreview(); });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !modal.hidden) closeCardPreview(); });
+  }
+
+  function openCardPreview(productId, trigger) {
+    const product = products.find((item) => String(item.id) === String(productId));
+    if (!product) return;
+    ensurePreviewModal();
+    const modal = qs("cardPreviewModal");
+    const image = qs("cardPreviewImage");
+    const title = qs("cardPreviewTitle");
+    const meta = qs("cardPreviewMeta");
+    const condition = qs("cardPreviewCondition");
+    const price = qs("cardPreviewPrice");
+    if (!modal || !image || !title || !meta || !condition || !price) return;
+    const details = [product.extension, product.number ? `#${product.number}` : "", product.rarity].filter(Boolean).join(" · ");
+    image.src = product.image || POKEMON_LOGO;
+    image.alt = product.name || "Produit Pokémon";
+    image.onerror = function () { this.onerror = null; this.src = POKEMON_LOGO; };
+    title.textContent = product.name || "Produit Pokémon";
+    meta.textContent = details || "Référence Pokémon";
+    condition.textContent = `État : ${product.condition || "Non renseigné"}`;
+    price.textContent = Number(product.price || 0) > 0 ? euro(product.price) : "Prix à définir";
+    lastPreviewTrigger = trigger || null;
+    modal.hidden = false;
+    document.body.classList.add("card-preview-open");
+    qs("cardPreviewClose")?.focus();
+  }
+
+  function closeCardPreview() {
+    const modal = qs("cardPreviewModal");
+    if (!modal || modal.hidden) return;
+    modal.hidden = true;
+    document.body.classList.remove("card-preview-open");
+    if (lastPreviewTrigger && typeof lastPreviewTrigger.focus === "function") lastPreviewTrigger.focus();
+    lastPreviewTrigger = null;
   }
 
   function addToCart(productId) {
@@ -144,7 +192,21 @@
     qs("shopMenuButton")?.addEventListener("click", toggleMenu);
     qs("search")?.addEventListener("input", renderProducts);
     qs("shopPayButton")?.addEventListener("click", checkoutBoutique);
-    qs("products")?.addEventListener("click", (event) => { const button = event.target.closest("[data-add-product]"); if (button) addToCart(button.dataset.addProduct); });
+    qs("products")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-add-product]");
+      if (button) { addToCart(button.dataset.addProduct); return; }
+      if (event.target.closest("a, input, select, textarea")) return;
+      const preview = event.target.closest("[data-preview-product]");
+      if (preview) openCardPreview(preview.dataset.previewProduct, preview);
+    });
+    qs("products")?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const preview = event.target.closest("[data-preview-product]");
+      if (!preview || preview.matches("article.product")) return;
+      event.preventDefault();
+      openCardPreview(preview.dataset.previewProduct, preview);
+    });
+    ensurePreviewModal();
     const range = new URLSearchParams(location.search).get("gamme");
     if (range === "pokemon") showPokemonRange(); else showRangeOverview();
     confirmReturnedPayment();
