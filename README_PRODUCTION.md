@@ -1,108 +1,55 @@
-# Cardoria V1.0 — Guide de mise en production
+# Cardoria — Production
 
-Guide opérationnel pour déployer Cardoria en production publique.
+Ce document décrit uniquement l’architecture de production actuelle.
 
----
+## Source de vérité
 
-## Architecture
+- Dépôt : `yoann5930/cardoria-site`
+- Branche de production : `main`
+- URL publique canonique : `https://www.cardoriashop.fr`
+- Hébergement de production : VPS OVH
 
-```
-[Vercel] Frontend statique (HTML/JS/CSS)
-    ↓ HTTPS API
-[Render] Backend Node.js Express
-    ↓
-[Disk Render] backend/data/ — SQLite + JSON + backups
-```
+Les anciennes infrastructures Render, Vercel et Oracle ne font plus partie de la production Cardoria.
 
-**Paiements :** SumUp uniquement (boutique + marketplace)  
-**IA :** OpenAI API  
-**Email :** SMTP (notifications, alertes)
+## Frontend et backend
 
----
+Le frontend public se trouve à la racine du dépôt. Le backend Node.js sert le runtime de production depuis `backend/public`.
 
-## 1. Prérequis
+Le workflow `.github/workflows/frontend-runtime-sync.yml` maintient le miroir du frontend vers `backend/public` lorsque `main` évolue. Ce miroir fait partie du fonctionnement actuel et ne doit pas être supprimé.
 
-- Compte [Render](https://render.com) (backend)
-- Compte [Vercel](https://vercel.com) (frontend)
-- Compte SumUp (API Key + Merchant Code)
-- Compte OpenAI (API Key)
-- SMTP (Gmail, SendGrid, OVH…)
-- Domaine `cardoria.fr` (optionnel staging Vercel)
+Le workflow vérifie également qu’aucune ancienne URL de production Vercel n’est réintroduite dans le frontend runtime.
 
----
+## Opérations OVH
 
-## 2. Déploiement Render (backend)
+Les opérations serveur sont séparées du code applicatif et passent par les workflows OVH dédiés :
 
-| Paramètre | Valeur |
-|-----------|--------|
-| Root Directory | `backend` |
-| Build Command | `npm install` |
-| Start Command | `npm start` |
-| Disk | 1 Go → `/opt/render/project/src/backend/data` |
+- `.github/workflows/ovh-ops.yml`
+- `.github/workflows/ovh-ops-issue.yml`
+- `.github/workflows/ovh-ops-run.yml`
 
-Variables : voir `backend/.env.example` et section ci-dessous.
+Les opérations exécutables sont strictement limitées par une liste blanche. Les déploiements utilisent uniquement la branche `main`.
 
-Webhook SumUp : `https://VOTRE-BACKEND.onrender.com/api/marketplace/webhooks/sumup`
+Aucun secret, mot de passe, clé SSH ou valeur sensible ne doit être ajouté à ce dépôt ou à cette documentation.
 
-Health : `GET /api/health/`
+## Déploiement
 
----
+1. Les modifications sont préparées et testées sur une branche dédiée.
+2. Les contrôles CI doivent être verts avant fusion.
+3. La branche validée est fusionnée dans `main`.
+4. Une opération OVH explicite et autorisée est ensuite nécessaire pour modifier le VPS de production.
+5. La production n’est considérée validée qu’après contrôles réels sur `https://www.cardoriashop.fr`.
 
-## 3. Déploiement Vercel (frontend)
+Une simple modification GitHub ou une fusion de branche ne doit pas être présentée comme un déploiement OVH réussi.
 
-1. Importer le repo — Framework **Other**
-2. Configurer `CARDORIA_SEO.backendUrl` dans `js/seo-config.js`
-3. Vérifier `vercel.json` (headers cache + sécurité)
+## Contrôles utiles
 
----
+- Santé API : `GET /api/health/`
+- Pages publiques et administration : contrôles définis dans les workflows CI du dépôt.
+- Synchronisation frontend runtime : `.github/workflows/frontend-runtime-sync.yml`
+- Opérations et diagnostics VPS : workflows `ovh-ops*`
 
-## 4. Variables essentielles
+## Infrastructures retirées
 
-```env
-NODE_ENV=production
-APP_VERSION=1.0.0
-ADMIN_CODE=<secret>
-OPENAI_API_KEY=sk-...
-SUMUP_API_KEY=...
-SUMUP_MERCHANT_CODE=...
-SMTP_HOST=...
-SITE_URL=https://cardoria.fr
-BACKUP_INTERVAL_HOURS=24
-BACKUP_MAX_KEEP=14
-ALERT_EMAIL=true
-GA4_MEASUREMENT_ID=G-...
-```
+Les configurations de déploiement Render, Vercel et Oracle sont considérées comme héritées et ne doivent pas être réintroduites comme cibles de production.
 
----
-
-## 5. Scripts pré-production
-
-```bash
-node scripts/audit-launch.mjs
-node scripts/generate-launch-sitemap.mjs
-node scripts/build-production.mjs
-```
-
----
-
-## 6. Admin production
-
-| Page | Rôle |
-|------|------|
-| `admin-system.html` | Santé, backups, logs, maintenance |
-| `admin-sante.html` | Monitoring détaillé |
-| `admin-marketplace.html` | Marketplace ops |
-
----
-
-## 7. Checklist go-live
-
-- [ ] Env Render complet
-- [ ] SumUp webhook testé
-- [ ] SMTP testé
-- [ ] Backup + rotation OK
-- [ ] Audit ≥ 70
-- [ ] Search Console sitemaps
-- [ ] GA4 Realtime
-
-Documentation : `docs/LAUNCH_VALIDATION_REPORT.md`
+Les références à ces plateformes peuvent uniquement subsister lorsqu’elles servent de garde-fou explicite empêchant le retour d’une ancienne URL ou configuration en production.

@@ -9,7 +9,7 @@ on:
       branch:
         required: false
         type: string
-        default: migration/oracle-free-20260902
+        default: main
 
 permissions:
   contents: read
@@ -45,7 +45,7 @@ jobs:
             *) echo "FORBIDDEN action"; exit 1 ;;
           esac
           case "$BRANCH" in
-            main|migration/oracle-free-20260902|migration/ovh-ops-20260903|migration/ovh-chatgpt-access-20260903|migration/ovh-https-cutover-20260903) ;;
+            main) ;;
             *) echo "FORBIDDEN branch"; exit 1 ;;
           esac
 
