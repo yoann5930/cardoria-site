@@ -1,0 +1,23 @@
+/* Cardoria — lisibilite renforcee des noms de cartes */
+body.shop-v1 .product h3,
+body.shop-v1 .product .product-name{
+  color:#fffbe8;
+  font-size:22px;
+  font-weight:800;
+  line-height:1.22;
+  letter-spacing:.008em;
+  text-shadow:0 1px 1px rgba(0,0,0,.92),0 0 14px rgba(255,225,138,.28),0 0 3px rgba(255,255,255,.18);
+}
+
+body.shop-v1 .product:hover h3,
+body.shop-v1 .product:hover .product-name{
+  color:#ffe99b;
+  text-shadow:0 1px 1px rgba(0,0,0,.96),0 0 18px rgba(255,225,138,.38),0 0 4px rgba(255,255,255,.22);
+}
+
+@media(max-width:620px){
+  body.shop-v1 .product h3,
+  body.shop-v1 .product .product-name{
+    font-size:21px;
+  }
+}
