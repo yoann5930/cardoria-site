@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mon compte CardoriaShop</title>
+  <meta name="description" content="Connectez-vous ou créez votre compte client CardoriaShop.">
+  <meta name="robots" content="noindex,follow">
+  <meta name="theme-color" content="#030303">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/css/client-auth.css?v=20260907-1">
+  <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
+</head>
+<body class="client-auth-page">
+  <header class="client-auth-header">
+    <a class="client-auth-brand" href="/" aria-label="Accueil CardoriaShop">
+      <img src="/assets/logo/cardoria-premium.png" alt="CardoriaShop" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
+      <span><strong>CARDORIA</strong><small>ESPACE CLIENT</small></span>
+    </a>
+    <a class="client-auth-back" href="/boutique.html">Retour à la boutique</a>
+  </header>
+
+  <main class="client-auth-main">
+    <section class="client-auth-shell" aria-labelledby="clientAuthTitle">
+      <div class="client-auth-intro">
+        <p class="client-auth-kicker">CARDORIASHOP</p>
+        <h1 id="clientAuthTitle">Votre espace client</h1>
+        <p>Connectez-vous pour retrouver votre compte Cardoria et accéder plus facilement à vos services.</p>
+      </div>
+
+      <div class="client-auth-card" id="clientAuthCard">
+        <div class="client-auth-tabs" role="tablist" aria-label="Connexion ou création de compte">
+          <button id="clientLoginTab" class="is-active" type="button" role="tab" aria-selected="true">Se connecter</button>
+          <button id="clientRegisterTab" type="button" role="tab" aria-selected="false">Créer un compte</button>
+        </div>
+
+        <form id="clientLoginForm" class="client-auth-form" autocomplete="on">
+          <label>Email
+            <input id="clientLoginEmail" type="email" autocomplete="email" required placeholder="vous@exemple.fr">
+          </label>
+          <label>Mot de passe
+            <input id="clientLoginPassword" type="password" autocomplete="current-password" required placeholder="Votre mot de passe">
+          </label>
+          <button class="client-auth-primary" type="submit">Se connecter</button>
+        </form>
+
+        <form id="clientRegisterForm" class="client-auth-form" autocomplete="on" hidden>
+          <label>Nom ou prénom
+            <input id="clientRegisterName" type="text" autocomplete="name" maxlength="120" placeholder="Votre nom">
+          </label>
+          <label>Email
+            <input id="clientRegisterEmail" type="email" autocomplete="email" required placeholder="vous@exemple.fr">
+          </label>
+          <label>Mot de passe
+            <input id="clientRegisterPassword" type="password" autocomplete="new-password" minlength="10" required placeholder="10 caractères minimum">
+          </label>
+          <p class="client-auth-help">Le mot de passe doit contenir au moins 10 caractères, avec des lettres et des chiffres.</p>
+          <button class="client-auth-primary" type="submit">Créer mon compte</button>
+        </form>
+
+        <p id="clientAuthMessage" class="client-auth-message" aria-live="polite"></p>
+      </div>
+
+      <div class="client-account-card" id="clientAccountCard" hidden>
+        <p class="client-auth-kicker">COMPTE CONNECTÉ</p>
+        <h2 id="clientAccountName">Mon compte</h2>
+        <p id="clientAccountEmail"></p>
+        <div class="client-account-actions">
+          <a href="/mes-commandes.html">Mes commandes</a>
+          <a href="/favoris.html">Mes favoris</a>
+          <a href="/marketplace.html">Marketplace</a>
+          <a href="/boutique.html">Boutique</a>
+        </div>
+        <button id="clientLogoutButton" class="client-auth-secondary" type="button">Se déconnecter</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/client-auth.js?v=20260907-1"></script>
+</body>
+</html>
