@@ -206,7 +206,11 @@ jobs:
           grep -q '"version":"6.0.0"' /tmp/cardoria-health.json
           curl --fail --silent http://127.0.0.1:10000/admin-login.html > /tmp/cardoria-login.html
           grep -q 'Admin Cardoria' /tmp/cardoria-login.html
-          grep -q 'adminEmailLoginForm' /tmp/cardoria-login.html
+          grep -q 'adminPasswordLoginForm' /tmp/cardoria-login.html
+          if grep -qi 'double authentification' /tmp/cardoria-login.html; then
+            echo 'Obsolete 2FA marker detected'
+            exit 1
+          fi
           curl --fail --silent http://127.0.0.1:10000/api > /tmp/cardoria-api.json
           grep -q '6.0.0' /tmp/cardoria-api.json
           curl --fail --silent http://127.0.0.1:10000/boutique.html > /tmp/cardoria-boutique.html

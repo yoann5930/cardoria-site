@@ -134,8 +134,13 @@ jobs:
 
       - name: Verify admin login page
         run: |
-          curl -fsS http://127.0.0.1:10000/admin-login.html | grep -q "Admin Cardoria"
-          curl -fsS http://127.0.0.1:10000/admin-login.html | grep -q "double authentification"
+          curl -fsS http://127.0.0.1:10000/admin-login.html > /tmp/cardoria-admin-login.html
+          grep -q "Admin Cardoria" /tmp/cardoria-admin-login.html
+          grep -q "adminPasswordLoginForm" /tmp/cardoria-admin-login.html
+          if grep -qi "double authentification" /tmp/cardoria-admin-login.html; then
+            echo "Obsolete 2FA marker detected"
+            exit 1
+          fi
 
       - name: Verify magic-link endpoint is public and neutral
         run: |
