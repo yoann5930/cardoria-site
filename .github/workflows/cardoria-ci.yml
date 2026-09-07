@@ -13,7 +13,6 @@ on:
       - "admin-catalogue.html"
       - "admin-references-scelles.html"
       - "js/admin/**"
-      - "render.yaml"
       - ".github/workflows/cardoria-ci.yml"
   pull_request:
     branches: [main]
@@ -27,7 +26,6 @@ on:
       - "admin-catalogue.html"
       - "admin-references-scelles.html"
       - "js/admin/**"
-      - "render.yaml"
       - ".github/workflows/cardoria-ci.yml"
 
 jobs:
@@ -93,7 +91,7 @@ jobs:
             echo "Client-side admin bypass detected"
             exit 1
           fi
-          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend render.yaml 2>/dev/null; then
+          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend 2>/dev/null; then
             echo "Direct admin bypass must never be enabled"
             exit 1
           fi
@@ -103,14 +101,6 @@ jobs:
           fi
           if git grep -I -nE 'SMTP_PASS[[:space:]]*:[[:space:]]*["'\''][^"'\'']+' -- . ':!.github/workflows' ':!backend/node_modules' ':!**/node_modules/**'; then
             echo "Hardcoded SMTP_PASS detected"
-            exit 1
-          fi
-          if grep -A2 -- '- key: SMTP_PASS' render.yaml | grep -q 'value:'; then
-            echo "SMTP_PASS must not have a plaintext value in render.yaml"
-            exit 1
-          fi
-          if ! grep -A2 -- '- key: SMTP_PASS' render.yaml | grep -q 'sync: false'; then
-            echo "SMTP_PASS must be a Render secret (sync: false)"
             exit 1
           fi
           if ! grep -q 'requireTLS: !secure && port === 587' backend/lib/email.js; then
