@@ -15,6 +15,29 @@ body.shop-v1 .product:hover .product-name{
   text-shadow:0 1px 1px rgba(0,0,0,.96),0 0 18px rgba(255,225,138,.38),0 0 4px rgba(255,255,255,.22);
 }
 
+body.shop-v1 .pokemon-product-visual[role="button"]{cursor:zoom-in;outline:none}
+body.shop-v1 .pokemon-product-visual[role="button"]:focus-visible{box-shadow:0 0 0 2px #ffe18a,0 0 0 5px rgba(255,225,138,.15)}
+body.card-preview-open{overflow:hidden}
+.card-preview-modal{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.82);backdrop-filter:blur(8px)}
+.card-preview-modal[hidden]{display:none!important}
+.card-preview-dialog{position:relative;display:grid;grid-template-columns:minmax(260px,440px) minmax(220px,340px);gap:30px;width:min(920px,94vw);max-height:90vh;overflow:auto;padding:28px;border:1px solid rgba(255,225,138,.24);border-radius:16px;background:linear-gradient(145deg,#090909,#111);box-shadow:0 28px 90px rgba(0,0,0,.62)}
+.card-preview-close{position:absolute;top:12px;right:12px;width:44px;height:44px;padding:0;border:1px solid rgba(255,255,255,.14);border-radius:50%;background:rgba(0,0,0,.62);color:#fffbe8;font-size:28px;line-height:1}
+.card-preview-close:hover,.card-preview-close:focus-visible{border-color:#ffe18a;color:#ffe18a}
+.card-preview-visual{display:grid;place-items:center;min-height:420px;padding:18px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:radial-gradient(circle at 50% 42%,rgba(255,225,138,.10),transparent 54%),#050505}
+.card-preview-visual img{display:block;max-width:100%;max-height:72vh;width:auto;height:auto;object-fit:contain;filter:drop-shadow(0 18px 32px rgba(0,0,0,.45))}
+.card-preview-copy{align-self:center;padding:16px 8px}
+.card-preview-kicker{margin:0 0 10px;color:#d8c071;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.card-preview-copy h2{margin:0 0 12px;color:#fffbe8;font-family:Georgia,"Times New Roman",serif;font-size:clamp(30px,4vw,46px);line-height:1.08}
+.card-preview-meta,.card-preview-condition{margin:8px 0;color:#c6bfb4;font-size:14px}
+.card-preview-price{margin:20px 0 0;color:#f0cc61;font-size:28px;font-weight:800}
+
+@media(max-width:720px){
+  .card-preview-dialog{grid-template-columns:1fr;gap:18px;padding:18px;width:min(96vw,620px)}
+  .card-preview-visual{min-height:300px;padding:12px}
+  .card-preview-visual img{max-height:58vh}
+  .card-preview-copy{padding:4px 2px 8px}
+}
+
 @media(max-width:620px){
   body.shop-v1 .product h3,
   body.shop-v1 .product .product-name{
