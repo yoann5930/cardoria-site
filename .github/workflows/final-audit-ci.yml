@@ -69,7 +69,7 @@ jobs:
           node --check lib/backup/durable.js
       - name: Core regression tests
         working-directory: .
-        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs
+        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs
       - name: Architecture separation guards
         working-directory: .
         run: |
@@ -81,6 +81,11 @@ jobs:
           grep -q 'createPurchaseFromProposal' backend/lib/rachat/workflow.js
           grep -q 'cardoria_backups' backend/lib/backup/durable.js
           grep -q 'roles: \["super_admin"\], action: "restore"' backend/routes/system.js
+          grep -q 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;' backend/routes/auth.js
+          if grep -q 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;' backend/routes/auth.js; then
+            echo 'Admin temporary code login must stay disabled'
+            exit 1
+          fi
           if grep -n 'marketplaceRoutes' backend/server.js; then
             echo 'Legacy marketplace router mounted'
             exit 1
@@ -118,6 +123,13 @@ jobs:
             echo 'Obsolete 2FA UI detected'
             exit 1
           fi
+          curl -fsS http://127.0.0.1:10000/client-login.html | grep -q 'Mot de passe oublié'
+          curl -fsS http://127.0.0.1:10000/client-orders.html | grep -q 'COMMANDES BOUTIQUE'
+          curl -fsS http://127.0.0.1:10000/mes-commandes.html | grep -q 'marketplace-orders.js'
+          code=$(curl -sS -o /tmp/cardoria-final-client-orders.json -w '%{http_code}' http://127.0.0.1:10000/api/auth/orders)
+          test "$code" = "401"
+          code=$(curl -sS -o /tmp/cardoria-final-sumup.json -w '%{http_code}' http://127.0.0.1:10000/api/payments/sumup/checkout)
+          test "$code" = "410"
           for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/accounting/summary /api/system/backups; do
             code=$(curl -sS -o /tmp/cardoria-final-anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
             test "$code" = "401"
@@ -128,6 +140,10 @@ jobs:
           grep -qi '^content-security-policy:' /tmp/cardoria-final-headers.txt
           grep -qi '^x-content-type-options: nosniff' /tmp/cardoria-final-headers.txt
           grep -qi '^x-frame-options: DENY' /tmp/cardoria-final-headers.txt
+          if grep -qi '^x-powered-by:' /tmp/cardoria-final-headers.txt; then
+            echo 'X-Powered-By header must not be exposed'
+            exit 1
+          fi
       - name: Stop backend
         if: always()
         run: |

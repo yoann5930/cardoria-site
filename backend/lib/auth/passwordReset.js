@@ -3,7 +3,7 @@
  */
 import crypto from "crypto";
 import { getDb } from "../engine/database.js";
-import { hashToken, makeId } from "./migrate.js";
+import { hashToken, makeId, ADMIN_ROLES } from "./migrate.js";
 import { getUserByEmail, updatePassword } from "./users.js";
 import { revokeAllUserSessions } from "./session.js";
 import { sendEmail } from "../email.js";
@@ -28,7 +28,8 @@ export async function requestPasswordReset(email) {
   // Ne jamais utiliser SITE_URL ici : sur le VPS cette variable peut contenir
   // l'adresse technique HTTP. Les liens d'authentification doivent rester sur
   // l'origine publique HTTPS canonique.
-  const link = `${RESET_PUBLIC_ORIGIN}/admin-reset-password.html?token=${token}`;
+  const resetPage = ADMIN_ROLES.includes(user.role) ? "admin-reset-password.html" : "reset-password.html";
+  const link = `${RESET_PUBLIC_ORIGIN}/${resetPage}?token=${token}`;
 
   const sent = await sendEmail({
     to: user.email,

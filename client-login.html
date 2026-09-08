@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex,follow">
   <meta name="theme-color" content="#030303">
   <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/css/client-auth.css?v=20260907-1">
+  <link rel="stylesheet" href="/css/client-auth.css?v=20260908-3">
   <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
 </head>
 <body class="client-auth-page">
@@ -42,6 +42,7 @@
             <input id="clientLoginPassword" type="password" autocomplete="current-password" required placeholder="Votre mot de passe">
           </label>
           <button class="client-auth-primary" type="submit">Se connecter</button>
+          <p class="client-auth-help"><a href="/reset-password.html">Mot de passe oublié ?</a></p>
         </form>
 
         <form id="clientRegisterForm" class="client-auth-form" autocomplete="on" hidden>
@@ -66,16 +67,16 @@
         <h2 id="clientAccountName">Mon compte</h2>
         <p id="clientAccountEmail"></p>
         <div class="client-account-actions">
-          <a href="/mes-commandes.html">Mes commandes</a>
-          <a href="/favoris.html">Mes favoris</a>
-          <a href="/marketplace.html">Marketplace</a>
+          <a href="/client-orders.html">Commandes Boutique</a>
+          <a href="/mes-commandes.html">Commandes Marketplace</a>
           <a href="/boutique.html">Boutique</a>
+          <a href="/marketplace.html">Marketplace</a>
         </div>
         <button id="clientLogoutButton" class="client-auth-secondary" type="button">Se déconnecter</button>
       </div>
     </section>
   </main>
 
-  <script src="/js/client-auth.js?v=20260907-1"></script>
+  <script src="/js/client-auth.js?v=20260908-3"></script>
 </body>
 </html>

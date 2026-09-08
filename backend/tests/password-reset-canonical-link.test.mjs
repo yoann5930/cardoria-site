@@ -10,6 +10,8 @@ const source = fs.readFileSync(path.join(__dirname, "../lib/auth/passwordReset.j
 
 test("password reset email always uses the canonical public HTTPS origin", () => {
   assert.match(source, /const RESET_PUBLIC_ORIGIN = "https:\/\/www\.cardoriashop\.fr";/);
-  assert.match(source, /const link = `\$\{RESET_PUBLIC_ORIGIN\}\/admin-reset-password\.html\?token=\$\{token\}`;/);
+  assert.match(source, /admin-reset-password\.html/);
+  assert.match(source, /reset-password\.html/);
+  assert.match(source, /\?token=\$\{token\}/);
   assert.doesNotMatch(source, /const siteUrl = String\(process\.env\.SITE_URL/);
 });

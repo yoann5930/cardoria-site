@@ -19,7 +19,31 @@ const router = Router();
 const WRITE_ADMIN = requireAuth({ roles: ["super_admin", "admin", "employee"], action: "write" });
 const FINANCE_ADMIN = requireAuth({ roles: ["super_admin", "admin"], action: "finance" });
 const BOUTIQUE_STATUSES = ["À préparer", "En préparation", "Expédiée", "Livrée", "Annulée"];
-const BOUTIQUE_CARRIERS = ["La Poste", "Mondial Relay", "Relais Colis"];
+const BOUTIQUE_CARRIERS = [
+  "La Poste",
+  "Colissimo",
+  "Chronopost",
+  "Mondial Relay",
+  "Relais Colis",
+  "Colis Privé",
+  "DPD",
+  "GLS",
+  "UPS",
+  "DHL Express",
+  "FedEx",
+  "TNT",
+  "Geodis",
+  "DB Schenker",
+  "Ciblex",
+  "France Express",
+  "Amazon Logistics",
+  "Cainiao",
+  "Correos",
+  "Royal Mail",
+  "PostNL",
+  "bpost",
+  "Autre transporteur"
+];
 
 function clean(value, max = 500) {
   return String(value == null ? "" : value).trim().slice(0, max);
@@ -198,7 +222,7 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
 
   const current = orders[index];
   const body = req.body || {};
-  const nextStatus = clean(body.status, 80) || current.status;
+  const nextStatus = clean(body.status, 80) === "Commande confirmée" ? "À préparer" : (clean(body.status, 80) || current.status);
   const nextCarrier = clean(body.carrier, 120);
 
   if (!BOUTIQUE_STATUSES.includes(nextStatus) && nextStatus !== current.status) {
@@ -208,7 +232,7 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
     return res.status(409).json({ ok: false, error: "Le paiement Revolut doit être confirmé avant de préparer ou expédier la commande." });
   }
   if (nextCarrier && !BOUTIQUE_CARRIERS.includes(nextCarrier) && nextCarrier !== clean(current.carrier, 120)) {
-    return res.status(400).json({ ok: false, error: "Transporteur non autorisé. Choisissez La Poste, Mondial Relay ou Relais Colis." });
+    return res.status(400).json({ ok: false, error: "Transporteur non autorisé. Choisissez un transporteur de la liste ou Autre transporteur." });
   }
   if (nextStatus === "Expédiée" && (!nextCarrier || !clean(body.tracking, 180))) {
     return res.status(400).json({ ok: false, error: "Transporteur et numéro de suivi obligatoires pour expédier la commande." });

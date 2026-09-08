@@ -2,6 +2,8 @@ name: Revolut purchase smoke test
 
 on:
   push:
+    branches:
+      - main
     paths:
       - '.github/workflows/revolut-purchase-smoke.yml'
   workflow_dispatch:
@@ -11,12 +13,13 @@ permissions:
 
 jobs:
   revolut-smoke:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Revolut Sandbox purchase smoke test
+      - name: Record Revolut status without creating an order
         shell: bash
         run: |
           set -euo pipefail
@@ -34,17 +37,8 @@ jobs:
           PRODUCT_NAME="$(node -e 'const d=JSON.parse(process.argv[1]); const id=process.argv[2]; const p=(d.products||[]).find(x=>String(x.id)===id); process.stdout.write(String(p?.name||""));' "$PRODUCTS" "$PRODUCT_ID")"
           PRODUCT_PRICE="$(node -e 'const d=JSON.parse(process.argv[1]); const id=process.argv[2]; const p=(d.products||[]).find(x=>String(x.id)===id); process.stdout.write(String(Number(p?.price||0)));' "$PRODUCTS" "$PRODUCT_ID")"
 
-          if [ "$CONFIGURED" = "true" ]; then
-            export PRODUCT_ID
-            PAYLOAD="$(node -e 'process.stdout.write(JSON.stringify({customerName:"Test CardoriaShop",customerEmail:"checkout-test@cardoriashop.fr",customerPhone:"+33600000000",address:"1 rue du Test",postalCode:"75001",city:"Paris",country:"France",items:[{ref:process.env.PRODUCT_ID,qty:1}],shipping:"Standard",successUrl:"https://www.cardoriashop.fr/boutique.html?gamme=pokemon"}))')"
-            TMP="$(mktemp)"
-            HTTP_CODE="$(curl --silent --show-error --output "$TMP" --write-out '%{http_code}' --request POST https://www.cardoriashop.fr/api/payments/boutique/checkout --header 'Content-Type: application/json' --data "$PAYLOAD")"
-            CHECKOUT="$(cat "$TMP")"
-            rm -f "$TMP"
-            RESULT="$(node -e 'const d=JSON.parse(process.argv[1]); const code=Number(process.argv[2]); const product={id:process.argv[3],name:process.argv[4],price:Number(process.argv[5])}; process.stdout.write(JSON.stringify({testedAt:new Date().toISOString(),provider:"revolut",environment:"sandbox",configured:true,product,httpStatus:code,checkoutCreated:Boolean(code===200&&d.ok&&d.url),orderId:d.orderId||"",providerOrderId:d.checkoutId||d.providerOrderId||"",error:d.error||""},null,2));' "$CHECKOUT" "$HTTP_CODE" "$PRODUCT_ID" "$PRODUCT_NAME" "$PRODUCT_PRICE")"
-          else
-            RESULT="$(node -e 'const product={id:process.argv[1],name:process.argv[2],price:Number(process.argv[3])}; process.stdout.write(JSON.stringify({testedAt:new Date().toISOString(),provider:"revolut",environment:"sandbox",configured:false,product,httpStatus:null,checkoutCreated:false,orderId:"",providerOrderId:"",error:"REVOLUT_SECRET_KEY manquante sur Render"},null,2));' "$PRODUCT_ID" "$PRODUCT_NAME" "$PRODUCT_PRICE")"
-          fi
+          # Never create a Boutique order or Revolut checkout from this workflow.
+          RESULT="$(node -e 'const product={id:process.argv[1],name:process.argv[2],price:Number(process.argv[3])}; const configured=process.argv[4]==="true"; process.stdout.write(JSON.stringify({testedAt:new Date().toISOString(),provider:"revolut",environment:"sandbox",configured,product,httpStatus:null,checkoutCreated:false,orderId:"",providerOrderId:"",error:configured?"Smoke lecture seule: aucun checkout réel n’est lancé.":"REVOLUT_SECRET_KEY manquante dans /etc/cardoria/cardoria.env sur OVH"},null,2));' "$PRODUCT_ID" "$PRODUCT_NAME" "$PRODUCT_PRICE" "$CONFIGURED")"
 
           printf '%s\n' "$RESULT" > .github/revolut-smoke-result.json
           cat .github/revolut-smoke-result.json

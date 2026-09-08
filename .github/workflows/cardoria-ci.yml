@@ -82,13 +82,18 @@ jobs:
 
       - name: Lot market and catalog regression tests
         working-directory: .
-        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs
+        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs
 
       - name: Reject client-side admin bypass
         working-directory: .
         run: |
           if grep -R -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' script.js js *.html 2>/dev/null; then
             echo "Client-side admin bypass detected"
+            exit 1
+          fi
+          grep -q 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;' backend/routes/auth.js
+          if grep -q 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;' backend/routes/auth.js; then
+            echo "Admin temporary code login must stay disabled"
             exit 1
           fi
           if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend 2>/dev/null; then
