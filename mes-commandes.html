@@ -3,18 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mes commandes — Cardoria</title>
+<title>Mes commandes et suivis — CardoriaShop</title>
 <meta name="robots" content="noindex,follow">
+<meta name="theme-color" content="#030303">
 <link rel="stylesheet" href="/style.css">
-<link rel="stylesheet" href="/css/marketplace.css">
+<link rel="stylesheet" href="/css/client-auth.css?v=20260908-2">
 <link rel="icon" href="/assets/logo/cardoria-premium.png">
 </head>
-<body>
-<header class="header"><div class="container nav"><a class="brand" href="marketplace.html"><img src="/assets/logo/cardoria-premium.png" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'" alt="Cardoria"><span>CARDORIA</span></a></header>
-<main class="container mk-page" id="ordersPage"></main>
-<footer class="footer"><img src="/assets/logo/cardoria-premium.png" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'" alt="Cardoria"></footer>
-<script src="/script.js?v=8"></script>
-<script src="/js/marketplace-client.js"></script>
-<script src="/js/marketplace-orders.js"></script>
+<body class="client-auth-page">
+<header class="client-auth-header">
+  <a class="client-auth-brand" href="/"><img src="/assets/logo/cardoria-premium.png" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'" alt="CardoriaShop"><span><strong>CARDORIA</strong><small>MES COMMANDES</small></span></a>
+  <a class="client-auth-back" href="/client-login.html">Mon compte</a>
+</header>
+<main class="client-auth-main">
+  <section class="client-auth-shell client-orders-shell">
+    <div class="client-auth-intro"><p class="client-auth-kicker">ESPACE CLIENT</p><h1>Mes commandes et suivis</h1><p>Retrouvez l’état de préparation et le suivi de vos colis CardoriaShop.</p></div>
+    <div id="clientOrdersMessage" class="client-auth-card"><p>Chargement de vos commandes…</p></div>
+    <div id="clientOrdersList" class="client-orders-list" hidden></div>
+  </section>
+</main>
+<script src="/js/client-orders.js?v=20260908-2"></script>
 </body>
 </html>
