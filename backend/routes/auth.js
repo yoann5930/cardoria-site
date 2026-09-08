@@ -13,6 +13,7 @@ import { validateBody, SCHEMAS } from "../lib/security/validate.js";
 import { authRateLimit } from "../lib/security/rateLimit.js";
 import { generateCsrfToken } from "../lib/security/csrf.js";
 import { logAudit } from "../lib/audit.js";
+import { readJson } from "../lib/storage.js";
 
 const router = Router();
 const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;
@@ -31,6 +32,27 @@ function validPassword(value) {
 
 function publicUser(user) {
   return { id: user.id, email: user.email, role: user.role, name: user.name, totpEnabled: !!user.totpEnabled };
+}
+
+function publicClientOrder(order) {
+  return {
+    id: order.id,
+    date: order.date,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+    items: Array.isArray(order.items) ? order.items.map((item) => ({
+      ref: item.ref,
+      name: item.name,
+      qty: Number(item.qty || 1),
+      price: Number(item.price || 0)
+    })) : [],
+    paymentStatus: order.paymentStatus || "pending",
+    status: order.status || "À préparer",
+    shipping: order.shipping || "Standard",
+    carrier: order.carrier || "",
+    tracking: order.tracking || "",
+    total: Number(order.total || 0)
+  };
 }
 
 function rejectTemporaryCodeLogin(res) {
@@ -179,6 +201,22 @@ router.get("/me", (req, res) => {
   const user = validateSession(token);
   if (!user) return res.status(401).json({ ok: false, error: "Session expiree." });
   res.json({ ok: true, user });
+});
+
+router.get("/orders", (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
+  const user = validateSession(token);
+  if (!user) return res.status(401).json({ ok: false, error: "Session expiree." });
+  if (user.role !== "client") return res.status(403).json({ ok: false, error: "Compte client requis." });
+
+  const email = normalizedEmail(user.email);
+  const orders = readJson("orders", [])
+    .filter((order) => normalizedEmail(order?.email) === email)
+    .sort((a, b) => String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || "")))
+    .map(publicClientOrder);
+
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ok: true, orders });
 });
 
 router.post("/password/request", authRateLimit, async (req, res) => {
