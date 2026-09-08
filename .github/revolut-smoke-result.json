@@ -1,0 +1,16 @@
+{
+  "testedAt": "2026-09-08T01:42:57.610Z",
+  "provider": "revolut",
+  "environment": "sandbox",
+  "configured": false,
+  "product": {
+    "id": "card:pokemon-sv08.5-039",
+    "name": "Cocotine",
+    "price": 0.03
+  },
+  "httpStatus": null,
+  "checkoutCreated": false,
+  "orderId": "",
+  "providerOrderId": "",
+  "error": "REVOLUT_SECRET_KEY manquante dans /etc/cardoria/cardoria.env sur OVH"
+}
