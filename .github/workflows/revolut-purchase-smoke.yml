@@ -5,46 +5,119 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/revolut-purchase-smoke.yml'
+      - ".github/workflows/revolut-purchase-smoke.yml"
+      - "backend/routes/payments.js"
+      - "backend/routes/payments-admin.js"
+      - "backend/lib/payments/revolut.js"
+      - "backend/lib/boutique/checkout.js"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/revolut-purchase-smoke.yml"
+      - "backend/routes/payments.js"
+      - "backend/routes/payments-admin.js"
+      - "backend/lib/payments/revolut.js"
+      - "backend/lib/boutique/checkout.js"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: revolut-purchase-smoke-main
+  cancel-in-progress: true
 
 jobs:
   revolut-smoke:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Record Revolut status without creating an order
         shell: bash
         run: |
           set -euo pipefail
-          STATUS="$(curl --fail --silent --show-error --retry 3 --retry-delay 3 https://www.cardoriashop.fr/api/payments/status)"
-          PROVIDER="$(node -e 'const s=JSON.parse(process.argv[1]); process.stdout.write(String(s.provider||""))' "$STATUS")"
-          ENVIRONMENT="$(node -e 'const s=JSON.parse(process.argv[1]); process.stdout.write(String(s.environment||""))' "$STATUS")"
-          CONFIGURED="$(node -e 'const s=JSON.parse(process.argv[1]); process.stdout.write(String(Boolean(s.configured)))' "$STATUS")"
-          if [ "$PROVIDER" != "revolut" ] || [ "$ENVIRONMENT" != "sandbox" ]; then
-            echo "Unexpected payment status: $STATUS"
-            exit 1
-          fi
+          STATUS_FILE="${RUNNER_TEMP}/revolut-status.json"
+          PRODUCTS_FILE="${RUNNER_TEMP}/revolut-products.json"
+          RESULT_FILE="${RUNNER_TEMP}/revolut-smoke-result.json"
 
-          PRODUCTS="$(curl --fail --silent --show-error --retry 3 --retry-delay 3 https://www.cardoriashop.fr/api/payments/boutique/products)"
-          PRODUCT_ID="$(node -e 'const d=JSON.parse(process.argv[1]); const p=(d.products||[]).filter(x=>x.purchasable && Number(x.stock)>0 && Number(x.price)>0).sort((a,b)=>Number(a.price)-Number(b.price))[0]; if(!p) process.exit(2); process.stdout.write(String(p.id));' "$PRODUCTS")"
-          PRODUCT_NAME="$(node -e 'const d=JSON.parse(process.argv[1]); const id=process.argv[2]; const p=(d.products||[]).find(x=>String(x.id)===id); process.stdout.write(String(p?.name||""));' "$PRODUCTS" "$PRODUCT_ID")"
-          PRODUCT_PRICE="$(node -e 'const d=JSON.parse(process.argv[1]); const id=process.argv[2]; const p=(d.products||[]).find(x=>String(x.id)===id); process.stdout.write(String(Number(p?.price||0)));' "$PRODUCTS" "$PRODUCT_ID")"
+          curl --fail --silent --show-error --retry 3 --retry-delay 3 \
+            --output "$STATUS_FILE" \
+            https://www.cardoriashop.fr/api/payments/status
 
-          # Never create a Boutique order or Revolut checkout from this workflow.
-          RESULT="$(node -e 'const product={id:process.argv[1],name:process.argv[2],price:Number(process.argv[3])}; const configured=process.argv[4]==="true"; process.stdout.write(JSON.stringify({testedAt:new Date().toISOString(),provider:"revolut",environment:"sandbox",configured,product,httpStatus:null,checkoutCreated:false,orderId:"",providerOrderId:"",error:configured?"Smoke lecture seule: aucun checkout réel n’est lancé.":"REVOLUT_SECRET_KEY manquante dans /etc/cardoria/cardoria.env sur OVH"},null,2));' "$PRODUCT_ID" "$PRODUCT_NAME" "$PRODUCT_PRICE" "$CONFIGURED")"
+          curl --fail --silent --show-error --retry 3 --retry-delay 3 \
+            --output "$PRODUCTS_FILE" \
+            https://www.cardoriashop.fr/api/payments/boutique/products
 
-          printf '%s\n' "$RESULT" > .github/revolut-smoke-result.json
-          cat .github/revolut-smoke-result.json
+          STATUS_FILE="$STATUS_FILE" PRODUCTS_FILE="$PRODUCTS_FILE" RESULT_FILE="$RESULT_FILE" node <<'NODE'
+          const fs = require("node:fs");
+          const status = JSON.parse(fs.readFileSync(process.env.STATUS_FILE, "utf8"));
+          const productsPayload = JSON.parse(fs.readFileSync(process.env.PRODUCTS_FILE, "utf8"));
+          const provider = String(status.provider || "");
+          const environment = String(status.environment || "").trim().toLowerCase();
+          const configured = Boolean(status.configured);
+          if (provider !== "revolut") {
+            throw new Error("Provider inattendu: " + provider);
+          }
+          if (environment !== "sandbox" && environment !== "production") {
+            throw new Error("Environment inattendu: " + environment);
+          }
+          const products = Array.isArray(productsPayload.products) ? productsPayload.products : [];
+          const product = products
+            .filter((item) => item && item.purchasable && Number(item.stock) > 0 && Number(item.price) > 0)
+            .sort((a, b) => Number(a.price) - Number(b.price))[0] || null;
+          let conclusion = "🔴 REVOLUT PROD NON CONFIGURÉ";
+          let error = "REVOLUT_SECRET_KEY manquante dans /etc/cardoria/cardoria.env sur OVH";
+          if (configured && environment === "production") {
+            conclusion = "🟢 REVOLUT PROD CONFIGURÉ";
+            error = "Smoke lecture seule: aucun checkout réel n’est lancé.";
+          } else if (configured && environment === "sandbox") {
+            conclusion = "🟠 REVOLUT CONFIGURÉ MAIS EN SANDBOX";
+            error = "Smoke lecture seule: aucun checkout réel n’est lancé.";
+          }
+          const result = {
+            testedAt: new Date().toISOString(),
+            provider,
+            environment,
+            configured,
+            product: product ? { id: String(product.id || ""), name: String(product.name || ""), price: Number(product.price || 0) } : null,
+            productAvailable: Boolean(product),
+            httpStatus: 200,
+            checkoutCreated: false,
+            orderId: "",
+            providerOrderId: "",
+            conclusion,
+            error
+          };
+          fs.writeFileSync(process.env.RESULT_FILE, JSON.stringify(result, null, 2) + "\n");
+          console.log(JSON.stringify(result, null, 2));
+          NODE
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/revolut-smoke-result.json
-          git commit -m "test: record Revolut smoke result" || exit 0
-          git push
+          {
+            echo "## Revolut purchase smoke"
+            echo
+            echo "- testedAt: \`$(node -e 'const r=require(process.argv[1]); process.stdout.write(r.testedAt)' "$RESULT_FILE")\`"
+            echo "- provider: \`$(node -e 'const r=require(process.argv[1]); process.stdout.write(r.provider)' "$RESULT_FILE")\`"
+            echo "- environment: \`$(node -e 'const r=require(process.argv[1]); process.stdout.write(r.environment)' "$RESULT_FILE")\`"
+            echo "- configured: \`$(node -e 'const r=require(process.argv[1]); process.stdout.write(String(r.configured))' "$RESULT_FILE")\`"
+            echo "- checkoutCreated: \`false\`"
+            echo "- orderId: \`\`"
+            echo "- providerOrderId: \`\`"
+            echo "- product: \`$(node -e 'const r=require(process.argv[1]); process.stdout.write(r.product ? r.product.id + " / " + r.product.name : "aucun produit achetable lu")' "$RESULT_FILE")\`"
+            echo
+            echo "$(node -e 'const r=require(process.argv[1]); process.stdout.write(r.conclusion)' "$RESULT_FILE")"
+            echo
+            echo "Aucun POST, checkout, commande, paiement ou écriture Git."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload smoke report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: revolut-smoke-result
+          path: ${{ runner.temp }}/revolut-smoke-result.json
+          if-no-files-found: error
+          retention-days: 14
