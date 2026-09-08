@@ -66,6 +66,10 @@ jobs:
             backend/public/admin-journal.html
             backend/public/admin-system.html
             backend/public/boutique.html
+            backend/public/client-login.html
+            backend/public/client-orders.html
+            backend/public/reset-password.html
+            backend/public/mes-commandes.html
             backend/public/marketplace.html
             backend/public/estimation.html
             backend/public/scanner.html
@@ -78,6 +82,10 @@ jobs:
             backend/public/css/admin.css
             backend/public/js/admin/admin-core.js
             backend/public/js/admin/admin-stock.js
+            backend/public/js/admin/admin-orders.js
+            backend/public/js/client-auth.js
+            backend/public/js/client-orders.js
+            backend/public/js/client-password-reset.js
           )
           for file in "${required[@]}"; do
             test -f "$file" || { echo "Missing runtime file: $file"; exit 1; }

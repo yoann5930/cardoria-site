@@ -40,7 +40,7 @@ function toMinor(value) {
 
 async function revolutRequest(method, requestPath, body, { idempotencyKey } = {}) {
   const secret = String(process.env.REVOLUT_SECRET_KEY || "").trim();
-  if (!secret) throw Object.assign(new Error("REVOLUT_SECRET_KEY non configurée"), { status: 503 });
+  if (!secret) throw Object.assign(new Error("REVOLUT_SECRET_KEY non configurée sur le serveur OVH"), { status: 503 });
   const headers = {
     Authorization: `Bearer ${secret}`,
     Accept: "application/json",
@@ -91,7 +91,7 @@ export async function createRevolutCheckout({
   redirectUrl,
   source = "boutique"
 }) {
-  if (!isRevolutConfigured()) throw Object.assign(new Error("Revolut non configuré — définir REVOLUT_SECRET_KEY"), { status: 503 });
+  if (!isRevolutConfigured()) throw Object.assign(new Error("Revolut non configuré — définir REVOLUT_SECRET_KEY dans /etc/cardoria/cardoria.env sur OVH"), { status: 503 });
   const amountMinor = toMinor(amount);
   if (amountMinor <= 0) throw Object.assign(new Error("Montant de paiement invalide"), { status: 400 });
 

@@ -38,7 +38,7 @@ router.post("/boutique/checkout", async (req, res) => {
         ok: false,
         provider: "revolut",
         environment: getRevolutEnvironment(),
-        error: "Paiement Revolut non configuré. Définir REVOLUT_SECRET_KEY dans Render."
+        error: "Paiement Revolut non configuré. Définir REVOLUT_SECRET_KEY dans /etc/cardoria/cardoria.env sur OVH."
       });
     }
     const body = req.body || {};

@@ -29,7 +29,7 @@
             { href: "admin-achats-acheteurs.html", label: "Tableau par acheteur", page: "purchases-buyers" }
           ]
         },
-        { href: "admin-paiements.html", label: "Paiements SumUp", page: "payments" },
+        { href: "admin-paiements.html", label: "Paiements Revolut", page: "payments" },
         { href: "admin-commandes.html", label: "Commandes", page: "orders" },
         { href: "admin-stock.html", label: "Stock", page: "stock" },
         { href: "admin-estimations.html", label: "Estimations", page: "estimations" },

@@ -11,6 +11,9 @@ function isPrivateIndexPath(pathname = "") {
   }
   return path.startsWith("/admin") ||
     path.startsWith("/mes-commandes") ||
+    path.startsWith("/client-orders") ||
+    path.startsWith("/client-login") ||
+    path.startsWith("/reset-password") ||
     path.startsWith("/favoris") ||
     path.startsWith("/souhaits") ||
     path.startsWith("/document-commande") ||
@@ -19,6 +22,7 @@ function isPrivateIndexPath(pathname = "") {
 
 export function applySecurityMiddleware(app) {
   app.set("trust proxy", 1);
+  app.disable("x-powered-by");
   app.use((req, res, next) => {
     req.requestId = "req_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     res.setHeader("X-Request-Id", req.requestId);
@@ -61,7 +65,8 @@ export function applySecurityMiddleware(app) {
   const allowedOrigins = (process.env.CORS_ORIGINS || process.env.SITE_URL || "").split(",").map((s) => s.trim()).filter(Boolean);
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) res.setHeader("Access-Control-Allow-Origin", origin || allowedOrigins[0] || "*");
+    if (origin && allowedOrigins.includes(origin)) res.setHeader("Access-Control-Allow-Origin", origin);
+    else if (!origin && allowedOrigins[0]) res.setHeader("Access-Control-Allow-Origin", allowedOrigins[0]);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-cardoria-admin-code, x-csrf-token, x-session-token");

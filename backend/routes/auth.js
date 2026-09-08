@@ -16,7 +16,7 @@ import { logAudit } from "../lib/audit.js";
 import { readJson } from "../lib/storage.js";
 
 const router = Router();
-const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;
+const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;
 const REQUIRE_ADMIN_2FA = String(
   process.env.ADMIN_REQUIRE_2FA ?? (process.env.NODE_ENV === "test" ? "true" : "false")
 ).trim().toLowerCase() === "true";
@@ -34,6 +34,12 @@ function publicUser(user) {
   return { id: user.id, email: user.email, role: user.role, name: user.name, totpEnabled: !!user.totpEnabled };
 }
 
+function clientOrderStatus(status) {
+  const value = String(status || "À préparer");
+  if (value === "À préparer") return "Commande confirmée";
+  return value;
+}
+
 function publicClientOrder(order) {
   return {
     id: order.id,
@@ -47,7 +53,7 @@ function publicClientOrder(order) {
       price: Number(item.price || 0)
     })) : [],
     paymentStatus: order.paymentStatus || "pending",
-    status: order.status || "À préparer",
+    status: clientOrderStatus(order.status),
     shipping: order.shipping || "Standard",
     carrier: order.carrier || "",
     tracking: order.tracking || "",
@@ -71,7 +77,7 @@ function completeSession(user, req) {
 }
 
 function beginAdmin2fa(user, req, origin = "password") {
-  if (ADMIN_CODE_LOGIN_TEMP_DISABLED) return null;
+  if (ADMIN_CODE_LOGIN_TEMP_DISABLED && !REQUIRE_ADMIN_2FA) return null;
   const totp = getTotpSecret(user.id);
   const enabled = !!totp?.enabled && !!totp?.secret;
   const setupSecret = enabled ? "" : generateTotpSecret();
@@ -126,7 +132,8 @@ router.post("/login", authRateLimit, (req, res) => {
     console.log(`[auth] login_success role=${user.role}`);
     logAudit({ type: "auth", action: "login_success", user: user.email, detail: user.role });
     if (ADMIN_ROLES.includes(user.role) && REQUIRE_ADMIN_2FA) {
-      return res.json(beginAdmin2fa(user, req, "password"));
+      const challenge = beginAdmin2fa(user, req, "password");
+      if (challenge) return res.json(challenge);
     }
     res.json(completeSession(user, req));
   } catch (e) {
@@ -137,7 +144,7 @@ router.post("/login", authRateLimit, (req, res) => {
 });
 
 router.post("/2fa/login/verify", authRateLimit, (req, res) => {
-  if (ADMIN_CODE_LOGIN_TEMP_DISABLED) return rejectTemporaryCodeLogin(res);
+  if (ADMIN_CODE_LOGIN_TEMP_DISABLED && !REQUIRE_ADMIN_2FA) return rejectTemporaryCodeLogin(res);
   try {
     const challengeToken = String(req.body?.challengeToken || "");
     const code = String(req.body?.totpCode || "").replace(/\s/g, "");
@@ -185,7 +192,10 @@ router.post("/email/confirm", authRateLimit, (req, res) => {
   try {
     const user = consumeMagicLogin(String(req.body?.token || ""));
     logAudit({ type: "auth", action: "email_link_validated", user: user.email, detail: user.role });
-    if (REQUIRE_ADMIN_2FA) return res.json(beginAdmin2fa(user, req, "magic_link"));
+    if (REQUIRE_ADMIN_2FA) {
+      const challenge = beginAdmin2fa(user, req, "magic_link");
+      if (challenge) return res.json(challenge);
+    }
     res.json(completeSession(user, req));
   } catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
 });
@@ -234,7 +244,7 @@ router.post("/password/confirm", authRateLimit, (req, res) => {
 });
 
 router.post("/2fa/setup", (req, res) => {
-  if (ADMIN_CODE_LOGIN_TEMP_DISABLED) return rejectTemporaryCodeLogin(res);
+  if (ADMIN_CODE_LOGIN_TEMP_DISABLED && !REQUIRE_ADMIN_2FA) return rejectTemporaryCodeLogin(res);
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
   const user = validateSession(token);
   if (!user || !ADMIN_ROLES.includes(user.role)) return res.status(401).json({ ok: false, error: "Session Admin requise." });
@@ -244,7 +254,7 @@ router.post("/2fa/setup", (req, res) => {
 });
 
 router.post("/2fa/enable", (req, res) => {
-  if (ADMIN_CODE_LOGIN_TEMP_DISABLED) return rejectTemporaryCodeLogin(res);
+  if (ADMIN_CODE_LOGIN_TEMP_DISABLED && !REQUIRE_ADMIN_2FA) return rejectTemporaryCodeLogin(res);
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
   const user = validateSession(token);
   if (!user || !ADMIN_ROLES.includes(user.role)) return res.status(401).json({ ok: false, error: "Session Admin requise." });

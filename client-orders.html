@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suivi Boutique — CardoriaShop</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#030303">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/css/client-auth.css?v=20260908-3">
+<link rel="icon" href="/assets/logo/cardoria-premium.png">
+</head>
+<body class="client-auth-page">
+<header class="client-auth-header">
+  <a class="client-auth-brand" href="/"><img src="/assets/logo/cardoria-premium.png" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'" alt="CardoriaShop"><span><strong>CARDORIA</strong><small>BOUTIQUE</small></span></a>
+  <a class="client-auth-back" href="/client-login.html">Mon compte</a>
+</header>
+<main class="client-auth-main">
+  <section class="client-auth-shell client-orders-shell">
+    <div class="client-auth-intro">
+      <p class="client-auth-kicker">COMMANDES BOUTIQUE</p>
+      <h1>Suivi de mes colis</h1>
+      <p>Uniquement les commandes passées dans la Boutique CardoriaShop. Les achats Marketplace restent sur une page séparée.</p>
+    </div>
+    <div id="clientOrdersMessage" class="client-auth-card"><p>Chargement de vos commandes Boutique…</p></div>
+    <div id="clientOrdersList" class="client-orders-list" hidden></div>
+    <p class="client-order-wait"><a class="client-auth-back" href="/mes-commandes.html">Voir mes commandes Marketplace</a></p>
+  </section>
+</main>
+<script src="/js/client-orders.js?v=20260908-3"></script>
+</body>
+</html>

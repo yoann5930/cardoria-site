@@ -43,7 +43,7 @@ jobs:
             rm -f "$TMP"
             RESULT="$(node -e 'const d=JSON.parse(process.argv[1]); const code=Number(process.argv[2]); const product={id:process.argv[3],name:process.argv[4],price:Number(process.argv[5])}; process.stdout.write(JSON.stringify({testedAt:new Date().toISOString(),provider:"revolut",environment:"sandbox",configured:true,product,httpStatus:code,checkoutCreated:Boolean(code===200&&d.ok&&d.url),orderId:d.orderId||"",providerOrderId:d.checkoutId||d.providerOrderId||"",error:d.error||""},null,2));' "$CHECKOUT" "$HTTP_CODE" "$PRODUCT_ID" "$PRODUCT_NAME" "$PRODUCT_PRICE")"
           else
-            RESULT="$(node -e 'const product={id:process.argv[1],name:process.argv[2],price:Number(process.argv[3])}; process.stdout.write(JSON.stringify({testedAt:new Date().toISOString(),provider:"revolut",environment:"sandbox",configured:false,product,httpStatus:null,checkoutCreated:false,orderId:"",providerOrderId:"",error:"REVOLUT_SECRET_KEY manquante sur Render"},null,2));' "$PRODUCT_ID" "$PRODUCT_NAME" "$PRODUCT_PRICE")"
+            RESULT="$(node -e 'const product={id:process.argv[1],name:process.argv[2],price:Number(process.argv[3])}; process.stdout.write(JSON.stringify({testedAt:new Date().toISOString(),provider:"revolut",environment:"sandbox",configured:false,product,httpStatus:null,checkoutCreated:false,orderId:"",providerOrderId:"",error:"REVOLUT_SECRET_KEY manquante dans /etc/cardoria/cardoria.env sur OVH"},null,2));' "$PRODUCT_ID" "$PRODUCT_NAME" "$PRODUCT_PRICE")"
           fi
 
           printf '%s\n' "$RESULT" > .github/revolut-smoke-result.json

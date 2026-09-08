@@ -81,6 +81,10 @@ jobs:
           node --check ../js/admin/admin-dashboard.js
           node --check ../js/admin/admin-audit.js
           node --check ../js/admin/admin-orders.js
+          node --check ../js/admin/admin-core.js
+          node --check ../js/client-orders.js
+          node --check ../js/client-auth.js
+          node --check ../js/client-password-reset.js
           node --check ../js/admin/admin-stock.js
           node --check ../js/admin/admin-payments.js
           node --check ../js/admin/admin-accounting.js
@@ -101,6 +105,13 @@ jobs:
           grep -q 'La Poste' backend/routes/payments-admin.js
           grep -q 'Mondial Relay' backend/routes/payments-admin.js
           grep -q 'Relais Colis' backend/routes/payments-admin.js
+          grep -q 'Autre transporteur' backend/routes/payments-admin.js
+          grep -q 'Synchroniser paiement Revolut' js/admin/admin-orders.js
+          grep -q 'Rembourser Revolut' js/admin/admin-orders.js
+          if grep -q 'Synchroniser SumUp\|Paiements SumUp' js/admin/admin-orders.js js/admin/admin-core.js; then
+            echo 'Obsolete SumUp boutique order UI labels still present'
+            exit 1
+          fi
       - name: Dashboard and audit wiring checks
         working-directory: .
         run: |
@@ -149,6 +160,11 @@ jobs:
       - name: Reject security regressions
         working-directory: .
         run: |
+          grep -q 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;' backend/routes/auth.js
+          if grep -q 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;' backend/routes/auth.js; then
+            echo 'Admin temporary code login must stay disabled'
+            exit 1
+          fi
           if grep -R -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' script.js js *.html 2>/dev/null; then
             echo 'Client-side admin secret detected'
             exit 1
@@ -230,6 +246,20 @@ jobs:
           test "$code" = "401"
           code=$(curl -sS -o /tmp/protected.json -w "%{http_code}" http://127.0.0.1:10000/api/health/full)
           test "$code" = "401"
+          curl --fail --silent http://127.0.0.1:10000/client-login.html > /tmp/cardoria-client-login.html
+          grep -q 'Mot de passe oublié' /tmp/cardoria-client-login.html
+          grep -q 'client-orders.html' /tmp/cardoria-client-login.html
+          curl --fail --silent http://127.0.0.1:10000/client-orders.html > /tmp/cardoria-client-orders.html
+          grep -q 'COMMANDES BOUTIQUE' /tmp/cardoria-client-orders.html
+          grep -q 'js/client-orders.js' /tmp/cardoria-client-orders.html
+          curl --fail --silent http://127.0.0.1:10000/mes-commandes.html > /tmp/cardoria-marketplace-orders.html
+          grep -q 'marketplace-orders.js' /tmp/cardoria-marketplace-orders.html
+          curl --fail --silent http://127.0.0.1:10000/reset-password.html > /tmp/cardoria-reset.html
+          grep -q 'client-password-reset.js' /tmp/cardoria-reset.html
+          code=$(curl -sS -o /tmp/client-orders.json -w "%{http_code}" http://127.0.0.1:10000/api/auth/orders)
+          test "$code" = "401"
+          code=$(curl -sS -o /tmp/sumup-gone.json -w "%{http_code}" http://127.0.0.1:10000/api/payments/sumup/checkout)
+          test "$code" = "410"
           for path in \
             /api/admin/dashboard \
             /api/admin/audit/summary \
@@ -252,6 +282,10 @@ jobs:
           grep -qi '^content-security-policy:' /tmp/headers.txt
           grep -qi '^x-content-type-options: nosniff' /tmp/headers.txt
           grep -qi '^x-frame-options: DENY' /tmp/headers.txt
+          if grep -qi '^x-powered-by:' /tmp/headers.txt; then
+            echo 'X-Powered-By header must not be exposed'
+            exit 1
+          fi
       - name: Stop backend
         if: always()
         run: |

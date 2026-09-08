@@ -5,7 +5,7 @@
 
   var orders = [];
   var filter = "all";
-  var CARRIERS = ["La Poste", "Mondial Relay", "Relais Colis"];
+  var CARRIERS = ["La Poste","Colissimo","Chronopost","Mondial Relay","Relais Colis","Colis Privé","DPD","GLS","UPS","DHL Express","FedEx","TNT","Geodis","DB Schenker","Ciblex","France Express","Amazon Logistics","Cainiao","Correos","Royal Mail","PostNL","bpost","Autre transporteur"];
   var STATUSES = ["À préparer", "En préparation", "Expédiée", "Livrée", "Annulée"];
 
   function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; }); }
@@ -35,7 +35,7 @@
     A.qs("#ordersRevenue").textContent = euro(orders.filter(function (o) { return o.paymentStatus === "paid"; }).reduce(function (s,o) { return s + total(o); }, 0));
 
     A.qs("#orderCards").innerHTML = list.map(function (o) {
-      var canSync = !!o.paymentProviderOrderId || !!o.revolutOrderId || !!o.sumupCheckoutId;
+      var canSync = !!(o.paymentProviderOrderId || o.revolutOrderId);
       var canRefund = o.paymentStatus === "paid" && canSync;
       var review = o.paymentReviewRequired ? '<div class="admin-panel" style="margin:10px 0;border-color:#b44"><strong style="color:#ff8f8f">Remboursement à confirmer</strong><br><small>Le stock reste bloqué jusqu’à confirmation du remboursement.</small></div>' : "";
       var items = (o.items || []).map(function (i) { return '<tr><td>'+esc(i.name||i.ref)+'</td><td>'+Number(i.qty||1)+'</td><td>'+euro(i.price)+'</td><td>'+euro(Number(i.qty||1)*Number(i.price||0))+'</td></tr>'; }).join("") || '<tr><td colspan="4">Aucun article</td></tr>';
@@ -53,8 +53,8 @@
           '<label class="admin-form-wide">Note interne<textarea data-field="internalNote" rows="3">'+esc(o.internalNote||"")+'</textarea></label>' +
         '</div><div class="actions" style="margin-top:14px">' +
           '<button type="button" class="btn btn-primary" data-save="'+esc(o.id)+'">Enregistrer</button> ' +
-          (canSync?'<button type="button" class="btn btn-secondary" data-sync="'+esc(o.id)+'">Synchroniser paiement</button> ':'') +
-          (canRefund?'<button type="button" class="btn btn-secondary" data-refund="'+esc(o.id)+'">Rembourser</button> ':'') +
+          (canSync?'<button type="button" class="btn btn-secondary" data-sync="'+esc(o.id)+'">Synchroniser paiement Revolut</button> ':'') +
+          (canRefund?'<button type="button" class="btn btn-secondary" data-refund="'+esc(o.id)+'">Rembourser Revolut</button> ':'') +
           '<button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="bon">Bon commande</button> <button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="facture">Facture</button>' +
         '</div><p class="small" data-status-message></p></article>';
     }).join("") || '<div class="admin-panel">Aucune commande.</div>';

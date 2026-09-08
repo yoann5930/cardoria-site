@@ -144,7 +144,7 @@ export async function createLiveBoutiqueCheckout({ customerName, customerEmail, 
   }
 }
 
-// Test à usage unique, activé uniquement par variable Render.
+// Test à usage unique, activé uniquement par variable d'environnement OVH.
 // Il crée un checkout Hosted Revolut en Sandbox, sans saisir de moyen de paiement ni débiter d'argent.
 if (String(process.env.REVOLUT_SMOKE_TEST_ON_START || "").toLowerCase() === "true") {
   setTimeout(async () => {

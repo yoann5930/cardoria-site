@@ -222,7 +222,7 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
 
   const current = orders[index];
   const body = req.body || {};
-  const nextStatus = clean(body.status, 80) || current.status;
+  const nextStatus = clean(body.status, 80) === "Commande confirmée" ? "À préparer" : (clean(body.status, 80) || current.status);
   const nextCarrier = clean(body.carrier, 120);
 
   if (!BOUTIQUE_STATUSES.includes(nextStatus) && nextStatus !== current.status) {
