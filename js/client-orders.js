@@ -9,10 +9,28 @@ function euro(v){return Number(v||0).toFixed(2).replace(".",",")+" €";}
 function trackingUrl(carrier,tracking){
   const t=String(tracking||"").trim(); if(!t)return "";
   const c=String(carrier||"").toLowerCase();
-  if(c.includes("mondial"))return "https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition="+encodeURIComponent(t);
-  if(c.includes("relais colis"))return "https://www.relaiscolis.com/suivi-de-colis/?search="+encodeURIComponent(t);
-  if(c.includes("poste")||c.includes("colissimo")||c.includes("chronopost"))return "https://www.laposte.fr/outils/suivre-vos-envois?code="+encodeURIComponent(t);
-  return "";
+  const q=encodeURIComponent(t);
+  if(c.includes("mondial"))return "https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition="+q;
+  if(c.includes("relais colis"))return "https://www.relaiscolis.com/suivi-de-colis/?search="+q;
+  if(c.includes("chronopost"))return "https://www.chronopost.fr/fr/suivi-colis?listeNumerosLT="+q;
+  if(c.includes("colissimo")||c.includes("la poste")||c==="poste")return "https://www.laposte.fr/outils/suivre-vos-envois?code="+q;
+  if(c.includes("colis privé")||c.includes("colis prive"))return "https://www.colisprive.fr/moncolis/pages/detailColis.aspx?numColis="+q;
+  if(c==="dpd"||c.includes("dpd "))return "https://trace.dpd.fr/fr/trace/"+q;
+  if(c==="gls"||c.includes("gls "))return "https://gls-group.com/FR/fr/suivi-colis/?match="+q;
+  if(c==="ups"||c.includes("ups "))return "https://www.ups.com/track?loc=fr_FR&tracknum="+q;
+  if(c.includes("dhl"))return "https://www.dhl.com/fr-fr/home/tracking.html?tracking-id="+q;
+  if(c.includes("fedex")||c==="tnt"||c.includes("tnt "))return "https://www.fedex.com/fedextrack/?trknbr="+q;
+  if(c.includes("geodis"))return "https://espace.geodis.com/track?reference="+q;
+  if(c.includes("schenker"))return "https://www.dbschenker.com/app/tracking-public/?refNumber="+q;
+  if(c.includes("ciblex"))return "https://www.ciblex.fr/suivi-colis/";
+  if(c.includes("france express"))return "https://www.france-express.com/suivi-envoi/";
+  if(c.includes("amazon"))return "https://www.amazon.fr/gp/css/shiptrack/view.html";
+  if(c.includes("cainiao"))return "https://global.cainiao.com/detail.htm?mailNoList="+q;
+  if(c.includes("correos"))return "https://www.correos.es/es/es/herramientas/localizador/envios/detalle?tracking-number="+q;
+  if(c.includes("royal mail"))return "https://www.royalmail.com/track-your-item#/tracking-results/"+q;
+  if(c.includes("postnl"))return "https://jouw.postnl.nl/track-and-trace/"+q;
+  if(c.includes("bpost"))return "https://track.bpost.cloud/btr/web/#/search?itemCode="+q;
+  return "https://www.google.com/search?q="+encodeURIComponent((carrier||"transporteur")+" suivi colis "+t);
 }
 function steps(status){
   if(status==="Annulée"||status==="Paiement échoué")return '<div class="client-order-progress is-cancelled"><span class="active">'+esc(status)+'</span></div>';
