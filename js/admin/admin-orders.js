@@ -35,12 +35,13 @@
     A.qs("#ordersRevenue").textContent = euro(orders.filter(function (o) { return o.paymentStatus === "paid"; }).reduce(function (s,o) { return s + total(o); }, 0));
 
     A.qs("#orderCards").innerHTML = list.map(function (o) {
-      var canRefund = o.paymentStatus === "paid" && !!(o.paymentProviderOrderId || o.sumupCheckoutId || o.sumupTransactionId);
+      var canSync = !!o.paymentProviderOrderId || !!o.revolutOrderId || !!o.sumupCheckoutId;
+      var canRefund = o.paymentStatus === "paid" && canSync;
       var review = o.paymentReviewRequired ? '<div class="admin-panel" style="margin:10px 0;border-color:#b44"><strong style="color:#ff8f8f">Remboursement à confirmer</strong><br><small>Le stock reste bloqué jusqu’à confirmation du remboursement.</small></div>' : "";
       var items = (o.items || []).map(function (i) { return '<tr><td>'+esc(i.name||i.ref)+'</td><td>'+Number(i.qty||1)+'</td><td>'+euro(i.price)+'</td><td>'+euro(Number(i.qty||1)*Number(i.price||0))+'</td></tr>'; }).join("") || '<tr><td colspan="4">Aucun article</td></tr>';
       var legacyCarrier = o.carrier && CARRIERS.indexOf(o.carrier) < 0 ? [o.carrier].concat(CARRIERS) : CARRIERS;
       return '<article class="request-card" data-order-card="'+esc(o.id)+'" style="margin-bottom:18px">' +
-        '<div class="request-head"><div><h3>'+esc(o.id)+'</h3><p>'+esc(o.date||"")+' • '+esc(o.client||"Client")+'<br>'+esc(o.email||"")+(o.phone?'<br>'+esc(o.phone):'')+'</p><small style="color:#baaf97">Commande Revolut : '+esc(o.paymentProviderOrderId||"—")+'</small></div><div style="text-align:right"><strong>'+euro(total(o))+'</strong><br><span class="admin-badge '+paymentClass(o)+'">'+esc(paymentLabel(o))+'</span></div></div>' +
+        '<div class="request-head"><div><h3>'+esc(o.id)+'</h3><p>'+esc(o.date||"")+' • '+esc(o.client||"Client")+'<br>'+esc(o.email||"")+(o.phone?'<br>'+esc(o.phone):'')+'</p><small style="color:#baaf97">Commande Revolut : '+esc(o.paymentProviderOrderId||o.revolutOrderId||"—")+'</small></div><div style="text-align:right"><strong>'+euro(total(o))+'</strong><br><span class="admin-badge '+paymentClass(o)+'">'+esc(paymentLabel(o))+'</span></div></div>' +
         '<div class="progress">'+statusSteps(o.status)+'</div>'+review+
         '<details open><summary style="cursor:pointer;color:#ffe18a;margin-bottom:10px">Articles</summary><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Article</th><th>Qté</th><th>PU</th><th>Total</th></tr></thead><tbody>'+items+'</tbody></table></div></details>' +
         '<div class="admin-form-grid" style="margin-top:14px">' +
@@ -52,6 +53,8 @@
           '<label class="admin-form-wide">Note interne<textarea data-field="internalNote" rows="3">'+esc(o.internalNote||"")+'</textarea></label>' +
         '</div><div class="actions" style="margin-top:14px">' +
           '<button type="button" class="btn btn-primary" data-save="'+esc(o.id)+'">Enregistrer</button> ' +
+          (canSync?'<button type="button" class="btn btn-secondary" data-sync="'+esc(o.id)+'">Synchroniser paiement</button> ':'') +
+          (canRefund?'<button type="button" class="btn btn-secondary" data-refund="'+esc(o.id)+'">Rembourser</button> ':'') +
           '<button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="bon">Bon commande</button> <button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="facture">Facture</button>' +
         '</div><p class="small" data-status-message></p></article>';
     }).join("") || '<div class="admin-panel">Aucune commande.</div>';
@@ -73,6 +76,8 @@
 
   function bind() {
     A.qs("#orderCards").querySelectorAll("button[data-save]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.save,c=card(id),m=c?.querySelector("[data-status-message]"); btn.disabled=true; if(m)m.textContent="Enregistrement..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id),{method:"PUT",body:JSON.stringify(payload(c))}).then(function(d){if(!d.ok)throw new Error(d.error||"Mise à jour impossible");return reload(id,"État de la commande mis à jour.");}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
+    A.qs("#orderCards").querySelectorAll("button[data-sync]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.sync,c=card(id),m=c?.querySelector("[data-status-message]"); btn.disabled=true; if(m)m.textContent="Synchronisation Revolut..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/sync-payment",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Synchronisation impossible");return reload(id,"Paiement synchronisé : "+(d.status||"OK"));}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
+    A.qs("#orderCards").querySelectorAll("button[data-refund]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.refund,c=card(id),m=c?.querySelector("[data-status-message]"); if(!confirm("Confirmer le remboursement intégral Revolut de cette commande ?"))return; btn.disabled=true; if(m)m.textContent="Remboursement Revolut..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/refund",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Remboursement impossible");return reload(id,d.status==="refunded"?"Remboursement confirmé.":"Remboursement demandé : "+(d.status||"en attente"));}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
     A.qs("#orderCards").querySelectorAll("button[data-doc]").forEach(function (btn) { btn.onclick=function(){window.open("document-commande.html?id="+encodeURIComponent(btn.dataset.doc)+"&type="+encodeURIComponent(btn.dataset.type),"_blank");}; });
   }
 
