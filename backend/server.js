@@ -460,34 +460,39 @@ safeInit("auth-post-restore", migrateAuth);
 authReady = true;
 console.log("[startup] auth-routes: ready after persistence restore");
 
-try {
-  await import("./lib/engine/multilingual-bootstrap.js");
-  console.log("[startup] multilingual-catalog: preload completed before provider sync");
-} catch (error) {
-  console.error("[startup] multilingual-catalog: preload failed", error?.message || String(error));
-}
-
-try {
-  const pokemonSync = await syncPokemonCatalog();
-  if (pokemonSync.skipped) console.log(`[startup] pokemon-catalog: already populated (${pokemonSync.count} cards)`);
-  else {
-    console.log(`[startup] pokemon-catalog: imported ${pokemonSync.imported} real cards from ${pokemonSync.source} (${pokemonSync.sets} sets)`);
-    const saved = await flushEnginePersistence("tcgdex-pokemon-sync");
-    if (!saved.ok) console.error("[startup] pokemon-catalog: persistence failed", saved.error || "unknown");
+const skipCatalogPreload = process.env.NODE_ENV === "test";
+if (skipCatalogPreload) {
+  console.log("[startup] catalog-preload: skipped in test");
+} else {
+  try {
+    await import("./lib/engine/multilingual-bootstrap.js");
+    console.log("[startup] multilingual-catalog: preload completed before provider sync");
+  } catch (error) {
+    console.error("[startup] multilingual-catalog: preload failed", error?.message || String(error));
   }
-} catch (error) {
-  startup.ok = false;
-  startup.degraded.push({ name: "pokemon-catalog", error: error?.message || String(error) });
-  console.error("[startup] pokemon-catalog: degraded", error);
-}
 
-try {
-  const referenceSync = await syncPokemonReferenceCatalog({ priceLimit: 0 });
-  console.log(`[startup] pokemon-reference: ${referenceSync.rarityUpdated || 0} rarity mappings updated (${referenceSync.rarities || 0} rarities)`);
-  const saved = await flushEnginePersistence("tcgdex-reference-rarities");
-  if (!saved.ok) console.error("[startup] pokemon-reference: persistence failed", saved.error || "unknown");
-} catch (error) {
-  console.error("[startup] pokemon-reference: optional sync skipped", error?.message || String(error));
+  try {
+    const pokemonSync = await syncPokemonCatalog();
+    if (pokemonSync.skipped) console.log(`[startup] pokemon-catalog: already populated (${pokemonSync.count} cards)`);
+    else {
+      console.log(`[startup] pokemon-catalog: imported ${pokemonSync.imported} real cards from ${pokemonSync.source} (${pokemonSync.sets} sets)`);
+      const saved = await flushEnginePersistence("tcgdex-pokemon-sync");
+      if (!saved.ok) console.error("[startup] pokemon-catalog: persistence failed", saved.error || "unknown");
+    }
+  } catch (error) {
+    startup.ok = false;
+    startup.degraded.push({ name: "pokemon-catalog", error: error?.message || String(error) });
+    console.error("[startup] pokemon-catalog: degraded", error);
+  }
+
+  try {
+    const referenceSync = await syncPokemonReferenceCatalog({ priceLimit: 0 });
+    console.log(`[startup] pokemon-reference: ${referenceSync.rarityUpdated || 0} rarity mappings updated (${referenceSync.rarities || 0} rarities)`);
+    const saved = await flushEnginePersistence("tcgdex-reference-rarities");
+    if (!saved.ok) console.error("[startup] pokemon-reference: persistence failed", saved.error || "unknown");
+  } catch (error) {
+    console.error("[startup] pokemon-reference: optional sync skipped", error?.message || String(error));
+  }
 }
 
 async function refreshMarketPrices(reason = "scheduled-market-refresh") {

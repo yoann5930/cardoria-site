@@ -184,7 +184,7 @@ jobs:
           echo $! > /tmp/cardoria-final-users.pid
       - name: Wait for backend
         run: |
-          for i in {1..60}; do
+          for i in {1..90}; do
             if curl -fsS http://127.0.0.1:10000/api/health/startup | grep -q '"ready":true'; then exit 0; fi
             sleep 1
           done
@@ -225,7 +225,7 @@ jobs:
           echo $! > /tmp/cardoria-final-marketplace.pid
       - name: Wait for backend
         run: |
-          for i in {1..60}; do
+          for i in {1..90}; do
             if curl -fsS http://127.0.0.1:10000/api/health/startup | grep -q '"ready":true'; then exit 0; fi
             sleep 1
           done
