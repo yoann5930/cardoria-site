@@ -1,9 +1,20 @@
 /** PayPal webhooks + remboursements Marketplace Cardoria. */
 import { getDb } from "../engine/database.js";
 import { getSeller } from "./sellers.js";
-import { getOrder, updateOrderStatus } from "./orders.js";
+import { getOrder, updateOrderStatus, markOrderPaymentStatus } from "./orders.js";
 import { captureLivePayPalOrder, captureMarketplacePayPalOrder } from "./paypal.js";
-import { listLiveCheckouts } from "../live/sessions.js";
+import { applyLivePaymentStatus, listLiveCheckouts } from "../live/sessions.js";
+
+const PROTECTED_ORDER_STATUSES = new Set(["paid", "preparing", "shipped", "delivered", "refunded"]);
+let testVerify = null;
+
+export function __setPayPalWebhookVerifyForTests(fn) {
+  testVerify = typeof fn === "function" ? fn : null;
+}
+
+export function __resetPayPalWebhookVerifyForTests() {
+  testVerify = null;
+}
 
 function envName() { return String(process.env.PAYPAL_ENV || "sandbox").toLowerCase() === "live" ? "live" : "sandbox"; }
 function apiBase() { return envName() === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com"; }
@@ -33,6 +44,7 @@ async function request(path, { method = "POST", body, sellerMerchantId = "" } = 
 export function paypalWebhookConfigured() { return Boolean(String(process.env.PAYPAL_WEBHOOK_ID || "").trim()); }
 
 export async function verifyPayPalWebhook(headers, event) {
+  if (testVerify) return testVerify(headers, event);
   const webhookId = String(process.env.PAYPAL_WEBHOOK_ID || "").trim();
   if (!webhookId) throw Object.assign(new Error("PAYPAL_WEBHOOK_ID obligatoire."), { status: 503 });
   const payload = {
@@ -70,7 +82,146 @@ export async function handlePayPalWebhook(headers, event) {
     }
     return { received: true, type, updated: rows.length };
   }
+  if (type === "PAYMENT.CAPTURE.PENDING") {
+    return { received: true, type, ...applyCapturePending(resource) };
+  }
+  if (type === "PAYMENT.CAPTURE.DENIED") {
+    return { received: true, type, ...applyCaptureDenied(resource) };
+  }
+  if (type === "CHECKOUT.ORDER.DECLINED") {
+    return { received: true, type, ...applyOrderDeclined(resource) };
+  }
   return { received: true, type, ignored: true };
+}
+
+function unique(values) {
+  return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
+}
+
+function resourceIds(resource = {}, { captureEvent = false } = {}) {
+  const units = Array.isArray(resource.purchase_units) ? resource.purchase_units : [];
+  const relatedOrderId = String(resource.supplementary_data?.related_ids?.order_id || "").trim();
+  return {
+    captureId: captureEvent ? String(resource.id || "").trim() : "",
+    paypalOrderId: captureEvent ? relatedOrderId : String(resource.id || relatedOrderId || "").trim(),
+    customIds: unique([
+      resource.custom_id,
+      resource.invoice_id,
+      ...units.map((unit) => unit?.reference_id),
+      ...units.map((unit) => unit?.custom_id)
+    ])
+  };
+}
+
+function findMarketplaceOrders({ captureId = "", paypalOrderId = "", customIds = [] } = {}) {
+  const db = getDb();
+  const ids = new Set();
+  if (captureId) {
+    for (const row of db.prepare("SELECT id FROM mk_orders WHERE paypal_capture_id=?").all(captureId)) ids.add(row.id);
+  }
+  if (paypalOrderId) {
+    for (const row of db.prepare("SELECT id FROM mk_orders WHERE paypal_order_id=?").all(paypalOrderId)) ids.add(row.id);
+  }
+  for (const customId of customIds) {
+    const byPk = getOrder(customId);
+    if (byPk) ids.add(byPk.id);
+    for (const row of db.prepare("SELECT id FROM mk_orders WHERE paypal_order_id=?").all(customId)) ids.add(row.id);
+  }
+  return [...ids].map((id) => getOrder(id)).filter(Boolean);
+}
+
+function findLiveCheckout({ captureId = "", paypalOrderId = "", customIds = [] } = {}) {
+  return listLiveCheckouts().find((item) => {
+    const providerOrderId = String(item.paymentProviderOrderId || "");
+    const providerCaptureId = String(item.paymentProviderTransactionId || "");
+    return (captureId && providerCaptureId === captureId)
+      || (paypalOrderId && providerOrderId === paypalOrderId)
+      || customIds.includes(item.id)
+      || customIds.includes(providerOrderId);
+  }) || null;
+}
+
+function rememberCaptureId(order, captureId) {
+  if (!order || !captureId || order.paypalCaptureId === captureId) return;
+  getDb().prepare("UPDATE mk_orders SET paypal_capture_id=?, payment_provider='paypal', updated_at=? WHERE id=?").run(captureId, new Date().toISOString(), order.id);
+}
+
+function applyMarketplacePending(order, captureId) {
+  if (!order) return { skipped: true, reason: "unknown" };
+  rememberCaptureId(order, captureId);
+  const current = getOrder(order.id) || order;
+  if (PROTECTED_ORDER_STATUSES.has(current.status) || current.status === "cancelled") {
+    return { skipped: true, protected: PROTECTED_ORDER_STATUSES.has(current.status), orderId: current.id, status: current.status };
+  }
+  if (current.status === "pending" && current.paymentStatus === "pending" && current.paymentMethod === "paypal") {
+    return { duplicate: true, orderId: current.id };
+  }
+  markOrderPaymentStatus(current.id, "pending", { paymentMethod: "paypal" });
+  return { updated: true, orderId: current.id };
+}
+
+function applyMarketplaceFailed(order) {
+  if (!order) return { skipped: true, reason: "unknown" };
+  if (PROTECTED_ORDER_STATUSES.has(order.status)) {
+    return { skipped: true, protected: true, orderId: order.id, status: order.status };
+  }
+  if (order.status === "cancelled") {
+    return { duplicate: true, orderId: order.id };
+  }
+  markOrderPaymentStatus(order.id, "failed", { paymentMethod: "paypal" });
+  return { updated: true, orderId: order.id };
+}
+
+function applyLivePending(checkout, captureId) {
+  if (!checkout) return { skipped: true, reason: "unknown" };
+  const updated = applyLivePaymentStatus(checkout.id, "pending", captureId ? { paymentProviderTransactionId: captureId } : {});
+  if (!updated) return { skipped: true, reason: "unknown" };
+  if (updated.protected || updated.alreadyPaid) return { skipped: true, protected: true, checkoutId: checkout.id, status: "paid" };
+  if (updated.duplicate) return { duplicate: true, checkoutId: checkout.id };
+  return { updated: true, checkoutId: checkout.id, status: updated.status };
+}
+
+function applyLiveFailed(checkout) {
+  if (!checkout) return { skipped: true, reason: "unknown" };
+  const updated = applyLivePaymentStatus(checkout.id, "failed");
+  if (!updated) return { skipped: true, reason: "unknown" };
+  if (updated.protected || updated.alreadyPaid) return { skipped: true, protected: true, checkoutId: checkout.id, status: "paid" };
+  if (updated.duplicate) return { duplicate: true, checkoutId: checkout.id };
+  return { updated: true, checkoutId: checkout.id, status: updated.status };
+}
+
+function applyCapturePending(resource) {
+  const ids = resourceIds(resource, { captureEvent: true });
+  const orders = findMarketplaceOrders({ captureId: ids.captureId, paypalOrderId: ids.paypalOrderId, customIds: ids.customIds });
+  const live = findLiveCheckout({ captureId: ids.captureId, paypalOrderId: ids.paypalOrderId, customIds: ids.customIds });
+  if (!orders.length && !live) return { ignored: true, reason: "unknown" };
+  return {
+    marketplace: orders.map((order) => applyMarketplacePending(order, ids.captureId)),
+    live: live ? applyLivePending(live, ids.captureId) : null
+  };
+}
+
+function applyCaptureDenied(resource) {
+  const ids = resourceIds(resource, { captureEvent: true });
+  const orders = findMarketplaceOrders({ captureId: ids.captureId, paypalOrderId: ids.paypalOrderId, customIds: ids.customIds });
+  const live = findLiveCheckout({ captureId: ids.captureId, paypalOrderId: ids.paypalOrderId, customIds: ids.customIds });
+  if (!orders.length && !live) return { ignored: true, reason: "unknown" };
+  return {
+    marketplace: orders.map((order) => applyMarketplaceFailed(order)),
+    live: live ? applyLiveFailed(live) : null
+  };
+}
+
+function applyOrderDeclined(resource) {
+  const paypalOrderId = String(resource?.id || "").trim();
+  const ids = resourceIds(resource);
+  const orders = findMarketplaceOrders({ paypalOrderId, customIds: ids.customIds });
+  const live = findLiveCheckout({ paypalOrderId, customIds: ids.customIds });
+  if (!orders.length && !live) return { ignored: true, reason: "unknown" };
+  return {
+    marketplace: orders.map((order) => applyMarketplaceFailed(order)),
+    live: live ? applyLiveFailed(live) : null
+  };
 }
 
 export async function refundPayPalOrder(orderId, amount = null) {

@@ -246,6 +246,12 @@ export function applyLivePaymentStatus(orderId, status, patch = {}) {
   if (previous === "paid" && status === "paid") {
     return { ...checkout, alreadyPaid: true };
   }
+  if (previous === "paid" && status !== "paid") {
+    return { ...checkout, alreadyPaid: true, protected: true };
+  }
+  if (previous === status) {
+    return { ...checkout, duplicate: true };
+  }
   checkout.status = status;
   if (patch.paymentProviderOrderId) checkout.paymentProviderOrderId = patch.paymentProviderOrderId;
   if (patch.paymentProviderTransactionId) checkout.paymentProviderTransactionId = patch.paymentProviderTransactionId;
