@@ -62,6 +62,8 @@ jobs:
             backend/public/admin-rachat.html
             backend/public/admin-catalogue.html
             backend/public/admin-marketplace.html
+            backend/public/admin-live.html
+            backend/public/live-vendeur.html
             backend/public/admin-utilisateurs.html
             backend/public/admin-journal.html
             backend/public/admin-system.html

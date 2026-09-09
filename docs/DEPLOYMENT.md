@@ -25,8 +25,10 @@ ALERT_EMAIL=true
 # Base de données
 DATABASE_URL=                  # PostgreSQL (migration future) — SQLite actif si vide
 
-# OpenAI, SMTP, SumUp — voir .env.example
-SUMUP_WEBHOOK_SECRET=          # OBLIGATOIRE en production
+# OpenAI, SMTP, Revolut / PayPal — voir backend/.env.example
+# SumUp n'est plus utilisé.
+REVOLUT_SECRET_KEY=
+PAYPAL_CLIENT_ID=
 
 # Sauvegardes
 BACKUP_INTERVAL_HOURS=24

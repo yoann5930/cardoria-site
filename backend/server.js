@@ -20,6 +20,8 @@ import marketplaceAdminRoutes, { webhookRouter } from "./routes/marketplace-admi
 import marketplaceModerationAdminRoutes from "./routes/marketplace-moderation-admin.js";
 import paymentsRoutes from "./routes/payments.js";
 import paymentsAdminRoutes from "./routes/payments-admin.js";
+import liveRoutes from "./routes/live.js";
+import liveAdminRoutes from "./routes/live-admin.js";
 import { seedEngineIfEmpty } from "./lib/engine/seed.js";
 import { getCardBySlug, searchCards } from "./lib/engine/cards.js";
 import { getLicense } from "./lib/engine/licenses.js";
@@ -524,6 +526,7 @@ app.use("/api/bigdata", apiRateLimit, bigdataAnalyticsRoutes);
 app.use("/api/engine", apiRateLimit, engineRoutes);
 app.use("/api/marketplace", marketplacePersistenceMiddleware, apiRateLimit, marketplaceV1Routes);
 app.use("/api/payments", marketplacePersistenceMiddleware, apiRateLimit, paymentsRoutes);
+app.use("/api/live", marketplacePersistenceMiddleware, apiRateLimit, liveRoutes);
 app.use("/api/seo", apiRateLimit, seoRoutes);
 
 app.use("/api/estimation-carte", (req, res, next) => { if (req.method === "POST") return aiRateLimit(req, res, next); next(); }, estimationRoutes);
@@ -539,6 +542,7 @@ app.use("/api/admin/engine", enginePersistenceMiddleware, engineAdminRoutes);
 app.use("/api/admin/marketplace", marketplacePersistenceMiddleware, marketplaceModerationAdminRoutes);
 app.use("/api/admin/marketplace", marketplacePersistenceMiddleware, marketplaceAdminRoutes);
 app.use("/api/admin/payments", marketplacePersistenceMiddleware, paymentsAdminRoutes);
+app.use("/api/admin/live", liveAdminRoutes);
 app.use("/api/admin/seo", seoAdminRoutes);
 app.use("/api/admin/ai", aiAdminRoutes);
 app.use("/api/admin/market", marketAdminRoutes);

@@ -2,7 +2,8 @@
 import { getDb } from "../engine/database.js";
 import { getSeller } from "./sellers.js";
 import { getOrder, updateOrderStatus } from "./orders.js";
-import { captureMarketplacePayPalOrder } from "./paypal.js";
+import { captureLivePayPalOrder, captureMarketplacePayPalOrder } from "./paypal.js";
+import { listLiveCheckouts } from "../live/sessions.js";
 
 function envName() { return String(process.env.PAYPAL_ENV || "sandbox").toLowerCase() === "live" ? "live" : "sandbox"; }
 function apiBase() { return envName() === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com"; }
@@ -56,6 +57,10 @@ export async function handlePayPalWebhook(headers, event) {
     const existing = getDb().prepare("SELECT COUNT(*) AS n FROM mk_orders WHERE paypal_order_id=? AND payment_status='paid'").get(resource.id)?.n || 0;
     const total = getDb().prepare("SELECT COUNT(*) AS n FROM mk_orders WHERE paypal_order_id=?").get(resource.id)?.n || 0;
     if (total > 0 && existing < total) return { received: true, type, capture: await captureMarketplacePayPalOrder(resource.id) };
+    const liveCheckout = listLiveCheckouts().find((item) => item.paymentProviderOrderId === resource.id);
+    if (liveCheckout && liveCheckout.status !== "paid") {
+      return { received: true, type, capture: await captureLivePayPalOrder(resource.id) };
+    }
   }
   if (["PAYMENT.CAPTURE.REFUNDED", "PAYMENT.CAPTURE.REVERSED"].includes(type) && resource.id) {
     const rows = getDb().prepare("SELECT id FROM mk_orders WHERE paypal_capture_id=?").all(resource.id);

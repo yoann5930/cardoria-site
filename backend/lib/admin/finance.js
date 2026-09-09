@@ -97,7 +97,7 @@ function boutiqueSaleRecord(order) {
     updatedAt: order.updatedAt || order.createdAt || order.date || "",
     source: "boutique",
     sourceLabel: "Boutique",
-    provider: "sumup",
+    provider: order.paymentProvider || "revolut",
     client: order.client || order.customerName || "",
     email: order.email || order.customerEmail || "",
     grossAmount: money(order.total),
@@ -106,8 +106,8 @@ function boutiqueSaleRecord(order) {
     sellerNet: 0,
     status,
     orderStatus: order.status || "",
-    paymentReference: order.sumupCheckoutId || "",
-    transactionReference: order.sumupTransactionId || ""
+    paymentReference: order.paymentProviderOrderId || order.sumupCheckoutId || "",
+    transactionReference: order.paymentProviderTransactionId || order.sumupTransactionId || ""
   };
 }
 

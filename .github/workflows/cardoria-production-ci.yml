@@ -55,7 +55,12 @@ jobs:
           node --check lib/auth/users.js
           node --check lib/boutique/stock.js
           node --check lib/boutique/checkout.js
+          node --check lib/payments/routing.js
           node --check lib/payments/sumup.js
+          node --check lib/live/sessions.js
+          node --check lib/live/checkout.js
+          node --check routes/live.js
+          node --check routes/live-admin.js
           node --check lib/payments/sumup-refund.js
           node --check lib/marketplace/migrate.js
           node --check lib/marketplace/orders.js
@@ -89,7 +94,13 @@ jobs:
           node --check ../js/admin/admin-payments.js
           node --check ../js/admin/admin-accounting.js
           node --check ../js/admin/admin-marketplace.js
+          node --check ../js/admin/admin-live.js
+          node --check ../js/live-vendeur.js
+          node --check ../js/cardoria-live-viewer.js
           node --check ../js/admin/admin-users.js
+      - name: Payment matrix routing tests
+        working-directory: .
+        run: node --test backend/tests/payment-matrix.test.mjs
       - name: Boutique stock and order wiring checks
         working-directory: .
         run: |
@@ -100,6 +111,11 @@ jobs:
           grep -q 'soldStock' backend/lib/boutique/stock.js
           grep -q 'postalCode' backend/lib/boutique/checkout.js
           grep -q 'customerPhone' backend/lib/boutique/checkout.js
+          grep -q 'assertSaleProvider' backend/lib/boutique/checkout.js
+          grep -q 'channel: "marketplace"' backend/routes/marketplace-paypal.js
+          grep -q 'PAYMENT_MATRIX' backend/lib/payments/routing.js
+          grep -q 'live_admin: "revolut"' backend/lib/payments/routing.js
+          grep -q 'live_seller: "paypal"' backend/lib/payments/routing.js
           grep -q 'boutique-inventory' js/admin/admin-stock.js
           grep -q 'data-refund' js/admin/admin-orders.js
           grep -q 'La Poste' backend/routes/payments-admin.js
@@ -234,6 +250,9 @@ jobs:
           grep -q 'shopPostalCode' /tmp/cardoria-boutique.html
           curl --fail --silent http://127.0.0.1:10000/api/payments/boutique/products > /tmp/cardoria-products.json
           grep -q '"ok":true' /tmp/cardoria-products.json
+          curl --fail --silent http://127.0.0.1:10000/api/live/matrix > /tmp/cardoria-live-matrix.json
+          grep -q '"boutique":"revolut"' /tmp/cardoria-live-matrix.json
+          grep -q '"live_seller":"paypal"' /tmp/cardoria-live-matrix.json
           curl --fail --silent 'http://127.0.0.1:10000/api/marketplace/v1/search?license=pokemon' > /tmp/cardoria-marketplace.json
           grep -q '"ok":true' /tmp/cardoria-marketplace.json
       - name: Sensitive marketplace and admin routes require authentication
@@ -269,6 +288,7 @@ jobs:
             /api/admin/payments/boutique-orders \
             /api/admin/payments/boutique-inventory \
             /api/admin/marketplace/orders \
+            /api/admin/live/sessions \
             /api/admin/accounting/summary \
             /api/admin/accounting/sales \
             /api/admin/accounting/purchases \

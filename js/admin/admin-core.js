@@ -41,7 +41,8 @@
       icon: "▣",
       items: [
         { href: "admin-catalogue.html", label: "Catalogue de référence", page: "catalog" },
-        { href: "admin-marketplace.html", label: "Marketplace", page: "marketplace" }
+        { href: "admin-marketplace.html", label: "Marketplace", page: "marketplace" },
+        { href: "admin-live.html", label: "Lives", page: "live" }
       ]
     },
     {

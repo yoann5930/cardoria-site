@@ -17,6 +17,10 @@ export function runServerAudit() {
 
   const health = getHealthReport();
   Object.entries(health.checks).forEach(([name, check]) => {
+    if (check.retired) {
+      ok.push(`Service ${name} : retiré`);
+      return;
+    }
     if (check.ok || check.configured) ok.push(`Service ${name} : OK`);
     else warnings.push(`Service ${name} : non configuré ou en échec`);
   });
@@ -27,7 +31,10 @@ export function runServerAudit() {
   if (process.env.NODE_ENV === "production" && !process.env.CORS_ORIGINS) {
     issues.push("CORS_ORIGINS non défini en production");
   }
-  if (!process.env.SUMUP_API_KEY) warnings.push("SUMUP_API_KEY manquant — paiements désactivés");
+  if (!process.env.REVOLUT_SECRET_KEY) warnings.push("REVOLUT_SECRET_KEY manquant — Boutique et Live Admin");
+  if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
+    warnings.push("PayPal Marketplace non configuré — Marketplace et Live vendeur");
+  }
 
   const envExample = path.join(ROOT, "backend", ".env.example");
   if (fs.existsSync(envExample)) ok.push(".env.example présent");

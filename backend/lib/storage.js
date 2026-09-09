@@ -14,7 +14,8 @@ const FILES = {
   "witnot-attribution": "witnot-attribution.json",
   "rachat-proposals": "rachat-proposals.json",
   "seller-subscriptions": "seller-subscriptions.json",
-  "marketplace-captured-sales": "marketplace-captured-sales.json"
+  "marketplace-captured-sales": "marketplace-captured-sales.json",
+  "live-sessions.json": "live-sessions.json"
 };
 
 function ensureDir() {

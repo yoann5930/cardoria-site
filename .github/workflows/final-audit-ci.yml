@@ -61,6 +61,9 @@ jobs:
           node --check lib/admin/finance.js
           node --check lib/boutique/stock.js
           node --check lib/payments/sumup.js
+          node --check lib/payments/routing.js
+          node --check lib/live/checkout.js
+          node --check routes/live.js
           node --check lib/marketplace/paypal.js
           node --check lib/marketplace/v1/listings.js
           node --check lib/marketplace/v1/disputes.js
@@ -69,12 +72,14 @@ jobs:
           node --check lib/backup/durable.js
       - name: Core regression tests
         working-directory: .
-        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs
+        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs
       - name: Architecture separation guards
         working-directory: .
         run: |
           grep -q 'listBoutiqueInventory' backend/routes/payments-admin.js
           grep -q 'refundSumUpTransaction' backend/routes/payments-admin.js
+          grep -q 'PAYMENT_MATRIX' backend/lib/payments/routing.js
+          grep -q 'assertSaleProvider' backend/routes/payments.js
           grep -q 'marketplaceGmv' backend/lib/admin/finance.js
           grep -q 'marketplaceCommission' backend/lib/admin/finance.js
           grep -q 'paypal' backend/lib/marketplace/paypal.js
@@ -130,7 +135,8 @@ jobs:
           test "$code" = "401"
           code=$(curl -sS -o /tmp/cardoria-final-sumup.json -w '%{http_code}' http://127.0.0.1:10000/api/payments/sumup/checkout)
           test "$code" = "410"
-          for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/accounting/summary /api/system/backups; do
+          curl -fsS http://127.0.0.1:10000/api/live/matrix | grep -q '"live_admin":"revolut"'
+          for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/admin/accounting/summary /api/system/backups; do
             code=$(curl -sS -o /tmp/cardoria-final-anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
             test "$code" = "401"
           done

@@ -334,6 +334,30 @@
     }
   }
 
+  const loadCardoriaSales = async () => {
+    const list = document.getElementById("cardoriaLivePayList");
+    const state = document.getElementById("cardoriaLivePayState");
+    if (!list) return;
+    try {
+      const response = await fetch("/api/live/sessions?status=all", { cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+      const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+      if (!sessions.length) {
+        list.innerHTML = "<p class='live-directory-empty'>Aucun Live Cardoria programmé. Le lecteur ci-dessus reste disponible.</p>";
+        if (state) state.textContent = "Live Admin = Revolut · Live vendeur = PayPal";
+        return;
+      }
+      list.innerHTML = sessions.map((session) => {
+        const provider = session.ownerRole === "seller" ? "PayPal" : "Revolut";
+        const products = (session.products || []).map((item) => `${item.name} (${Number(item.price || 0).toFixed(2)} €)`).join(" · ");
+        return `<article class="live-card-select" data-live-pay="${session.id}"><span class="live-card-dot"></span><span><strong>${session.title || "Live Cardoria"}</strong><small>${session.status} · ${provider}${products ? " · " + products : ""}</small></span></article>`;
+      }).join("");
+      if (state) state.textContent = `${sessions.length} session(s) · paiement forcé par le serveur`;
+    } catch {
+      if (state) state.textContent = "Live Admin = Revolut · Live vendeur = PayPal";
+    }
+  };
+
   soundButton?.addEventListener("click", () => {
     video.muted = !video.muted;
     soundButton.textContent = video.muted ? "Activer le son" : "Couper le son";
@@ -341,7 +365,9 @@
   });
 
   void loadDirectory();
+  void loadCardoriaSales();
   directoryTimer = window.setInterval(loadDirectory, 5000);
+  window.setInterval(loadCardoriaSales, 8000);
   window.addEventListener("beforeunload", () => {
     if (directoryTimer) window.clearInterval(directoryTimer);
     stopHeartbeat();

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { readJson, writeJson } from "../storage.js";
 import { createRevolutCheckout, isRevolutConfigured, getRevolutEnvironment } from "../payments/revolut.js";
+import { assertSaleProvider, assertServerAmount } from "../payments/routing.js";
 import { listBoutiqueProducts } from "./catalog.js";
 
 function money(value) {
@@ -53,7 +54,8 @@ function validateItems(rawItems) {
   });
 }
 
-export async function createLiveBoutiqueCheckout({ customerName, customerEmail, customerPhone, address, postalCode, city, country, items, shipping, successUrl, trafficSource, visitorId }) {
+export async function createLiveBoutiqueCheckout({ customerName, customerEmail, customerPhone, address, postalCode, city, country, items, shipping, successUrl, trafficSource, visitorId, requestedProvider, requestedAmount }) {
+  assertSaleProvider({ channel: "boutique", requestedProvider });
   const name = clean(customerName, 120);
   const email = validateEmail(customerEmail);
   const phone = clean(customerPhone, 40);
@@ -67,7 +69,7 @@ export async function createLiveBoutiqueCheckout({ customerName, customerEmail, 
 
   const verifiedItems = validateItems(items);
   const shippingCost = 0;
-  const total = money(verifiedItems.reduce((sum, item) => sum + item.qty * item.price, 0) + shippingCost);
+  const total = assertServerAmount(money(verifiedItems.reduce((sum, item) => sum + item.qty * item.price, 0) + shippingCost), requestedAmount);
   const orderId = "CMD-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomInt(1000, 10000);
   const now = new Date().toISOString();
   const fullAddress = [street, `${zip} ${locality}`.trim(), countryName].filter(Boolean).join("\n");

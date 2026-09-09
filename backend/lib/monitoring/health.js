@@ -8,7 +8,8 @@ import { DATA_DIR } from "../storage.js";
 import { cacheStats } from "../cache.js";
 import { getErrorStats } from "./errors.js";
 import { listBackups } from "../backup/full.js";
-import { isSumUpConfigured } from "../payments/sumup.js";
+import { isRevolutConfigured } from "../payments/revolut.js";
+import { getPayPalMarketplaceConfig } from "../marketplace/paypal.js";
 import { isSmtpConfigured } from "../email.js";
 import { getMarketplacePersistenceStatus } from "../marketplace/persistence.js";
 
@@ -75,7 +76,9 @@ export function getHealthReport() {
       disk: checkDisk(),
       openai: { ok: !!process.env.OPENAI_API_KEY, configured: !!process.env.OPENAI_API_KEY },
       smtp: { ok: isSmtpConfigured(), configured: isSmtpConfigured() },
-      sumup: { ok: isSumUpConfigured(), configured: isSumUpConfigured() },
+      revolut: { ok: isRevolutConfigured(), configured: isRevolutConfigured() },
+      paypal: { ok: getPayPalMarketplaceConfig().configured, configured: getPayPalMarketplaceConfig().configured },
+      sumup: { ok: false, configured: false, retired: true },
       postgres: checkPostgres()
     },
     memory: {

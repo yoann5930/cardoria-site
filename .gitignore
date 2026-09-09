@@ -1,0 +1,4 @@
+# Runtime and local test stores — never commit
+/data/
+/backend/data/
+/backend/node_modules/

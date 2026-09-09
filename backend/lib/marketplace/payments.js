@@ -1,5 +1,6 @@
 /**
- * Paiements marketplace — délégation SumUp Cardoria.
+ * Ancien pont SumUp Marketplace — entièrement retiré.
+ * Les fonctions exportées lèvent 410 et ne contactent plus SumUp.
  */
 export {
   isSumUpConfigured,

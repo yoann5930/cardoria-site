@@ -290,6 +290,60 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
   return { provider: "paypal", id: result.id, status: result.status, url, commissionPercent: cfg.commissionPercent, fees };
 }
 
+export async function createLivePayPalOrder({ checkoutId, amount, sellerId, description, successUrl, cancelUrl, platformFee }) {
+  const cfg = assertConfigured();
+  const seller = ensureSellerCanReceive({ sellerId, total: amount, shippingCost: 0 });
+  const fee = round2(platformFee != null ? platformFee : amount * (cfg.commissionPercent / 100));
+  const payload = {
+    intent: "CAPTURE",
+    purchase_units: [{
+      reference_id: checkoutId,
+      custom_id: checkoutId,
+      description: String(description || "Live vendeur Cardoria").slice(0, 110),
+      payee: { merchant_id: seller.paypalMerchantId },
+      amount: { currency_code: "EUR", value: round2(amount).toFixed(2) },
+      payment_instruction: {
+        disbursement_mode: cfg.delayedDisbursement ? "DELAYED" : "INSTANT",
+        platform_fees: [{ amount: { currency_code: "EUR", value: fee.toFixed(2) } }]
+      }
+    }],
+    payment_source: { paypal: { experience_context: { return_url: successUrl, cancel_url: cancelUrl, user_action: "PAY_NOW" } } }
+  };
+  const result = await paypalRequest("/v2/checkout/orders", {
+    method: "POST",
+    body: payload,
+    requestId: `cardoria-live-${checkoutId}`.slice(0, 100),
+    sellerMerchantId: seller.paypalMerchantId
+  });
+  const url = getActionUrl(result);
+  if (!url) throw new Error("Lien de paiement PayPal introuvable.");
+  return { provider: "paypal", id: result.id, status: result.status, url, platformFee: fee, sellerNet: round2(amount - fee) };
+}
+
+export async function captureLivePayPalOrder(paypalOrderId) {
+  if (!paypalOrderId) throw Object.assign(new Error("Identifiant de paiement PayPal requis."), { status: 400 });
+  const { applyLivePaymentStatus, listLiveCheckouts } = await import("../live/sessions.js");
+  const checkout = listLiveCheckouts().find((item) => item.paymentProviderOrderId === paypalOrderId);
+  if (!checkout) throw Object.assign(new Error("Paiement Live PayPal introuvable."), { status: 404 });
+  if (checkout.status === "paid") return { provider: "paypal", alreadyPaid: true, checkout };
+  const seller = ensureSellerCanReceive({ sellerId: checkout.ownerId, total: checkout.amount, shippingCost: 0 });
+  const result = await paypalRequest(`/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
+    method: "POST",
+    body: {},
+    requestId: `capture-live-${paypalOrderId}`,
+    sellerMerchantId: seller.paypalMerchantId
+  });
+  const capture = result.purchase_units?.[0]?.payments?.captures?.[0];
+  const captureStatus = String(capture?.status || result.status || "").toUpperCase();
+  if (captureStatus === "COMPLETED") {
+    applyLivePaymentStatus(checkout.id, "paid", {
+      paymentProviderOrderId: paypalOrderId,
+      paymentProviderTransactionId: capture?.id || ""
+    });
+  }
+  return { provider: "paypal", id: result.id, status: result.status, captureId: capture?.id || "", checkout: listLiveCheckouts().find((item) => item.id === checkout.id) };
+}
+
 function captureSellerMerchantId(paypalOrderId) {
   const rows = getDb().prepare("SELECT DISTINCT seller_id FROM mk_orders WHERE paypal_order_id = ?").all(paypalOrderId);
   if (rows.length !== 1) return "";

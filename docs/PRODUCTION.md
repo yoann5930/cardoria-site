@@ -4,7 +4,9 @@
 
 - [ ] Définir `ADMIN_INITIAL_PASSWORD` fort et `ADMIN_CODE` unique (ou `LEGACY_ADMIN_CODE=false`)
 - [ ] Configurer `CORS_ORIGINS` avec les domaines réels (`cardoria.fr`)
-- [ ] Activer `SUMUP_WEBHOOK_SECRET` sur Render
+- [ ] Configurer Revolut (`REVOLUT_SECRET_KEY`, `REVOLUT_WEBHOOK_SECRET`) dans `/etc/cardoria/cardoria.env` sur OVH
+- [ ] Configurer PayPal Marketplace (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_PARTNER_MERCHANT_ID`, `PAYPAL_PARTNER_ATTRIBUTION_ID`, `PAYPAL_WEBHOOK_ID`)
+- [ ] Ne plus utiliser SumUp (retiré du runtime)
 - [ ] Vérifier `NODE_ENV=production`
 - [ ] Limiter `BODY_LIMIT` (15 Mo par défaut)
 - [ ] Activer `ALERT_EMAIL=true` + SMTP configuré
@@ -53,7 +55,7 @@
 - [ ] Backend Render → URL API dans `js/seo-config.js` / `CARDORIA_BACKEND`
 - [ ] Variables Render selon `docs/DEPLOYMENT.md`
 - [ ] SSL actif (HSTS automatique si `NODE_ENV=production`)
-- [ ] Test bout en bout : estimation, paiement SumUp, admin
+- [ ] Test bout en bout : estimation, paiement Revolut Boutique / PayPal Marketplace, admin
 
 ## Éléments à configurer manuellement
 
@@ -61,7 +63,7 @@
 2. **Render disk** pour persistance SQLite
 3. **PostgreSQL** (Supabase/Neon) quand migration planifiée
 4. **SMTP** (Gmail app password ou SendGrid)
-5. **SumUp** clés production + webhook URL
+5. **Revolut + PayPal** clés production + webhooks (SumUp retiré)
 6. **OpenAI** clé + budget
 7. **Google Analytics / Clarity** IDs dans Render env
 8. **Sauvegardes off-site** (S3, Drive) — non automatisées dans le code
