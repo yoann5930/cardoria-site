@@ -13,23 +13,13 @@
 
   const search = new URLSearchParams(window.location.search);
   const focusLiveId = String(search.get("session") || "").trim();
-  const urlPrivilegeFlags = {
-    admin: search.get("admin"),
-    free: search.get("free"),
-    noFee: search.get("noFee")
-  };
-  const urlFlagsNeverGrantAdmin = true;
-  void urlPrivilegeFlags;
-
   const grantFromHash = () => {
     const match = String(window.location.hash || "").match(/cardoriaAdminGrant=([A-Za-z0-9_-]+)/);
     return match ? match[1] : "";
   };
-
   const adminSessionToken = () => {
     try { return sessionStorage.getItem("cardoria_session_token") || ""; } catch { return ""; }
   };
-
   const liveAccessHeaders = () => {
     const headers = { Accept: "application/json", "Content-Type": "application/json" };
     const token = adminSessionToken();
@@ -38,6 +28,7 @@
     if (grant) headers["x-live-admin-grant"] = grant;
     return headers;
   };
+  const providerLabel = (session = {}) => session.ownerRole === "seller" || session.paymentProvider === "paypal" ? "PayPal" : "SumUp";
 
   const renderAdminBar = (access) => {
     const bar = document.getElementById("cardoriaLiveAdminBar");
@@ -45,39 +36,28 @@
     const session = access.session || {};
     const title = access.title || session.title || "Live Cardoria";
     bar.hidden = false;
-    const titleNode = document.getElementById("cardoriaLiveAdminTitle");
-    const modeNode = document.getElementById("cardoriaLiveAdminMode");
+    document.getElementById("cardoriaLiveAdminTitle").textContent = title;
+    document.getElementById("cardoriaLiveAdminMode").textContent = "Mode Admin / Cardoria — accès interne sans frais";
     const metaNode = document.getElementById("cardoriaLiveAdminMeta");
-    const toolsNode = document.getElementById("cardoriaLiveAdminTools");
-    if (titleNode) titleNode.textContent = title;
-    if (modeNode) modeNode.textContent = "Mode Admin / Cardoria — accès interne sans frais";
-    if (metaNode) {
-      const provider = session.paymentProvider === "paypal" || session.ownerRole === "seller" ? "PayPal" : "Revolut";
-      metaNode.textContent = `${title} · ${session.status || ""} · ventes visiteurs : ${provider} (inchangé, aucun paiement créé pour cet accès)`;
-    }
+    if (metaNode) metaNode.textContent = `${title} · ${session.status || ""} · ventes visiteurs : ${providerLabel(session)} (aucun paiement créé pour cet accès)`;
     document.title = title + " — Admin Cardoria";
     const heading = document.querySelector(".live-brand h1");
     if (heading) heading.textContent = title;
+    const toolsNode = document.getElementById("cardoriaLiveAdminTools");
     if (toolsNode && adminSessionToken() && session.id) {
-      toolsNode.innerHTML =
-        `<button type="button" data-admin-live-start="${session.id}">Démarrer</button>` +
-        `<button type="button" data-admin-live-stop="${session.id}">Arrêter</button>` +
-        `<a href="/admin-live.html">Retour Admin Lives</a>`;
-      toolsNode.querySelector("[data-admin-live-start]")?.addEventListener("click", () => {
-        fetch(`/api/admin/live/sessions/${encodeURIComponent(session.id)}/start`, { method: "POST", headers: liveAccessHeaders(), body: "{}" })
-          .then((response) => response.json().then((payload) => ({ ok: response.ok && payload.ok !== false, payload })))
-          .then((result) => { if (!result.ok) throw new Error(result.payload.error || "Démarrage impossible"); location.reload(); })
-          .catch((error) => alert(error.message));
-      });
-      toolsNode.querySelector("[data-admin-live-stop]")?.addEventListener("click", () => {
-        fetch(`/api/admin/live/sessions/${encodeURIComponent(session.id)}/stop`, { method: "POST", headers: liveAccessHeaders(), body: "{}" })
-          .then((response) => response.json().then((payload) => ({ ok: response.ok && payload.ok !== false, payload })))
-          .then((result) => { if (!result.ok) throw new Error(result.payload.error || "Arrêt impossible"); location.reload(); })
-          .catch((error) => alert(error.message));
-      });
+      toolsNode.innerHTML = `<button type="button" data-admin-live-start="${session.id}">Démarrer</button><button type="button" data-admin-live-stop="${session.id}">Arrêter</button><a href="/admin-live.html">Retour Admin Lives</a>`;
+      toolsNode.querySelector("[data-admin-live-start]")?.addEventListener("click", () => adminAction(session.id, "start"));
+      toolsNode.querySelector("[data-admin-live-stop]")?.addEventListener("click", () => adminAction(session.id, "stop"));
     }
   };
-
+  const adminAction = async (id, action) => {
+    try {
+      const response = await fetch(`/api/admin/live/sessions/${encodeURIComponent(id)}/${action}`, { method: "POST", headers: liveAccessHeaders(), body: "{}" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || "Action Live impossible");
+      location.reload();
+    } catch (error) { alert(error.message); }
+  };
   const loadFocusedLiveTitle = async () => {
     if (!focusLiveId) return;
     try {
@@ -89,392 +69,67 @@
       document.title = payload.session.title + " — Live Cardoria";
     } catch {}
   };
-
   const loadAdminLiveAccess = async () => {
-    if (!focusLiveId || !urlFlagsNeverGrantAdmin) return;
-    if (!adminSessionToken() && !grantFromHash()) return;
+    if (!focusLiveId || (!adminSessionToken() && !grantFromHash())) return;
     try {
-      const response = await fetch(`/api/live/sessions/${encodeURIComponent(focusLiveId)}/admin-access`, {
-        headers: liveAccessHeaders(),
-        cache: "no-store"
-      });
+      const response = await fetch(`/api/live/sessions/${encodeURIComponent(focusLiveId)}/admin-access`, { headers: liveAccessHeaders(), cache: "no-store" });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) return;
-      if (payload.accessRole === "admin" && payload.accessContext === "cardoria") renderAdminBar(payload);
+      if (response.ok && payload.ok && payload.accessRole === "admin" && payload.accessContext === "cardoria") renderAdminBar(payload);
     } catch {}
   };
 
-  let mediaSource = null;
-  let sourceBuffer = null;
-  let objectUrl = null;
-  let activeSessionId = null;
-  let pendingChunks = [];
-  let liveActive = false;
-  let eventSource = null;
-  let directoryTimer = null;
-  let peerConnection = null;
-  let viewerId = null;
-  let heartbeatTimer = null;
-
-  const setStatus = (message, active = false) => {
-    stateNode.textContent = message;
-    stageNode.dataset.live = active ? "true" : "false";
-  };
-
-  const setViewers = (count) => {
-    const value = Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : 0;
-    viewersNode.textContent = `${value} spectateur${value > 1 ? "s" : ""}`;
-  };
-
+  let mediaSource = null, sourceBuffer = null, objectUrl = null, activeSessionId = null, eventSource = null, peerConnection = null, viewerId = null, heartbeatTimer = null, directoryTimer = null;
+  let pendingChunks = [], liveActive = false;
+  const setStatus = (message, active = false) => { stateNode.textContent = message; stageNode.dataset.live = active ? "true" : "false"; };
+  const setViewers = (count) => { const value = Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : 0; viewersNode.textContent = `${value} spectateur${value > 1 ? "s" : ""}`; };
   const apiPost = async (path, body, keepalive = false) => {
-    const response = await fetch(`${API_BASE}${path}`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-      cache: "no-store",
-      keepalive,
-    });
+    const response = await fetch(`${API_BASE}${path}`, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(body), cache: "no-store", keepalive });
     const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      const message = payload?.error?.message || `Erreur Live (${response.status}).`;
-      throw new Error(message);
-    }
+    if (!response.ok) throw new Error(payload?.error?.message || `Service vidéo Live indisponible (${response.status}).`);
     return payload;
   };
-
-  const base64ToBytes = (base64) => {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    return bytes;
-  };
-
-  const stopHeartbeat = () => {
-    if (heartbeatTimer) window.clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
-  };
-
-  const clearLegacyPlayer = () => {
-    pendingChunks = [];
-    sourceBuffer = null;
-    if (mediaSource && mediaSource.readyState === "open") {
-      try { mediaSource.endOfStream(); } catch {}
-    }
-    mediaSource = null;
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-    objectUrl = null;
-  };
-
-  const stopWebRtcViewer = async (notifyServer = true) => {
-    stopHeartbeat();
-    peerConnection?.close();
-    peerConnection = null;
-    const currentViewerId = viewerId;
-    viewerId = null;
-    if (notifyServer && currentViewerId) {
-      try {
-        await apiPost("/api/v1/live/webrtc/viewer/stop", { viewerId: currentViewerId }, true);
-      } catch {}
-    }
-  };
-
-  const clearPlayer = async () => {
-    eventSource?.close();
-    eventSource = null;
-    await stopWebRtcViewer(true);
-    clearLegacyPlayer();
-    video.pause();
-    video.srcObject = null;
-    video.removeAttribute("src");
-    video.load();
-  };
-
-  const disconnectSession = async () => {
-    liveActive = false;
-    await clearPlayer();
-  };
-
-  const appendNext = () => {
-    if (!sourceBuffer || sourceBuffer.updating || pendingChunks.length === 0) return;
-    const next = pendingChunks.shift();
-    try {
-      sourceBuffer.appendBuffer(next);
-    } catch {
-      pendingChunks.unshift(next);
-      window.setTimeout(appendNext, 120);
-    }
-  };
-
+  const base64ToBytes = (base64) => { const binary = atob(base64); const bytes = new Uint8Array(binary.length); for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i); return bytes; };
+  const stopHeartbeat = () => { if (heartbeatTimer) clearInterval(heartbeatTimer); heartbeatTimer = null; };
+  const clearLegacyPlayer = () => { pendingChunks = []; sourceBuffer = null; if (mediaSource?.readyState === "open") { try { mediaSource.endOfStream(); } catch {} } mediaSource = null; if (objectUrl) URL.revokeObjectURL(objectUrl); objectUrl = null; };
+  const stopWebRtcViewer = async (notify = true) => { stopHeartbeat(); peerConnection?.close(); peerConnection = null; const id = viewerId; viewerId = null; if (notify && id) { try { await apiPost("/api/v1/live/webrtc/viewer/stop", { viewerId: id }, true); } catch {} } };
+  const clearPlayer = async () => { eventSource?.close(); eventSource = null; await stopWebRtcViewer(true); clearLegacyPlayer(); video.pause(); video.srcObject = null; video.removeAttribute("src"); video.load(); };
+  const appendNext = () => { if (!sourceBuffer || sourceBuffer.updating || !pendingChunks.length) return; const next = pendingChunks.shift(); try { sourceBuffer.appendBuffer(next); } catch { pendingChunks.unshift(next); setTimeout(appendNext, 120); } };
   const startLegacyPlayer = (sessionId, mimeType) => {
-    clearLegacyPlayer();
-    activeSessionId = sessionId;
-    if (!window.MediaSource || !MediaSource.isTypeSupported(mimeType)) {
-      setStatus("Ce navigateur ne peut pas lire ce format Live. Utilisez Edge ou Chrome récent.", false);
-      return;
-    }
-
-    mediaSource = new MediaSource();
-    objectUrl = URL.createObjectURL(mediaSource);
-    video.src = objectUrl;
-    video.srcObject = null;
-    video.muted = true;
-    soundButton?.removeAttribute("hidden");
-
-    mediaSource.addEventListener("sourceopen", () => {
-      if (!mediaSource || mediaSource.readyState !== "open" || activeSessionId !== sessionId) return;
-      try {
-        sourceBuffer = mediaSource.addSourceBuffer(mimeType);
-        sourceBuffer.mode = "sequence";
-        sourceBuffer.addEventListener("updateend", appendNext);
-        sourceBuffer.addEventListener("error", () => setStatus("Le flux Live a rencontré une erreur de lecture.", false));
-        appendNext();
-      } catch {
-        setStatus("Impossible d’ouvrir le flux Live dans ce navigateur.", false);
-      }
-    }, { once: true });
-
-    liveActive = true;
-    setStatus("LIVE EN COURS", true);
-    video.play().catch(() => {});
+    clearLegacyPlayer(); activeSessionId = sessionId;
+    if (!window.MediaSource || !MediaSource.isTypeSupported(mimeType)) return setStatus("Format Live non pris en charge par ce navigateur.", false);
+    mediaSource = new MediaSource(); objectUrl = URL.createObjectURL(mediaSource); video.src = objectUrl; video.srcObject = null; video.muted = true; soundButton?.removeAttribute("hidden");
+    mediaSource.addEventListener("sourceopen", () => { try { sourceBuffer = mediaSource.addSourceBuffer(mimeType); sourceBuffer.mode = "sequence"; sourceBuffer.addEventListener("updateend", appendNext); appendNext(); } catch { setStatus("Impossible d’ouvrir le flux Live.", false); } }, { once: true });
+    liveActive = true; setStatus("LIVE EN COURS", true); video.play().catch(() => {});
   };
-
   const connectCloudflare = async (sessionId) => {
-    await stopWebRtcViewer(true);
-    clearLegacyPlayer();
-    setStatus("Connexion WebRTC au live…", false);
-
+    await stopWebRtcViewer(true); clearLegacyPlayer(); setStatus("Connexion WebRTC au live…", false);
     const start = await apiPost("/api/v1/live/webrtc/viewer/start", { liveSessionId: sessionId });
     if (!start?.viewerId || !start?.offer?.sdp) throw new Error("Signal WebRTC incomplet.");
-    viewerId = start.viewerId;
-    setViewers(start.live?.viewerCount || 0);
-
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
-      bundlePolicy: "max-bundle",
-    });
-    peerConnection = pc;
-    const remoteStream = new MediaStream();
-
-    pc.addEventListener("track", (event) => {
-      if (activeSessionId !== sessionId) return;
-      remoteStream.addTrack(event.track);
-      video.srcObject = remoteStream;
-      video.removeAttribute("src");
-      video.muted = true;
-      soundButton?.removeAttribute("hidden");
-      liveActive = true;
-      setStatus("LIVE EN COURS", true);
-      video.play().catch(() => {});
-    });
-
-    pc.addEventListener("connectionstatechange", () => {
-      if (activeSessionId !== sessionId) return;
-      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-        setStatus("Connexion au live interrompue. Reconnexion…", false);
-      }
-    });
-
-    await pc.setRemoteDescription(start.offer);
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    await apiPost("/api/v1/live/webrtc/viewer/answer", {
-      viewerId,
-      answer: { type: "answer", sdp: answer.sdp || "" },
-    });
-
-    heartbeatTimer = window.setInterval(async () => {
-      if (!viewerId || activeSessionId !== sessionId) return;
-      try {
-        const heartbeat = await apiPost("/api/v1/live/webrtc/viewer/heartbeat", { viewerId });
-        if (heartbeat?.active === false) {
-          setStatus("Le live est terminé.", false);
-          liveActive = false;
-          await stopWebRtcViewer(false);
-          window.setTimeout(loadDirectory, 500);
-        }
-      } catch {
-        // A transient heartbeat error must not immediately stop media playback.
-      }
-    }, 30_000);
+    viewerId = start.viewerId; setViewers(start.live?.viewerCount || 0);
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }], bundlePolicy: "max-bundle" }); peerConnection = pc; const remoteStream = new MediaStream();
+    pc.addEventListener("track", (event) => { if (activeSessionId !== sessionId) return; remoteStream.addTrack(event.track); video.srcObject = remoteStream; video.removeAttribute("src"); video.muted = true; soundButton?.removeAttribute("hidden"); liveActive = true; setStatus("LIVE EN COURS", true); video.play().catch(() => {}); });
+    await pc.setRemoteDescription(start.offer); const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); await apiPost("/api/v1/live/webrtc/viewer/answer", { viewerId, answer: { type: "answer", sdp: answer.sdp || "" } });
+    heartbeatTimer = setInterval(async () => { if (!viewerId || activeSessionId !== sessionId) return; try { const hb = await apiPost("/api/v1/live/webrtc/viewer/heartbeat", { viewerId }); if (hb?.active === false) { liveActive = false; setStatus("Le live est terminé.", false); await stopWebRtcViewer(false); } } catch {} }, 30000);
   };
-
-  const stopPlayer = async () => {
-    liveActive = false;
-    setStatus("Le live est terminé.", false);
-    await clearPlayer();
-    window.setTimeout(loadDirectory, 500);
-  };
-
-  const enqueueChunk = (event) => {
-    if (!event || !event.data || event.sessionId !== activeSessionId) return;
-    try {
-      pendingChunks.push(base64ToBytes(event.data));
-      appendNext();
-      if (video.paused) video.play().catch(() => {});
-    } catch {
-      setStatus("Un fragment du direct n’a pas pu être lu.", false);
-    }
-  };
-
-  const applyState = (live) => {
-    if (!live || live.sessionId !== activeSessionId) return;
-    setViewers(live.viewerCount);
-    if (!live.active && !liveActive) setStatus("Ce live n’est plus en cours.", false);
-  };
-
-  const connectLegacy = (sessionId) => {
-    eventSource = new EventSource(`${API_BASE}/api/v1/live/sessions/${encodeURIComponent(sessionId)}/events`);
-    eventSource.addEventListener("state", (message) => {
-      try { applyState(JSON.parse(message.data).state); } catch {}
-    });
-    eventSource.addEventListener("stream-start", (message) => {
-      try {
-        const event = JSON.parse(message.data);
-        if (event.sessionId === activeSessionId) startLegacyPlayer(event.sessionId, event.mimeType);
-      } catch {
-        setStatus("Impossible d’initialiser le direct.", false);
-      }
-    });
-    eventSource.addEventListener("chunk", (message) => {
-      try { enqueueChunk(JSON.parse(message.data)); } catch {}
-    });
-    eventSource.addEventListener("stream-stop", (message) => {
-      try {
-        const event = JSON.parse(message.data);
-        if (event.sessionId === activeSessionId) void stopPlayer();
-      } catch {}
-    });
-    eventSource.onerror = () => {
-      if (!liveActive) setStatus("Connexion au live…", false);
-    };
-  };
-
-  const connectSession = async (sessionId, mimeType) => {
-    if (!sessionId) return;
-    await disconnectSession();
-    activeSessionId = sessionId;
-    setStatus("Connexion au live…", false);
-    setViewers(0);
-
-    try {
-      if (mimeType === CLOUDFLARE_MIME) {
-        await connectCloudflare(sessionId);
-      } else {
-        connectLegacy(sessionId);
-      }
-    } catch (error) {
-      liveActive = false;
-      setStatus(error instanceof Error ? error.message : "Impossible de rejoindre ce live.", false);
-    }
-
-    directoryNode.querySelectorAll("[data-session-id]").forEach((button) => {
-      button.dataset.selected = button.dataset.sessionId === sessionId ? "true" : "false";
-    });
-  };
-
+  const connectLegacy = (sessionId) => { eventSource = new EventSource(`${API_BASE}/api/v1/live/sessions/${encodeURIComponent(sessionId)}/events`); eventSource.addEventListener("stream-start", (m) => { try { const e = JSON.parse(m.data); if (e.sessionId === activeSessionId) startLegacyPlayer(e.sessionId, e.mimeType); } catch {} }); eventSource.addEventListener("chunk", (m) => { try { const e = JSON.parse(m.data); if (e.data && e.sessionId === activeSessionId) { pendingChunks.push(base64ToBytes(e.data)); appendNext(); } } catch {} }); eventSource.addEventListener("stream-stop", () => { liveActive = false; setStatus("Le live est terminé.", false); }); eventSource.onerror = () => { if (!liveActive) setStatus("Service vidéo Live indisponible.", false); }; };
+  const connectSession = async (sessionId, mimeType) => { if (!sessionId) return; await clearPlayer(); activeSessionId = sessionId; setStatus("Connexion au live…", false); setViewers(0); try { if (mimeType === CLOUDFLARE_MIME) await connectCloudflare(sessionId); else connectLegacy(sessionId); } catch (error) { liveActive = false; setStatus(error.message || "Impossible de rejoindre ce live.", false); } };
   const renderDirectory = (directory) => {
     const sessions = Array.isArray(directory?.sessions) ? directory.sessions : [];
-    if (directoryStateNode) {
-      directoryStateNode.textContent = sessions.length
-        ? `${sessions.length} live${sessions.length > 1 ? "s" : ""} en cours`
-        : "Aucun live en cours";
-    }
-
+    if (directoryStateNode) directoryStateNode.textContent = sessions.length ? `${sessions.length} live${sessions.length > 1 ? "s" : ""} en cours` : "Aucun live vidéo en cours";
     directoryNode.innerHTML = "";
-    if (!sessions.length) {
-      const empty = document.createElement("div");
-      empty.className = "live-directory-empty";
-      empty.textContent = "Aucun vendeur n’est en direct pour le moment.";
-      directoryNode.appendChild(empty);
-      if (!liveActive) {
-        activeSessionId = null;
-        setStatus("Aucun live public n’est actuellement en cours.", false);
-        setViewers(0);
-      }
-      return;
-    }
-
-    sessions.forEach((session, index) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "live-card-select";
-      button.dataset.sessionId = session.sessionId;
-      button.dataset.selected = session.sessionId === activeSessionId ? "true" : "false";
-      const started = session.startedAt ? new Date(session.startedAt) : null;
-      const timeLabel = started && !Number.isNaN(started.getTime())
-        ? started.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-        : "maintenant";
-      button.innerHTML = `<span class="live-card-dot"></span><span><strong>Live ${index + 1}</strong><small>Démarré à ${timeLabel} · ${session.viewerCount || 0} spectateur${Number(session.viewerCount) > 1 ? "s" : ""}</small></span>`;
-      button.addEventListener("click", () => void connectSession(session.sessionId, session.mimeType));
-      directoryNode.appendChild(button);
-    });
-
-    const current = sessions.find((session) => session.sessionId === activeSessionId);
-    if (!current) void connectSession(sessions[0].sessionId, sessions[0].mimeType);
+    if (!sessions.length) { const empty = document.createElement("div"); empty.className = "live-directory-empty"; empty.textContent = "Aucun flux vidéo n’est en direct pour le moment."; directoryNode.appendChild(empty); if (!liveActive) { activeSessionId = null; setStatus("Aucun live public n’est actuellement en cours.", false); setViewers(0); } return; }
+    sessions.forEach((session, index) => { const button = document.createElement("button"); button.type = "button"; button.className = "live-card-select"; button.dataset.sessionId = session.sessionId; button.innerHTML = `<span class="live-card-dot"></span><span><strong>Live ${index + 1}</strong><small>${session.viewerCount || 0} spectateur(s)</small></span>`; button.addEventListener("click", () => connectSession(session.sessionId, session.mimeType)); directoryNode.appendChild(button); });
+    if (!sessions.some((s) => s.sessionId === activeSessionId)) connectSession(sessions[0].sessionId, sessions[0].mimeType);
   };
-
-  async function loadDirectory() {
-    try {
-      const response = await fetch(`${API_BASE}/api/v1/live/sessions`, { headers: { Accept: "application/json" }, cache: "no-store" });
-      if (!response.ok) throw new Error("directory");
-      const payload = await response.json();
-      renderDirectory(payload.live);
-    } catch {
-      if (directoryStateNode) directoryStateNode.textContent = "Connexion au service Live…";
-    }
-  }
-
+  async function loadDirectory() { try { const response = await fetch(`${API_BASE}/api/v1/live/sessions`, { headers: { Accept: "application/json" }, cache: "no-store" }); if (!response.ok) throw new Error(); const payload = await response.json(); renderDirectory(payload.live); } catch { if (directoryStateNode) directoryStateNode.textContent = "Service vidéo Live indisponible"; if (!liveActive) setStatus("Le service vidéo Live est actuellement indisponible.", false); } }
   const loadCardoriaSales = async () => {
-    const list = document.getElementById("cardoriaLivePayList");
-    const state = document.getElementById("cardoriaLivePayState");
-    if (!list) return;
-    try {
-      const response = await fetch("/api/live/sessions?status=all", { cache: "no-store" });
-      const payload = await response.json().catch(() => ({}));
-      const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
-      if (!sessions.length) {
-        list.innerHTML = "<p class='live-directory-empty'>Aucun Live Cardoria programmé. Le lecteur ci-dessus reste disponible.</p>";
-        if (state) state.textContent = "Live Admin = Revolut · Live vendeur = PayPal";
-        return;
-      }
-      list.innerHTML = sessions.map((session) => {
-        const provider = session.ownerRole === "seller" ? "PayPal" : "Revolut";
-        const products = (session.products || []).map((item) => `${item.name} (${Number(item.price || 0).toFixed(2)} €)`).join(" · ");
-        const selected = focusLiveId && session.id === focusLiveId ? "true" : "false";
-        return `<article class="live-card-select" data-live-pay="${session.id}" data-selected="${selected}"><span class="live-card-dot"></span><span><strong>${session.title || "Live Cardoria"}</strong><small>${session.status} · ${provider}${products ? " · " + products : ""}</small></span></article>`;
-      }).join("");
-      if (state) state.textContent = `${sessions.length} session(s) · paiement forcé par le serveur`;
-    } catch {
-      if (state) state.textContent = "Live Admin = Revolut · Live vendeur = PayPal";
-    }
+    const list = document.getElementById("cardoriaLivePayList"), state = document.getElementById("cardoriaLivePayState"); if (!list) return;
+    try { const response = await fetch("/api/live/sessions?status=all", { cache: "no-store" }); const payload = await response.json().catch(() => ({})); const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+      if (!sessions.length) { list.innerHTML = "<p class='live-directory-empty'>Aucun Live Cardoria programmé.</p>"; if (state) state.textContent = "Live Admin = SumUp · Live vendeur = PayPal"; return; }
+      list.innerHTML = sessions.map((session) => { const products = (session.products || []).map((item) => `${item.name} (${Number(item.price || 0).toFixed(2)} €)`).join(" · "); return `<article class="live-card-select"><span class="live-card-dot"></span><span><strong>${session.title || "Live Cardoria"}</strong><small>${session.status} · ${providerLabel(session)}${products ? " · " + products : ""}</small></span></article>`; }).join(""); if (state) state.textContent = `${sessions.length} session(s) · paiement forcé par le serveur`;
+    } catch { if (state) state.textContent = "Live Admin = SumUp · Live vendeur = PayPal"; }
   };
-
-  soundButton?.addEventListener("click", () => {
-    video.muted = !video.muted;
-    soundButton.textContent = video.muted ? "Activer le son" : "Couper le son";
-    if (!video.muted) video.play().catch(() => {});
-  });
-
-  void loadDirectory();
-  void loadCardoriaSales();
-  void loadFocusedLiveTitle();
-  void loadAdminLiveAccess();
-  directoryTimer = window.setInterval(loadDirectory, 5000);
-  window.setInterval(loadCardoriaSales, 8000);
-  window.addEventListener("beforeunload", () => {
-    if (directoryTimer) window.clearInterval(directoryTimer);
-    stopHeartbeat();
-    if (viewerId) {
-      try {
-        navigator.sendBeacon?.(`${API_BASE}/api/v1/live/webrtc/viewer/stop`, new Blob([
-          JSON.stringify({ viewerId }),
-        ], { type: "application/json" }));
-      } catch {}
-    }
-    eventSource?.close();
-    peerConnection?.close();
-  }, { once: true });
+  soundButton?.addEventListener("click", () => { video.muted = !video.muted; soundButton.textContent = video.muted ? "Activer le son" : "Couper le son"; if (!video.muted) video.play().catch(() => {}); });
+  loadDirectory(); loadCardoriaSales(); loadFocusedLiveTitle(); loadAdminLiveAccess(); directoryTimer = setInterval(loadDirectory, 5000); setInterval(loadCardoriaSales, 8000);
+  window.addEventListener("beforeunload", () => { if (directoryTimer) clearInterval(directoryTimer); stopHeartbeat(); eventSource?.close(); peerConnection?.close(); }, { once: true });
 })();
