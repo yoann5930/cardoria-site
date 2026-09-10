@@ -9,6 +9,13 @@
     });
   }
 
+  function providerLabel(provider, ownerRole) {
+    var value = String(provider || "").toLowerCase();
+    if (value === "sumup") return "SumUp";
+    if (value === "paypal") return "PayPal";
+    return ownerRole === "seller" ? "PayPal" : "SumUp";
+  }
+
   function renderSessions(sessions) {
     A.qs("#liveBody").innerHTML = (sessions || []).map(function (s) {
       return "<tr>" +
@@ -16,7 +23,7 @@
         "<td>" + esc(s.title) + "</td>" +
         "<td>" + esc(s.ownerRole === "seller" ? "Vendeur" : "Cardoria/Admin") + "<br><small>" + esc(s.ownerId) + "</small></td>" +
         "<td>" + esc(s.status) + "</td>" +
-        "<td><strong>" + esc(s.paymentProvider === "revolut" ? "Revolut" : "PayPal") + "</strong></td>" +
+        "<td><strong>" + esc(providerLabel(s.paymentProvider, s.ownerRole)) + "</strong></td>" +
         "<td>" + (s.products || []).map(function (p) { return esc(p.name) + " · " + A.euro(p.price); }).join("<br>") + "</td>" +
         "<td><div class='admin-live-actions'>" +
         "<button class='btn btn-primary' type='button' data-enter-live='" + esc(s.id) + "'>Entrer dans le Live</button> " +
@@ -67,9 +74,9 @@
     });
   }
 
-  A.renderShell("live", "Lives Cardoria", "Live Admin = Revolut · Live vendeur = PayPal. Le fournisseur est forcé côté serveur.",
-    '<div class="admin-panel"><p>Boutique et Live Cardoria/Admin : Revolut. Marketplace et Live vendeur : PayPal. SumUp n’est plus utilisé. « Entrer dans le Live » est un accès admin interne : il ne crée aucun paiement et ne contourne pas les frais visiteurs/vendeurs.</p></div>' +
-    '<div class="admin-panel"><h2>Créer un Live Cardoria (Revolut)</h2>' +
+  A.renderShell("live", "Lives Cardoria", "Live Admin = SumUp · Live vendeur = PayPal. Le fournisseur est forcé côté serveur.",
+    '<div class="admin-panel"><p>Boutique et Live Cardoria/Admin : SumUp. Marketplace et Live vendeur : PayPal. « Entrer dans le Live » est un accès admin interne : il ne crée aucun paiement et ne contourne pas les frais visiteurs/vendeurs.</p></div>' +
+    '<div class="admin-panel"><h2>Créer un Live Cardoria (SumUp)</h2>' +
     '<div class="admin-filters"><input id="liveTitle" placeholder="Titre du Live" value="Live Cardoria">' +
     '<input id="liveProduct" placeholder="Produit / lot" value="Lot Pokémon">' +
     '<input id="livePrice" type="number" min="1" step="0.01" value="19.90">' +
