@@ -1,0 +1,79 @@
+import { Router } from "express";
+import { ADMIN_ROLES } from "../lib/auth.js";
+import { validateSession } from "../lib/auth/session.js";
+import { assertSellerSession } from "../lib/marketplace/v1/security.js";
+import { getLiveSession } from "../lib/live/sessions.js";
+import { isCloudflareRealtimeConfigured } from "../lib/live/cloudflare-realtime.js";
+import {
+  answerRealtimeViewer,
+  heartbeatRealtimeViewer,
+  realtimeStatus,
+  startRealtimePublisher,
+  startRealtimeViewer,
+  stopRealtimePublisher,
+  stopRealtimeViewer
+} from "../lib/live/realtime-sessions.js";
+
+const router = Router();
+
+function token(req) {
+  return String(req.headers.authorization || "").replace(/^Bearer\s+/i, "") || String(req.headers["x-session-token"] || "");
+}
+
+function publisherActor(req, liveId) {
+  const live = getLiveSession(liveId);
+  if (!live) throw Object.assign(new Error("Live introuvable."), { status: 404 });
+  const user = validateSession(token(req));
+  if (user && ADMIN_ROLES.includes(user.role)) return user;
+  const seller = assertSellerSession(req);
+  return { role: "seller", id: seller.id, sellerId: seller.id, email: seller.email };
+}
+
+function fail(res, error) {
+  res.status(Number(error?.status || error?.code) || 400).json({ ok: false, error: error?.message || "Erreur Live WebRTC", code: error?.code || "LIVE_WEBRTC_ERROR" });
+}
+
+router.get("/status", (req, res) => {
+  res.json({ ok: true, provider: "cloudflare-realtime", configured: isCloudflareRealtimeConfigured(), ...realtimeStatus() });
+});
+
+router.post("/publisher/start", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const liveId = String(body.liveSessionId || body.liveId || "");
+    const offer = body.offer;
+    const tracks = Array.isArray(body.tracks) ? body.tracks : [];
+    if (!liveId || offer?.type !== "offer" || !offer.sdp || !tracks.length) return res.status(400).json({ ok: false, error: "Offre WebRTC ou pistes invalides." });
+    const actor = publisherActor(req, liveId);
+    const result = await startRealtimePublisher({ liveId, actor, offer, tracks });
+    res.json({ ok: true, ...result });
+  } catch (error) { fail(res, error); }
+});
+
+router.post("/publisher/stop", (req, res) => {
+  try {
+    const liveId = String(req.body?.liveSessionId || req.body?.liveId || "");
+    const actor = publisherActor(req, liveId);
+    res.json(stopRealtimePublisher({ liveId, actor }));
+  } catch (error) { fail(res, error); }
+});
+
+router.post("/viewer/start", async (req, res) => {
+  try {
+    const liveId = String(req.body?.liveSessionId || req.body?.liveId || "");
+    res.json({ ok: true, ...(await startRealtimeViewer(liveId)) });
+  } catch (error) { fail(res, error); }
+});
+
+router.post("/viewer/answer", async (req, res) => {
+  try {
+    const { viewerId, answer } = req.body || {};
+    if (!viewerId || answer?.type !== "answer" || !answer.sdp) return res.status(400).json({ ok: false, error: "Réponse WebRTC invalide." });
+    res.json(await answerRealtimeViewer({ viewerId: String(viewerId), answer }));
+  } catch (error) { fail(res, error); }
+});
+
+router.post("/viewer/heartbeat", (req, res) => res.json(heartbeatRealtimeViewer(String(req.body?.viewerId || ""))));
+router.post("/viewer/stop", (req, res) => res.json(stopRealtimeViewer(String(req.body?.viewerId || ""))));
+
+export default router;
