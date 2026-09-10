@@ -1,0 +1,38 @@
+name: Cardoria Live Realtime CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/routes/live*.js"
+      - "backend/lib/live/**"
+      - "backend/tests/live-realtime-contract.test.mjs"
+      - ".github/workflows/live-realtime-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/routes/live*.js"
+      - "backend/lib/live/**"
+      - "backend/tests/live-realtime-contract.test.mjs"
+      - ".github/workflows/live-realtime-ci.yml"
+
+jobs:
+  live-realtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+      - name: Syntax
+        run: |
+          node --check backend/routes/live.js
+          node --check backend/routes/live-realtime.js
+          node --check backend/lib/live/cloudflare-realtime.js
+          node --check backend/lib/live/realtime-sessions.js
+      - name: Live realtime contract
+        run: node --test backend/tests/live-realtime-contract.test.mjs
+      - name: Existing payment matrix regression
+        run: node --test backend/tests/payment-matrix.test.mjs
