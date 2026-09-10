@@ -1,6 +1,8 @@
 /** Routes publiques et vendeur Live Cardoria. */
 import { Router } from "express";
 import { logAudit } from "../lib/audit.js";
+import { ADMIN_ROLES } from "../lib/auth.js";
+import { validateSession } from "../lib/auth/session.js";
 import { MarketplaceAuthError, assertSellerSession } from "../lib/marketplace/v1/security.js";
 import { PAYMENT_MATRIX } from "../lib/payments/routing.js";
 import { createLiveCheckout, planLiveCheckout } from "../lib/live/checkout.js";
@@ -10,6 +12,7 @@ import {
   listLiveCheckouts,
   listLiveSessions,
   publicLiveSession,
+  resolveAdminLiveAccess,
   setLiveStatus,
   updateLiveSession
 } from "../lib/live/sessions.js";
@@ -45,6 +48,32 @@ router.get("/sessions/:id", (req, res) => {
   const session = getLiveSession(req.params.id);
   if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." });
   res.json({ ok: true, session: publicLiveSession(session) });
+});
+
+router.get("/sessions/:id/admin-access", (req, res) => {
+  const session = getLiveSession(req.params.id);
+  if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." });
+  const header = String(req.headers.authorization || "");
+  const sessionToken = header.replace(/^Bearer\s+/i, "") || String(req.headers["x-session-token"] || "");
+  const user = validateSession(sessionToken);
+  const actor = user && ADMIN_ROLES.includes(user.role) ? user : null;
+  const access = resolveAdminLiveAccess({
+    liveId: session.id,
+    grantToken: String(req.headers["x-live-admin-grant"] || ""),
+    actor
+  });
+  if (!access) {
+    return res.status(401).json({ ok: false, error: "Accès admin Live refusé." });
+  }
+  res.json({
+    ok: true,
+    accessRole: access.accessRole,
+    accessContext: access.accessContext,
+    title: session.title,
+    ownerRole: session.ownerRole,
+    paymentProvider: session.paymentProvider,
+    session: publicLiveSession(session)
+  });
 });
 
 router.post("/checkout", async (req, res) => {

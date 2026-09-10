@@ -9,7 +9,7 @@ const STORE_KEY = "live-sessions.json";
 const inflight = new Map();
 
 function emptyStore() {
-  return { sessions: [], checkouts: [] };
+  return { sessions: [], checkouts: [], adminAccess: [] };
 }
 
 let testStore = null;
@@ -24,10 +24,14 @@ export function __resetLiveStoreForTests() {
 }
 
 function load() {
-  if (testStore) return testStore;
+  if (testStore) {
+    if (!Array.isArray(testStore.adminAccess)) testStore.adminAccess = [];
+    return testStore;
+  }
   const data = readJson(STORE_KEY, emptyStore());
   if (!Array.isArray(data.sessions)) data.sessions = [];
   if (!Array.isArray(data.checkouts)) data.checkouts = [];
+  if (!Array.isArray(data.adminAccess)) data.adminAccess = [];
   return data;
 }
 
@@ -35,6 +39,7 @@ function save(data) {
   if (testStore) {
     testStore.sessions = data.sessions;
     testStore.checkouts = data.checkouts;
+    testStore.adminAccess = data.adminAccess || [];
     return;
   }
   writeJson(STORE_KEY, data);
@@ -111,10 +116,22 @@ export function getLiveSession(id) {
   return session ? withProvider(session) : null;
 }
 
+function isCardoriaAdminRole(role) {
+  return ["super_admin", "admin", "employee"].includes(String(role || "").toLowerCase());
+}
+
+function hashGrantToken(token) {
+  return crypto.createHash("sha256").update(String(token || "")).digest("hex");
+}
+
+export function liveUrlPrivilegeQueryIsIgnored() {
+  return true;
+}
+
 export function assertCanManageLive(actor, session, { adminOverride = false } = {}) {
   if (!session) throw Object.assign(new Error("Live introuvable."), { status: 404 });
   const role = String(actor?.role || "").toLowerCase();
-  const isAdmin = ["super_admin", "admin", "employee"].includes(role);
+  const isAdmin = isCardoriaAdminRole(role);
   if (adminOverride && isAdmin) return session;
   if (session.ownerRole === "admin") {
     if (!isAdmin) throw Object.assign(new Error("Ce Live Cardoria est réservé à l'administration."), { status: 403 });
@@ -125,6 +142,97 @@ export function assertCanManageLive(actor, session, { adminOverride = false } = 
     throw Object.assign(new Error("Ce Live appartient à un autre vendeur."), { status: 403 });
   }
   return session;
+}
+
+export function assertAdminLiveEnter(actor, session) {
+  if (!session) throw Object.assign(new Error("Live introuvable."), { status: 404 });
+  if (!isCardoriaAdminRole(actor?.role)) {
+    throw Object.assign(new Error("Accès admin Live réservé à Cardoria."), { status: 403 });
+  }
+  return session;
+}
+
+export function grantAdminLiveAccess(sessionId, actor) {
+  const session = getLiveSession(sessionId);
+  if (!session) throw Object.assign(new Error("Live introuvable."), { status: 404 });
+  assertAdminLiveEnter(actor, session);
+  const now = Date.now();
+  const token = crypto.randomBytes(32).toString("base64url");
+  const grant = {
+    id: "ALG-" + crypto.randomUUID(),
+    liveId: session.id,
+    tokenHash: hashGrantToken(token),
+    actorId: String(actor?.id || actor?.email || "admin"),
+    actorEmail: String(actor?.email || ""),
+    actorRole: String(actor?.role || "admin"),
+    accessRole: "admin",
+    accessContext: "cardoria",
+    createdAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + 8 * 3600000).toISOString()
+  };
+  const data = load();
+  data.adminAccess = (data.adminAccess || [])
+    .filter((item) => new Date(item.expiresAt).getTime() > now)
+    .slice(0, 200);
+  data.adminAccess.unshift(grant);
+  const index = data.sessions.findIndex((item) => item.id === session.id);
+  if (index >= 0) {
+    data.sessions[index] = {
+      ...data.sessions[index],
+      lastAdminEnterAt: grant.createdAt,
+      lastAdminEnterBy: grant.actorEmail || grant.actorId,
+      ownerRole: data.sessions[index].ownerRole,
+      ownerId: data.sessions[index].ownerId
+    };
+  }
+  save(data);
+  const live = getLiveSession(session.id);
+  return {
+    grantToken: token,
+    grantId: grant.id,
+    expiresAt: grant.expiresAt,
+    accessRole: "admin",
+    accessContext: "cardoria",
+    session: publicLiveSession(live),
+    url: `/live.html?session=${encodeURIComponent(live.id)}`,
+    paymentCreated: false,
+    checkoutCreated: false,
+    commissionCreated: false
+  };
+}
+
+export function resolveAdminLiveAccess({ liveId, grantToken, actor } = {}) {
+  const session = getLiveSession(liveId);
+  if (!session) return null;
+  if (isCardoriaAdminRole(actor?.role)) {
+    return { session, accessRole: "admin", accessContext: "cardoria", via: "admin_session" };
+  }
+  const token = String(grantToken || "").trim();
+  if (!token) return null;
+  const now = Date.now();
+  const grant = (load().adminAccess || []).find((item) => (
+    item.liveId === session.id
+    && item.tokenHash === hashGrantToken(token)
+    && item.accessRole === "admin"
+    && item.accessContext === "cardoria"
+    && new Date(item.expiresAt).getTime() > now
+  ));
+  if (!grant) return null;
+  return { session, accessRole: "admin", accessContext: "cardoria", via: "grant", grantId: grant.id };
+}
+
+export function listAdminLiveAccess({ liveId } = {}) {
+  let grants = load().adminAccess || [];
+  if (liveId) grants = grants.filter((item) => item.liveId === String(liveId));
+  return grants.map((item) => ({
+    id: item.id,
+    liveId: item.liveId,
+    accessRole: item.accessRole,
+    accessContext: item.accessContext,
+    actorId: item.actorId,
+    createdAt: item.createdAt,
+    expiresAt: item.expiresAt
+  }));
 }
 
 export function createLiveSession({ title, ownerRole, ownerId, ownerEmail, products, scheduledAt, actor }) {

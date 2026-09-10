@@ -18,12 +18,38 @@
         "<td>" + esc(s.status) + "</td>" +
         "<td><strong>" + esc(s.paymentProvider === "revolut" ? "Revolut" : "PayPal") + "</strong></td>" +
         "<td>" + (s.products || []).map(function (p) { return esc(p.name) + " · " + A.euro(p.price); }).join("<br>") + "</td>" +
-        "<td><button class='btn btn-secondary' type='button' data-start='" + esc(s.id) + "'>Démarrer</button> " +
+        "<td><div class='admin-live-actions'>" +
+        "<button class='btn btn-primary' type='button' data-enter-live='" + esc(s.id) + "'>Entrer dans le Live</button> " +
+        "<button class='btn btn-secondary' type='button' data-start='" + esc(s.id) + "'>Démarrer</button> " +
         "<button class='btn btn-secondary' type='button' data-stop='" + esc(s.id) + "'>Arrêter</button> " +
-        "<button class='btn' type='button' data-cancel='" + esc(s.id) + "'>Annuler</button></td>" +
+        "<button class='btn' type='button' data-cancel='" + esc(s.id) + "'>Annuler</button>" +
+        "</div></td>" +
         "</tr>";
     }).join("") || "<tr><td colspan='7'>Aucun Live</td></tr>";
 
+    A.qs("#liveBody").querySelectorAll("[data-enter-live]").forEach(function (btn) {
+      btn.onclick = function () {
+        var liveWindow = window.open("about:blank", "_blank");
+        btn.disabled = true;
+        A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(btn.dataset.enterLive) + "/enter", { method: "POST", body: "{}" })
+          .then(function (d) {
+            if (!d || d.ok === false) throw new Error((d && d.error) || "Accès Live refusé");
+            var access = d.access || {};
+            var url = access.url || ("/live.html?session=" + encodeURIComponent(btn.dataset.enterLive));
+            if (access.grantToken) url += "#cardoriaAdminGrant=" + encodeURIComponent(access.grantToken);
+            var liveUrl = new URL(url, location.origin).href;
+            if (liveWindow) liveWindow.location.href = liveUrl;
+            else location.assign(liveUrl);
+          })
+          .catch(function (e) {
+            if (liveWindow) {
+              try { liveWindow.close(); } catch (err) {}
+            }
+            alert(e.message);
+          })
+          .finally(function () { btn.disabled = false; });
+      };
+    });
     A.qs("#liveBody").querySelectorAll("[data-start]").forEach(function (btn) {
       btn.onclick = function () { A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(btn.dataset.start) + "/start", { method: "POST", body: "{}" }).then(load).catch(function (e) { alert(e.message); }); };
     });
@@ -42,7 +68,7 @@
   }
 
   A.renderShell("live", "Lives Cardoria", "Live Admin = Revolut · Live vendeur = PayPal. Le fournisseur est forcé côté serveur.",
-    '<div class="admin-panel"><p>Boutique et Live Cardoria/Admin : Revolut. Marketplace et Live vendeur : PayPal. SumUp n’est plus utilisé.</p></div>' +
+    '<div class="admin-panel"><p>Boutique et Live Cardoria/Admin : Revolut. Marketplace et Live vendeur : PayPal. SumUp n’est plus utilisé. « Entrer dans le Live » est un accès admin interne : il ne crée aucun paiement et ne contourne pas les frais visiteurs/vendeurs.</p></div>' +
     '<div class="admin-panel"><h2>Créer un Live Cardoria (Revolut)</h2>' +
     '<div class="admin-filters"><input id="liveTitle" placeholder="Titre du Live" value="Live Cardoria">' +
     '<input id="liveProduct" placeholder="Produit / lot" value="Lot Pokémon">' +

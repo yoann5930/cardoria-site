@@ -11,6 +11,99 @@
 
   if (!(video instanceof HTMLVideoElement) || !stateNode || !viewersNode || !stageNode || !directoryNode) return;
 
+  const search = new URLSearchParams(window.location.search);
+  const focusLiveId = String(search.get("session") || "").trim();
+  const urlPrivilegeFlags = {
+    admin: search.get("admin"),
+    free: search.get("free"),
+    noFee: search.get("noFee")
+  };
+  const urlFlagsNeverGrantAdmin = true;
+  void urlPrivilegeFlags;
+
+  const grantFromHash = () => {
+    const match = String(window.location.hash || "").match(/cardoriaAdminGrant=([A-Za-z0-9_-]+)/);
+    return match ? match[1] : "";
+  };
+
+  const adminSessionToken = () => {
+    try { return sessionStorage.getItem("cardoria_session_token") || ""; } catch { return ""; }
+  };
+
+  const liveAccessHeaders = () => {
+    const headers = { Accept: "application/json", "Content-Type": "application/json" };
+    const token = adminSessionToken();
+    const grant = grantFromHash();
+    if (token) headers.Authorization = "Bearer " + token;
+    if (grant) headers["x-live-admin-grant"] = grant;
+    return headers;
+  };
+
+  const renderAdminBar = (access) => {
+    const bar = document.getElementById("cardoriaLiveAdminBar");
+    if (!bar || !access) return;
+    const session = access.session || {};
+    const title = access.title || session.title || "Live Cardoria";
+    bar.hidden = false;
+    const titleNode = document.getElementById("cardoriaLiveAdminTitle");
+    const modeNode = document.getElementById("cardoriaLiveAdminMode");
+    const metaNode = document.getElementById("cardoriaLiveAdminMeta");
+    const toolsNode = document.getElementById("cardoriaLiveAdminTools");
+    if (titleNode) titleNode.textContent = title;
+    if (modeNode) modeNode.textContent = "Mode Admin / Cardoria — accès interne sans frais";
+    if (metaNode) {
+      const provider = session.paymentProvider === "paypal" || session.ownerRole === "seller" ? "PayPal" : "Revolut";
+      metaNode.textContent = `${title} · ${session.status || ""} · ventes visiteurs : ${provider} (inchangé, aucun paiement créé pour cet accès)`;
+    }
+    document.title = title + " — Admin Cardoria";
+    const heading = document.querySelector(".live-brand h1");
+    if (heading) heading.textContent = title;
+    if (toolsNode && adminSessionToken() && session.id) {
+      toolsNode.innerHTML =
+        `<button type="button" data-admin-live-start="${session.id}">Démarrer</button>` +
+        `<button type="button" data-admin-live-stop="${session.id}">Arrêter</button>` +
+        `<a href="/admin-live.html">Retour Admin Lives</a>`;
+      toolsNode.querySelector("[data-admin-live-start]")?.addEventListener("click", () => {
+        fetch(`/api/admin/live/sessions/${encodeURIComponent(session.id)}/start`, { method: "POST", headers: liveAccessHeaders(), body: "{}" })
+          .then((response) => response.json().then((payload) => ({ ok: response.ok && payload.ok !== false, payload })))
+          .then((result) => { if (!result.ok) throw new Error(result.payload.error || "Démarrage impossible"); location.reload(); })
+          .catch((error) => alert(error.message));
+      });
+      toolsNode.querySelector("[data-admin-live-stop]")?.addEventListener("click", () => {
+        fetch(`/api/admin/live/sessions/${encodeURIComponent(session.id)}/stop`, { method: "POST", headers: liveAccessHeaders(), body: "{}" })
+          .then((response) => response.json().then((payload) => ({ ok: response.ok && payload.ok !== false, payload })))
+          .then((result) => { if (!result.ok) throw new Error(result.payload.error || "Arrêt impossible"); location.reload(); })
+          .catch((error) => alert(error.message));
+      });
+    }
+  };
+
+  const loadFocusedLiveTitle = async () => {
+    if (!focusLiveId) return;
+    try {
+      const response = await fetch(`/api/live/sessions/${encodeURIComponent(focusLiveId)}`, { cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+      if (!payload?.session?.title) return;
+      const heading = document.querySelector(".live-brand h1");
+      if (heading) heading.textContent = payload.session.title;
+      document.title = payload.session.title + " — Live Cardoria";
+    } catch {}
+  };
+
+  const loadAdminLiveAccess = async () => {
+    if (!focusLiveId || !urlFlagsNeverGrantAdmin) return;
+    if (!adminSessionToken() && !grantFromHash()) return;
+    try {
+      const response = await fetch(`/api/live/sessions/${encodeURIComponent(focusLiveId)}/admin-access`, {
+        headers: liveAccessHeaders(),
+        cache: "no-store"
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) return;
+      if (payload.accessRole === "admin" && payload.accessContext === "cardoria") renderAdminBar(payload);
+    } catch {}
+  };
+
   let mediaSource = null;
   let sourceBuffer = null;
   let objectUrl = null;
@@ -350,7 +443,8 @@
       list.innerHTML = sessions.map((session) => {
         const provider = session.ownerRole === "seller" ? "PayPal" : "Revolut";
         const products = (session.products || []).map((item) => `${item.name} (${Number(item.price || 0).toFixed(2)} €)`).join(" · ");
-        return `<article class="live-card-select" data-live-pay="${session.id}"><span class="live-card-dot"></span><span><strong>${session.title || "Live Cardoria"}</strong><small>${session.status} · ${provider}${products ? " · " + products : ""}</small></span></article>`;
+        const selected = focusLiveId && session.id === focusLiveId ? "true" : "false";
+        return `<article class="live-card-select" data-live-pay="${session.id}" data-selected="${selected}"><span class="live-card-dot"></span><span><strong>${session.title || "Live Cardoria"}</strong><small>${session.status} · ${provider}${products ? " · " + products : ""}</small></span></article>`;
       }).join("");
       if (state) state.textContent = `${sessions.length} session(s) · paiement forcé par le serveur`;
     } catch {
@@ -366,6 +460,8 @@
 
   void loadDirectory();
   void loadCardoriaSales();
+  void loadFocusedLiveTitle();
+  void loadAdminLiveAccess();
   directoryTimer = window.setInterval(loadDirectory, 5000);
   window.setInterval(loadCardoriaSales, 8000);
   window.addEventListener("beforeunload", () => {

@@ -5,6 +5,7 @@ import { logAudit } from "../lib/audit.js";
 import {
   createLiveSession,
   getLiveSession,
+  grantAdminLiveAccess,
   listLiveCheckouts,
   listLiveSessions,
   publicLiveSession,
@@ -74,6 +75,42 @@ router.patch("/sessions/:id", WRITE_ADMIN, (req, res) => {
   try {
     const session = updateLiveSession(req.params.id, req.body || {}, actor(req), { adminOverride: true });
     res.json({ ok: true, provider: session.paymentProvider, session: publicLiveSession(session) });
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+router.post("/sessions/:id/enter", (req, res) => {
+  try {
+    const user = req.authUser;
+    if (!user) return res.status(401).json({ ok: false, error: "Authentification requise." });
+    const result = grantAdminLiveAccess(req.params.id, user);
+    logAudit({
+      type: "live",
+      action: "admin_live_entered",
+      user: user.email || "admin",
+      detail: `${result.session.id} ${result.session.title} access=admin/cardoria payment=none`
+    });
+    res.json({
+      ok: true,
+      access: {
+        role: result.accessRole,
+        context: result.accessContext,
+        liveId: result.session.id,
+        title: result.session.title,
+        status: result.session.status,
+        ownerRole: result.session.ownerRole,
+        paymentProvider: result.session.paymentProvider,
+        url: result.url,
+        grantToken: result.grantToken,
+        grantId: result.grantId,
+        expiresAt: result.expiresAt
+      },
+      session: result.session,
+      paymentCreated: false,
+      checkoutCreated: false,
+      commissionCreated: false
+    });
   } catch (error) {
     fail(res, error);
   }
