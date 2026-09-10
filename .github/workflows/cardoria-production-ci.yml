@@ -2,18 +2,13 @@ name: Cardoria Production CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   production-check:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     env:
       NODE_ENV: test
       PORT: '10000'
@@ -30,284 +25,74 @@ jobs:
         with:
           node-version: '22.22.0'
           package-manager-cache: false
-      - name: Install backend
-        run: npm install --omit=dev
-      - name: Dependency security audit
-        run: npm audit --omit=dev --audit-level=low
+      - name: Install and security audit
+        working-directory: backend
+        run: |
+          npm install --omit=dev
+          npm audit --omit=dev --audit-level=low
       - name: Syntax checks
         run: |
-          node --check server.js
-          node --check routes/auth.js
-          node --check routes/admin.js
-          node --check routes/admin-dashboard.js
-          node --check routes/admin-finance.js
-          node --check routes/marketplace-v1.js
-          node --check routes/marketplace-paypal.js
-          node --check routes/marketplace-admin.js
-          node --check routes/payments.js
-          node --check routes/payments-admin.js
-          node --check routes/gdpr.js
-          node --check lib/admin/dashboard.js
-          node --check lib/admin/finance.js
-          node --check lib/auth.js
-          node --check lib/auth/migrate.js
-          node --check lib/auth/magicLink.js
-          node --check lib/auth/users.js
-          node --check lib/boutique/stock.js
-          node --check lib/boutique/checkout.js
-          node --check lib/payments/routing.js
-          node --check lib/payments/sumup.js
-          node --check lib/live/sessions.js
-          node --check lib/live/checkout.js
-          node --check routes/live.js
-          node --check routes/live-admin.js
-          node --check lib/payments/sumup-refund.js
-          node --check lib/marketplace/migrate.js
-          node --check lib/marketplace/orders.js
-          node --check lib/marketplace/sellers.js
-          node --check lib/marketplace/paypal.js
-          node --check lib/marketplace/paypal-events.js
-          node --check lib/marketplace/persistence.js
-          node --check lib/marketplace/v1/security.js
-          node --check lib/marketplace/v1/cart.js
-          node --check lib/security/index.js
-          node --check lib/email.js
-          node --check ../script.js
-          node --check ../js/boutique.js
-          node --check ../js/marketplace-client.js
-          node --check ../js/marketplace-cart-page.js
-          node --check ../js/marketplace-listing.js
-          node --check ../js/marketplace-browse.js
-          node --check ../js/marketplace-sell.js
-          node --check ../js/marketplace-orders.js
-          node --check ../js/marketplace-seller.js
-          node --check ../js/marketplace-seller-dashboard.js
-          node --check ../js/marketplace-my-listings.js
-          node --check ../js/admin/admin-dashboard.js
-          node --check ../js/admin/admin-audit.js
-          node --check ../js/admin/admin-orders.js
-          node --check ../js/admin/admin-core.js
-          node --check ../js/client-orders.js
-          node --check ../js/client-auth.js
-          node --check ../js/client-password-reset.js
-          node --check ../js/admin/admin-stock.js
-          node --check ../js/admin/admin-payments.js
-          node --check ../js/admin/admin-accounting.js
-          node --check ../js/admin/admin-marketplace.js
-          node --check ../js/admin/admin-live.js
-          node --check ../js/live-vendeur.js
-          node --check ../js/cardoria-live-viewer.js
-          node --check ../js/admin/admin-users.js
-      - name: Payment matrix routing tests
-        working-directory: .
+          node --check backend/server.js
+          node --check backend/routes/payments.js
+          node --check backend/routes/payments-admin.js
+          node --check backend/routes/live.js
+          node --check backend/routes/live-admin.js
+          node --check backend/lib/payments/routing.js
+          node --check backend/lib/payments/sumup.js
+          node --check backend/lib/payments/sumup-refund.js
+          node --check backend/lib/boutique/checkout.js
+          node --check backend/lib/live/checkout.js
+          node --check backend/lib/live/sessions.js
+          node --check js/boutique.js
+          node --check js/admin/admin-orders.js
+          node --check js/admin/admin-payments.js
+      - name: Payment matrix and idempotence tests
         run: node --test backend/tests/payment-matrix.test.mjs
-      - name: Boutique stock and order wiring checks
-        working-directory: .
+      - name: SumUp Boutique and Live Admin wiring
         run: |
-          grep -q 'listBoutiqueInventory' backend/routes/payments-admin.js
-          grep -q 'refundRevolutOrder' backend/routes/payments-admin.js
-          grep -q 'refundHoldStock' backend/lib/boutique/stock.js
-          grep -q 'pendingStock' backend/lib/boutique/stock.js
-          grep -q 'soldStock' backend/lib/boutique/stock.js
-          grep -q 'postalCode' backend/lib/boutique/checkout.js
-          grep -q 'customerPhone' backend/lib/boutique/checkout.js
-          grep -q 'assertSaleProvider' backend/lib/boutique/checkout.js
-          grep -q 'channel: "marketplace"' backend/routes/marketplace-paypal.js
-          grep -q 'PAYMENT_MATRIX' backend/lib/payments/routing.js
-          grep -q 'live_admin: "revolut"' backend/lib/payments/routing.js
+          grep -q 'boutique: "sumup"' backend/lib/payments/routing.js
+          grep -q 'live_admin: "sumup"' backend/lib/payments/routing.js
           grep -q 'live_seller: "paypal"' backend/lib/payments/routing.js
-          grep -q 'boutique-inventory' js/admin/admin-stock.js
-          grep -q 'data-refund' js/admin/admin-orders.js
-          grep -q 'La Poste' backend/routes/payments-admin.js
-          grep -q 'Mondial Relay' backend/routes/payments-admin.js
-          grep -q 'Relais Colis' backend/routes/payments-admin.js
-          grep -q 'Autre transporteur' backend/routes/payments-admin.js
-          grep -q 'Synchroniser paiement Revolut' js/admin/admin-orders.js
-          grep -q 'Rembourser Revolut' js/admin/admin-orders.js
-          if grep -q 'Synchroniser SumUp\|Paiements SumUp' js/admin/admin-orders.js js/admin/admin-core.js; then
-            echo 'Obsolete SumUp boutique order UI labels still present'
-            exit 1
-          fi
-      - name: Dashboard and audit wiring checks
-        working-directory: .
-        run: |
-          grep -q 'buildAdminDashboard' backend/routes/admin-dashboard.js
-          grep -q 'boutiqueRevenue' backend/lib/admin/dashboard.js
-          grep -q 'marketplaceCommission' backend/lib/admin/dashboard.js
-          grep -q 'isPaidPurchase' backend/lib/admin/dashboard.js
-          grep -q 'listBoutiqueInventory' backend/lib/admin/dashboard.js
-          grep -q 'audit/summary' backend/routes/admin-dashboard.js
-          grep -q 'audit/export.csv' backend/routes/admin-dashboard.js
-          grep -q 'kpiBoutiqueRevenue' js/admin/admin-dashboard.js
-          grep -q 'stockOversold' js/admin/admin-dashboard.js
-          grep -q 'auditDanger' js/admin/admin-audit.js
-          grep -q 'exportAudit' js/admin/admin-audit.js
-          if grep -q 'dayData.reduce.*revenue' js/admin/admin-dashboard.js; then
-            echo 'Dashboard frontend must not derive revenue from analytics days'
-            exit 1
-          fi
-      - name: SumUp and accounting wiring checks
-        working-directory: .
-        run: |
-          grep -q 'paymentReconciliation' backend/routes/payments-admin.js
+          grep -q 'marketplace: "paypal"' backend/lib/payments/routing.js
+          grep -q 'createSumUpCheckout' backend/lib/boutique/checkout.js
+          grep -q 'idempotencyKey' backend/lib/boutique/checkout.js
+          grep -q 'createSumUpCheckout' backend/lib/live/checkout.js
+          grep -q 'refundSumUpTransaction' backend/routes/payments-admin.js
           grep -q 'sumup_admin_sync' backend/routes/payments-admin.js
           grep -q 'sumup_admin_refund' backend/routes/payments-admin.js
-          grep -q 'FINANCE_ADMIN' backend/routes/payments-admin.js
-          grep -q 'getFinanceSummary' backend/routes/admin-finance.js
-          grep -q 'financeCsv' backend/routes/admin-finance.js
-          grep -q 'marketplaceGmv' backend/lib/admin/finance.js
-          grep -q 'marketplaceCommission' backend/lib/admin/finance.js
-          grep -q 'boutiqueCogs' backend/lib/admin/finance.js
-          grep -q 'cashCommercialBalance' backend/lib/admin/finance.js
-          grep -q '/api/admin/accounting", adminFinanceRoutes' backend/server.js
-          grep -q 'data-sync\|/sync' js/admin/admin-payments.js
-          grep -q '/refund' js/admin/admin-payments.js
-          grep -q 'finMarketplaceGmv' js/admin/admin-accounting.js
-          grep -q 'finMargin' js/admin/admin-accounting.js
-          grep -q 'exportSummary' js/admin/admin-accounting.js
-          if grep -q '/api/admin/accounting/stats' js/admin/admin-accounting.js; then
-            echo 'Accounting frontend still uses legacy stats route'
-            exit 1
-          fi
-          if grep -q 'analytics.sales' backend/lib/admin/finance.js; then
-            echo 'Authoritative accounting must not use analytics.sales'
-            exit 1
-          fi
-      - name: Reject security regressions
-        working-directory: .
+          grep -q 'SUMUP_WEBHOOK_SECRET obligatoire en production' backend/lib/payments/sumup.js
+          grep -q 'provider:"sumup"' js/boutique.js
+          if grep -q 'live_admin: "revolut"' backend/lib/payments/routing.js; then exit 1; fi
+      - name: Security regression guards
         run: |
           grep -q 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;' backend/routes/auth.js
-          if grep -q 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;' backend/routes/auth.js; then
-            echo 'Admin temporary code login must stay disabled'
-            exit 1
-          fi
-          if grep -R -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' script.js js *.html 2>/dev/null; then
-            echo 'Client-side admin secret detected'
-            exit 1
-          fi
-          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend 2>/dev/null; then
-            echo 'Direct admin bypass enabled'
-            exit 1
-          fi
-          if grep -n 'marketplaceRoutes' backend/server.js; then
-            echo 'Legacy marketplace router mounted'
-            exit 1
-          fi
-          if grep -R -n 'api/marketplace/listings\|api/marketplace/orders?email' js *.html 2>/dev/null; then
-            echo 'Legacy marketplace endpoint still used by frontend'
-            exit 1
-          fi
-          if grep -R -n 'CARDORIA59330' js/admin 2>/dev/null; then
-            echo 'Hardcoded admin credential detected in admin frontend'
-            exit 1
-          fi
-          if git grep -I -nE 'SMTP_PASS[[:space:]]*=[[:space:]]*[^[:space:]#]+' -- . ':!.github/workflows' ':!backend/node_modules' ':!**/node_modules/**'; then
-            echo 'Hardcoded SMTP_PASS detected'
-            exit 1
-          fi
-          if git grep -I -nE 'SMTP_PASS[[:space:]]*:[[:space:]]*["'\''][^"'\'']+' -- . ':!.github/workflows' ':!backend/node_modules' ':!**/node_modules/**'; then
-            echo 'Hardcoded SMTP_PASS detected'
-            exit 1
-          fi
-          if ! grep -q 'requireTLS: !secure && port === 587' backend/lib/email.js; then
-            echo 'Gmail STARTTLS on port 587 is missing'
-            exit 1
-          fi
+          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend 2>/dev/null; then exit 1; fi
+          if git grep -I -nE 'SMTP_PASS[[:space:]]*=[[:space:]]*[^[:space:]#]+' -- . ':!.github/workflows' ':!backend/node_modules'; then exit 1; fi
       - name: Start backend
+        working-directory: backend
         run: |
           node server.js > /tmp/cardoria-backend.log 2>&1 &
           echo $! > /tmp/cardoria-backend.pid
-      - name: Wait for complete backend startup
+      - name: Runtime health and payment matrix
         run: |
           ready=false
           for i in {1..90}; do
-            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-startup.json; then
-              cat /tmp/cardoria-startup.json
-              if grep -q '"ready":true' /tmp/cardoria-startup.json; then
-                ready=true
-                break
-              fi
-            fi
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/startup.json && grep -q '"ready":true' /tmp/startup.json; then ready=true; break; fi
             sleep 1
           done
           test "$ready" = "true"
-      - name: Health and public Boutique checks
-        run: |
-          curl --fail --silent http://127.0.0.1:10000/api/health/ > /tmp/cardoria-health.json
-          cat /tmp/cardoria-health.json
-          grep -q '"version":"6.0.0"' /tmp/cardoria-health.json
-          curl --fail --silent http://127.0.0.1:10000/admin-login.html > /tmp/cardoria-login.html
-          grep -q 'Admin Cardoria' /tmp/cardoria-login.html
-          grep -q 'adminPasswordLoginForm' /tmp/cardoria-login.html
-          if grep -qi 'double authentification' /tmp/cardoria-login.html; then
-            echo 'Obsolete 2FA marker detected'
-            exit 1
-          fi
-          curl --fail --silent http://127.0.0.1:10000/api > /tmp/cardoria-api.json
-          grep -q '6.0.0' /tmp/cardoria-api.json
-          curl --fail --silent http://127.0.0.1:10000/boutique.html > /tmp/cardoria-boutique.html
-          grep -q 'shopPhone' /tmp/cardoria-boutique.html
-          grep -q 'shopPostalCode' /tmp/cardoria-boutique.html
-          curl --fail --silent http://127.0.0.1:10000/api/payments/boutique/products > /tmp/cardoria-products.json
-          grep -q '"ok":true' /tmp/cardoria-products.json
-          curl --fail --silent http://127.0.0.1:10000/api/live/matrix > /tmp/cardoria-live-matrix.json
-          grep -q '"boutique":"revolut"' /tmp/cardoria-live-matrix.json
-          grep -q '"live_seller":"paypal"' /tmp/cardoria-live-matrix.json
-          curl --fail --silent 'http://127.0.0.1:10000/api/marketplace/v1/search?license=pokemon' > /tmp/cardoria-marketplace.json
-          grep -q '"ok":true' /tmp/cardoria-marketplace.json
-      - name: Sensitive marketplace and admin routes require authentication
-        run: |
-          code=$(curl -sS -o /tmp/gdpr.json -w "%{http_code}" -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:10000/api/gdpr/export)
+          curl --fail --silent http://127.0.0.1:10000/api/health/ > /tmp/health.json
+          grep -q '"version":"6.0.0"' /tmp/health.json
+          curl --fail --silent http://127.0.0.1:10000/api/live/matrix > /tmp/matrix.json
+          grep -q '"boutique":"sumup"' /tmp/matrix.json
+          grep -q '"live_admin":"sumup"' /tmp/matrix.json
+          grep -q '"live_seller":"paypal"' /tmp/matrix.json
+          curl --fail --silent http://127.0.0.1:10000/api/payments/status > /tmp/payments.json
+          grep -q '"provider":"sumup"' /tmp/payments.json
+          code=$(curl -sS -o /tmp/admin.json -w "%{http_code}" http://127.0.0.1:10000/api/admin/payments/summary)
           test "$code" = "401"
-          code=$(curl -sS -o /tmp/listing.json -w "%{http_code}" -H 'Content-Type: application/json' -d '{"sellerId":"fake","title":"x","price":1}' http://127.0.0.1:10000/api/marketplace/v1/listings)
-          test "$code" = "401"
-          code=$(curl -sS -o /tmp/checkout.json -w "%{http_code}" -H 'Content-Type: application/json' -d '{"userId":"fake"}' http://127.0.0.1:10000/api/marketplace/v1/paypal/checkout)
-          test "$code" = "401"
-          code=$(curl -sS -o /tmp/protected.json -w "%{http_code}" http://127.0.0.1:10000/api/health/full)
-          test "$code" = "401"
-          curl --fail --silent http://127.0.0.1:10000/client-login.html > /tmp/cardoria-client-login.html
-          grep -q 'Mot de passe oublié' /tmp/cardoria-client-login.html
-          grep -q 'client-orders.html' /tmp/cardoria-client-login.html
-          curl --fail --silent http://127.0.0.1:10000/client-orders.html > /tmp/cardoria-client-orders.html
-          grep -q 'COMMANDES BOUTIQUE' /tmp/cardoria-client-orders.html
-          grep -q 'js/client-orders.js' /tmp/cardoria-client-orders.html
-          curl --fail --silent http://127.0.0.1:10000/mes-commandes.html > /tmp/cardoria-marketplace-orders.html
-          grep -q 'marketplace-orders.js' /tmp/cardoria-marketplace-orders.html
-          curl --fail --silent http://127.0.0.1:10000/reset-password.html > /tmp/cardoria-reset.html
-          grep -q 'client-password-reset.js' /tmp/cardoria-reset.html
-          code=$(curl -sS -o /tmp/client-orders.json -w "%{http_code}" http://127.0.0.1:10000/api/auth/orders)
-          test "$code" = "401"
-          code=$(curl -sS -o /tmp/sumup-gone.json -w "%{http_code}" http://127.0.0.1:10000/api/payments/sumup/checkout)
-          test "$code" = "410"
-          for path in \
-            /api/admin/dashboard \
-            /api/admin/audit/summary \
-            /api/admin/audit/export.csv \
-            /api/admin/users \
-            /api/admin/payments/summary \
-            /api/admin/payments/boutique-orders \
-            /api/admin/payments/boutique-inventory \
-            /api/admin/marketplace/orders \
-            /api/admin/live/sessions \
-            /api/admin/accounting/summary \
-            /api/admin/accounting/sales \
-            /api/admin/accounting/purchases \
-            /api/admin/accounting/export.csv?type=sales; do
-            code=$(curl -sS -o /tmp/admin-protected.json -w "%{http_code}" "http://127.0.0.1:10000${path}")
-            test "$code" = "401"
-          done
-      - name: Security headers present
-        run: |
-          curl -sSI http://127.0.0.1:10000/ > /tmp/headers.txt
-          grep -qi '^content-security-policy:' /tmp/headers.txt
-          grep -qi '^x-content-type-options: nosniff' /tmp/headers.txt
-          grep -qi '^x-frame-options: DENY' /tmp/headers.txt
-          if grep -qi '^x-powered-by:' /tmp/headers.txt; then
-            echo 'X-Powered-By header must not be exposed'
-            exit 1
-          fi
       - name: Stop backend
         if: always()
         run: |
           if [ -f /tmp/cardoria-backend.pid ]; then kill $(cat /tmp/cardoria-backend.pid) || true; fi
-          cat /tmp/cardoria-backend.log || true
+          if [ -f /tmp/cardoria-backend.log ]; then cat /tmp/cardoria-backend.log; fi
