@@ -7,6 +7,7 @@ import { MarketplaceAuthError, assertSellerSession } from "../lib/marketplace/v1
 import { PAYMENT_MATRIX } from "../lib/payments/routing.js";
 import { createLiveCheckout, planLiveCheckout } from "../lib/live/checkout.js";
 import liveRealtimeRoutes from "./live-realtime.js";
+import { isRealtimePublished } from "../lib/live/realtime-sessions.js";
 import { createLiveSession, getLiveSession, listLiveCheckouts, listLiveSessions, publicLiveSession, resolveAdminLiveAccess, setLiveStatus, updateLiveSession } from "../lib/live/sessions.js";
 
 const router = Router();
@@ -16,9 +17,19 @@ function fail(res, error, fallback = 400) {
   return res.status(error?.status || error?.code || fallback).json({ ok: false, error: error?.message || "Erreur Live", provider: error?.provider || error?.expectedProvider, expectedProvider: error?.expectedProvider, requestedProvider: error?.requestedProvider });
 }
 function sellerActor(req) { const seller = assertSellerSession(req); return { role: "seller", sellerId: seller.id, id: seller.id, email: seller.email, seller }; }
-router.get("/matrix", (req, res) => res.json({ ok: true, matrix: PAYMENT_MATRIX, sumup: "retired" }));
-router.get("/sessions", (req, res) => { const status = String(req.query.status || "live"); res.json({ ok: true, sessions: listLiveSessions({ status: status === "all" ? undefined : status }).map(publicLiveSession) }); });
-router.get("/sessions/:id", (req, res) => { const session = getLiveSession(req.params.id); if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." }); res.json({ ok: true, session: publicLiveSession(session) }); });
+function publicRealtimeSession(session) {
+  const live = publicLiveSession(session);
+  if (!live) return null;
+  return {
+    ...live,
+    mimeType: "application/x-cloudflare-webrtc",
+    streamPublished: isRealtimePublished(live.id)
+  };
+}
+
+router.get("/matrix", (req, res) => res.json({ ok: true, matrix: PAYMENT_MATRIX, retired: ["revolut"] }));
+router.get("/sessions", (req, res) => { const status = String(req.query.status || "live"); res.json({ ok: true, sessions: listLiveSessions({ status: status === "all" ? undefined : status }).map(publicRealtimeSession) }); });
+router.get("/sessions/:id", (req, res) => { const session = getLiveSession(req.params.id); if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." }); res.json({ ok: true, session: publicRealtimeSession(session) }); });
 router.get("/sessions/:id/admin-access", (req, res) => {
   const session = getLiveSession(req.params.id); if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." });
   const header = String(req.headers.authorization || ""); const sessionToken = header.replace(/^Bearer\s+/i, "") || String(req.headers["x-session-token"] || "");

@@ -16,11 +16,12 @@
         "<td>" + esc(s.title) + "</td>" +
         "<td>" + esc(s.ownerRole === "seller" ? "Vendeur" : "Cardoria/Admin") + "<br><small>" + esc(s.ownerId) + "</small></td>" +
         "<td>" + esc(s.status) + "</td>" +
-        "<td><strong>" + esc(s.paymentProvider === "revolut" ? "Revolut" : "PayPal") + "</strong></td>" +
+        "<td><strong>" + esc(s.paymentProvider === "paypal" ? "PayPal" : "SumUp") + "</strong></td>" +
         "<td>" + (s.products || []).map(function (p) { return esc(p.name) + " · " + A.euro(p.price); }).join("<br>") + "</td>" +
         "<td><div class='admin-live-actions'>" +
         "<button class='btn btn-primary' type='button' data-enter-live='" + esc(s.id) + "'>Entrer dans le Live</button> " +
         "<button class='btn btn-secondary' type='button' data-start='" + esc(s.id) + "'>Démarrer</button> " +
+        "<button class='btn btn-primary' type='button' data-publish='" + esc(s.id) + "'>Diffuser caméra</button> " +
         "<button class='btn btn-secondary' type='button' data-stop='" + esc(s.id) + "'>Arrêter</button> " +
         "<button class='btn' type='button' data-cancel='" + esc(s.id) + "'>Annuler</button>" +
         "</div></td>" +
@@ -53,6 +54,9 @@
     A.qs("#liveBody").querySelectorAll("[data-start]").forEach(function (btn) {
       btn.onclick = function () { A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(btn.dataset.start) + "/start", { method: "POST", body: "{}" }).then(load).catch(function (e) { alert(e.message); }); };
     });
+    A.qs("#liveBody").querySelectorAll("[data-publish]").forEach(function (btn) {
+      btn.onclick = function () { publishLive(btn.dataset.publish); };
+    });
     A.qs("#liveBody").querySelectorAll("[data-stop]").forEach(function (btn) {
       btn.onclick = function () { A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(btn.dataset.stop) + "/stop", { method: "POST", body: "{}" }).then(load).catch(function (e) { alert(e.message); }); };
     });
@@ -67,9 +71,34 @@
     });
   }
 
-  A.renderShell("live", "Lives Cardoria", "Live Admin = Revolut · Live vendeur = PayPal. Le fournisseur est forcé côté serveur.",
-    '<div class="admin-panel"><p>Boutique et Live Cardoria/Admin : Revolut. Marketplace et Live vendeur : PayPal. SumUp n’est plus utilisé. « Entrer dans le Live » est un accès admin interne : il ne crée aucun paiement et ne contourne pas les frais visiteurs/vendeurs.</p></div>' +
-    '<div class="admin-panel"><h2>Créer un Live Cardoria (Revolut)</h2>' +
+  var publisherHandle = null;
+
+  function publishLive(liveId) {
+    if (!window.CardoriaLivePublisher) {
+      alert("Module de diffusion Live indisponible.");
+      return;
+    }
+    var preview = A.qs("#livePublisherPreview");
+    Promise.resolve(publisherHandle ? publisherHandle.stop() : null).then(function () {
+      publisherHandle = null;
+      return A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(liveId) + "/start", { method: "POST", body: "{}" });
+    }).then(function () {
+      return window.CardoriaLivePublisher.publish({
+        liveId: liveId,
+        token: sessionStorage.getItem("cardoria_session_token"),
+        preview: preview
+      });
+    }).then(function (handle) {
+      publisherHandle = handle;
+      if (A.qs("#livePublishState")) A.qs("#livePublishState").textContent = "Diffusion WebRTC en cours.";
+    }).catch(function (e) {
+      alert(e.message || "Publication impossible.");
+    });
+  }
+
+  A.renderShell("live", "Lives Cardoria", "Live Admin = SumUp · Live vendeur = PayPal. Le fournisseur est forcé côté serveur.",
+    '<div class="admin-panel"><p>Boutique et Live Cardoria/Admin : SumUp. Marketplace et Live vendeur : PayPal. Revolut n’est plus utilisé. « Entrer dans le Live » est un accès admin interne : il ne crée aucun paiement et ne contourne pas les frais visiteurs/vendeurs.</p><p id="livePublishState">Caméra/micro : utilisez « Diffuser caméra » après le démarrage.</p><video id="livePublisherPreview" muted playsinline autoplay style="width:min(420px,100%);border-radius:12px;background:#000"></video></div>' +
+    '<div class="admin-panel"><h2>Créer un Live Cardoria (SumUp)</h2>' +
     '<div class="admin-filters"><input id="liveTitle" placeholder="Titre du Live" value="Live Cardoria">' +
     '<input id="liveProduct" placeholder="Produit / lot" value="Lot Pokémon">' +
     '<input id="livePrice" type="number" min="1" step="0.01" value="19.90">' +

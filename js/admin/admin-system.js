@@ -31,9 +31,10 @@
       "<table class='admin-table' style='margin-top:16px;font-size:14px'>" +
       "<tr><th>Base SQLite</th><td>" + badge(c.database && c.database.ok) + " " + esc(c.database && c.database.cards != null ? c.database.cards : 0) + " cartes</td></tr>" +
       "<tr><th>SMTP</th><td>" + badge(c.smtp && c.smtp.ok) + "</td></tr>" +
-      "<tr><th>Revolut</th><td>" + badge(c.revolut && c.revolut.ok) + "</td></tr>" +
+      "<tr><th>SumUp</th><td>" + badge(c.sumup && c.sumup.ok) + "</td></tr>" +
       "<tr><th>PayPal</th><td>" + badge(c.paypal && c.paypal.ok) + "</td></tr>" +
-      "<tr><th>SumUp</th><td>" + (c.sumup && c.sumup.retired ? '<span class="admin-badge">Retiré</span>' : badge(false)) + "</td></tr>" +
+      "<tr><th>Cloudflare Live</th><td>" + badge(c.cloudflareRealtime && c.cloudflareRealtime.ok) + "</td></tr>" +
+      "<tr><th>Revolut</th><td>" + (c.revolut && c.revolut.retired ? '<span class="admin-badge">Retiré</span>' : badge(false)) + "</td></tr>" +
       "<tr><th>Render</th><td>" + badge(dep.render && dep.render.ok) + " " + esc(dep.backendUrl || "—") + "</td></tr>" +
       "<tr><th>Maintenance</th><td>" + (r.maintenance && r.maintenance.active ? '<span class="admin-badge admin-badge--danger">ACTIVE</span> ' + esc(r.maintenance.message || "") : badge(true)) + "</td></tr></table>";
   }

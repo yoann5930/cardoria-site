@@ -80,6 +80,8 @@ jobs:
           grep -q '"boutique":"sumup"' /tmp/matrix.json
           grep -q '"live_admin":"sumup"' /tmp/matrix.json
           grep -q '"live_seller":"paypal"' /tmp/matrix.json
+          grep -q '"revolut"' /tmp/matrix.json
+          if grep -q '"sumup":"retired"' /tmp/matrix.json; then echo "SumUp must not be announced retired"; exit 1; fi
           curl -fsS http://127.0.0.1:10000/api/payments/status | grep -q '"provider":"sumup"'
           for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/system/backups; do
             code=$(curl -sS -o /tmp/anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")

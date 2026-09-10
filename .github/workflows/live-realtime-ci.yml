@@ -7,6 +7,10 @@ on:
       - "backend/routes/live*.js"
       - "backend/lib/live/**"
       - "backend/tests/live-realtime-contract.test.mjs"
+      - "backend/tests/live-architecture.test.mjs"
+      - "js/cardoria-live-viewer.js"
+      - "js/cardoria-live-publisher.js"
+      - "live.html"
       - ".github/workflows/live-realtime-ci.yml"
   pull_request:
     branches: [main]
@@ -14,6 +18,10 @@ on:
       - "backend/routes/live*.js"
       - "backend/lib/live/**"
       - "backend/tests/live-realtime-contract.test.mjs"
+      - "backend/tests/live-architecture.test.mjs"
+      - "js/cardoria-live-viewer.js"
+      - "js/cardoria-live-publisher.js"
+      - "live.html"
       - ".github/workflows/live-realtime-ci.yml"
 
 jobs:
@@ -35,7 +43,17 @@ jobs:
           node --check backend/routes/live-realtime.js
           node --check backend/lib/live/cloudflare-realtime.js
           node --check backend/lib/live/realtime-sessions.js
+          node --check js/cardoria-live-viewer.js
+          node --check js/cardoria-live-publisher.js
       - name: Live realtime contract
         run: node --test backend/tests/live-realtime-contract.test.mjs
+      - name: Live architecture guards
+        run: |
+          node --test backend/tests/live-architecture.test.mjs
+          if grep -q 'sumup: "retired"' backend/routes/live.js; then echo "SumUp must not be announced retired"; exit 1; fi
+          if grep -R -n 'whatnot-live-studio' live.html live-vendeur.html admin-live.html js/cardoria-live-viewer.js js/cardoria-live-publisher.js js/live-vendeur.js js/admin/admin-live.js backend/public/live.html backend/public/live-vendeur.html backend/public/admin-live.html backend/public/js/cardoria-live-viewer.js backend/public/js/cardoria-live-publisher.js backend/public/js/live-vendeur.js backend/public/js/admin/admin-live.js backend/routes/live.js backend/routes/live-realtime.js; then
+            echo "Render Live studio leaked into active Live runtime"
+            exit 1
+          fi
       - name: Existing payment matrix regression
         run: node --test backend/tests/payment-matrix.test.mjs

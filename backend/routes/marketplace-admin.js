@@ -6,7 +6,7 @@ import { getAllOrders, updateOrderStatus } from "../lib/marketplace/orders.js";
 import { searchListings } from "../lib/marketplace/listings.js";
 import { listSellers, setSellerVerified } from "../lib/marketplace/sellers.js";
 import { generateShippingLabel } from "../lib/marketplace/shipping.js";
-import { isRevolutConfigured } from "../lib/payments/revolut.js";
+import { isSumUpConfigured } from "../lib/payments/sumup.js";
 import { getPayPalMarketplaceConfig } from "../lib/marketplace/paypal.js";
 import { refundPayPalOrder, paypalWebhookConfigured } from "../lib/marketplace/paypal-events.js";
 import { processPriceAlerts } from "../lib/marketplace/social.js";
@@ -17,7 +17,7 @@ import { exportAccountingCsv, getInvoiceHtmlByOrder } from "../lib/marketplace/v
 
 export const webhookRouter = Router();
 webhookRouter.all("/sumup", (req, res) => {
-  res.status(410).json({ ok: false, error: "SumUp a été retiré. Boutique et Live Admin utilisent Revolut. Marketplace et Live vendeur utilisent PayPal." });
+  res.status(410).json({ ok: false, error: "Le webhook Marketplace SumUp a été retiré. Boutique et Live Admin utilisent SumUp. Marketplace et Live vendeur utilisent PayPal." });
 });
 
 const MANUAL_ORDER_STATUSES = new Set(["preparing", "shipped", "delivered", "cancelled"]);
@@ -61,7 +61,7 @@ router.put("/sellers/:id/verified", WRITE_ADMIN, (req, res) => {
 router.post("/alerts/process", WRITE_ADMIN, async (req, res) => res.json({ ok: true, ...(await processPriceAlerts()) }));
 router.get("/config", (req, res) => {
   const paypal = getPayPalMarketplaceConfig();
-  res.json({ ok: true, boutique: { provider: "revolut", configured: isRevolutConfigured() }, live: { admin: "revolut", seller: "paypal" }, marketplace: { provider: "paypal", configured: paypal.configured, webhookConfigured: paypalWebhookConfigured(), environment: paypal.environment, commissionPercent: paypal.commissionPercent, delayedDisbursement: paypal.delayedDisbursement }, carriers: ["mondial_relay", "colissimo", "chronopost"], carrierLabelsReady: false, stats: getMarketplaceStats() });
+  res.json({ ok: true, boutique: { provider: "sumup", configured: isSumUpConfigured() }, live: { admin: "sumup", seller: "paypal" }, marketplace: { provider: "paypal", configured: paypal.configured, webhookConfigured: paypalWebhookConfigured(), environment: paypal.environment, commissionPercent: paypal.commissionPercent, delayedDisbursement: paypal.delayedDisbursement }, carriers: ["mondial_relay", "colissimo", "chronopost"], carrierLabelsReady: false, stats: getMarketplaceStats() });
 });
 router.get("/stats", (req, res) => res.json({ ok: true, stats: getMarketplaceStats() }));
 router.put("/orders/:id/tracking", WRITE_ADMIN, (req, res) => {

@@ -10,6 +10,7 @@ import {
 const publishedLives = new Map();
 const viewerSessions = new Map();
 const VIEWER_TTL_MS = 90_000;
+const LIVE_PUBLISHER_ADMIN_ROLES = ["super_admin", "admin", "employee"];
 
 function requireLive(liveId) {
   const live = getLiveSession(liveId);
@@ -28,7 +29,7 @@ function assertPublisher(live, actor) {
     error.status = 401;
     throw error;
   }
-  const admin = ["admin", "superadmin"].includes(actor.role);
+  const admin = LIVE_PUBLISHER_ADMIN_ROLES.includes(String(actor.role || "").toLowerCase());
   const sellerOwner = live.ownerRole === "seller" && String(live.ownerId || "") === String(actor.id || actor.sellerId || "");
   const adminOwner = live.ownerRole === "admin" && admin;
   if (!sellerOwner && !adminOwner) {
@@ -118,6 +119,19 @@ export function heartbeatRealtimeViewer(viewerId) {
 export function stopRealtimeViewer(viewerId) {
   viewerSessions.delete(viewerId);
   return { ok: true };
+}
+
+export function isRealtimePublished(liveId) {
+  return publishedLives.has(String(liveId || ""));
+}
+
+export function isLivePublisher(live, actor) {
+  try {
+    assertPublisher(live, actor);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function realtimeStatus() {

@@ -137,7 +137,7 @@ test("bouton Admin Live et route enter sont branchés sans bypass URL", () => {
   assert.match(viewer, /x-live-admin-grant/);
   assert.equal(liveUrlPrivilegeQueryIsIgnored(), true);
   assert.equal(PAYMENT_MATRIX.live_seller, "paypal");
-  assert.equal(PAYMENT_MATRIX.live_admin, "revolut");
+  assert.equal(PAYMENT_MATRIX.live_admin, "sumup");
 });
 
 test("admin authentifié entre dans le Live sans paiement ni commission", async () => {

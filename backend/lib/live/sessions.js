@@ -300,7 +300,10 @@ export function setLiveStatus(id, status, actor, { adminOverride = false } = {})
   assertCanManageLive(actor, current, { adminOverride });
   const now = new Date().toISOString();
   current.status = nextStatus;
-  if (nextStatus === "live") current.startedAt = current.startedAt || now;
+  if (nextStatus === "live") {
+    current.startedAt = current.startedAt || now;
+    current.endedAt = "";
+  }
   if (nextStatus === "ended" || nextStatus === "cancelled") current.endedAt = now;
   current.updatedAt = now;
   data.sessions[index] = withProvider(current);
