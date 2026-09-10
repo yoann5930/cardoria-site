@@ -35,7 +35,7 @@ function sellerActor(req) {
 }
 
 router.get("/matrix", (req, res) => {
-  res.json({ ok: true, matrix: PAYMENT_MATRIX, sumup: "retired" });
+  res.json({ ok: true, matrix: PAYMENT_MATRIX, liveAdmin: PAYMENT_MATRIX.live_admin, liveSeller: PAYMENT_MATRIX.live_seller });
 });
 
 router.get("/sessions", (req, res) => {
@@ -57,137 +57,59 @@ router.get("/sessions/:id/admin-access", (req, res) => {
   const sessionToken = header.replace(/^Bearer\s+/i, "") || String(req.headers["x-session-token"] || "");
   const user = validateSession(sessionToken);
   const actor = user && ADMIN_ROLES.includes(user.role) ? user : null;
-  const access = resolveAdminLiveAccess({
-    liveId: session.id,
-    grantToken: String(req.headers["x-live-admin-grant"] || ""),
-    actor
-  });
-  if (!access) {
-    return res.status(401).json({ ok: false, error: "Accès admin Live refusé." });
-  }
-  res.json({
-    ok: true,
-    accessRole: access.accessRole,
-    accessContext: access.accessContext,
-    title: session.title,
-    ownerRole: session.ownerRole,
-    paymentProvider: session.paymentProvider,
-    session: publicLiveSession(session)
-  });
+  const access = resolveAdminLiveAccess({ liveId: session.id, grantToken: String(req.headers["x-live-admin-grant"] || ""), actor });
+  if (!access) return res.status(401).json({ ok: false, error: "Accès admin Live refusé." });
+  res.json({ ok: true, accessRole: access.accessRole, accessContext: access.accessContext, title: session.title, ownerRole: session.ownerRole, paymentProvider: session.paymentProvider, session: publicLiveSession(session) });
 });
 
 router.post("/checkout", async (req, res) => {
   try {
     const body = req.body || {};
-    const checkout = await createLiveCheckout({
-      liveId: body.liveId,
-      productId: body.productId,
-      qty: body.qty,
-      customerEmail: body.customerEmail,
-      customerName: body.customerName,
-      requestedProvider: body.provider,
-      requestedAmount: body.amount ?? body.total,
-      successUrl: body.successUrl,
-      cancelUrl: body.cancelUrl
-    });
-    res.json({
-      ok: true,
-      provider: checkout.provider,
-      channel: checkout.channel,
-      checkout
-    });
-  } catch (error) {
-    fail(res, error);
-  }
+    const checkout = await createLiveCheckout({ liveId: body.liveId, productId: body.productId, qty: body.qty, customerEmail: body.customerEmail, customerName: body.customerName, requestedProvider: body.provider, requestedAmount: body.amount ?? body.total, successUrl: body.successUrl, cancelUrl: body.cancelUrl });
+    res.json({ ok: true, provider: checkout.provider, channel: checkout.channel, checkout });
+  } catch (error) { fail(res, error); }
 });
 
 router.post("/checkout/plan", (req, res) => {
   try {
     const body = req.body || {};
-    const checkout = planLiveCheckout({
-      liveId: body.liveId,
-      productId: body.productId,
-      qty: body.qty,
-      customerEmail: body.customerEmail,
-      customerName: body.customerName,
-      requestedProvider: body.provider,
-      requestedAmount: body.amount ?? body.total
-    });
+    const checkout = planLiveCheckout({ liveId: body.liveId, productId: body.productId, qty: body.qty, customerEmail: body.customerEmail, customerName: body.customerName, requestedProvider: body.provider, requestedAmount: body.amount ?? body.total });
     res.json({ ok: true, provider: checkout.provider, channel: checkout.channel, checkout });
-  } catch (error) {
-    fail(res, error);
-  }
+  } catch (error) { fail(res, error); }
 });
 
 router.get("/seller/sessions", (req, res) => {
-  try {
-    const actor = sellerActor(req);
-    const sessions = listLiveSessions({ ownerRole: "seller", ownerId: actor.sellerId }).map(publicLiveSession);
-    res.json({ ok: true, provider: "paypal", sessions });
-  } catch (error) {
-    fail(res, error, error instanceof MarketplaceAuthError ? error.status : 401);
-  }
+  try { const actor = sellerActor(req); const sessions = listLiveSessions({ ownerRole: "seller", ownerId: actor.sellerId }).map(publicLiveSession); res.json({ ok: true, provider: "paypal", sessions }); }
+  catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 401); }
 });
 
 router.post("/seller/sessions", (req, res) => {
   try {
-    const actor = sellerActor(req);
-    const body = req.body || {};
-    const session = createLiveSession({
-      title: body.title,
-      ownerRole: "seller",
-      ownerId: actor.sellerId,
-      ownerEmail: actor.email,
-      products: body.products,
-      scheduledAt: body.scheduledAt,
-      actor
-    });
+    const actor = sellerActor(req); const body = req.body || {};
+    const session = createLiveSession({ title: body.title, ownerRole: "seller", ownerId: actor.sellerId, ownerEmail: actor.email, products: body.products, scheduledAt: body.scheduledAt, actor });
     logAudit({ type: "live", action: "seller_live_created", user: actor.email || actor.sellerId, detail: session.id });
     res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) });
-  } catch (error) {
-    fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400);
-  }
+  } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); }
 });
 
 router.patch("/seller/sessions/:id", (req, res) => {
-  try {
-    const actor = sellerActor(req);
-    const session = updateLiveSession(req.params.id, req.body || {}, actor);
-    res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) });
-  } catch (error) {
-    fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400);
-  }
+  try { const actor = sellerActor(req); const session = updateLiveSession(req.params.id, req.body || {}, actor); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); }
+  catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); }
 });
 
 router.post("/seller/sessions/:id/start", (req, res) => {
-  try {
-    const actor = sellerActor(req);
-    const session = setLiveStatus(req.params.id, "live", actor);
-    logAudit({ type: "live", action: "seller_live_started", user: actor.email || actor.sellerId, detail: session.id });
-    res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) });
-  } catch (error) {
-    fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400);
-  }
+  try { const actor = sellerActor(req); const session = setLiveStatus(req.params.id, "live", actor); logAudit({ type: "live", action: "seller_live_started", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); }
+  catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); }
 });
 
 router.post("/seller/sessions/:id/stop", (req, res) => {
-  try {
-    const actor = sellerActor(req);
-    const session = setLiveStatus(req.params.id, "ended", actor);
-    logAudit({ type: "live", action: "seller_live_stopped", user: actor.email || actor.sellerId, detail: session.id });
-    res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) });
-  } catch (error) {
-    fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400);
-  }
+  try { const actor = sellerActor(req); const session = setLiveStatus(req.params.id, "ended", actor); logAudit({ type: "live", action: "seller_live_stopped", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); }
+  catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); }
 });
 
 router.get("/seller/checkouts", (req, res) => {
-  try {
-    const actor = sellerActor(req);
-    res.json({ ok: true, provider: "paypal", checkouts: listLiveCheckouts({ ownerId: actor.sellerId }) });
-  } catch (error) {
-    fail(res, error, error instanceof MarketplaceAuthError ? error.status : 401);
-  }
+  try { const actor = sellerActor(req); res.json({ ok: true, provider: "paypal", checkouts: listLiveCheckouts({ ownerId: actor.sellerId }) }); }
+  catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 401); }
 });
 
 export default router;
