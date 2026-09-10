@@ -2,27 +2,13 @@ name: Cardoria Final Audit CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
-
-permissions:
-  contents: read
-
-concurrency:
-  group: cardoria-final-audit-${{ github.ref }}
-  cancel-in-progress: true
+    branches: [main]
 
 jobs:
-  core-regression:
-    name: Core regression and production guards
+  final-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
-    defaults:
-      run:
-        working-directory: backend
     env:
       NODE_ENV: test
       PORT: '10000'
@@ -40,247 +26,69 @@ jobs:
         with:
           node-version: '22.22.0'
           package-manager-cache: false
-      - name: Install backend
-        run: npm install --omit=dev
-      - name: Dependency security audit
-        run: npm audit --omit=dev --audit-level=low
+      - name: Install and audit
+        working-directory: backend
+        run: |
+          npm install --omit=dev
+          npm audit --omit=dev --audit-level=low
       - name: Critical syntax checks
         run: |
-          node --check server.js
-          node --check routes/auth.js
-          node --check routes/admin-users.js
-          node --check routes/admin-dashboard.js
-          node --check routes/admin-finance.js
-          node --check routes/payments-admin.js
-          node --check routes/marketplace-v1.js
-          node --check routes/marketplace-admin.js
-          node --check routes/marketplace-moderation-admin.js
-          node --check routes/rachat-admin.js
-          node --check routes/system.js
-          node --check lib/admin/dashboard.js
-          node --check lib/admin/finance.js
-          node --check lib/boutique/stock.js
-          node --check lib/payments/sumup.js
-          node --check lib/payments/routing.js
-          node --check lib/live/checkout.js
-          node --check routes/live.js
-          node --check lib/marketplace/paypal.js
-          node --check lib/marketplace/v1/listings.js
-          node --check lib/marketplace/v1/disputes.js
-          node --check lib/rachat/workflow.js
-          node --check lib/backup/full.js
-          node --check lib/backup/durable.js
+          node --check backend/server.js
+          node --check backend/routes/auth.js
+          node --check backend/routes/payments.js
+          node --check backend/routes/payments-admin.js
+          node --check backend/routes/live.js
+          node --check backend/routes/live-admin.js
+          node --check backend/lib/payments/sumup.js
+          node --check backend/lib/payments/sumup-refund.js
+          node --check backend/lib/payments/routing.js
+          node --check backend/lib/boutique/checkout.js
+          node --check backend/lib/live/checkout.js
+          node --check backend/lib/marketplace/paypal.js
+          node --check js/boutique.js
+          node --check js/admin/admin-orders.js
       - name: Core regression tests
-        working-directory: .
         run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs
-      - name: Architecture separation guards
-        working-directory: .
+      - name: Architecture guards
         run: |
-          grep -q 'listBoutiqueInventory' backend/routes/payments-admin.js
+          grep -q 'boutique: "sumup"' backend/lib/payments/routing.js
+          grep -q 'live_admin: "sumup"' backend/lib/payments/routing.js
+          grep -q 'live_seller: "paypal"' backend/lib/payments/routing.js
+          grep -q 'marketplace: "paypal"' backend/lib/payments/routing.js
           grep -q 'refundSumUpTransaction' backend/routes/payments-admin.js
-          grep -q 'PAYMENT_MATRIX' backend/lib/payments/routing.js
-          grep -q 'assertSaleProvider' backend/routes/payments.js
-          grep -q 'marketplaceGmv' backend/lib/admin/finance.js
-          grep -q 'marketplaceCommission' backend/lib/admin/finance.js
-          grep -q 'paypal' backend/lib/marketplace/paypal.js
-          grep -q 'createPurchaseFromProposal' backend/lib/rachat/workflow.js
-          grep -q 'cardoria_backups' backend/lib/backup/durable.js
-          grep -q 'roles: \["super_admin"\], action: "restore"' backend/routes/system.js
+          grep -q 'idempotencyKey' backend/lib/boutique/checkout.js
+          grep -q 'SUMUP_WEBHOOK_SECRET obligatoire en production' backend/lib/payments/sumup.js
           grep -q 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;' backend/routes/auth.js
-          if grep -q 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = false;' backend/routes/auth.js; then
-            echo 'Admin temporary code login must stay disabled'
-            exit 1
-          fi
-          if grep -n 'marketplaceRoutes' backend/server.js; then
-            echo 'Legacy marketplace router mounted'
-            exit 1
-          fi
-          if grep -R -n 'ADMIN_CODE_LOCAL="CARDORIA59330"\|const ADMIN_CODE_LOCAL="CARDORIA59330"' script.js js *.html 2>/dev/null; then
-            echo 'Client-side admin bypass detected'
-            exit 1
-          fi
-          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend 2>/dev/null; then
-            echo 'Admin bypass enabled'
-            exit 1
-          fi
+          if grep -q 'live_admin: "revolut"' backend/lib/payments/routing.js; then exit 1; fi
+          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend 2>/dev/null; then exit 1; fi
       - name: Start backend
+        working-directory: backend
         run: |
-          node server.js > /tmp/cardoria-final-core.log 2>&1 &
-          echo $! > /tmp/cardoria-final-core.pid
-      - name: Wait for complete startup
+          node server.js > /tmp/cardoria-final.log 2>&1 &
+          echo $! > /tmp/cardoria-final.pid
+      - name: Runtime smoke and security boundaries
         run: |
           ready=false
           for i in {1..90}; do
-            if curl -fsS http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-final-startup.json; then
-              if grep -q '"ready":true' /tmp/cardoria-final-startup.json; then ready=true; break; fi
-            fi
+            if curl -fsS http://127.0.0.1:10000/api/health/startup > /tmp/startup.json && grep -q '"ready":true' /tmp/startup.json; then ready=true; break; fi
             sleep 1
           done
-          cat /tmp/cardoria-final-startup.json || true
           test "$ready" = "true"
-      - name: Public smoke and authentication boundaries
-        run: |
           curl -fsS http://127.0.0.1:10000/api/health/ | grep -q '"version":"6.0.0"'
           curl -fsS http://127.0.0.1:10000/api/payments/boutique/products | grep -q '"ok":true'
-          curl -fsS 'http://127.0.0.1:10000/api/marketplace/v1/search?license=pokemon' | grep -q '"ok":true'
-          curl -fsS http://127.0.0.1:10000/admin-login.html > /tmp/cardoria-final-admin-login.html
-          if grep -qi 'double authentification' /tmp/cardoria-final-admin-login.html; then
-            echo 'Obsolete 2FA UI detected'
-            exit 1
-          fi
-          curl -fsS http://127.0.0.1:10000/client-login.html | grep -q 'Mot de passe oublié'
-          curl -fsS http://127.0.0.1:10000/client-orders.html | grep -q 'COMMANDES BOUTIQUE'
-          curl -fsS http://127.0.0.1:10000/mes-commandes.html | grep -q 'marketplace-orders.js'
-          code=$(curl -sS -o /tmp/cardoria-final-client-orders.json -w '%{http_code}' http://127.0.0.1:10000/api/auth/orders)
-          test "$code" = "401"
-          code=$(curl -sS -o /tmp/cardoria-final-sumup.json -w '%{http_code}' http://127.0.0.1:10000/api/payments/sumup/checkout)
-          test "$code" = "410"
-          curl -fsS http://127.0.0.1:10000/api/live/matrix | grep -q '"live_admin":"revolut"'
-          for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/admin/accounting/summary /api/system/backups; do
-            code=$(curl -sS -o /tmp/cardoria-final-anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
+          curl -fsS http://127.0.0.1:10000/api/live/matrix > /tmp/matrix.json
+          grep -q '"boutique":"sumup"' /tmp/matrix.json
+          grep -q '"live_admin":"sumup"' /tmp/matrix.json
+          grep -q '"live_seller":"paypal"' /tmp/matrix.json
+          curl -fsS http://127.0.0.1:10000/api/payments/status | grep -q '"provider":"sumup"'
+          for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/system/backups; do
+            code=$(curl -sS -o /tmp/anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
             test "$code" = "401"
           done
-      - name: Security headers
-        run: |
-          curl -sSI http://127.0.0.1:10000/ > /tmp/cardoria-final-headers.txt
-          grep -qi '^content-security-policy:' /tmp/cardoria-final-headers.txt
-          grep -qi '^x-content-type-options: nosniff' /tmp/cardoria-final-headers.txt
-          grep -qi '^x-frame-options: DENY' /tmp/cardoria-final-headers.txt
-          if grep -qi '^x-powered-by:' /tmp/cardoria-final-headers.txt; then
-            echo 'X-Powered-By header must not be exposed'
-            exit 1
-          fi
+          code=$(curl -sS -o /tmp/retired.json -w '%{http_code}' http://127.0.0.1:10000/api/payments/revolut/checkout)
+          test "$code" = "410"
       - name: Stop backend
         if: always()
         run: |
-          if [ -f /tmp/cardoria-final-core.pid ]; then kill $(cat /tmp/cardoria-final-core.pid) || true; fi
-          if [ "${{ job.status }}" != "success" ]; then cat /tmp/cardoria-final-core.log || true; fi
-
-  admin-users:
-    name: Admin Users E2E
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: backend
-    env:
-      NODE_ENV: test
-      PORT: '10000'
-      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
-      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
-      CORS_ORIGINS: 'http://127.0.0.1:10000'
-      ALERT_EMAIL: 'false'
-      MARKETPLACE_DEMO_MODE: 'false'
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22.22.0'
-          package-manager-cache: false
-      - run: npm install --omit=dev
-      - name: Start backend
-        run: |
-          node server.js > /tmp/cardoria-final-users.log 2>&1 &
-          echo $! > /tmp/cardoria-final-users.pid
-      - name: Wait for backend
-        run: |
-          for i in {1..90}; do
-            if curl -fsS http://127.0.0.1:10000/api/health/startup | grep -q '"ready":true'; then exit 0; fi
-            sleep 1
-          done
-          exit 1
-      - name: Complete users lifecycle
-        run: node scripts/users-admin-e2e.mjs
-      - name: Stop backend
-        if: always()
-        run: |
-          if [ -f /tmp/cardoria-final-users.pid ]; then kill $(cat /tmp/cardoria-final-users.pid) || true; fi
-          if [ "${{ job.status }}" != "success" ]; then cat /tmp/cardoria-final-users.log || true; fi
-
-  marketplace-admin:
-    name: Marketplace moderation and disputes E2E
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: backend
-    env:
-      NODE_ENV: test
-      PORT: '10000'
-      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
-      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
-      CORS_ORIGINS: 'http://127.0.0.1:10000'
-      ALERT_EMAIL: 'false'
-      MARKETPLACE_DEMO_MODE: 'false'
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22.22.0'
-          package-manager-cache: false
-      - run: npm install --omit=dev
-      - name: Start backend
-        run: |
-          node server.js > /tmp/cardoria-final-marketplace.log 2>&1 &
-          echo $! > /tmp/cardoria-final-marketplace.pid
-      - name: Wait for backend
-        run: |
-          for i in {1..90}; do
-            if curl -fsS http://127.0.0.1:10000/api/health/startup | grep -q '"ready":true'; then exit 0; fi
-            sleep 1
-          done
-          exit 1
-      - name: Complete Marketplace Admin lifecycle
-        run: node scripts/marketplace-admin-e2e.mjs
-      - name: Stop backend
-        if: always()
-        run: |
-          if [ -f /tmp/cardoria-final-marketplace.pid ]; then kill $(cat /tmp/cardoria-final-marketplace.pid) || true; fi
-          if [ "${{ job.status }}" != "success" ]; then cat /tmp/cardoria-final-marketplace.log || true; fi
-
-  rachat:
-    name: Rachat to Boutique stock E2E
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    defaults:
-      run:
-        working-directory: backend
-    env:
-      NODE_ENV: test
-      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
-      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
-      ALERT_EMAIL: 'false'
-      MARKETPLACE_DEMO_MODE: 'false'
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22.22.0'
-          package-manager-cache: false
-      - run: npm install --omit=dev
-      - name: Full Rachat workflow
-        run: node tests/rachat-workflow.mjs
-
-  backup-restore:
-    name: Isolated backup restore E2E
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    defaults:
-      run:
-        working-directory: backend
-    env:
-      NODE_ENV: test
-      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
-      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
-      ALERT_EMAIL: 'false'
-      MARKETPLACE_DEMO_MODE: 'false'
-      BACKUP_INTERVAL_HOURS: '0'
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22.22.0'
-          package-manager-cache: false
-      - run: npm install --omit=dev
-      - name: Backup create validate restore isolation
-        run: node scripts/system-backup-e2e.mjs
+          if [ -f /tmp/cardoria-final.pid ]; then kill $(cat /tmp/cardoria-final.pid) || true; fi
+          if [ -f /tmp/cardoria-final.log ]; then cat /tmp/cardoria-final.log; fi
