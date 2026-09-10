@@ -10,15 +10,33 @@ import { calculateShipping } from "../lib/marketplace/shipping.js";
 import { getDb } from "../lib/engine/database.js";
 import { getPayPalMarketplaceConfig, createSellerOnboarding, syncSellerPayPalStatus, createMarketplacePayPalOrder, captureMarketplacePayPalOrder } from "../lib/marketplace/paypal.js";
 import { handlePayPalWebhook, paypalWebhookConfigured } from "../lib/marketplace/paypal-events.js";
+import { assertSaleProvider, assertServerAmount } from "../lib/payments/routing.js";
 
 const router = Router();
-function fail(res, error, fallback = 400) { res.status(error?.status || error?.code || fallback).json({ ok: false, error: error?.message || "Erreur PayPal" }); }
+function fail(res, error, fallback = 400) { res.status(error?.status || error?.code || fallback).json({ ok: false, error: error?.message || "Erreur PayPal", provider: error?.provider || error?.expectedProvider, expectedProvider: error?.expectedProvider, requestedProvider: error?.requestedProvider }); }
 
 router.get("/v1/persistence/status", (req, res) => { const p = getMarketplacePersistenceStatus(); res.json({ ok: true, persistence: { configured: !!p.configured, healthy: p.ok !== false, restored: !!p.restored } }); });
 router.get("/v1/persistence/probe", (req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 router.get("/v1/paypal/config", (req, res) => {
   const cfg = getPayPalMarketplaceConfig();
-  res.json({ ok: true, provider: cfg.provider, environment: cfg.environment, configured: cfg.configured, webhookConfigured: paypalWebhookConfigured(), commissionConfigured: cfg.commissionPercent != null, commissionPercent: cfg.commissionPercent, delayedDisbursement: cfg.delayedDisbursement, demoMode: isMarketplaceDemoMode() });
+  res.json({
+    ok: true,
+    provider: cfg.provider,
+    environment: cfg.environment,
+    configured: cfg.configured,
+    webhookConfigured: paypalWebhookConfigured(),
+    commissionConfigured: cfg.commissionPercent != null,
+    commissionPercent: cfg.commissionPercent,
+    delayedDisbursement: cfg.delayedDisbursement,
+    demoMode: isMarketplaceDemoMode(),
+    presence: {
+      PAYPAL_CLIENT_ID: Boolean(String(process.env.PAYPAL_CLIENT_ID || "").trim()),
+      PAYPAL_CLIENT_SECRET: Boolean(String(process.env.PAYPAL_CLIENT_SECRET || "").trim()),
+      PAYPAL_PARTNER_MERCHANT_ID: Boolean(String(process.env.PAYPAL_PARTNER_MERCHANT_ID || "").trim()),
+      PAYPAL_PARTNER_ATTRIBUTION_ID: Boolean(String(process.env.PAYPAL_PARTNER_ATTRIBUTION_ID || "").trim()),
+      PAYPAL_WEBHOOK_ID: paypalWebhookConfigured()
+    }
+  });
 });
 router.post("/v1/paypal/webhook", async (req, res) => {
   try { res.json({ ok: true, ...(await handlePayPalWebhook(req.headers, req.body || {})) }); }
@@ -48,6 +66,7 @@ router.post("/v1/paypal/checkout", async (req, res) => {
   try {
     const user = getMarketplaceUser(req);
     const body = req.body || {};
+    assertSaleProvider({ channel: "marketplace", requestedProvider: body.provider });
     const cartUserId = String(body.userId || "").trim();
     if (!cartUserId) return res.status(400).json({ ok: false, error: "Panier client invalide." });
     const cart = getCart(cartUserId);
@@ -58,6 +77,8 @@ router.post("/v1/paypal/checkout", async (req, res) => {
     }
     const carrier = String(body.shippingCarrier || "mondial_relay");
     const serverShippingCost = calculateShipping(carrier, Math.max(0.05, cart.items.reduce((sum, item) => sum + Number(item.qty || 1) * 0.05, 0)));
+    const serverTotal = cart.items.reduce((sum, item) => sum + Number(item.qty || 1) * Number(item.price || 0), 0) + serverShippingCost;
+    assertServerAmount(serverTotal, body.amount ?? body.total);
     orders = createOrdersFromCart(cartUserId, { buyerEmail: user.email, buyerName: user.name || String(body.buyerName || "").slice(0, 120), buyerId: user.id, shippingCarrier: carrier, shippingCost: serverShippingCost, shippingAddress: String(body.shippingAddress || "").trim().slice(0, 500), clearAfterCreate: false });
     const base = (process.env.FRONTEND_URL || process.env.MARKETPLACE_FRONTEND_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
     const successBase = String(body.successUrl || `${base}/marketplace-paiement-succes.html`);

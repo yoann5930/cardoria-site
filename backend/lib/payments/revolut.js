@@ -13,6 +13,7 @@ import {
   updatePayment
 } from "./ledger.js";
 import { makePaymentId } from "./migrate.js";
+import { applyLivePaymentStatus } from "../live/sessions.js";
 
 const API_VERSION = process.env.REVOLUT_API_VERSION || "2026-04-20";
 
@@ -216,6 +217,12 @@ export async function syncRevolutOrder(revolutOrderId) {
         providerOrderId: revolutOrderId,
         providerTransactionId: transactionId,
         paymentMethod: "revolut_hosted"
+      });
+    }
+    if (payment.source === "live_cardoria" || String(payment.orderId || "").startsWith("LCK-")) {
+      applyLivePaymentStatus(payment.orderId, status, {
+        paymentProviderOrderId: revolutOrderId,
+        paymentProviderTransactionId: transactionId
       });
     }
   }

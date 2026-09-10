@@ -4,7 +4,7 @@
 
 Finalisation marketplace : panier, annonces étendues, commandes, expédition, factures TVA, vendeurs, litiges, notifications email, SEO annonce, admin complet.
 
-**SumUp uniquement** — aucun Stripe ajouté.
+**Marketplace = PayPal. Boutique et Live Admin = Revolut.** SumUp n'est plus utilisé. Aucun Stripe ajouté.
 
 ---
 
@@ -78,7 +78,7 @@ Architecture SQLite compatible PostgreSQL (requêtes paramétrées, pas de SQL d
 | GET `/sellers/:id/orders` | Commandes vendeur |
 | PUT `/sellers/:id/orders/:oid/tracking` | Suivi expédition vendeur |
 | GET/POST `/cart/*` | Panier (add, qty, remove, clear) |
-| POST `/cart/checkout` | Validation commande + redirect SumUp |
+| POST `/v1/paypal/checkout` | Checkout Marketplace PayPal (montant recalculé serveur) |
 | GET `/orders` | Historique client (email + userId) |
 | GET `/orders/secure/:id` | Détail commande sécurisé |
 | GET `/orders/:id/invoice` | Facture HTML (export PDF via impression navigateur) |
@@ -88,7 +88,7 @@ Architecture SQLite compatible PostgreSQL (requêtes paramétrées, pas de SQL d
 
 **Admin :** `/api/admin/marketplace/` — config, stats, annonces, vendeurs, commandes, tracking, remboursement, facture, litiges, export CSV comptable.
 
-**Webhook SumUp :** `POST /api/marketplace/webhooks/sumup`
+**Webhook PayPal :** `POST /api/marketplace/v1/paypal/webhook`. Ancien webhook SumUp : `POST /api/marketplace/webhooks/sumup` → 410.
 
 ---
 
@@ -103,9 +103,12 @@ Architecture SQLite compatible PostgreSQL (requêtes paramétrées, pas de SQL d
 ## Variables d'environnement
 
 ```env
-SUMUP_API_KEY=
-SUMUP_MERCHANT_CODE=
-SUMUP_WEBHOOK_SECRET=
+# SumUp retiré. Marketplace = PayPal.
+PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
+PAYPAL_PARTNER_MERCHANT_ID=
+PAYPAL_PARTNER_ATTRIBUTION_ID=
+PAYPAL_WEBHOOK_ID=
 MARKETPLACE_SUCCESS_URL=https://votre-domaine/marketplace-paiement-succes.html
 MARKETPLACE_CANCEL_URL=https://votre-domaine/marketplace-paiement-echec.html
 MARKETPLACE_VAT_RATE=20
@@ -125,8 +128,8 @@ ADMIN_EMAIL=
 ### Render (backend)
 1. Root `backend`, `npm install`, `npm start`
 2. Disk persistant `backend/data/`
-3. Configurer SumUp + SMTP + URLs succès/échec
-4. Webhook SumUp : `https://votre-backend.onrender.com/api/marketplace/webhooks/sumup`
+3. Configurer PayPal Marketplace + Revolut Boutique + SMTP + URLs succès/échec
+4. Webhook PayPal : `/api/marketplace/v1/paypal/webhook` — SumUp n'est plus utilisé
 
 ### Vercel (frontend)
 1. Déployer pages : `panier-marketplace.html`, `marketplace-paiement-*.html`, `mes-annonces.html`, `espace-vendeur.html`, `annonce.html`
@@ -139,7 +142,7 @@ ADMIN_EMAIL=
 1. **Vendeur** : créer annonce brouillon puis publier (`vendre.html`, `mes-annonces.html`)
 2. **Modification** : éditer prix/stock via PUT v1, vérifier slug SEO inchangé ou régénéré
 3. **Panier** : ajouter 2 annonces, modifier quantités, retirer article
-4. **Checkout** : validation commande + redirect SumUp sandbox
+4. **Checkout** : validation commande + redirect PayPal sandbox
 5. **Webhook / confirm** : paiement test → statut `paid`, stock décrémenté, emails client + admin
 6. **Expédition** : saisir suivi admin ou espace vendeur → email expédition
 7. **Facture** : ouvrir facture v1, vérifier TVA `MARKETPLACE_VAT_RATE`

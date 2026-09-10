@@ -102,34 +102,32 @@ Pages enterprise dans la racine du projet :
 - `POST /listings` — Publier une annonce (photos, stock, état, négociable)
 - `GET /sellers/:id` — Profil vendeur (avis, badge vérifié)
 - `POST /orders`, `GET /orders`, `GET /orders/:id/invoice` — Commandes & facture PDF
-- `POST /checkout` — Lien de paiement SumUp (carte bancaire)
-- `GET /shipping/options`, `POST /shipping/quote`
-- `GET/POST/DELETE /favorites`, `/wishlist`, `/alerts`
-- `GET /compare?listingId=&cardId=` — Comparateur automatique
+- `POST /checkout` — retiré (410). Checkout Marketplace : `/api/marketplace/v1/paypal/checkout`
 
-### Paiements SumUp — `/api/payments/*`
-- `POST /boutique/checkout` — Commande boutique + lien SumUp
-- `GET /sumup/confirm/:checkoutId` — Synchronisation statut paiement
-- Statuts : `pending` / `paid` / `failed` / `refunded`
+### Paiements — `/api/payments/*` et Live
+- Boutique Cardoria : **Revolut** (`POST /api/payments/boutique/checkout`)
+- Live Admin Cardoria : **Revolut** (`POST /api/live/checkout`)
+- Live vendeur : **PayPal** (`POST /api/live/checkout`)
+- Marketplace vendeur : **PayPal** (`POST /api/marketplace/v1/paypal/checkout`)
+- Ancien SumUp : `ALL /api/payments/sumup/*` et `ALL /api/marketplace/webhooks/sumup` → 410
+- Webhooks : `POST /api/payments/revolut/webhook`, `POST /api/marketplace/v1/paypal/webhook`
 
-### Webhook SumUp
-- `POST /api/marketplace/webhooks/sumup` — Confirmation paiement (header `x-payload-signature`)
-
-### Admin — `/api/admin/marketplace/*` + `/api/admin/payments/*`
+### Admin — `/api/admin/marketplace/*` + `/api/admin/payments/*` + `/api/admin/live/*`
 - Commandes, statuts, génération étiquettes transporteurs
 - Badge vendeur vérifié, alertes baisse de prix
-- Historique paiements SumUp (boutique + marketplace)
-- Factures liées aux références checkout SumUp
+- Historique paiements Revolut / PayPal (SumUp uniquement en archive ledger)
+- Pilotage des Lives (Admin = Revolut, vendeur = PayPal)
 
 ### Variables marketplace & paiement
-- `SUMUP_API_KEY`, `SUMUP_MERCHANT_CODE`, `SUMUP_WEBHOOK_SECRET`
+- `REVOLUT_SECRET_KEY`, `REVOLUT_WEBHOOK_SECRET`, `REVOLUT_ENVIRONMENT`
+- `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_PARTNER_MERCHANT_ID`, `PAYPAL_PARTNER_ATTRIBUTION_ID`, `PAYPAL_WEBHOOK_ID`
 - `BOUTIQUE_SUCCESS_URL`, `MARKETPLACE_SUCCESS_URL`, `MARKETPLACE_CANCEL_URL`
 - `MONDIAL_RELAY_API_KEY`, `COLISSIMO_API_KEY`, `CHRONOPOST_API_KEY`
 
 ### Pages frontend
 - `marketplace.html`, `annonce.html`, `vendeur.html`, `vendre.html`
 - `mes-commandes.html`, `favoris.html`, `souhaits.html`, `comparateur.html`
-- `admin-marketplace.html`, `admin-paiements.html`
+- `admin-marketplace.html`, `admin-paiements.html`, `admin-live.html`, `live-vendeur.html`
 
 ## IA Premium (v5.4)
 

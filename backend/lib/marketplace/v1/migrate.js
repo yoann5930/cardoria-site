@@ -53,13 +53,13 @@ export function migrateMarketplaceV1() {
     CREATE INDEX IF NOT EXISTS idx_mk_listings_slug ON mk_listings(slug);
     CREATE INDEX IF NOT EXISTS idx_mk_cart_user ON mk_cart_items(user_id);
     CREATE INDEX IF NOT EXISTS idx_mk_disputes_order ON mk_disputes(order_id, status);
-    CREATE INDEX IF NOT EXISTS idx_mk_disputes_status_priority ON mk_disputes(status, priority, updated_at);
     CREATE INDEX IF NOT EXISTS idx_mk_invoices_order ON mk_invoices(order_id);
     CREATE INDEX IF NOT EXISTS idx_mk_sellers_paypal ON mk_sellers(paypal_merchant_id, paypal_onboarding_status);
     CREATE INDEX IF NOT EXISTS idx_mk_orders_paypal ON mk_orders(paypal_order_id, paypal_capture_id);
   `);
 
   migrateDisputeColumns(db);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_mk_disputes_status_priority ON mk_disputes(status, priority, updated_at);`);
 }
 
 function addColumnIfMissing(db, table, cols, name, type) {

@@ -184,7 +184,7 @@ export function buildAdminDashboard({ period = "month", estimations = [], users 
     recentActivity,
     chart: Object.values(chartMap).sort((a, b) => a.date.localeCompare(b.date)),
     sources: {
-      revenue: "Boutique SumUp payée + commissions Marketplace enregistrées",
+      revenue: "Boutique Revolut payée + commissions Marketplace PayPal enregistrées",
       marketplace: "Commandes Marketplace payées",
       purchases: "Achats Cardoria payés uniquement",
       stock: "Inventaire Boutique serveur unique",

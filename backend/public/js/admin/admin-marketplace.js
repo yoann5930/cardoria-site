@@ -105,7 +105,7 @@
 
   A.adminFetch("/api/admin/marketplace/config").then(function (d) {
     var b = d.boutique || {}, m = d.marketplace || {};
-    A.qs("#mkConfig").textContent = "Boutique : SumUp " + (b.configured ? "actif" : "non configuré") + " — Marketplace : PayPal " + (m.configured ? "actif" : "non configuré") + " — Webhook PayPal : " + (m.webhookConfigured ? "actif" : "non configuré") + " — Environnement : " + (m.environment || "—") + " — Étiquettes transporteur : " + (d.carrierLabelsReady ? "actives" : "en attente d’intégration");
+    A.qs("#mkConfig").textContent = "Boutique : Revolut " + (b.configured ? "actif" : "non configuré") + " — Live Admin : Revolut — Live vendeur : PayPal — Marketplace : PayPal " + (m.configured ? "actif" : "non configuré") + " — Webhook PayPal : " + (m.webhookConfigured ? "actif" : "non configuré") + " — Environnement : " + (m.environment || "—") + " — Étiquettes transporteur : " + (d.carrierLabelsReady ? "actives" : "en attente d’intégration");
     if (d.stats) A.qs("#mkStats").innerHTML = "<div class='admin-kpi'><label>Annonces</label><strong>" + d.stats.listingsActive + "/" + d.stats.listings + "</strong></div><div class='admin-kpi'><label>Commandes payées</label><strong>" + d.stats.ordersPaid + "</strong></div><div class='admin-kpi'><label>CA</label><strong>" + A.euro(d.stats.revenue) + "</strong></div><div class='admin-kpi'><label>Litiges ouverts</label><strong>" + d.stats.disputesOpen + "</strong></div>";
   }).catch(function (e) { A.qs("#mkConfig").textContent = e.message; });
 

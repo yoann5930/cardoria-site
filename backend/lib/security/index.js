@@ -69,7 +69,7 @@ export function applySecurityMiddleware(app) {
     else if (!origin && allowedOrigins[0]) res.setHeader("Access-Control-Allow-Origin", allowedOrigins[0]);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-cardoria-admin-code, x-csrf-token, x-session-token");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-cardoria-admin-code, x-csrf-token, x-session-token, x-live-admin-grant");
     res.setHeader("Access-Control-Max-Age", "86400");
     if (req.method === "OPTIONS") return res.sendStatus(204);
     next();

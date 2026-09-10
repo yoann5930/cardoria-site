@@ -12,7 +12,7 @@ export async function checkAndAlert() {
   const report = getHealthReport();
   const failures = [];
   if (!report.checks.database.ok) failures.push("SQLite");
-  if (!report.checks.sumup.configured && process.env.NODE_ENV === "production") failures.push("SumUp non configuré");
+  if (!report.checks.revolut?.configured && process.env.NODE_ENV === "production") failures.push("Revolut non configuré");
   if (!report.checks.smtp.configured && process.env.ALERT_EMAIL === "true") failures.push("SMTP");
 
   if (!failures.length) return { ok: true, alerted: false };

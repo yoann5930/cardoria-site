@@ -66,13 +66,18 @@ jobs:
       - name: Wait for backend
         run: |
           ready=false
-          for i in {1..60}; do
+          for i in {1..90}; do
             if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/startup.json; then
               if grep -q '"ready":true' /tmp/startup.json; then ready=true; break; fi
             fi
             sleep 1
           done
-          test "$ready" = "true"
+          if [ "$ready" != "true" ]; then
+            echo "Backend did not become ready in time"
+            cat /tmp/startup.json || true
+            cat /tmp/cardoria-rachat.log || true
+            exit 1
+          fi
       - name: Rachat routes and pages checks
         working-directory: .
         run: |

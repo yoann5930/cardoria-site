@@ -19,7 +19,7 @@ export {
   mapRevolutOrderStatus
 } from "./revolut.js";
 
-// Compatibilité lecture avec les anciennes transactions SumUp uniquement.
+// Stubs SumUp retirés du runtime (410). Conservés pour les anciens imports.
 export {
   isSumUpConfigured,
   retrieveSumUpCheckout,

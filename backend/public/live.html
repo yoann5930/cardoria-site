@@ -28,6 +28,15 @@
         </div>
       </header>
 
+      <section id="cardoriaLiveAdminBar" class="live-directory-wrap" hidden>
+        <div class="live-directory-head">
+          <strong id="cardoriaLiveAdminTitle">Live Cardoria</strong>
+          <span id="cardoriaLiveAdminMode">Mode Admin / Cardoria</span>
+        </div>
+        <p id="cardoriaLiveAdminMeta" style="margin:0 0 10px;color:#aaa;font-size:13px"></p>
+        <div class="live-tools" id="cardoriaLiveAdminTools"></div>
+      </section>
+
       <section class="live-directory-wrap" aria-label="Lives en cours">
         <div class="live-directory-head">
           <strong>Lives en cours</strong>
@@ -46,6 +55,14 @@
         </div>
       </section>
 
+      <section class="live-directory-wrap" aria-label="Ventes Live Cardoria">
+        <div class="live-directory-head">
+          <strong>Ventes Live Cardoria</strong>
+          <span id="cardoriaLivePayState">Live Admin = Revolut · Live vendeur = PayPal</span>
+        </div>
+        <div class="live-directory" id="cardoriaLivePayList"></div>
+      </section>
+
       <section class="live-meta" aria-live="polite">
         <div>
           <div class="live-state" id="cardoriaLiveState">Connexion au service Live…</div>
@@ -58,6 +75,6 @@
       </section>
     </div>
   </main>
-  <script src="/js/cardoria-live-viewer.js?v=20260901-3" defer></script>
+  <script src="/js/cardoria-live-viewer.js?v=20260910-admin-live-enter" defer></script>
 </body>
 </html>

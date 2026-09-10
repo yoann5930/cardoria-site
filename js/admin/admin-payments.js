@@ -34,7 +34,7 @@
     var provider = String(p.provider || "").toLowerCase();
     if (provider === "revolut") return "Revolut";
     if (provider === "paypal") return "PayPal";
-    if (provider === "sumup") return "Historique SumUp";
+    if (provider === "sumup") return "SumUp (archivé)";
     return provider || "—";
   }
 
