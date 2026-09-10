@@ -1,0 +1,34 @@
+name: Cardoria Admin Menu Architecture CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "admin*.html"
+      - "boutique.html"
+      - "js/admin/**"
+      - "backend/public/**"
+      - "tests/admin-menu-architecture.test.mjs"
+      - ".github/workflows/admin-menu-architecture-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "admin*.html"
+      - "boutique.html"
+      - "js/admin/**"
+      - "backend/public/**"
+      - "tests/admin-menu-architecture.test.mjs"
+      - ".github/workflows/admin-menu-architecture-ci.yml"
+
+jobs:
+  admin-menu-architecture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+      - name: Run Admin menu architecture audit
+        run: node --test tests/admin-menu-architecture.test.mjs
