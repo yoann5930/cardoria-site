@@ -9,7 +9,8 @@ const admin = fs.readFileSync(new URL("../../js/admin/admin-live.js", import.met
 const phone = fs.readFileSync(new URL("../../live-camera.html", import.meta.url), "utf8");
 
 test("Live room can be created without product or price", () => {
-  assert.match(sessions, /if \(!Array\.isArray\(raw\) \|\| !raw\.length\) return \[\];/);
+  assert.match(sessions, /normalizeProducts\(raw\)\{if\(!Array\.isArray\(raw\)\|\|!raw\.length\)return \[\];/);
+  assert.match(sessions, /products=\[\]/);
   assert.match(admin, /products:\[\]/);
   assert.doesNotMatch(admin, /19,90|9,90|Revolut/i);
 });
