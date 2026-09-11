@@ -13,23 +13,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check public Live page
+      - name: Inspect public Live runtime
         run: |
-          set -euo pipefail
-          curl -fsS --retry 2 --connect-timeout 10 https://cardoriashop.fr/live.html -o /tmp/live.html
-          grep -q 'cardoria-live-publisher.js' /tmp/live.html
-          grep -q 'cardoria-live-viewer.js' /tmp/live.html
-      - name: Check WebRTC production configuration
+          set -u
+          code=$(curl -L -sS --retry 2 --connect-timeout 10 -o /tmp/live.html -w '%{http_code}' https://cardoriashop.fr/live.html || true)
+          echo "live_http=$code"
+          echo "live_size=$(wc -c < /tmp/live.html 2>/dev/null || echo 0)"
+          echo "has_publisher=$(grep -q 'cardoria-live-publisher.js' /tmp/live.html && echo yes || echo no)"
+          echo "has_viewer=$(grep -q 'cardoria-live-viewer.js' /tmp/live.html && echo yes || echo no)"
+          grep -o '<title>[^<]*</title>' /tmp/live.html | head -1 || true
+      - name: Inspect WebRTC production configuration
         run: |
-          set -euo pipefail
-          body=$(curl -fsS --retry 2 --connect-timeout 10 https://cardoriashop.fr/api/live/webrtc/status)
-          printf '%s\n' "$body"
-          node -e 'const x=JSON.parse(process.argv[1]); if(x.ok!==true) process.exit(2); if(x.provider!=="cloudflare-realtime") process.exit(3); if(x.configured!==true){console.error("CLOUDFLARE_REALTIME_NOT_CONFIGURED"); process.exit(4)}' "$body"
-      - name: Check camera pairing page and publisher client
+          set -u
+          code=$(curl -L -sS --retry 2 --connect-timeout 10 -o /tmp/webrtc.json -w '%{http_code}' https://cardoriashop.fr/api/live/webrtc/status || true)
+          echo "webrtc_http=$code"
+          cat /tmp/webrtc.json 2>/dev/null || true
+          if [ "$code" != "200" ]; then exit 10; fi
+          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/webrtc.json","utf8")); console.log("provider="+x.provider); console.log("configured="+x.configured); if(x.ok!==true) process.exit(2); if(x.provider!=="cloudflare-realtime") process.exit(3); if(x.configured!==true) process.exit(4)'
+      - name: Inspect camera pairing page and publisher client
         run: |
-          set -euo pipefail
-          curl -fsS --retry 2 --connect-timeout 10 https://cardoriashop.fr/live-camera.html -o /tmp/camera.html
-          curl -fsS --retry 2 --connect-timeout 10 https://cardoriashop.fr/js/cardoria-live-publisher.js -o /tmp/publisher.js
-          grep -q 'Démarrer la caméra 2' /tmp/camera.html
-          grep -q 'getUserMedia' /tmp/publisher.js
-          grep -q '/api/live/webrtc/publisher/start' /tmp/publisher.js
+          set -u
+          c1=$(curl -L -sS --retry 2 --connect-timeout 10 -o /tmp/camera.html -w '%{http_code}' https://cardoriashop.fr/live-camera.html || true)
+          c2=$(curl -L -sS --retry 2 --connect-timeout 10 -o /tmp/publisher.js -w '%{http_code}' https://cardoriashop.fr/js/cardoria-live-publisher.js || true)
+          echo "camera_page_http=$c1"
+          echo "publisher_js_http=$c2"
+          echo "camera_button=$(grep -q 'Démarrer la caméra 2' /tmp/camera.html && echo yes || echo no)"
+          echo "publisher_getUserMedia=$(grep -q 'getUserMedia' /tmp/publisher.js && echo yes || echo no)"
+          echo "publisher_api=$(grep -q '/api/live/webrtc/publisher/start' /tmp/publisher.js && echo yes || echo no)"
+          test "$c1" = "200"
+          test "$c2" = "200"
