@@ -43,10 +43,14 @@ jobs:
           node --check backend/routes/live-realtime.js
           node --check backend/lib/live/cloudflare-realtime.js
           node --check backend/lib/live/realtime-sessions.js
+          node --check backend/lib/live/camera-media.js
           node --check js/cardoria-live-viewer.js
           node --check js/cardoria-live-publisher.js
+          node --check js/cardoria-live-media.js
       - name: Live realtime contract
         run: node --test backend/tests/live-realtime-contract.test.mjs
+      - name: Live camera permission tests
+        run: node --test backend/tests/live-camera.test.mjs
       - name: Live architecture guards
         run: |
           node --test backend/tests/live-architecture.test.mjs

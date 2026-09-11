@@ -44,6 +44,7 @@
 .admin-table tr:hover td{background:rgba(212,175,55,.04)}
 .admin-live-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .admin-live-actions .btn{white-space:nowrap}
+.admin-live-camera-error{color:#ff8a8a;font-weight:700;max-width:720px;line-height:1.45}
 .admin-badge{display:inline-flex;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;text-transform:uppercase}
 .admin-badge--ok{background:rgba(76,175,125,.15);color:#8fd4a8}
 .admin-badge--warn{background:rgba(212,175,55,.15);color:#ffe18a}

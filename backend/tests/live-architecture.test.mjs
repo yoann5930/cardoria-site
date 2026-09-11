@@ -13,15 +13,19 @@ const LIVE_RUNTIME = [
   "live.html",
   "live-vendeur.html",
   "admin-live.html",
+  "live-camera.html",
   "js/cardoria-live-viewer.js",
   "js/cardoria-live-publisher.js",
+  "js/cardoria-live-media.js",
   "js/live-vendeur.js",
   "js/admin/admin-live.js",
   "backend/public/live.html",
   "backend/public/live-vendeur.html",
   "backend/public/admin-live.html",
+  "backend/public/live-camera.html",
   "backend/public/js/cardoria-live-viewer.js",
   "backend/public/js/cardoria-live-publisher.js",
+  "backend/public/js/cardoria-live-media.js",
   "backend/public/js/live-vendeur.js",
   "backend/public/js/admin/admin-live.js",
   "backend/routes/live.js",
@@ -36,7 +40,9 @@ const MIRRORS = [
   ["js/cardoria-live-viewer.js", "backend/public/js/cardoria-live-viewer.js"],
   ["js/cardoria-live-publisher.js", "backend/public/js/cardoria-live-publisher.js"],
   ["js/live-vendeur.js", "backend/public/js/live-vendeur.js"],
-  ["js/admin/admin-live.js", "backend/public/js/admin/admin-live.js"]
+  ["js/admin/admin-live.js", "backend/public/js/admin/admin-live.js"],
+  ["js/cardoria-live-media.js", "backend/public/js/cardoria-live-media.js"],
+  ["live-camera.html", "backend/public/live-camera.html"]
 ];
 
 test("Live payment architecture is SumUp admin + PayPal seller + retired Revolut", () => {

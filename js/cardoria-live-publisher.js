@@ -8,8 +8,15 @@
     opts=opts||{}; var liveId=String(opts.liveId||""),token=String(opts.token||""),pairToken=String(opts.pairToken||""),sourceId=String(opts.sourceId||(pairToken?"secondary":"primary")),preview=opts.preview;
     if(!liveId&&!pairToken)throw new Error("Identifiant Live manquant."); if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error("Ce navigateur ne peut pas publier de caméra/micro.");
     var headers={Accept:"application/json","Content-Type":"application/json"}; if(token)headers.Authorization="Bearer "+token;
-    var video=opts.cameraId?{deviceId:{exact:opts.cameraId}}:{facingMode:opts.facingMode||"environment"}; var audio=opts.microphoneId?{deviceId:{exact:opts.microphoneId}}:(opts.audio===false?false:true);
-    var stream=await navigator.mediaDevices.getUserMedia({video:video,audio:audio}); if(preview){preview.srcObject=stream;preview.muted=true;preview.playsInline=true;preview.play().catch(function(){});}
+    var stream;
+    if(global.CardoriaLiveMedia&&CardoriaLiveMedia.getUserMediaStream){
+      stream=await CardoriaLiveMedia.getUserMediaStream({cameraId:opts.cameraId,microphoneId:opts.microphoneId,audio:opts.audio,isMobile:opts.isMobile});
+    }else{
+      var video=opts.cameraId?{deviceId:{exact:opts.cameraId}}:true;
+      var audio=opts.microphoneId?{deviceId:{exact:opts.microphoneId}}:(opts.audio===false?false:true);
+      stream=await navigator.mediaDevices.getUserMedia({video:video,audio:audio});
+    }
+    if(preview){preview.srcObject=stream;preview.muted=true;preview.playsInline=true;preview.play().catch(function(){});}
     var bootstrap=new RTCPeerConnection(ICE); stream.getTracks().forEach(function(track){bootstrap.addTrack(track,stream);}); var offer=await bootstrap.createOffer(); await bootstrap.setLocalDescription(offer); await waitIce(bootstrap); var local=bootstrap.localDescription||offer;
     var tracks=bootstrap.getTransceivers().filter(function(item){return item.sender&&item.sender.track;}).map(function(item){return{mid:item.mid,trackName:sourceId+"-"+(item.sender.track.kind==="video"?"camera":"microphone"),kind:item.sender.track.kind};});
     var response=await fetch("/api/live/webrtc/publisher/start",{method:"POST",headers:headers,body:JSON.stringify({liveSessionId:liveId,pairToken:pairToken||undefined,sourceId:sourceId,offer:{type:"offer",sdp:local.sdp||""},tracks:tracks})}); var payload=await response.json().catch(function(){return{};});

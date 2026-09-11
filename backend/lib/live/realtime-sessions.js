@@ -50,3 +50,4 @@ export function stopRealtimeViewer(viewerId){const id=String(viewerId||""),liveI
 export function isRealtimePublished(liveId){return(livePublishers(String(liveId||""))?.sources.size||0)>0;}
 export function isLivePublisher(live,actor){try{assertPublisher(live,actor);return true;}catch{return false;}}
 export function realtimeStatus(){cleanupRealtimeViewers();let publishers=0;for(const entry of publishedLives.values())publishers+=entry.sources.size;return{published:publishedLives.size,publishers,viewers:viewerSessions.size,maxPublishersPerLive:MAX_PUBLISHERS_PER_LIVE,provider:realtimeProvider()};}
+export function __resetRealtimeStoreForTests(){publishedLives.clear();viewerSessions.clear();publisherPairs.clear();}

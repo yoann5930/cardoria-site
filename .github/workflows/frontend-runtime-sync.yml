@@ -63,6 +63,8 @@ jobs:
             backend/public/admin-catalogue.html
             backend/public/admin-marketplace.html
             backend/public/admin-live.html
+            backend/public/live.html
+            backend/public/live-camera.html
             backend/public/live-vendeur.html
             backend/public/admin-utilisateurs.html
             backend/public/admin-journal.html
@@ -83,6 +85,9 @@ jobs:
             backend/public/style.css
             backend/public/css/admin.css
             backend/public/js/admin/admin-core.js
+            backend/public/js/admin/admin-live.js
+            backend/public/js/cardoria-live-media.js
+            backend/public/js/cardoria-live-publisher.js
             backend/public/js/admin/admin-stock.js
             backend/public/js/admin/admin-orders.js
             backend/public/js/client-auth.js
