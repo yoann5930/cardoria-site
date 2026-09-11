@@ -25,7 +25,7 @@ function publicRealtimeSession(session) {
   return { ...live, mimeType: "application/x-cloudflare-webrtc", streamPublished: isRealtimePublished(live.id) };
 }
 
-router.get("/matrix", (req, res) => res.json({ ok: true, matrix: PAYMENT_MATRIX, retired: ["revolut", "render"] }));
+router.get("/matrix", (req, res) => res.json({ ok: true, matrix: PAYMENT_MATRIX, retired: ["revolut"] }));
 router.get("/sessions", (req, res) => { const status = String(req.query.status || "live"); res.json({ ok: true, sessions: listLiveSessions({ status: status === "all" ? undefined : status }).map(publicRealtimeSession) }); });
 router.get("/sessions/:id", (req, res) => { const session = getLiveSession(req.params.id); if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." }); res.json({ ok: true, session: publicRealtimeSession(session) }); });
 router.get("/sessions/:id/admin-access", (req, res) => {
