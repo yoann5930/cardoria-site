@@ -1,0 +1,44 @@
+name: Cardoria Live Studio V2 CI
+on:
+  pull_request:
+    paths:
+      - 'backend/lib/live/**'
+      - 'backend/routes/live**'
+      - 'backend/tests/live-studio-v2-contract.test.mjs'
+      - 'js/admin/admin-live.js'
+      - 'js/cardoria-live-publisher.js'
+      - 'live-camera.html'
+      - '.github/workflows/live-studio-v2-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/lib/live/**'
+      - 'backend/routes/live**'
+      - 'backend/tests/live-studio-v2-contract.test.mjs'
+      - 'js/admin/admin-live.js'
+      - 'js/cardoria-live-publisher.js'
+      - 'live-camera.html'
+jobs:
+  live-studio-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.0'
+      - name: Install backend production dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Syntax
+        run: |
+          node --check backend/lib/live/sessions.js
+          node --check backend/lib/live/realtime-sessions.js
+          node --check backend/routes/live-realtime.js
+          node --check js/admin/admin-live.js
+          node --check js/cardoria-live-publisher.js
+      - name: Live Studio V2 contract
+        run: node --test backend/tests/live-studio-v2-contract.test.mjs
+      - name: Existing payment matrix regression
+        run: node --test backend/tests/payment-matrix.test.mjs
+      - name: Existing realtime regression
+        run: node --test backend/tests/live-realtime-contract.test.mjs
