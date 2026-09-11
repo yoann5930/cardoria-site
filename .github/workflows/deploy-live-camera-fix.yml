@@ -1,0 +1,53 @@
+name: Deploy Live Camera Fix
+
+on:
+  push:
+    branches:
+      - ops/deploy-live-camera-fix-20260911
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Deploy main to OVH
+        env:
+          OVH_VPS_HOST: ${{ secrets.OVH_VPS_HOST }}
+          OVH_VPS_USER: ${{ secrets.OVH_VPS_USER }}
+          OVH_VPS_SSH_KEY: ${{ secrets.OVH_VPS_SSH_KEY }}
+          OVH_VPS_HOST_FINGERPRINT: ${{ secrets.OVH_VPS_HOST_FINGERPRINT }}
+        run: |
+          set -euo pipefail
+          test -n "${OVH_VPS_HOST:-}"
+          test -n "${OVH_VPS_USER:-}"
+          test -n "${OVH_VPS_SSH_KEY:-}"
+          test -n "${OVH_VPS_HOST_FINGERPRINT:-}"
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$OVH_VPS_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          unset OVH_VPS_SSH_KEY
+          ssh-keyscan -t ed25519 -T 10 "$OVH_VPS_HOST" > "$HOME/.ssh/known_hosts"
+          got=$(ssh-keygen -lf "$HOME/.ssh/known_hosts" | awk '{print $2}')
+          expected=$(printf '%s' "$OVH_VPS_HOST_FINGERPRINT" | tr -d '\r\n')
+          test "$got" = "$expected"
+          ssh -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o BatchMode=yes -o PreferredAuthentications=publickey -o ConnectTimeout=15 "${OVH_VPS_USER}@${OVH_VPS_HOST}" "deploy main"
+      - name: Verify Live camera runtime
+        run: |
+          set -euo pipefail
+          sleep 5
+          curl -fsS --retry 3 --connect-timeout 10 https://cardoriashop.fr/live.html -o /tmp/live.html
+          curl -fsS --retry 3 --connect-timeout 10 https://cardoriashop.fr/live-camera.html -o /tmp/camera.html
+          curl -fsS --retry 3 --connect-timeout 10 https://cardoriashop.fr/js/cardoria-live-publisher.js -o /tmp/publisher.js
+          curl -fsS --retry 3 --connect-timeout 10 https://cardoriashop.fr/js/cardoria-live-viewer.js -o /tmp/viewer.js
+          body=$(curl -fsS --retry 3 --connect-timeout 10 https://cardoriashop.fr/api/live/webrtc/status)
+          printf '%s\n' "$body"
+          node -e 'const x=JSON.parse(process.argv[1]); if(x.ok!==true)process.exit(2); if(x.configured!==true)process.exit(3); if(!["cardoria-p2p","cloudflare-realtime"].includes(x.provider))process.exit(4);' "$body"
+          grep -q '/api/live/webrtc/publisher/offers' /tmp/publisher.js
+          grep -q '/api/live/webrtc/publisher/answer' /tmp/publisher.js
+          grep -q '/api/live/webrtc/viewer/offer' /tmp/viewer.js
+          grep -q '/api/live/webrtc/viewer/answers' /tmp/viewer.js
+          grep -q 'Démarrer la caméra 2' /tmp/camera.html
+          echo 'LIVE CAMERA RUNTIME OK'
