@@ -11,7 +11,9 @@ import {
   startRealtimePublisher,
   startRealtimeViewer,
   stopRealtimePublisher,
-  stopRealtimeViewer
+  stopRealtimeViewer,
+  createPublisherPair,
+  claimPublisherPair
 } from "../lib/live/realtime-sessions.js";
 
 const router = Router();
@@ -30,22 +32,42 @@ function publisherActor(req, liveId) {
 }
 
 function fail(res, error) {
-  res.status(Number(error?.status || error?.code) || 400).json({ ok: false, error: error?.message || "Erreur Live WebRTC", code: error?.code || "LIVE_WEBRTC_ERROR" });
+  const raw = Number(error?.status || error?.code);
+  const status = Number.isInteger(raw) && raw >= 400 && raw <= 599 ? raw : 400;
+  res.status(status).json({ ok: false, error: error?.message || "Erreur Live WebRTC", code: error?.code || "LIVE_WEBRTC_ERROR" });
 }
 
 router.get("/status", (req, res) => {
   res.json({ ok: true, provider: "cloudflare-realtime", configured: isCloudflareRealtimeConfigured(), ...realtimeStatus() });
 });
 
+router.post("/publisher/pair", (req, res) => {
+  try {
+    const liveId = String(req.body?.liveSessionId || req.body?.liveId || "");
+    const actor = publisherActor(req, liveId);
+    const pair = createPublisherPair({ liveId, actor, sourceId: req.body?.sourceId || "secondary" });
+    res.json({ ok: true, ...pair, url: `/live-camera.html?pair=${encodeURIComponent(pair.token)}` });
+  } catch (error) { fail(res, error); }
+});
+
 router.post("/publisher/start", async (req, res) => {
   try {
     const body = req.body || {};
-    const liveId = String(body.liveSessionId || body.liveId || "");
+    let liveId = String(body.liveSessionId || body.liveId || "");
+    let sourceId = String(body.sourceId || "primary");
+    let actor;
+    if (body.pairToken) {
+      const pair = claimPublisherPair(String(body.pairToken));
+      liveId = pair.liveId;
+      sourceId = pair.sourceId;
+      actor = pair.actor;
+    } else {
+      actor = publisherActor(req, liveId);
+    }
     const offer = body.offer;
     const tracks = Array.isArray(body.tracks) ? body.tracks : [];
     if (!liveId || offer?.type !== "offer" || !offer.sdp || !tracks.length) return res.status(400).json({ ok: false, error: "Offre WebRTC ou pistes invalides." });
-    const actor = publisherActor(req, liveId);
-    const result = await startRealtimePublisher({ liveId, actor, offer, tracks });
+    const result = await startRealtimePublisher({ liveId, actor, offer, tracks, sourceId });
     res.json({ ok: true, ...result });
   } catch (error) { fail(res, error); }
 });
@@ -54,7 +76,7 @@ router.post("/publisher/stop", (req, res) => {
   try {
     const liveId = String(req.body?.liveSessionId || req.body?.liveId || "");
     const actor = publisherActor(req, liveId);
-    res.json(stopRealtimePublisher({ liveId, actor }));
+    res.json(stopRealtimePublisher({ liveId, actor, sourceId: req.body?.sourceId }));
   } catch (error) { fail(res, error); }
 });
 
