@@ -140,6 +140,69 @@
     throw Object.assign(new Error(explained.text), { name: lastError && lastError.name || explained.code, cardoriaRetry: explained.retry, cardoriaCode: explained.code });
   }
 
+  function sameCameraSelected(cameraIdA, cameraIdB) {
+    var a = String(cameraIdA || "");
+    var b = String(cameraIdB || "");
+    return Boolean(a && b && a === b);
+  }
+
+  function assignDistinctCameras(opts) {
+    opts = opts || {};
+    var cameras = opts.cameras || [];
+    var occupied = {};
+    (opts.occupiedIds || []).forEach(function (item) {
+      var id = String(item || "");
+      if (id) occupied[id] = true;
+    });
+    var ids = cameras.map(function (item) { return String(item && item.deviceId || item || ""); }).filter(Boolean);
+    var primary = String(opts.primaryId || "");
+    var secondary = String(opts.secondaryId || "");
+    if (!primary) {
+      primary = ids.filter(function (id) { return !occupied[id]; })[0] || ids[0] || "";
+    }
+    if (!secondary) {
+      secondary = ids.filter(function (id) { return id !== primary && !occupied[id]; })[0] || "";
+    }
+    var unique = [];
+    ids.forEach(function (id) { if (unique.indexOf(id) === -1) unique.push(id); });
+    return {
+      primary: primary,
+      secondary: secondary,
+      conflict: sameCameraSelected(primary, secondary),
+      distinctAvailable: unique.length >= 2
+    };
+  }
+
+  function describeSourceState(state) {
+    var labels = { inactive: "inactive", connecting: "connexion", live: "diffusion", error: "erreur", phone: "téléphone" };
+    return labels[String(state || "inactive")] || labels.inactive;
+  }
+
+  function canStartSecondaryPc(opts) {
+    opts = opts || {};
+    if (opts.phonePaired) {
+      return {
+        ok: false,
+        code: "PHONE_SECONDARY",
+        retry: true,
+        text: "Caméra 2 est déjà utilisée par le téléphone. Arrêtez Caméra 2 / téléphone avant de lancer Caméra 2 PC."
+      };
+    }
+    if (Number(opts.sourceCount || 0) >= Number(opts.max || 2)) {
+      return {
+        ok: false,
+        code: "LIVE_CAMERA_LIMIT",
+        retry: false,
+        text: "Deux caméras maximum sont autorisées sur ce Live."
+      };
+    }
+    return { ok: true, code: "", retry: false, text: "" };
+  }
+
+  function thirdSourceMessage() {
+    return "Deux caméras maximum sont autorisées sur ce Live. Arrêtez une source avant d’en lancer une troisième.";
+  }
+
   global.CardoriaLiveMedia = {
     isMobileUserAgent: isMobileUserAgent,
     isCameraBlockedByPermissionsPolicy: isCameraBlockedByPermissionsPolicy,
@@ -148,6 +211,12 @@
     explainGetUserMediaError: explainGetUserMediaError,
     listDevices: listDevices,
     detectAvailability: detectAvailability,
-    getUserMediaStream: getUserMediaStream
+    getUserMediaStream: getUserMediaStream,
+    sameCameraSelected: sameCameraSelected,
+    assignDistinctCameras: assignDistinctCameras,
+    describeSourceState: describeSourceState,
+    canStartSecondaryPc: canStartSecondaryPc,
+    thirdSourceMessage: thirdSourceMessage,
+    LIVE_MAX_PUBLISHERS: 2
   };
 })(typeof window !== "undefined" ? window : globalThis);

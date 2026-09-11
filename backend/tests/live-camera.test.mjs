@@ -11,10 +11,16 @@ import { createUser } from "../lib/auth/users.js";
 import { getDb } from "../lib/engine/database.js";
 import {
   LIVE_PERMISSIONS_POLICY,
+  LIVE_MAX_PUBLISHERS,
   buildGetUserMediaAttempts,
   explainGetUserMediaError,
   isMobileUserAgent,
-  permissionStateBlocksCamera
+  permissionStateBlocksCamera,
+  sameCameraSelected,
+  assignDistinctCameras,
+  canStartSecondaryPc,
+  describeSourceState,
+  thirdSourceMessage
 } from "../lib/live/camera-media.js";
 import { __resetRealtimeStoreForTests } from "../lib/live/realtime-sessions.js";
 import { __resetLiveStoreForTests, __setLiveStoreForTests } from "../lib/live/sessions.js";
@@ -138,19 +144,56 @@ test("frontend admin/publisher : pas d’alerte Permission denied, pas de facing
   assert.match(admin, /Réessayer/);
   assert.match(admin, /Cardoria\/Admin = SumUp/);
   assert.match(admin, /isMobile: false/);
+  assert.match(admin, /liveCameraSelect1/);
+  assert.match(admin, /liveCameraSelect2/);
+  assert.match(admin, /liveMicSelect1/);
+  assert.match(admin, /liveMicSelect2/);
+  assert.match(admin, /livePublisherPreview1/);
+  assert.match(admin, /livePublisherPreview2/);
+  assert.match(admin, /Démarrer Caméra 1/);
+  assert.match(admin, /Arrêter Caméra 1/);
+  assert.match(admin, /Démarrer Caméra 2 PC/);
+  assert.match(admin, /Arrêter Caméra 2 PC/);
+  assert.match(admin, /Caméra 2 sans micro/);
+  assert.match(admin, /État : inactive/);
   assert.doesNotMatch(admin, /Permission denied/);
   assert.doesNotMatch(admin, /facingMode:\s*["']environment["']/);
   const publisher = readRepo("js/cardoria-live-publisher.js");
   assert.match(publisher, /CardoriaLiveMedia/);
   assert.match(publisher, /\/api\/live\/webrtc\/publisher\/start/);
+  assert.match(publisher, /cameraId:usedCameraId/);
   assert.doesNotMatch(publisher, /facingMode:\s*opts\.facingMode\s*\|\|\s*["']environment["']/);
   const media = readRepo("js/cardoria-live-media.js");
   assert.match(media, /NotAllowedError/);
   assert.match(media, /OverconstrainedError/);
+  assert.match(media, /assignDistinctCameras/);
   const cameraPage = readRepo("live-camera.html");
   assert.match(cameraPage, /pairToken:pair/);
   assert.match(cameraPage, /Réessayer/);
   assert.match(cameraPage, /isMobile: true/);
+  const viewer = readRepo("js/cardoria-live-viewer.js");
+  assert.match(viewer, /syncViewerSources/);
+  assert.match(viewer, /data-live-source-video/);
+});
+
+test("deux webcams distinctes, états, et Caméra 2 sans micro", () => {
+  assert.equal(LIVE_MAX_PUBLISHERS, 2);
+  assert.equal(sameCameraSelected("cam-a", "cam-a"), true);
+  assert.equal(sameCameraSelected("cam-a", "cam-b"), false);
+  assert.equal(sameCameraSelected("", "cam-a"), false);
+  const assigned = assignDistinctCameras({
+    cameras: [{ deviceId: "cam-a" }, { deviceId: "cam-b" }],
+    primaryId: "cam-a"
+  });
+  assert.equal(assigned.secondary, "cam-b");
+  assert.equal(assigned.conflict, false);
+  assert.equal(assignDistinctCameras({ cameras: [{ deviceId: "cam-a" }], primaryId: "cam-a", secondaryId: "cam-a" }).conflict, true);
+  assert.equal(describeSourceState("connecting"), "connexion");
+  assert.equal(describeSourceState("live"), "diffusion");
+  assert.equal(canStartSecondaryPc({ phonePaired: true }).ok, false);
+  assert.equal(canStartSecondaryPc({ phonePaired: false, sourceCount: 1, max: 2 }).ok, true);
+  assert.equal(canStartSecondaryPc({ phonePaired: false, sourceCount: 2, max: 2 }).ok, false);
+  assert.match(thirdSourceMessage(), /Deux caméras maximum/);
 });
 
 test("runtime : header Permissions-Policy sur admin-live.html", async () => {
@@ -227,6 +270,59 @@ test("webrtc pair/start sans Live → 404 ; publish, stop, reconnexion, spectate
       });
       assert.equal(pair.status, 200);
       assert.match(pair.data.url, /\/live-camera\.html#pair=/);
+
+      const cam2 = await requestJson(base, "/api/live/webrtc/publisher/start", {
+        method: "POST",
+        body: { liveSessionId: "LIVE-CAM-ADMIN", sourceId: "secondary", offer: DUMMY_OFFER, tracks: DUMMY_TRACKS },
+        token: admin.token
+      });
+      assert.equal(cam2.status, 200);
+      const both = await requestJson(base, "/api/live/webrtc/viewer/start", {
+        method: "POST",
+        body: { liveSessionId: "LIVE-CAM-ADMIN" }
+      });
+      assert.equal(both.status, 200);
+      assert.equal(both.data.sourceCount, 2);
+      assert.deepEqual((both.data.sources || []).map((item) => item.sourceId).sort(), ["primary", "secondary"]);
+      const beat = await requestJson(base, "/api/live/webrtc/viewer/heartbeat", {
+        method: "POST",
+        body: { viewerId: both.data.viewerId }
+      });
+      assert.equal(beat.status, 200);
+      assert.deepEqual((beat.data.sources || []).slice().sort(), ["primary", "secondary"]);
+
+      const third = await requestJson(base, "/api/live/webrtc/publisher/start", {
+        method: "POST",
+        body: { liveSessionId: "LIVE-CAM-ADMIN", sourceId: "tertiary", offer: DUMMY_OFFER, tracks: DUMMY_TRACKS },
+        token: admin.token
+      });
+      assert.equal(third.status, 409);
+      assert.match(String(third.data.error || ""), /Deux caméras maximum/);
+
+      const stopPrimary = await requestJson(base, "/api/live/webrtc/publisher/stop", {
+        method: "POST",
+        body: { liveSessionId: "LIVE-CAM-ADMIN", sourceId: "primary" },
+        token: admin.token
+      });
+      assert.equal(stopPrimary.status, 200);
+      const viewerCam2Only = await requestJson(base, "/api/live/webrtc/viewer/start", {
+        method: "POST",
+        body: { liveSessionId: "LIVE-CAM-ADMIN" }
+      });
+      assert.equal(viewerCam2Only.status, 200);
+      assert.equal(viewerCam2Only.data.sourceCount, 1);
+      assert.equal(viewerCam2Only.data.sources[0].sourceId, "secondary");
+
+      const reconnectCam2 = await requestJson(base, "/api/live/webrtc/publisher/start", {
+        method: "POST",
+        body: { liveSessionId: "LIVE-CAM-ADMIN", sourceId: "secondary", offer: DUMMY_OFFER, tracks: DUMMY_TRACKS },
+        token: admin.token
+      });
+      assert.equal(reconnectCam2.status, 200);
+      const stillCam2 = await requestJson(base, "/api/live/webrtc/status/LIVE-CAM-ADMIN");
+      assert.equal(stillCam2.status, 200);
+      assert.deepEqual(stillCam2.data.sources, ["secondary"]);
+      assert.equal(stillCam2.data.publishers, 1);
     });
   } finally {
     admin.cleanup();
