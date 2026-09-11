@@ -1,6 +1,7 @@
 /** Middleware securite global — headers, CORS, sanitisation, request ID. */
 import { sanitizeObject } from "./sanitize.js";
 import { logError } from "../monitoring/errors.js";
+import { LIVE_PERMISSIONS_POLICY } from "../live/camera-media.js";
 
 const PUBLIC_RELEASE = "cardoria-seo-20260902-1";
 
@@ -30,7 +31,7 @@ export function applySecurityMiddleware(app) {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(self)");
+    res.setHeader("Permissions-Policy", LIVE_PERMISSIONS_POLICY);
 
     const publicPath = String(req.path || "");
     const host = String(req.hostname || req.headers.host || "").split(":")[0].toLowerCase();
@@ -57,7 +58,7 @@ export function applySecurityMiddleware(app) {
 
     // Le site historique contient encore quelques scripts/styles inline. CSP reste
     // donc compatible tout en bloquant objets, iframes, base-uri et origines inconnues.
-    res.setHeader("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com; upgrade-insecure-requests");
+    res.setHeader("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' blob:; connect-src 'self' https: stun: turn:; form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com; upgrade-insecure-requests");
     if (process.env.NODE_ENV === "production") res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     next();
   });

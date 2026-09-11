@@ -82,6 +82,7 @@ jobs:
           node --check js/cardoria-live-actions.js
           node --check js/cardoria-live-viewer.js
           node --check js/cardoria-live-publisher.js
+          node --check js/cardoria-live-media.js
       - name: Live Studio V2 contract
         run: node --test backend/tests/live-studio-v2-contract.test.mjs
       - name: Live actions
@@ -92,3 +93,5 @@ jobs:
         run: node --test backend/tests/payment-matrix.test.mjs
       - name: Existing realtime regression
         run: node --test backend/tests/live-realtime-contract.test.mjs
+      - name: Live camera permission tests
+        run: node --test backend/tests/live-camera.test.mjs

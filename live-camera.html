@@ -1,1 +1,109 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Caméra Live Cardoria</title><style>body{margin:0;background:#05070b;color:#fff;font-family:Arial,sans-serif}.wrap{max-width:760px;margin:auto;padding:18px}.card{background:#10131a;border:1px solid #4b3d19;border-radius:16px;padding:16px}video{width:100%;max-height:70vh;background:#000;border-radius:12px}button,select{width:100%;padding:14px;margin-top:10px;border-radius:10px;font-size:16px}button{background:#f3c94f;border:0;font-weight:700}.muted{color:#bbb}</style></head><body><main class="wrap"><h1>Caméra 2 · Live Cardoria</h1><div class="card"><p class="muted">Ouvre ce lien sur le téléphone qui doit servir de deuxième caméra. Autorise la caméra et le micro, puis démarre. Le jeton d'appairage reste dans le fragment du navigateur et n'est pas envoyé dans l'URL HTTP.</p><select id="camera"><option value="">Caméra arrière / automatique</option></select><select id="micro"><option value="">Micro automatique</option></select><video id="preview" autoplay muted playsinline></video><button id="start">Démarrer la caméra 2</button><button id="stop" disabled>Arrêter</button><p id="status">Prêt.</p></div></main><script src="/js/cardoria-live-publisher.js?v=20260911-live-studio-v2"></script><script>(function(){var h=new URLSearchParams(location.hash.replace(/^#/,'')),pair=h.get('pair')||'',pub=null,cam=document.getElementById('camera'),mic=document.getElementById('micro'),status=document.getElementById('status');async function load(){try{var d=await CardoriaLivePublisher.devices();d.cameras.forEach(function(x,i){var o=document.createElement('option');o.value=x.deviceId;o.textContent=x.label||('Caméra '+(i+1));cam.appendChild(o)});d.microphones.forEach(function(x,i){var o=document.createElement('option');o.value=x.deviceId;o.textContent=x.label||('Micro '+(i+1));mic.appendChild(o)})}catch(e){}}document.getElementById('start').onclick=async function(){if(!pair){status.textContent='Lien caméra invalide ou expiré.';return}try{status.textContent='Connexion…';pub=await CardoriaLivePublisher.publish({pairToken:pair,sourceId:'secondary',cameraId:cam.value,microphoneId:mic.value,preview:document.getElementById('preview')});history.replaceState(null,'',location.pathname);pair='';status.textContent='Caméra 2 connectée au Live.';this.disabled=true;document.getElementById('stop').disabled=false}catch(e){status.textContent=e.message||'Connexion impossible.'}};document.getElementById('stop').onclick=async function(){if(pub)await pub.stop();status.textContent='Caméra arrêtée.';this.disabled=true};load()})();</script></body></html>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Caméra Live Cardoria</title>
+  <style>
+    body{margin:0;background:#05070b;color:#fff;font-family:Arial,sans-serif}
+    .wrap{max-width:760px;margin:auto;padding:18px}
+    .card{background:#10131a;border:1px solid #4b3d19;border-radius:16px;padding:16px}
+    video{width:100%;max-height:70vh;background:#000;border-radius:12px}
+    button,select{width:100%;padding:14px;margin-top:10px;border-radius:10px;font-size:16px}
+    button{background:#f3c94f;border:0;font-weight:700}
+    button[disabled]{opacity:.55}
+    .muted{color:#bbb}
+    .error{color:#ffb4b4;margin-top:10px}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>Caméra 2 · Live Cardoria</h1>
+    <div class="card">
+      <p class="muted">Ouvre ce lien sur le téléphone qui doit servir de deuxième caméra. Autorisez Caméra et Microphone pour cardoriashop.fr, puis démarrez. Le jeton d'appairage reste dans le fragment #pair= du navigateur et n'est pas envoyé dans l'URL HTTP.</p>
+      <select id="camera"><option value="">Caméra arrière / automatique</option></select>
+      <select id="micro"><option value="">Micro automatique</option></select>
+      <video id="preview" autoplay muted playsinline></video>
+      <button id="start" type="button">Démarrer la caméra 2</button>
+      <button id="retry" type="button" hidden>Réessayer</button>
+      <button id="stop" type="button" disabled>Arrêter</button>
+      <p id="status">Prêt.</p>
+      <p id="error" class="error" hidden></p>
+    </div>
+  </main>
+  <script src="/js/cardoria-live-media.js?v=20260912-live-camera"></script>
+  <script src="/js/cardoria-live-publisher.js?v=20260912-live-camera"></script>
+  <script>
+    (function () {
+      var h = new URLSearchParams(location.hash.replace(/^#/, ""));
+      var pair = h.get("pair") || "";
+      var pub = null;
+      var cam = document.getElementById("camera");
+      var mic = document.getElementById("micro");
+      var status = document.getElementById("status");
+      var errorBox = document.getElementById("error");
+      var startBtn = document.getElementById("start");
+      var retryBtn = document.getElementById("retry");
+      var stopBtn = document.getElementById("stop");
+      function showError(message, retry) {
+        errorBox.hidden = !message;
+        errorBox.textContent = message || "";
+        retryBtn.hidden = !retry;
+      }
+      async function load() {
+        try {
+          var d = await CardoriaLivePublisher.devices();
+          d.cameras.forEach(function (x, i) {
+            var o = document.createElement("option");
+            o.value = x.deviceId;
+            o.textContent = x.label || ("Caméra " + (i + 1));
+            cam.appendChild(o);
+          });
+          d.microphones.forEach(function (x, i) {
+            var o = document.createElement("option");
+            o.value = x.deviceId;
+            o.textContent = x.label || ("Micro " + (i + 1));
+            mic.appendChild(o);
+          });
+        } catch (e) {}
+      }
+      async function startCamera() {
+        if (!pair) {
+          status.textContent = "Lien caméra invalide ou expiré.";
+          return;
+        }
+        showError("", false);
+        status.textContent = "Connexion…";
+        try {
+          pub = await CardoriaLivePublisher.publish({
+            pairToken:pair,
+            sourceId: "secondary",
+            cameraId: cam.value,
+            microphoneId: mic.value,
+            isMobile: true,
+            preview: document.getElementById("preview")
+          });
+          history.replaceState(null, "", location.pathname);
+          pair = "";
+          status.textContent = "Caméra 2 connectée au Live.";
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+          void load();
+        } catch (e) {
+          showError(e.message || "Connexion impossible.", !e || e.cardoriaRetry !== false);
+          status.textContent = "Caméra non démarrée.";
+        }
+      }
+      startBtn.onclick = startCamera;
+      retryBtn.onclick = startCamera;
+      stopBtn.onclick = async function () {
+        if (pub) await pub.stop();
+        status.textContent = "Caméra arrêtée.";
+        stopBtn.disabled = true;
+        startBtn.disabled = false;
+      };
+      load();
+    })();
+  </script>
+</body>
+</html>

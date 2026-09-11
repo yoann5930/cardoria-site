@@ -43,11 +43,15 @@ jobs:
           node --check backend/lib/boutique/checkout.js
           node --check backend/lib/live/checkout.js
           node --check backend/lib/live/sessions.js
+          node --check backend/lib/live/camera-media.js
+          node --check backend/lib/security/index.js
           node --check js/boutique.js
           node --check js/admin/admin-orders.js
           node --check js/admin/admin-payments.js
       - name: Payment matrix and idempotence tests
         run: node --test backend/tests/payment-matrix.test.mjs
+      - name: Live camera permission tests
+        run: node --test backend/tests/live-camera.test.mjs
       - name: SumUp Boutique and Live Admin wiring
         run: |
           grep -q 'boutique: "sumup"' backend/lib/payments/routing.js
@@ -88,6 +92,11 @@ jobs:
           grep -q '"live_admin":"sumup"' /tmp/matrix.json
           grep -q '"live_seller":"paypal"' /tmp/matrix.json
           if grep -q '"sumup":"retired"' /tmp/matrix.json; then echo "SumUp must not be announced retired"; exit 1; fi
+          curl -sSI http://127.0.0.1:10000/admin-live.html > /tmp/headers.txt
+          grep -qi 'permissions-policy:' /tmp/headers.txt
+          grep -qi 'camera=(self)' /tmp/headers.txt
+          grep -qi 'microphone=(self)' /tmp/headers.txt
+          if grep -Eiq 'camera=\(\)[[:space:],]' /tmp/headers.txt; then echo 'Permissions-Policy still disables camera'; exit 1; fi
           curl --fail --silent http://127.0.0.1:10000/api/payments/status > /tmp/payments.json
           grep -q '"provider":"sumup"' /tmp/payments.json
           code=$(curl -sS -o /tmp/admin.json -w "%{http_code}" http://127.0.0.1:10000/api/admin/payments/summary)
