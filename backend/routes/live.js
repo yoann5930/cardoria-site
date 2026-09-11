@@ -26,7 +26,11 @@ function publicRealtimeSession(session) {
 }
 
 router.get("/matrix", (req, res) => res.json({ ok: true, matrix: PAYMENT_MATRIX, retired: ["revolut"] }));
-router.get("/sessions", (req, res) => { const status = String(req.query.status || "live"); res.json({ ok: true, sessions: listLiveSessions({ status: status === "all" ? undefined : status }).map(publicRealtimeSession) }); });
+router.get("/sessions", (req, res) => {
+  // Public Live listings must never expose drafts, scheduled, ended or cancelled sessions.
+  // Admin/seller history remains available through authenticated routes.
+  res.json({ ok: true, sessions: listLiveSessions({ status: "live" }).map(publicRealtimeSession) });
+});
 router.get("/sessions/:id", (req, res) => { const session = getLiveSession(req.params.id); if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." }); res.json({ ok: true, session: publicRealtimeSession(session) }); });
 router.get("/sessions/:id/admin-access", (req, res) => {
   const session = getLiveSession(req.params.id); if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." });
