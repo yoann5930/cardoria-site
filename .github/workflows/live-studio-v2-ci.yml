@@ -1,0 +1,94 @@
+name: Cardoria Live Studio V2 CI
+on:
+  pull_request:
+    paths:
+      - 'backend/lib/live/**'
+      - 'backend/routes/live**'
+      - 'backend/tests/live-studio-v2-contract.test.mjs'
+      - 'backend/tests/live-actions.test.mjs'
+      - 'backend/tests/live-sale-actions.test.mjs'
+      - 'js/admin/admin-live.js'
+      - 'backend/public/js/admin/admin-live.js'
+      - 'js/live-vendeur.js'
+      - 'backend/public/js/live-vendeur.js'
+      - 'js/live-studio-actions-ui.js'
+      - 'backend/public/js/live-studio-actions-ui.js'
+      - 'js/cardoria-live-actions.js'
+      - 'backend/public/js/cardoria-live-actions.js'
+      - 'js/cardoria-live-viewer.js'
+      - 'backend/public/js/cardoria-live-viewer.js'
+      - 'js/cardoria-live-publisher.js'
+      - 'backend/public/js/cardoria-live-publisher.js'
+      - 'live.html'
+      - 'backend/public/live.html'
+      - 'live-vendeur.html'
+      - 'backend/public/live-vendeur.html'
+      - 'admin-live.html'
+      - 'backend/public/admin-live.html'
+      - 'live-camera.html'
+      - '.github/workflows/live-studio-v2-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/lib/live/**'
+      - 'backend/routes/live**'
+      - 'backend/tests/live-studio-v2-contract.test.mjs'
+      - 'backend/tests/live-actions.test.mjs'
+      - 'backend/tests/live-sale-actions.test.mjs'
+      - 'js/admin/admin-live.js'
+      - 'backend/public/js/admin/admin-live.js'
+      - 'js/live-vendeur.js'
+      - 'backend/public/js/live-vendeur.js'
+      - 'js/live-studio-actions-ui.js'
+      - 'backend/public/js/live-studio-actions-ui.js'
+      - 'js/cardoria-live-actions.js'
+      - 'backend/public/js/cardoria-live-actions.js'
+      - 'js/cardoria-live-viewer.js'
+      - 'backend/public/js/cardoria-live-viewer.js'
+      - 'js/cardoria-live-publisher.js'
+      - 'backend/public/js/cardoria-live-publisher.js'
+      - 'live.html'
+      - 'backend/public/live.html'
+      - 'live-vendeur.html'
+      - 'backend/public/live-vendeur.html'
+      - 'admin-live.html'
+      - 'backend/public/admin-live.html'
+      - 'live-camera.html'
+jobs:
+  live-studio-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.0'
+      - name: Install backend production dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Syntax
+        run: |
+          node --check backend/lib/live/sessions.js
+          node --check backend/lib/live/actions.js
+          node --check backend/lib/live/sale-rules.js
+          node --check backend/lib/live/checkout.js
+          node --check backend/lib/live/realtime-sessions.js
+          node --check backend/routes/live-actions.js
+          node --check backend/routes/live-admin.js
+          node --check backend/routes/live.js
+          node --check backend/routes/live-realtime.js
+          node --check js/admin/admin-live.js
+          node --check js/live-vendeur.js
+          node --check js/live-studio-actions-ui.js
+          node --check js/cardoria-live-actions.js
+          node --check js/cardoria-live-viewer.js
+          node --check js/cardoria-live-publisher.js
+      - name: Live Studio V2 contract
+        run: node --test backend/tests/live-studio-v2-contract.test.mjs
+      - name: Live actions
+        run: node --test backend/tests/live-actions.test.mjs
+      - name: Live action sale pricing
+        run: node --test backend/tests/live-sale-actions.test.mjs
+      - name: Existing payment matrix regression
+        run: node --test backend/tests/payment-matrix.test.mjs
+      - name: Existing realtime regression
+        run: node --test backend/tests/live-realtime-contract.test.mjs

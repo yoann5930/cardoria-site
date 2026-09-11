@@ -7,11 +7,13 @@ import { MarketplaceAuthError, assertSellerSession } from "../lib/marketplace/v1
 import { PAYMENT_MATRIX } from "../lib/payments/routing.js";
 import { createLiveCheckout, planLiveCheckout } from "../lib/live/checkout.js";
 import liveRealtimeRoutes from "./live-realtime.js";
+import liveActionRoutes from "./live-actions.js";
 import { isRealtimePublished } from "../lib/live/realtime-sessions.js";
 import { createLiveSession, getLiveSession, listLiveCheckouts, listLiveSessions, publicLiveSession, resolveAdminLiveAccess, setLiveStatus, updateLiveSession } from "../lib/live/sessions.js";
 
 const router = Router();
 router.use("/webrtc", liveRealtimeRoutes);
+router.use("/actions", liveActionRoutes);
 
 function fail(res, error, fallback = 400) {
   return res.status(error?.status || error?.code || fallback).json({ ok: false, error: error?.message || "Erreur Live", provider: error?.provider || error?.expectedProvider, expectedProvider: error?.expectedProvider, requestedProvider: error?.requestedProvider });
@@ -20,11 +22,7 @@ function sellerActor(req) { const seller = assertSellerSession(req); return { ro
 function publicRealtimeSession(session) {
   const live = publicLiveSession(session);
   if (!live) return null;
-  return {
-    ...live,
-    mimeType: "application/x-cloudflare-webrtc",
-    streamPublished: isRealtimePublished(live.id)
-  };
+  return { ...live, mimeType: "application/x-cloudflare-webrtc", streamPublished: isRealtimePublished(live.id) };
 }
 
 router.get("/matrix", (req, res) => res.json({ ok: true, matrix: PAYMENT_MATRIX, retired: ["revolut"] }));
