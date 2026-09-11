@@ -19,14 +19,40 @@
     });
   }
 
+  var publisherHandle = null;
+
+  function publishLive(liveId) {
+    if (!window.CardoriaLivePublisher) {
+      alert("Module de diffusion Live indisponible.");
+      return;
+    }
+    var preview = document.getElementById("lvPreview");
+    Promise.resolve(publisherHandle ? publisherHandle.stop() : null).then(function () {
+      publisherHandle = null;
+      return api("/seller/sessions/" + encodeURIComponent(liveId) + "/start", { method: "POST", body: "{}" });
+    }).then(function () {
+      return window.CardoriaLivePublisher.publish({
+        liveId: liveId,
+        token: M.getToken(),
+        preview: preview
+      });
+    }).then(function (handle) {
+      publisherHandle = handle;
+      var state = document.getElementById("lvPublishState");
+      if (state) state.textContent = "Diffusion WebRTC en cours.";
+    }).catch(function (e) { alert(e.message); });
+  }
+
   function render(sessions) {
     root.innerHTML =
       "<p><strong>Paiement forcé : PayPal</strong></p>" +
+      "<p id='lvPublishState'>Après le démarrage, autorisez caméra/micro puis diffusez.</p>" +
+      "<video id='lvPreview' muted playsinline autoplay style='width:min(420px,100%);border-radius:12px;background:#000'></video>" +
       "<div><input id='lvTitle' placeholder='Titre' value='Live vendeur'><input id='lvProduct' placeholder='Lot' value='Carte Live'><input id='lvPrice' type='number' min='1' step='0.01' value='9.90'> <button type='button' id='lvCreate'>Créer</button></div>" +
       "<h2>Mes Lives</h2>" +
       (sessions || []).map(function (s) {
         return "<div style='border:1px solid rgba(212,175,55,.25);padding:12px;margin:8px 0;border-radius:8px'><strong>" + M.esc(s.title) + "</strong> — " + M.esc(s.status) + " — " + M.esc(s.paymentProvider) +
-          "<div style='margin-top:8px'><button type='button' data-start='" + M.esc(s.id) + "'>Démarrer</button> <button type='button' data-stop='" + M.esc(s.id) + "'>Arrêter</button></div></div>";
+          "<div style='margin-top:8px'><button type='button' data-start='" + M.esc(s.id) + "'>Démarrer</button> <button type='button' data-publish='" + M.esc(s.id) + "'>Diffuser caméra</button> <button type='button' data-stop='" + M.esc(s.id) + "'>Arrêter</button></div></div>";
       }).join("") || "<p>Aucun Live vendeur.</p>";
     var createBtn = document.getElementById("lvCreate");
     createBtn.onclick = function () {
@@ -41,6 +67,9 @@
     };
     root.querySelectorAll("[data-start]").forEach(function (btn) {
       btn.onclick = function () { btn.disabled = true; api("/seller/sessions/" + encodeURIComponent(btn.dataset.start) + "/start", { method: "POST", body: "{}" }).then(load).catch(function (e) { alert(e.message); }).finally(function () { btn.disabled = false; }); };
+    });
+    root.querySelectorAll("[data-publish]").forEach(function (btn) {
+      btn.onclick = function () { publishLive(btn.dataset.publish); };
     });
     root.querySelectorAll("[data-stop]").forEach(function (btn) {
       btn.onclick = function () { btn.disabled = true; api("/seller/sessions/" + encodeURIComponent(btn.dataset.stop) + "/stop", { method: "POST", body: "{}" }).then(load).catch(function (e) { alert(e.message); }).finally(function () { btn.disabled = false; }); };

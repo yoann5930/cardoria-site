@@ -87,6 +87,7 @@ jobs:
           grep -q '"boutique":"sumup"' /tmp/matrix.json
           grep -q '"live_admin":"sumup"' /tmp/matrix.json
           grep -q '"live_seller":"paypal"' /tmp/matrix.json
+          if grep -q '"sumup":"retired"' /tmp/matrix.json; then echo "SumUp must not be announced retired"; exit 1; fi
           curl --fail --silent http://127.0.0.1:10000/api/payments/status > /tmp/payments.json
           grep -q '"provider":"sumup"' /tmp/payments.json
           code=$(curl -sS -o /tmp/admin.json -w "%{http_code}" http://127.0.0.1:10000/api/admin/payments/summary)

@@ -19,9 +19,10 @@
       "<tr><th>Base SQLite</th><td>" + badge(c.database?.ok) + " " + (c.database?.cards ?? 0) + " cartes</td></tr>" +
       "<tr><th>OpenAI</th><td>" + badge(c.openai?.ok) + "</td></tr>" +
       "<tr><th>SMTP</th><td>" + badge(c.smtp?.ok) + "</td></tr>" +
-      "<tr><th>Revolut</th><td>" + badge(c.revolut?.ok) + "</td></tr>" +
+      "<tr><th>SumUp</th><td>" + badge(c.sumup?.ok) + "</td></tr>" +
       "<tr><th>PayPal</th><td>" + badge(c.paypal?.ok) + "</td></tr>" +
-      "<tr><th>SumUp</th><td>" + (c.sumup && c.sumup.retired ? '<span class="admin-badge">Retiré</span>' : badge(false)) + "</td></tr>" +
+      "<tr><th>Cloudflare Live</th><td>" + badge(c.cloudflareRealtime?.ok) + "</td></tr>" +
+      "<tr><th>Revolut</th><td>" + (c.revolut && c.revolut.retired ? '<span class="admin-badge">Retiré</span>' : badge(false)) + "</td></tr>" +
       "<tr><th>PostgreSQL</th><td>" + badge(c.postgres?.configured) + " <span style='color:#baaf97'>" + (c.postgres?.note || "") + "</span></td></tr>" +
       "<tr><th>Cache</th><td>" + (h.cache?.entries || 0) + " entrées</td></tr>" +
       "<tr><th>Sauvegardes</th><td>" + (h.backups?.count || 0) + " — dernière : " + (h.backups?.latest?.createdAt || "—") + "</td></tr>" +
