@@ -45,6 +45,13 @@
 .admin-live-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .admin-live-actions .btn{white-space:nowrap}
 .admin-live-camera-error{color:#ff8a8a;font-weight:700;max-width:720px;line-height:1.45}
+.admin-live-camera-warn{color:#ffe18a;font-weight:700;max-width:720px;line-height:1.45}
+.admin-live-cameras{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:18px 0}
+.admin-live-camera-block{padding:16px;border:1px solid rgba(212,175,55,.22);border-radius:14px;background:rgba(255,255,255,.02)}
+.admin-live-camera-block h3{margin:0 0 8px;color:#ffe18a;font-size:16px}
+.admin-live-camera-block.is-disabled{opacity:.55}
+.admin-live-camera-block video{width:100%;max-height:240px;border-radius:12px;background:#000;margin:10px 0;display:block}
+.admin-live-cam-mute{display:flex;gap:8px;align-items:center;color:#baaf97;font-size:13px;margin:8px 0}
 .admin-badge{display:inline-flex;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;text-transform:uppercase}
 .admin-badge--ok{background:rgba(76,175,125,.15);color:#8fd4a8}
 .admin-badge--warn{background:rgba(212,175,55,.15);color:#ffe18a}
@@ -62,5 +69,5 @@
 .admin-form-grid input,.admin-form-grid textarea{background:rgba(255,255,255,.06);color:#fff8e8}
 .admin-form-grid textarea{resize:vertical}
 .admin-form-wide{grid-column:1/-1}
-@media(max-width:1024px){.admin-layout{grid-template-columns:1fr}.admin-sidebar{position:relative;height:auto}.admin-main::before{left:50%;width:min(88vw,760px);height:min(88vw,760px)}.admin-kpi-grid{grid-template-columns:repeat(2,1fr)}.admin-grid-2{grid-template-columns:1fr}}
+@media(max-width:1024px){.admin-layout{grid-template-columns:1fr}.admin-sidebar{position:relative;height:auto}.admin-main::before{left:50%;width:min(88vw,760px);height:min(88vw,760px)}.admin-kpi-grid{grid-template-columns:repeat(2,1fr)}.admin-grid-2{grid-template-columns:1fr}.admin-live-cameras{grid-template-columns:1fr}}
 @media(max-width:640px){.admin-main{padding:18px 16px 32px}.admin-kpi-grid{grid-template-columns:1fr}.admin-form-grid{grid-template-columns:1fr}.admin-form-wide{grid-column:auto}}

@@ -92,3 +92,65 @@ export function explainGetUserMediaError(error, { host = "cardoriashop.fr" } = {
     text: "Impossible d’ouvrir la caméra. Vérifiez les autorisations Caméra et Microphone, puis réessayez."
   };
 }
+
+export const LIVE_SOURCE_PRIMARY = "primary";
+export const LIVE_SOURCE_SECONDARY = "secondary";
+export const LIVE_MAX_PUBLISHERS = 2;
+
+export function sameCameraSelected(cameraIdA, cameraIdB) {
+  const a = String(cameraIdA || "");
+  const b = String(cameraIdB || "");
+  return Boolean(a && b && a === b);
+}
+
+export function assignDistinctCameras({ cameras = [], primaryId = "", secondaryId = "", occupiedIds = [] } = {}) {
+  const ids = (cameras || []).map((item) => String(item?.deviceId || item || "")).filter(Boolean);
+  const occupied = new Set((occupiedIds || []).map((item) => String(item || "")).filter(Boolean));
+  let primary = String(primaryId || "");
+  let secondary = String(secondaryId || "");
+  if (!primary) primary = ids.find((id) => !occupied.has(id)) || ids[0] || "";
+  if (!secondary) secondary = ids.find((id) => id !== primary && !occupied.has(id)) || "";
+  const conflict = sameCameraSelected(primary, secondary);
+  return {
+    primary,
+    secondary,
+    conflict,
+    distinctAvailable: ids.filter((id, index) => ids.indexOf(id) === index).length >= 2
+  };
+}
+
+export function describeSourceState(state = "inactive") {
+  const key = String(state || "inactive");
+  const labels = {
+    inactive: "inactive",
+    connecting: "connexion",
+    live: "diffusion",
+    error: "erreur",
+    phone: "téléphone"
+  };
+  return labels[key] || labels.inactive;
+}
+
+export function canStartSecondaryPc({ phonePaired = false, sourceCount = 0, max = LIVE_MAX_PUBLISHERS } = {}) {
+  if (phonePaired) {
+    return {
+      ok: false,
+      code: "PHONE_SECONDARY",
+      retry: true,
+      text: "Caméra 2 est déjà utilisée par le téléphone. Arrêtez Caméra 2 / téléphone avant de lancer Caméra 2 PC."
+    };
+  }
+  if (Number(sourceCount) >= Number(max) && Number(max) > 0) {
+    return {
+      ok: false,
+      code: "LIVE_CAMERA_LIMIT",
+      retry: false,
+      text: "Deux caméras maximum sont autorisées sur ce Live."
+    };
+  }
+  return { ok: true, code: "", retry: false, text: "" };
+}
+
+export function thirdSourceMessage() {
+  return "Deux caméras maximum sont autorisées sur ce Live. Arrêtez une source avant d’en lancer une troisième.";
+}
