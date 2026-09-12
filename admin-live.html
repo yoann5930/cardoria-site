@@ -5,15 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>Lives — Cardoria Enterprise</title>
-<link rel="stylesheet" href="/style.css?v=20260912-dual-cameras">
-<link rel="stylesheet" href="/css/admin.css?v=20260912-dual-cameras">
+<link rel="stylesheet" href="/style.css?v=20260912-live-admin-session">
+<link rel="stylesheet" href="/css/admin.css?v=20260912-live-admin-session">
 <link rel="icon" href="/assets/logo/cardoria-premium.png">
+<script>
+(function(){
+  try {
+    var expires = Number(localStorage.getItem("cardoria_admin_handoff_expires") || 0);
+    if (expires && expires <= Date.now()) {
+      ["cardoria_admin_handoff_token","cardoria_admin_handoff_email","cardoria_admin_handoff_csrf","cardoria_admin_handoff_expires"].forEach(function(k){ localStorage.removeItem(k); });
+      return;
+    }
+    if (!sessionStorage.getItem("cardoria_session_token") && expires > Date.now()) {
+      var token = localStorage.getItem("cardoria_admin_handoff_token") || "";
+      if (token) {
+        sessionStorage.setItem("cardoria_admin_connected", "yes");
+        sessionStorage.setItem("cardoria_session_token", token);
+        sessionStorage.setItem("cardoria_admin_email", localStorage.getItem("cardoria_admin_handoff_email") || "");
+        var csrf = localStorage.getItem("cardoria_admin_handoff_csrf") || "";
+        if (csrf) sessionStorage.setItem("cardoria_csrf_token", csrf);
+      }
+    }
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
-<script src="/js/admin/admin-core.js?v=20260912-dual-cameras"></script>
+<script src="/js/admin/admin-core.js?v=20260912-live-admin-session"></script>
 <script src="/js/cardoria-live-media.js?v=20260912-dual-cameras"></script>
 <script src="/js/cardoria-live-publisher.js?v=20260912-dual-cameras"></script>
-<script src="/js/admin/admin-live.js?v=20260912-dual-cameras"></script>
+<script src="/js/admin/admin-live.js?v=20260912-live-admin-session"></script>
 <script src="/js/live-studio-actions-ui.js?v=20260912-dual-cameras"></script>
 </body>
 </html>
