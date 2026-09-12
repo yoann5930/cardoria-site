@@ -3,12 +3,12 @@
   var ICE = { iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }, { urls: "stun:stun.l.google.com:19302" }], bundlePolicy: "max-bundle" };
   function waitIce(pc) { if (pc.iceGatheringState === "complete") return Promise.resolve(); return new Promise(function (resolve) { var done=false; function finish(){if(!done){done=true;resolve();}} pc.addEventListener("icegatheringstatechange",function(){if(pc.iceGatheringState==="complete")finish();}); setTimeout(finish,3000); }); }
   function usedCameraId(stream, fallback) { try { var track=stream&&stream.getVideoTracks&&stream.getVideoTracks()[0]; var settings=track&&track.getSettings?track.getSettings():{}; return String(settings.deviceId||fallback||""); } catch (e) { return String(fallback||""); } }
-  async function devices() { if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return { cameras: [], microphones: [] }; var list=await navigator.mediaDevices.enumerateDevices(); return { cameras:list.filter(function(d){return d.kind==="videoinput";}), microphones:list.filter(function(d){return d.kind==="audioinput";}) }; }
+  async function devices() { if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return { cameras: [], microphones: [] }; var list=await navigator.mediaDevices.enumerateDevices(); return { cameras:list.filter(function(d){return d.kind==="videoinput";}), microphones:list.filter(function(d){return d.kind==="audioinput";} ) }; }
   async function post(path,body,headers){var response=await fetch(path,{method:"POST",headers:headers,body:JSON.stringify(body),cache:"no-store"});var payload=await response.json().catch(function(){return{};});if(!response.ok||payload.ok===false)throw new Error(payload.error||"Publication WebRTC impossible.");return payload;}
   async function publish(opts) {
-    opts=opts||{}; var liveId=String(opts.liveId||""),token=String(opts.token||""),pairToken=String(opts.pairToken||""),sourceId=String(opts.sourceId||(pairToken?"secondary":"primary")),preview=opts.preview;
+    opts=opts||{}; var liveId=String(opts.liveId||""),token=String(opts.token||""),grantToken=String(opts.grantToken||""),pairToken=String(opts.pairToken||""),sourceId=String(opts.sourceId||(pairToken?"secondary":"primary")),preview=opts.preview;
     if(!liveId&&!pairToken)throw new Error("Identifiant Live manquant."); if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error("Ce navigateur ne peut pas publier de caméra/micro.");
-    var headers={Accept:"application/json","Content-Type":"application/json"}; if(token)headers.Authorization="Bearer "+token;
+    var headers={Accept:"application/json","Content-Type":"application/json"}; if(token)headers.Authorization="Bearer "+token; if(grantToken)headers["x-live-admin-grant"]=grantToken;
     var stream;
     if(global.CardoriaLiveMedia&&CardoriaLiveMedia.getUserMediaStream){
       stream=await CardoriaLiveMedia.getUserMediaStream({cameraId:opts.cameraId,microphoneId:opts.microphoneId,audio:opts.audio,isMobile:opts.isMobile});
