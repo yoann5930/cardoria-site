@@ -2,13 +2,13 @@ import { Router } from "express";
 import { ADMIN_ROLES } from "../lib/auth.js";
 import { validateSession } from "../lib/auth/session.js";
 import { assertSellerSession } from "../lib/marketplace/v1/security.js";
-import { getLiveSession } from "../lib/live/sessions.js";
+import { getLiveSession, resolveAdminLiveAccess } from "../lib/live/sessions.js";
 import { isCloudflareRealtimeConfigured } from "../lib/live/cloudflare-realtime.js";
 import { answerRealtimeViewer, heartbeatRealtimeViewer, realtimeStatus, realtimeStatusForLive, realtimeProvider, startRealtimePublisher, startRealtimeViewer, stopRealtimePublisher, stopRealtimeViewer, createPublisherPair, claimPublisherPair, pollRealtimePublisherOffers, submitRealtimePublisherAnswer, submitRealtimeViewerOffer, pollRealtimeViewerAnswers } from "../lib/live/realtime-sessions.js";
 
 const router=Router();
 function token(req){return String(req.headers.authorization||"").replace(/^Bearer\s+/i,"")||String(req.headers["x-session-token"]||"");}
-function publisherActor(req,liveId){const live=getLiveSession(liveId);if(!live)throw Object.assign(new Error("Live introuvable."),{status:404});const user=validateSession(token(req));if(user&&ADMIN_ROLES.includes(user.role))return user;const seller=assertSellerSession(req);return{role:"seller",id:seller.id,sellerId:seller.id,email:seller.email};}
+function publisherActor(req,liveId){const live=getLiveSession(liveId);if(!live)throw Object.assign(new Error("Live introuvable."),{status:404});const user=validateSession(token(req));if(user&&ADMIN_ROLES.includes(user.role))return user;const access=resolveAdminLiveAccess({liveId,grantToken:String(req.headers["x-live-admin-grant"]||""),actor:null});if(access&&access.accessRole==="admin"&&access.accessContext==="cardoria")return{role:"admin",id:"cardoria-live-grant",email:""};const seller=assertSellerSession(req);return{role:"seller",id:seller.id,sellerId:seller.id,email:seller.email};}
 function fail(res,error){const raw=Number(error?.status||error?.code),status=Number.isInteger(raw)&&raw>=400&&raw<=599?raw:400;res.status(status).json({ok:false,error:error?.message||"Erreur Live WebRTC",code:error?.code||"LIVE_WEBRTC_ERROR"});}
 router.get("/status",(req,res)=>res.json({ok:true,provider:realtimeProvider(),configured:true,cloudflareConfigured:isCloudflareRealtimeConfigured(),...realtimeStatus()}));
 router.get("/status/:liveId",(req,res)=>{const live=getLiveSession(req.params.liveId);if(!live)return res.status(404).json({ok:false,error:"Live introuvable."});res.json({ok:true,provider:realtimeProvider(),configured:true,cloudflareConfigured:isCloudflareRealtimeConfigured(),...realtimeStatusForLive(req.params.liveId)});});
