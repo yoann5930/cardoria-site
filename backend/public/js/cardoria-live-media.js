@@ -63,7 +63,9 @@
     var host = opts.host || (typeof location !== "undefined" && location.hostname) || "cardoriashop.fr";
     var name = String(error && error.name || "");
     var message = String(error && error.message || "");
-    if (name === "NotAllowedError" || /permission denied/i.test(message)) return { code: "NotAllowedError", retry: true, text: "Le navigateur a refusé l’accès à la caméra ou au microphone. Dans les paramètres du site, autorisez Caméra et Microphone pour " + host + ", puis cliquez sur Réessayer." };
+    if (name === "NotAllowedError" || /permission denied/i.test(message)) {
+      return { code: "NotAllowedError", retry: true, text: "Le navigateur a refusé l’accès à la caméra ou au microphone. Dans les paramètres du site, autorisez Caméra et Microphone pour " + host + ", puis cliquez sur Réessayer." };
+    }
     if (name === "NotFoundError" || name === "DevicesNotFoundError") return { code: "NotFoundError", retry: true, text: "Aucune caméra ou aucun microphone n’a été détecté. Branchez une webcam ou autorisez l’accès aux périphériques, puis réessayez." };
     if (name === "NotReadableError" || name === "TrackStartError") return { code: "NotReadableError", retry: true, text: "La caméra ou le microphone est déjà utilisé par une autre application. Fermez cet autre programme, puis réessayez." };
     if (name === "OverconstrainedError" || name === "ConstraintNotSatisfiedError") return { code: "OverconstrainedError", retry: true, text: "Cette caméra ne correspond pas aux contraintes demandées. Une autre webcam disponible va être utilisée, ou choisissez un périphérique dans la liste." };
