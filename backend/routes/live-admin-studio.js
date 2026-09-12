@@ -1,7 +1,8 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { ADMIN_ROLES } from "../lib/auth.js";
 import { validateSession } from "../lib/auth/session.js";
-import { getLiveSession, listLiveCheckouts, publicLiveSession, resolveAdminLiveAccess, setLiveStatus } from "../lib/live/sessions.js";
+import { getLiveSession, listLiveCheckouts, publicLiveSession, resolveAdminLiveAccess, setLiveStatus, updateLiveSession } from "../lib/live/sessions.js";
 import { drawGiveaway, getLiveActionState, pinLiveProduct, startAuction, startBreak, startFlashSale, startGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
 
 const router = Router();
@@ -19,6 +20,15 @@ function snapshot(liveId){const live=getLiveSession(liveId);return{session:publi
 router.get("/:liveId",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,...snapshot(req.params.liveId)});}catch(error){fail(res,error);}});
 router.post("/:liveId/start",(req,res)=>{try{const {actor}=actorFor(req,req.params.liveId);const session=setLiveStatus(req.params.liveId,"live",actor,{adminOverride:true});res.json({ok:true,session:publicLiveSession(session)});}catch(error){fail(res,error);}});
 router.post("/:liveId/stop",(req,res)=>{try{const {actor}=actorFor(req,req.params.liveId);const session=setLiveStatus(req.params.liveId,"ended",actor,{adminOverride:true});res.json({ok:true,session:publicLiveSession(session)});}catch(error){fail(res,error);}});
+router.post("/:liveId/products",(req,res)=>{try{
+  const {actor,live}=actorFor(req,req.params.liveId),body=req.body||{};
+  const name=String(body.name||"").trim().slice(0,160); if(!name) throw Object.assign(new Error("Nom du lot obligatoire."),{status:400});
+  const mode=["auction","giveaway","break","flash","buy_now"].includes(String(body.mode||"").toLowerCase())?String(body.mode).toLowerCase():"buy_now";
+  const price=mode==="giveaway"?0:Math.round((Number(body.price)||0)*100)/100; if(mode!=="giveaway"&&price<=0) throw Object.assign(new Error("Prix du lot obligatoire."),{status:400});
+  const stock=Math.max(1,Math.min(1000,Math.trunc(Number(body.stock)||1))),product={id:"LOT-"+crypto.randomUUID(),name,price,qty:stock,stock,mode};
+  const session=updateLiveSession(req.params.liveId,{products:[...(live.products||[]),product]},actor,{adminOverride:true});
+  res.json({ok:true,product,session:publicLiveSession(session)});
+}catch(error){fail(res,error);}});
 router.post("/:liveId/actions/pin",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,state:pinLiveProduct(req.params.liveId,req.body?.productId)});}catch(error){fail(res,error);}});
 router.post("/:liveId/actions/unpin",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,state:unpinLiveProduct(req.params.liveId)});}catch(error){fail(res,error);}});
 router.post("/:liveId/actions/auction/start",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,auction:startAuction(req.params.liveId,req.body||{})});}catch(error){fail(res,error);}});
