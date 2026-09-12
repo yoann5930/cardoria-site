@@ -8,12 +8,14 @@ import { PAYMENT_MATRIX } from "../lib/payments/routing.js";
 import { createLiveCheckout, planLiveCheckout } from "../lib/live/checkout.js";
 import liveRealtimeRoutes from "./live-realtime.js";
 import liveActionRoutes from "./live-actions.js";
+import liveAdminStudioRoutes from "./live-admin-studio.js";
 import { isRealtimePublished } from "../lib/live/realtime-sessions.js";
 import { createLiveSession, getLiveSession, listLiveCheckouts, listLiveSessions, publicLiveSession, resolveAdminLiveAccess, setLiveStatus, updateLiveSession } from "../lib/live/sessions.js";
 
 const router = Router();
 router.use("/webrtc", liveRealtimeRoutes);
 router.use("/actions", liveActionRoutes);
+router.use("/admin-studio", liveAdminStudioRoutes);
 
 function fail(res, error, fallback = 400) {
   return res.status(error?.status || error?.code || fallback).json({ ok: false, error: error?.message || "Erreur Live", provider: error?.provider || error?.expectedProvider, expectedProvider: error?.expectedProvider, requestedProvider: error?.requestedProvider });
