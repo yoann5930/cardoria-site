@@ -4,12 +4,22 @@
   // L'administration doit joindre l'API locale du même hôte.
   const BACKEND = window.CARDORIA_ADMIN_BACKEND || (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "";
   const ADMIN_ROLES = ["super_admin", "admin", "employee"];
+  const HANDOFF_TTL_MS = 10 * 60 * 1000;
 
   function qs(id) { return document.getElementById(id); }
 
   function clearMessages() {
     if (qs("loginError")) qs("loginError").textContent = "";
     if (qs("loginSuccess")) qs("loginSuccess").textContent = "";
+  }
+
+  function saveAdminHandoff(data, email) {
+    try {
+      localStorage.setItem("cardoria_admin_handoff_token", data.token || "");
+      localStorage.setItem("cardoria_admin_handoff_email", data.user?.email || email || "");
+      localStorage.setItem("cardoria_admin_handoff_csrf", data.csrfToken || "");
+      localStorage.setItem("cardoria_admin_handoff_expires", String(Date.now() + HANDOFF_TTL_MS));
+    } catch (error) {}
   }
 
   function finalizeSession(data, fallbackEmail) {
@@ -23,6 +33,7 @@
     if (data.csrfToken) sessionStorage.setItem("cardoria_csrf_token", data.csrfToken);
     sessionStorage.removeItem("cardoria_admin_code");
     sessionStorage.removeItem("cardoria_2fa_challenge");
+    saveAdminHandoff(data, fallbackEmail);
     location.href = "/admin.html";
   }
 
