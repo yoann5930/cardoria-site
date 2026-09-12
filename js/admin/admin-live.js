@@ -82,7 +82,20 @@
     selectedLiveId = String(id || selectedLiveId || "");
     var session = selectedSession();
     var node = A.qs("#liveSelectedSession");
-    if (node) node.textContent = session ? ("Live sélectionné : " + session.title + " (" + session.status + ")") : "Live sélectionné : créez ou démarrez un Live dans le tableau.";
+    if (node) node.textContent = session ? ("Live sélectionné : " + session.title + " (" + session.status + ")") : "Live sélectionné : créez un Live puis préparez vos lots.";
+    var status = A.qs("#liveStudioStatus");
+    if (status) status.textContent = session ? ("Salle " + session.status) : "Aucune salle";
+    ["#liveGoStart", "#liveGoPause", "#liveGoEnd", "#liveGoWatch", "#liveGoCancel"].forEach(function (sel) {
+      var btn = A.qs(sel);
+      if (btn) {
+        if (btn.hasAttribute("data-start")) btn.setAttribute("data-start", selectedLiveId);
+        if (btn.hasAttribute("data-stop")) btn.setAttribute("data-stop", selectedLiveId);
+        if (btn.hasAttribute("data-cancel")) btn.setAttribute("data-cancel", selectedLiveId);
+        if (btn.hasAttribute("data-enter-live")) btn.setAttribute("data-enter-live", selectedLiveId);
+      }
+    });
+    window.CardoriaLiveSelectedId = selectedLiveId;
+    window.dispatchEvent(new CustomEvent("cardoria-live-selected", { detail: { id: selectedLiveId, session: session } }));
   }
   function fillOneSelect(select, items, placeholder, preferred) {
     if (!select) return;
@@ -153,7 +166,7 @@
     A.qs("#liveBody").innerHTML = listedSessions.map(function (s) {
       var products = (s.products || []).map(function (p) { return esc(p.name) + " · " + esc(p.mode) + (p.mode === "giveaway" ? " gratuit" : " · " + A.euro(p.price)); }).join("<br>") || "Aucune vente configurée";
       var selected = s.id === selectedLiveId ? " btn-primary" : "";
-      return "<tr><td>" + esc(s.title) + "</td><td>" + esc(s.status) + "</td><td><strong>" + (s.ownerRole === "seller" ? "PayPal" : "SumUp") + "</strong></td><td>" + products + "</td><td class='admin-live-actions'><button class='btn" + selected + "' data-select='" + esc(s.id) + "'>Sélectionner</button> <button class='btn btn-primary' data-enter='" + esc(s.id) + "'>Studio</button> <button class='btn btn-secondary' data-start='" + esc(s.id) + "'>Démarrer</button> <button class='btn btn-primary' data-cam1='" + esc(s.id) + "'>Caméra 1</button> <button class='btn btn-secondary' data-cam2pc='" + esc(s.id) + "'>Caméra 2 PC</button> <button class='btn btn-primary' data-cam2='" + esc(s.id) + "'>Caméra 2 / téléphone</button> <button class='btn btn-secondary' data-stop='" + esc(s.id) + "'>Arrêter</button></td></tr>";
+      return "<tr><td>" + esc(s.title) + "</td><td>" + esc(s.status) + "</td><td><strong>" + (s.ownerRole === "seller" ? "PayPal" : "SumUp") + "</strong></td><td>" + products + "</td><td class='admin-live-actions'><button class='btn" + selected + "' data-select='" + esc(s.id) + "'>Sélectionner</button> <button class='btn btn-secondary' data-enter-live='" + esc(s.id) + "'>Voir comme spectateur</button> <button class='btn' data-cancel='" + esc(s.id) + "'>Annuler</button></td></tr>";
     }).join("") || "<tr><td colspan='5'>Aucun Live</td></tr>";
     if (!selectedLiveId && listedSessions[0]) selectedLiveId = listedSessions[0].id;
     setSelectedLive(selectedLiveId);
@@ -163,32 +176,38 @@
     A.qs("#liveBody").querySelectorAll("[data-select]").forEach(function (b) {
       b.onclick = function () { setSelectedLive(b.dataset.select); renderSessions(listedSessions); };
     });
-    A.qs("#liveBody").querySelectorAll("[data-enter]").forEach(function (b) {
-      b.onclick = function () {
-        A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(b.dataset.enter) + "/enter", { method: "POST", body: "{}" }).then(function (d) {
-          var u = (d.access && d.access.url) || ("/live.html?session=" + encodeURIComponent(b.dataset.enter));
-          if (d.access && d.access.grantToken) u += "#cardoriaAdminGrant=" + encodeURIComponent(d.access.grantToken);
-          location.href = u;
-        }).catch(function (e) { alert(e.message); });
+    A.qs("#liveBody").querySelectorAll("[data-enter-live]").forEach(function (btn) {
+      btn.onclick = function () {
+        var liveWindow = window.open("about:blank", "_blank");
+        A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(btn.dataset.enterLive) + "/enter", { method: "POST", body: "{}" }).then(function (d) {
+          var liveUrl = (d.access && d.access.url) || ("/live.html?session=" + encodeURIComponent(btn.dataset.enterLive));
+          if (d.access && d.access.grantToken) liveUrl += "#cardoriaAdminGrant=" + encodeURIComponent(d.access.grantToken);
+          if (liveWindow) liveWindow.location.href = liveUrl;
+          else location.assign(liveUrl);
+        }).catch(function (e) {
+          if (liveWindow) liveWindow.close();
+          alert(e.message);
+        });
       };
     });
-    A.qs("#liveBody").querySelectorAll("[data-start]").forEach(function (b) {
+    A.qs("#liveBody").querySelectorAll("[data-cancel]").forEach(function (b) {
       b.onclick = function () {
-        setSelectedLive(b.dataset.start);
-        A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(b.dataset.start) + "/start", { method: "POST", body: "{}" }).then(load);
+        if (!confirm("Annuler cette salle Live ?")) return;
+        A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(b.dataset.cancel) + "/cancel", { method: "POST", body: "{}" }).then(load);
       };
     });
-    A.qs("#liveBody").querySelectorAll("[data-cam1]").forEach(function (b) {
-      b.onclick = function () { setSelectedLive(b.dataset.cam1); publishCamera(b.dataset.cam1, "primary", "Caméra 1"); };
-    });
-    A.qs("#liveBody").querySelectorAll("[data-cam2pc]").forEach(function (b) {
-      b.onclick = function () { setSelectedLive(b.dataset.cam2pc); publishCamera(b.dataset.cam2pc, "secondary", "Caméra 2 PC"); };
-    });
-    A.qs("#liveBody").querySelectorAll("[data-cam2]").forEach(function (b) {
-      b.onclick = function () { setSelectedLive(b.dataset.cam2); pairSecond(b.dataset.cam2); };
-    });
-    A.qs("#liveBody").querySelectorAll("[data-stop]").forEach(function (b) {
-      b.onclick = function () { A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(b.dataset.stop) + "/stop", { method: "POST", body: "{}" }).then(load); };
+  }
+  function openSpectator(id) {
+    if (!id) return alert("Sélectionnez un Live.");
+    var liveWindow = window.open("about:blank", "_blank");
+    A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(id) + "/enter", { method: "POST", body: "{}" }).then(function (d) {
+      var liveUrl = (d.access && d.access.url) || ("/live.html?session=" + encodeURIComponent(id));
+      if (d.access && d.access.grantToken) liveUrl += "#cardoriaAdminGrant=" + encodeURIComponent(d.access.grantToken);
+      if (liveWindow) liveWindow.location.href = liveUrl;
+      else location.assign(liveUrl);
+    }).catch(function (e) {
+      if (liveWindow) liveWindow.close();
+      alert(e.message);
     });
   }
   function cameraChoice(sourceId) {
@@ -353,8 +372,51 @@
     A.adminFetch("/api/admin/live/sessions").then(function (d) { renderSessions(d.sessions || []); });
     refreshPayments();
   }
-  A.renderShell("live", "Studio Live Cardoria", "Salle Live indépendante des ventes : aucun prix ni paiement pour démarrer.",
-    '<div class="admin-panel"><h2>Nouveau Live</h2><div class="admin-filters"><input id="liveTitle" placeholder="Titre du Live" value="Live Cardoria"><button class="btn btn-primary" id="liveCreate">Créer le Live</button></div><p>Dans le Live : <strong>aucune vente, achat immédiat, enchère, vente flash, giveaway ou ouverture/break</strong>.</p><p><strong>Paiement :</strong> Cardoria/Admin = SumUp uniquement lors d’une vente. Vendeur tiers = PayPal + commission.</p><p><strong>Vidéo :</strong> 2 sources maximum. Caméra 1 et Caméra 2 PC ont chacune leur webcam, micro et aperçu. Caméra 2 / téléphone remplace Caméra 2 PC pour rester à 2 flux.</p><p id="liveSelectedSession">Live sélectionné : créez ou démarrez un Live dans le tableau.</p><div class="admin-live-cameras"><div class="admin-live-camera-block" id="liveCam1Block"><h3>Caméra 1</h3><p id="liveCam1State">État : inactive</p><div class="admin-filters"><select id="liveCameraSelect1"><option value="">Webcam automatique (PC)</option></select><select id="liveMicSelect1"><option value="">Micro automatique</option></select></div><video id="livePublisherPreview1" muted playsinline autoplay></video><p id="liveCam1Error" class="admin-live-camera-error" hidden></p><div class="admin-live-actions"><button class="btn btn-primary" type="button" id="liveCam1Start">Démarrer Caméra 1</button> <button class="btn" type="button" id="liveCam1Stop">Arrêter Caméra 1</button> <button class="btn btn-secondary" type="button" id="liveCam1Retry" hidden>Réessayer</button></div></div><div class="admin-live-camera-block" id="liveCam2Block"><h3>Caméra 2 PC</h3><p id="liveCam2State">État : inactive</p><div class="admin-filters"><select id="liveCameraSelect2"><option value="">Autre webcam (PC)</option></select><select id="liveMicSelect2"><option value="">Micro automatique</option></select></div><label class="admin-live-cam-mute"><input id="liveCam2NoMic" type="checkbox"> Caméra 2 sans micro</label><video id="livePublisherPreview2" muted playsinline autoplay></video><p id="liveCam2SameWarn" class="admin-live-camera-warn" hidden></p><p id="liveCam2Error" class="admin-live-camera-error" hidden></p><div class="admin-live-actions"><button class="btn btn-primary" type="button" id="liveCam2Start">Démarrer Caméra 2 PC</button> <button class="btn" type="button" id="liveCam2Stop">Arrêter Caméra 2 PC</button> <button class="btn btn-secondary" type="button" id="liveCam2Retry" hidden>Réessayer</button></div></div></div><div class="admin-live-camera-block"><h3>Caméra 2 / téléphone</h3><p id="liveCam2PhoneState">État : inactive</p><p>Troisième mode d’entrée pour la source secondaire uniquement. Si le téléphone est utilisé, Caméra 2 PC est désactivée automatiquement.</p><button class="btn btn-primary" type="button" id="liveCam2Phone">Caméra 2 / téléphone</button> <button class="btn" type="button" id="liveCam2PhoneStop">Arrêter Caméra 2</button><p id="cameraPair"></p></div></div><div class="admin-panel"><h2>Paiements du Live</h2><p id="livePaymentsSummary">Payés: 0 · En attente: 0 · Refusés: 0</p><table class="admin-table"><thead><tr><th>Statut</th><th>Acheteur</th><th>Produit / lot</th><th>Montant</th><th>Fournisseur</th><th>Mise à jour</th><th>ID paiement</th></tr></thead><tbody id="livePaymentsBody"><tr><td colspan="7">Chargement…</td></tr></tbody></table></div><div class="admin-panel"><h2>Mes Lives</h2><table class="admin-table"><thead><tr><th>Titre</th><th>Statut</th><th>Paiement ventes</th><th>Actions/produits</th><th>Contrôles</th></tr></thead><tbody id="liveBody"></tbody></table></div>');
+  A.renderShell("live", "Studio Live Cardoria", "Tableau de bord liveur : un écran pour vendre. Les réglages techniques restent repliés.",
+    [
+      '<div class="live-studio">',
+      '<header class="live-studio-controls"><div><h2>Contrôles Live</h2><p id="liveSelectedSession">Live sélectionné : créez un Live puis préparez vos lots.</p><p id="liveStudioStatus">Aucune salle</p></div>',
+      '<div class="live-studio-control-btns">',
+      '<button class="live-studio-btn live-studio-btn--go" type="button" id="liveGoStart" data-start="">Démarrer le Live</button>',
+      '<button class="live-studio-btn live-studio-btn--pause" type="button" id="liveGoPause">Pause</button>',
+      '<button class="live-studio-btn live-studio-btn--end" type="button" id="liveGoEnd" data-stop="">Terminer le Live</button>',
+      '<button class="live-studio-btn live-studio-btn--ghost" type="button" id="liveGoWatch" data-enter-live="">Voir comme spectateur</button>',
+      '<span class="live-studio-sr">Entrer dans le Live</span>',
+      '</div></header>',
+      '<div class="live-studio-layout"><section class="live-studio-video"><h2>Vidéo</h2><div class="live-studio-previews">',
+      '<div class="admin-live-camera-block" id="liveCam1Block"><div class="live-studio-cam-status"><strong>Caméra 1</strong><p id="liveCam1State">État : inactive</p></div><video id="livePublisherPreview1" muted playsinline autoplay></video><p id="liveCam1Error" class="admin-live-camera-error" hidden></p><div class="admin-live-actions"><button class="live-studio-btn live-studio-btn--go" type="button" id="liveCam1Start">Démarrer Caméra 1</button> <button class="live-studio-btn" type="button" id="liveCam1Stop">Arrêter Caméra 1</button> <button class="live-studio-btn" type="button" id="liveCam1Retry" hidden>Réessayer</button></div></div>',
+      '<div class="admin-live-camera-block" id="liveCam2Block"><div class="live-studio-cam-status"><strong>Caméra 2 PC</strong><p id="liveCam2State">État : inactive</p></div><video id="livePublisherPreview2" muted playsinline autoplay></video><p id="liveCam2SameWarn" class="admin-live-camera-warn" hidden></p><p id="liveCam2Error" class="admin-live-camera-error" hidden></p><div class="admin-live-actions"><button class="live-studio-btn live-studio-btn--go" type="button" id="liveCam2Start">Démarrer Caméra 2 PC</button> <button class="live-studio-btn" type="button" id="liveCam2Stop">Arrêter Caméra 2 PC</button> <button class="live-studio-btn" type="button" id="liveCam2Retry" hidden>Réessayer</button></div></div>',
+      '</div><details class="live-studio-cam-settings"><summary>Réglages caméra</summary><p><strong>Paiement :</strong> Cardoria/Admin = SumUp uniquement lors d’une vente. Vendeur tiers = PayPal + commission.</p><p>2 sources maximum. Caméra 2 / téléphone remplace Caméra 2 PC pour rester à 2 flux.</p><div class="admin-filters"><select id="liveCameraSelect1"><option value="">Webcam automatique (PC)</option></select><select id="liveMicSelect1"><option value="">Micro automatique</option></select></div><div class="admin-filters"><select id="liveCameraSelect2"><option value="">Autre webcam (PC)</option></select><select id="liveMicSelect2"><option value="">Micro automatique</option></select></div><label class="admin-live-cam-mute"><input id="liveCam2NoMic" type="checkbox"> Caméra 2 sans micro</label><p id="liveCam2PhoneState">État : inactive</p><button class="live-studio-btn" type="button" id="liveCam2Phone">Caméra 2 / téléphone</button> <button class="live-studio-btn" type="button" id="liveCam2PhoneStop">Arrêter Caméra 2</button><p id="cameraPair"></p></details></section>',
+      '<section id="liveActionStudio" class="live-studio-stage"></section></div>',
+      '<section class="live-studio-activity"><article><h3>Spectateurs</h3><p id="liveStudioViewers">0</p></article><article><h3>Chat</h3><div id="liveStudioChat">Aucun message</div></article><article><h3>Dernière vente</h3><p id="liveStudioLastSale">—</p></article><article><h3>Paiements</h3><p id="livePaymentsSummary">Payés: 0 · En attente: 0 · Refusés: 0</p></article></section>',
+      '<details class="live-studio-prepare admin-panel"><summary>Préparer le Live / historique</summary><h2>Nouveau Live</h2><div class="admin-filters"><input id="liveTitle" placeholder="Titre du Live" value="Live Cardoria"><button class="btn btn-primary" id="liveCreate">Créer le Live</button></div><p>Salle d’abord, ventes ensuite. Aucun prix n’est demandé pour créer la salle.</p><h2>Paiements du Live</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Statut</th><th>Acheteur</th><th>Produit / lot</th><th>Montant</th><th>Fournisseur</th><th>Mise à jour</th><th>ID paiement</th></tr></thead><tbody id="livePaymentsBody"><tr><td colspan="7">Chargement…</td></tr></tbody></table></div><h2>Mes Lives</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Titre</th><th>Statut</th><th>Paiement ventes</th><th>Actions/produits</th><th>Contrôles</th></tr></thead><tbody id="liveBody"></tbody></table></div><button type="button" id="liveGoCancel" class="live-studio-btn" data-cancel="" hidden>Annuler</button></details></div>'
+    ].join(""));
+  A.qs("#liveGoStart").onclick = function () {
+    var id = requireSelectedLive();
+    if (!id) return;
+    A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(id) + "/start", { method: "POST", body: "{}" }).then(function () {
+      load();
+      if (!publishers.primary) publishCamera(id, "primary", "Caméra 1");
+    }).catch(function (e) { alert(e.message); });
+  };
+  A.qs("#liveGoPause").onclick = function () {
+    stopCameras().then(function () {
+      var status = A.qs("#liveStudioStatus");
+      if (status) status.textContent = "Pause — salle ouverte. Relancez une caméra pour reprendre.";
+    });
+  };
+  A.qs("#liveGoEnd").onclick = function () {
+    var id = requireSelectedLive();
+    if (!id) return;
+    if (!confirm("Terminer le Live ? La salle sera fermée.")) return;
+    stopCameras().then(function () {
+      return A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(id) + "/stop", { method: "POST", body: "{}" });
+    }).then(load).catch(function (e) { alert(e.message); });
+  };
+  A.qs("#liveGoWatch").onclick = function () {
+    var id = requireSelectedLive();
+    if (id) openSpectator(id);
+  };
   A.qs("#liveCreate").onclick = function () {
     var b = this;
     b.disabled = true;

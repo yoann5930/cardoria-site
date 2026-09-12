@@ -19,6 +19,7 @@ const LIVE_RUNTIME = [
   "js/cardoria-live-media.js",
   "js/live-vendeur.js",
   "js/admin/admin-live.js",
+  "js/live-studio-actions-ui.js",
   "backend/public/live.html",
   "backend/public/live-vendeur.html",
   "backend/public/admin-live.html",
@@ -28,6 +29,7 @@ const LIVE_RUNTIME = [
   "backend/public/js/cardoria-live-media.js",
   "backend/public/js/live-vendeur.js",
   "backend/public/js/admin/admin-live.js",
+  "backend/public/js/live-studio-actions-ui.js",
   "backend/routes/live.js",
   "backend/routes/live-realtime.js",
   "backend/routes/live-admin.js"
@@ -42,6 +44,8 @@ const MIRRORS = [
   ["js/live-vendeur.js", "backend/public/js/live-vendeur.js"],
   ["js/admin/admin-live.js", "backend/public/js/admin/admin-live.js"],
   ["js/cardoria-live-media.js", "backend/public/js/cardoria-live-media.js"],
+  ["js/live-studio-actions-ui.js", "backend/public/js/live-studio-actions-ui.js"],
+  ["css/admin.css", "backend/public/css/admin.css"],
   ["live-camera.html", "backend/public/live-camera.html"]
 ];
 

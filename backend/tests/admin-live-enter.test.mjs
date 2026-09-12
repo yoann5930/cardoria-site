@@ -115,7 +115,7 @@ test("bouton Admin Live et route enter sont branchés sans bypass URL", () => {
   for (const relative of ["js/admin/admin-live.js", "backend/public/js/admin/admin-live.js"]) {
     const source = readRepo(relative);
     assert.match(source, /data-enter-live=/);
-    assert.match(source, /Entrer dans le Live/);
+    assert.match(source, /Voir comme spectateur/);
     assert.match(source, /\/api\/admin\/live\/sessions\/" \+ encodeURIComponent\(btn\.dataset\.enterLive\) \+ "\/enter"/);
     assert.match(source, /window\.open\("about:blank", "_blank"\)/);
     assert.match(source, /liveWindow\.location\.href = liveUrl/);
@@ -132,7 +132,7 @@ test("bouton Admin Live et route enter sont branchés sans bypass URL", () => {
   assert.match(route, /requireAdmin/);
   assert.doesNotMatch(route, /createLiveCheckout|createRevolutCheckout|createLivePayPalOrder/);
   const viewer = readRepo("js/cardoria-live-viewer.js");
-  assert.match(viewer, /urlFlagsNeverGrantAdmin = true/);
+  assert.match(viewer, /urlFlagsNeverGrantAdmin\s*=\s*true/);
   assert.match(viewer, /cardoriaAdminGrant/);
   assert.match(viewer, /x-live-admin-grant/);
   assert.equal(liveUrlPrivilegeQueryIsIgnored(), true);
