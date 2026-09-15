@@ -42,7 +42,7 @@ case "$cmd" in
     exec sudo -n /usr/local/bin/cardoria-ops smtp-configure
     ;;
   sumup-configure)
-    exec sudo -n /usr/bin/bash /opt/cardoria/current/oracle/sumup-configure.sh
+    exec sudo -n /usr/local/bin/cardoria-sumup-configure
     ;;
   deploy)
     exec sudo -n /usr/local/bin/cardoria-ops deploy
