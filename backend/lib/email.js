@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import nodemailer from "nodemailer";
 
 export const ALERT_EMAIL = process.env.MAIL_TO || "Cardoria59330@gmail.com";
@@ -34,7 +35,15 @@ function createSmtpTransport() {
   });
 }
 
+function writeTestOutbox(message) {
+  const outbox = envTrim("CARDORIA_TEST_EMAIL_OUTBOX");
+  if (process.env.NODE_ENV !== "test" || !outbox) return false;
+  fs.writeFileSync(outbox, JSON.stringify(message), "utf8");
+  return true;
+}
+
 export async function sendEmail({ subject, text, html, attachments, to }) {
+  if (writeTestOutbox({ to: to || ALERT_EMAIL, subject, text, html })) return true;
   if (!isSmtpConfigured()) {
     console.warn("SMTP non configuré — e-mail non envoyé :", subject, `(${smtpMissingReason()})`);
     return false;
