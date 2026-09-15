@@ -26,7 +26,14 @@ function publicSeller(seller) {
 }
 function publicListingOrNull(listing) {
   if (!listing || listing.status !== "active" || listing.moderationLocked || Number(listing.stock || 0) <= 0) return null;
-  return listing;
+  const {
+    moderationLocked,
+    moderationReason,
+    moderatedBy,
+    moderatedAt,
+    ...publicListing
+  } = listing;
+  return publicListing;
 }
 
 router.get("/v1/plans", (req, res) => res.json({ ok: true, currency: "EUR", billingPeriod: "month", plans: listSellerPlans() }));
