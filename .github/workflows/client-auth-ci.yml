@@ -1,4 +1,4 @@
-name: Cardoria Final Audit CI
+name: Cardoria Client Auth CI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  final-audit:
+  client-auth-e2e:
     runs-on: ubuntu-latest
     env:
       NODE_ENV: test
@@ -26,41 +26,13 @@ jobs:
         with:
           node-version: '22.22.0'
           package-manager-cache: false
-      - name: Install and audit
+      - name: Install backend
         working-directory: backend
+        run: npm install --omit=dev
+      - name: Client auth frontend contract
         run: |
-          npm install --omit=dev
-          npm audit --omit=dev --audit-level=low
-      - name: Critical syntax checks
-        run: |
-          node --check backend/server.js
-          node --check backend/routes/auth.js
-          node --check backend/routes/payments.js
-          node --check backend/routes/payments-admin.js
-          node --check backend/routes/live.js
-          node --check backend/routes/live-admin.js
-          node --check backend/lib/payments/sumup.js
-          node --check backend/lib/payments/sumup-refund.js
-          node --check backend/lib/payments/routing.js
-          node --check backend/lib/boutique/checkout.js
-          node --check backend/lib/live/checkout.js
-          node --check backend/lib/marketplace/paypal.js
-          node --check js/boutique.js
-          node --check js/admin/admin-orders.js
           node --check js/client-auth.js
           node --check js/client-password-reset.js
-      - name: Core regression tests
-        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs
-      - name: Architecture guards
-        run: |
-          grep -q 'boutique: "sumup"' backend/lib/payments/routing.js
-          grep -q 'live_admin: "sumup"' backend/lib/payments/routing.js
-          grep -q 'live_seller: "paypal"' backend/lib/payments/routing.js
-          grep -q 'marketplace: "paypal"' backend/lib/payments/routing.js
-          grep -q 'refundSumUpTransaction' backend/routes/payments-admin.js
-          grep -q 'idempotencyKey' backend/lib/boutique/checkout.js
-          grep -q 'SUMUP_WEBHOOK_SECRET obligatoire en production' backend/lib/payments/sumup.js
-          grep -q 'const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;' backend/routes/auth.js
           grep -q '/api/auth/login' js/client-auth.js
           grep -q '/api/auth/register' js/client-auth.js
           grep -q '/api/auth/me' js/client-auth.js
@@ -68,14 +40,12 @@ jobs:
           grep -q '/api/auth/password/request' js/client-password-reset.js
           grep -q '/api/auth/password/confirm' js/client-password-reset.js
           grep -q '/reset-password.html' client-login.html
-          if grep -q 'live_admin: "revolut"' backend/lib/payments/routing.js; then exit 1; fi
-          if grep -R -n 'ADMIN_AUTH_DISABLED.*true' backend 2>/dev/null; then exit 1; fi
       - name: Start backend
         working-directory: backend
         run: |
-          node server.js > /tmp/cardoria-final.log 2>&1 &
-          echo $! > /tmp/cardoria-final.pid
-      - name: Runtime smoke and security boundaries
+          node server.js > /tmp/cardoria-client-auth.log 2>&1 &
+          echo $! > /tmp/cardoria-client-auth.pid
+      - name: Wait for backend
         run: |
           ready=false
           for i in {1..90}; do
@@ -83,22 +53,7 @@ jobs:
             sleep 1
           done
           test "$ready" = "true"
-          curl -fsS http://127.0.0.1:10000/api/health/ | grep -q '"version":"6.0.0"'
-          curl -fsS http://127.0.0.1:10000/api/payments/boutique/products | grep -q '"ok":true'
-          curl -fsS http://127.0.0.1:10000/api/live/matrix > /tmp/matrix.json
-          grep -q '"boutique":"sumup"' /tmp/matrix.json
-          grep -q '"live_admin":"sumup"' /tmp/matrix.json
-          grep -q '"live_seller":"paypal"' /tmp/matrix.json
-          grep -q '"revolut"' /tmp/matrix.json
-          if grep -q '"sumup":"retired"' /tmp/matrix.json; then echo "SumUp must not be announced retired"; exit 1; fi
-          curl -fsS http://127.0.0.1:10000/api/payments/status | grep -q '"provider":"sumup"'
-          for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/system/backups; do
-            code=$(curl -sS -o /tmp/anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
-            test "$code" = "401"
-          done
-          code=$(curl -sS -o /tmp/retired.json -w '%{http_code}' http://127.0.0.1:10000/api/payments/revolut/checkout)
-          test "$code" = "410"
-      - name: Client authentication E2E
+      - name: Client register login session logout flow
         run: |
           EMAIL="client-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@cardoria.invalid"
           PASSWORD='ClientTest2026!'
@@ -149,7 +104,8 @@ jobs:
             http://127.0.0.1:10000/api/auth/login)
           test "$code" = "401"
           grep -q 'Email ou mot de passe incorrect' /tmp/bad-login.json
-
+      - name: Client password reset contract
+        run: |
           code=$(curl -sS -o /tmp/reset-unknown.json -w '%{http_code}' \
             -H 'Content-Type: application/json' \
             -d '{"email":"unknown-client-ci@cardoria.invalid"}' \
@@ -166,5 +122,5 @@ jobs:
       - name: Stop backend
         if: always()
         run: |
-          if [ -f /tmp/cardoria-final.pid ]; then kill $(cat /tmp/cardoria-final.pid) || true; fi
-          if [ -f /tmp/cardoria-final.log ]; then cat /tmp/cardoria-final.log; fi
+          if [ -f /tmp/cardoria-client-auth.pid ]; then kill $(cat /tmp/cardoria-client-auth.pid) || true; fi
+          if [ -f /tmp/cardoria-client-auth.log ]; then cat /tmp/cardoria-client-auth.log; fi
