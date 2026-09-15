@@ -103,7 +103,7 @@ const sellerTracking = await auth(sellerAccountA.token, `/api/marketplace/v1/sel
 assert(sellerTracking.response.status === 200 && sellerTracking.body.order?.shippingTracking === "CARDORIA-E2E-TRACK", "Seller tracking update failed");
 
 const outsiderInvoice = await auth(buyerB.token, `/api/marketplace/v1/orders/${order.id}/invoice`);
-assert(outsideInvoice.response.status === 403, "Unrelated buyer can access Marketplace invoice");
+assert(outsiderInvoice.response.status === 403, "Unrelated buyer can access Marketplace invoice");
 
 const retiredCheckout = await auth(buyerA.token, "/api/marketplace/v1/cart/checkout", { method: "POST", body: "{}" });
 assert(retiredCheckout.response.status === 410, "Retired Marketplace SumUp checkout is not blocked");
