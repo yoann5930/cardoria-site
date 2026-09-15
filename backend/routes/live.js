@@ -21,10 +21,21 @@ function fail(res, error, fallback = 400) {
   return res.status(error?.status || error?.code || fallback).json({ ok: false, error: error?.message || "Erreur Live", provider: error?.provider || error?.expectedProvider, expectedProvider: error?.expectedProvider, requestedProvider: error?.requestedProvider });
 }
 function sellerActor(req) { const seller = assertSellerSession(req); return { role: "seller", sellerId: seller.id, id: seller.id, email: seller.email, seller }; }
+function safePublicText(value) { return String(value == null ? "" : value).replace(/[<>]/g, ""); }
+function sanitizePublicValue(value) {
+  if (typeof value === "string") return safePublicText(value);
+  if (Array.isArray(value)) return value.map(sanitizePublicValue);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizePublicValue(item)]));
+  return value;
+}
 function publicRealtimeSession(session) {
   const live = publicLiveSession(session);
   if (!live) return null;
-  return { ...live, mimeType: "application/x-cloudflare-webrtc", streamPublished: isRealtimePublished(live.id) };
+  return sanitizePublicValue({ ...live, mimeType: "application/x-cloudflare-webrtc", streamPublished: isRealtimePublished(live.id) });
+}
+function getPublicLiveSession(id) {
+  const session = getLiveSession(id);
+  return session?.status === "live" ? session : null;
 }
 
 router.get("/matrix", (req, res) => res.json({ ok: true, matrix: PAYMENT_MATRIX, retired: ["revolut"] }));
@@ -33,14 +44,18 @@ router.get("/sessions", (req, res) => {
   // Admin/seller history remains available through authenticated routes.
   res.json({ ok: true, sessions: listLiveSessions({ status: "live" }).map(publicRealtimeSession) });
 });
-router.get("/sessions/:id", (req, res) => { const session = getLiveSession(req.params.id); if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." }); res.json({ ok: true, session: publicRealtimeSession(session) }); });
+router.get("/sessions/:id", (req, res) => {
+  const session = getPublicLiveSession(req.params.id);
+  if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." });
+  res.json({ ok: true, session: publicRealtimeSession(session) });
+});
 router.get("/sessions/:id/admin-access", (req, res) => {
   const session = getLiveSession(req.params.id); if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." });
   const header = String(req.headers.authorization || ""); const sessionToken = header.replace(/^Bearer\s+/i, "") || String(req.headers["x-session-token"] || "");
   const user = validateSession(sessionToken); const actor = user && ADMIN_ROLES.includes(user.role) ? user : null;
   const access = resolveAdminLiveAccess({ liveId: session.id, grantToken: String(req.headers["x-live-admin-grant"] || ""), actor });
   if (!access) return res.status(401).json({ ok: false, error: "Accès admin Live refusé." });
-  res.json({ ok: true, accessRole: access.accessRole, accessContext: access.accessContext, title: session.title, ownerRole: session.ownerRole, paymentProvider: session.paymentProvider, session: publicLiveSession(session) });
+  res.json({ ok: true, accessRole: access.accessRole, accessContext: access.accessContext, title: safePublicText(session.title), ownerRole: session.ownerRole, paymentProvider: session.paymentProvider, session: publicRealtimeSession(session) });
 });
 router.post("/checkout", async (req, res) => { try { const body = req.body || {}; const checkout = await createLiveCheckout({ liveId: body.liveId, productId: body.productId, qty: body.qty, customerEmail: body.customerEmail, customerName: body.customerName, requestedProvider: body.provider, requestedAmount: body.amount ?? body.total, successUrl: body.successUrl, cancelUrl: body.cancelUrl }); res.json({ ok: true, provider: checkout.provider, channel: checkout.channel, checkout }); } catch (error) { fail(res, error); } });
 router.post("/checkout/plan", (req, res) => { try { const body = req.body || {}; const checkout = planLiveCheckout({ liveId: body.liveId, productId: body.productId, qty: body.qty, customerEmail: body.customerEmail, customerName: body.customerName, requestedProvider: body.provider, requestedAmount: body.amount ?? body.total }); res.json({ ok: true, provider: checkout.provider, channel: checkout.channel, checkout }); } catch (error) { fail(res, error); } });
