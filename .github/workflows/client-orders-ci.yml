@@ -1,0 +1,99 @@
+name: Cardoria Client Orders CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  client-orders-e2e:
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      ADMIN_INITIAL_PASSWORD: 'Cardoria-CI-Only-Password-2026!'
+      ADMIN_EMAIL: 'ci-admin@cardoria.invalid'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+      LEGACY_ADMIN_CODE: 'false'
+      ADMIN_AUTH_DISABLED: 'false'
+      BACKUP_INTERVAL_HOURS: '0'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Install backend
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Orders frontend contract
+        run: |
+          node --check js/client-orders.js
+          node --check backend/public/js/client-orders.js
+          cmp js/client-orders.js backend/public/js/client-orders.js
+          grep -q 'En attente SumUp' js/client-orders.js
+          grep -q 'Paiement en attente' js/client-orders.js
+      - name: Start clean backend
+        working-directory: backend
+        run: |
+          rm -rf data
+          mkdir -p data
+          node server.js > /tmp/cardoria-client-orders.log 2>&1 &
+          echo $! > /tmp/cardoria-client-orders.pid
+      - name: Wait for backend
+        run: |
+          ready=false
+          for i in {1..90}; do
+            if curl -fsS http://127.0.0.1:10000/api/health/startup > /tmp/startup.json && grep -q '"ready":true' /tmp/startup.json; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = "true"
+      - name: Client orders isolation and privacy E2E
+        run: |
+          EMAIL_A="orders-a-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@cardoria.invalid"
+          EMAIL_B="orders-b-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@cardoria.invalid"
+          PASSWORD='OrdersTest2026!'
+
+          curl -fsS -H 'Content-Type: application/json' -d "{\"name\":\"Orders A\",\"email\":\"${EMAIL_A}\",\"password\":\"${PASSWORD}\"}" http://127.0.0.1:10000/api/auth/register > /tmp/a.json
+          curl -fsS -H 'Content-Type: application/json' -d "{\"name\":\"Orders B\",\"email\":\"${EMAIL_B}\",\"password\":\"${PASSWORD}\"}" http://127.0.0.1:10000/api/auth/register > /tmp/b.json
+          TOKEN_A=$(node -e "const d=require('/tmp/a.json');process.stdout.write(d.token||'')")
+          TOKEN_B=$(node -e "const d=require('/tmp/b.json');process.stdout.write(d.token||'')")
+          test -n "$TOKEN_A"
+          test -n "$TOKEN_B"
+
+          node - "$EMAIL_A" "$EMAIL_B" <<'NODE'
+          const fs=require('fs');
+          const [a,b]=process.argv.slice(2);
+          const orders=[
+            {id:'CMD-OWN-A',email:a,date:'2026-09-15',items:[{ref:'PKM-A',name:'Booster A',qty:1,price:6.9}],paymentStatus:'pending',status:'En attente SumUp',shipping:'Livraison',carrier:'Mondial Relay',tracking:'TRACK-A',total:6.9,address:'SECRET-ADDRESS-A',phone:'SECRET-PHONE-A',providerOrderId:'SECRET-PROVIDER-A',sumupCheckoutId:'SECRET-SUMUP-A',internalNote:'SECRET-NOTE-A'},
+            {id:'CMD-OWN-B',email:b,date:'2026-09-15',items:[{ref:'PKM-B',name:'Booster B',qty:2,price:7.5}],paymentStatus:'paid',status:'À préparer',shipping:'Livraison',carrier:'La Poste',tracking:'TRACK-B',total:15,address:'SECRET-ADDRESS-B',phone:'SECRET-PHONE-B',providerOrderId:'SECRET-PROVIDER-B',sumupCheckoutId:'SECRET-SUMUP-B',internalNote:'SECRET-NOTE-B'}
+          ];
+          fs.writeFileSync('backend/data/orders.json',JSON.stringify(orders,null,2));
+          NODE
+
+          code=$(curl -sS -o /tmp/no-session.json -w '%{http_code}' http://127.0.0.1:10000/api/auth/orders)
+          test "$code" = "401"
+
+          code=$(curl -sS -o /tmp/orders-a.json -w '%{http_code}' -H "Authorization: Bearer ${TOKEN_A}" http://127.0.0.1:10000/api/auth/orders)
+          test "$code" = "200"
+          grep -q 'CMD-OWN-A' /tmp/orders-a.json
+          ! grep -q 'CMD-OWN-B' /tmp/orders-a.json
+          grep -q 'En attente SumUp' /tmp/orders-a.json
+          grep -q 'TRACK-A' /tmp/orders-a.json
+          ! grep -E -q 'SECRET-ADDRESS|SECRET-PHONE|SECRET-PROVIDER|SECRET-SUMUP|SECRET-NOTE' /tmp/orders-a.json
+
+          code=$(curl -sS -o /tmp/orders-b.json -w '%{http_code}' -H "Authorization: Bearer ${TOKEN_B}" http://127.0.0.1:10000/api/auth/orders)
+          test "$code" = "200"
+          grep -q 'CMD-OWN-B' /tmp/orders-b.json
+          ! grep -q 'CMD-OWN-A' /tmp/orders-b.json
+          ! grep -E -q 'SECRET-ADDRESS|SECRET-PHONE|SECRET-PROVIDER|SECRET-SUMUP|SECRET-NOTE' /tmp/orders-b.json
+      - name: Existing Boutique orders regression tests
+        run: node --test tests/client-boutique-orders.test.mjs
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-client-orders.pid ]; then kill $(cat /tmp/cardoria-client-orders.pid) || true; fi
+          if [ -f /tmp/cardoria-client-orders.log ]; then cat /tmp/cardoria-client-orders.log; fi
