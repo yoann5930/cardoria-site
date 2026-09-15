@@ -44,6 +44,7 @@ function paymentLabel(status){
 }
 function steps(status){
   const label=statusLabel(status);
+  if(label==="En attente SumUp")return '<div class="client-order-progress is-pending"><span class="active">Paiement en attente</span></div>';
   if(label==="Annulée"||label==="Paiement échoué")return '<div class="client-order-progress is-cancelled"><span class="active">'+esc(label)+'</span></div>';
   const values=["Commande confirmée","En préparation","Expédiée","Livrée"];
   let idx=0;
