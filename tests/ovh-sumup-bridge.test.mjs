@@ -7,6 +7,7 @@ const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "
 test("SumUp OVH remains an allowlisted stdin-only secret operation", () => {
   const dispatch = read(".github/workflows/ovh-ops.yml");
   const run = read(".github/workflows/ovh-ops-run.yml");
+  const deploy = read("oracle/deploy.sh");
   const script = read("oracle/sumup-configure.sh");
   const wrapper = read("oracle/cardoria-ops-ssh-wrapper.sh");
   const sudoers = read("oracle/sudoers-cardoria-ops");
@@ -31,7 +32,8 @@ test("SumUp OVH remains an allowlisted stdin-only secret operation", () => {
   assert.match(script, /webhookConfigured!==true/);
   assert.match(script, /sumup_configure: rollback/);
 
+  assert.match(deploy, /install -m 0755 -o root -g root .*sumup-configure\.sh.*\/usr\/local\/bin\/cardoria-sumup-configure/);
   assert.match(wrapper, /sumup-configure\)/);
-  assert.match(wrapper, /\/usr\/bin\/bash \/opt\/cardoria\/current\/oracle\/sumup-configure\.sh/);
-  assert.match(sudoers, /\/usr\/bin\/bash \/opt\/cardoria\/current\/oracle\/sumup-configure\.sh/);
+  assert.match(wrapper, /sudo -n \/usr\/local\/bin\/cardoria-sumup-configure/);
+  assert.match(sudoers, /\/usr\/local\/bin\/cardoria-sumup-configure/);
 });
