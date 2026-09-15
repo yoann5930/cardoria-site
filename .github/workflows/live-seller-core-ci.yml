@@ -1,0 +1,91 @@
+name: Cardoria Live Seller Core CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'backend/routes/live.js'
+      - 'backend/routes/live-actions.js'
+      - 'backend/lib/live/**'
+      - 'backend/scripts/live-seller-core-e2e.mjs'
+      - 'js/live-vendeur.js'
+      - 'backend/public/js/live-vendeur.js'
+      - '.github/workflows/live-seller-core-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/routes/live.js'
+      - 'backend/routes/live-actions.js'
+      - 'backend/lib/live/**'
+      - 'backend/scripts/live-seller-core-e2e.mjs'
+      - 'js/live-vendeur.js'
+      - 'backend/public/js/live-vendeur.js'
+      - '.github/workflows/live-seller-core-ci.yml'
+
+jobs:
+  live-seller-core-e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Install backend
+        run: npm install --omit=dev
+      - name: Live seller syntax checks
+        run: |
+          node --check server.js
+          node --check routes/live.js
+          node --check routes/live-actions.js
+          node --check lib/live/sessions.js
+          node --check lib/live/checkout.js
+          node --check scripts/live-seller-core-e2e.mjs
+      - name: Seller Live lifecycle guards
+        working-directory: .
+        run: |
+          grep -q 'assertSellerLiveCanStart' backend/routes/live.js
+          grep -q 'ne peut pas être redémarré' backend/routes/live.js
+          grep -q 'ownerRole:"seller"\|ownerRole: "seller"' backend/routes/live.js
+          grep -q 'provider: "paypal"' backend/routes/live.js
+      - name: Start clean backend
+        run: |
+          rm -rf data
+          node server.js > /tmp/cardoria-live-seller.log 2>&1 &
+          echo $! > /tmp/cardoria-live-seller.pid
+      - name: Wait for backend
+        run: |
+          ready=false
+          for i in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-live-seller-startup.json; then
+              if grep -q '"ready":true' /tmp/cardoria-live-seller-startup.json; then ready=true; break; fi
+            fi
+            sleep 1
+          done
+          test "$ready" = "true"
+      - name: Live seller ownership routing actions and lifecycle E2E
+        run: node scripts/live-seller-core-e2e.mjs
+      - name: Existing Live regressions
+        working-directory: .
+        run: |
+          node --test backend/tests/payment-matrix.test.mjs
+          node --test backend/tests/live-studio-v2-contract.test.mjs
+          node --test backend/tests/live-actions.test.mjs
+          node --test backend/tests/live-sale-actions.test.mjs
+          node --test backend/tests/live-realtime-contract.test.mjs
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-live-seller.pid ]; then kill $(cat /tmp/cardoria-live-seller.pid) || true; fi
+          cat /tmp/cardoria-live-seller.log || true
