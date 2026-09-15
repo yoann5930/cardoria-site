@@ -1,0 +1,41 @@
+name: OVH SumUp Configure Once 20260916
+
+on:
+  push:
+    branches:
+      - ops/sumup-configure-20260916-0132
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: deploy
+      branch: main
+    secrets: inherit
+
+  sumup-configure:
+    needs: deploy
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: sumup-configure
+      branch: main
+    secrets: inherit
+
+  healthcheck:
+    needs: sumup-configure
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: healthcheck
+      branch: main
+    secrets: inherit
+
+  report:
+    needs: healthcheck
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: report
+      branch: main
+    secrets: inherit
