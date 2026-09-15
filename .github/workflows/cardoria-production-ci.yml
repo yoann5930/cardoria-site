@@ -64,7 +64,9 @@ jobs:
           grep -q 'refundSumUpTransaction' backend/routes/payments-admin.js
           grep -q 'sumup_admin_sync' backend/routes/payments-admin.js
           grep -q 'sumup_admin_refund' backend/routes/payments-admin.js
-          grep -q 'SUMUP_WEBHOOK_SECRET obligatoire en production' backend/lib/payments/sumup.js
+          grep -q 'syncPaymentFromCheckout(checkoutId)' backend/lib/payments/sumup.js
+          grep -q 'retrieveSumUpCheckout(checkoutId)' backend/lib/payments/sumup.js
+          if grep -q 'SUMUP_WEBHOOK_SECRET' backend/lib/payments/sumup.js; then echo 'Undocumented SumUp webhook secret dependency found'; exit 1; fi
           grep -q 'provider:"sumup"' js/boutique.js
           if grep -q 'live_admin: "revolut"' backend/lib/payments/routing.js; then exit 1; fi
       - name: Security regression guards
@@ -99,6 +101,7 @@ jobs:
           if grep -Eiq 'camera=\(\)[[:space:],]' /tmp/headers.txt; then echo 'Permissions-Policy still disables camera'; exit 1; fi
           curl --fail --silent http://127.0.0.1:10000/api/payments/status > /tmp/payments.json
           grep -q '"provider":"sumup"' /tmp/payments.json
+          grep -q '"webhookMode":"api-verification"' /tmp/payments.json
           code=$(curl -sS -o /tmp/admin.json -w "%{http_code}" http://127.0.0.1:10000/api/admin/payments/summary)
           test "$code" = "401"
       - name: Stop backend
