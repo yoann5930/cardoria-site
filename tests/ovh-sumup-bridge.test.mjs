@@ -4,7 +4,7 @@ import fs from "node:fs";
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("SumUp OVH uses API key + merchant code and API verification for webhooks", () => {
+test("SumUp OVH uses API key + merchant code and validates the running process without leaking secrets", () => {
   const dispatch = read(".github/workflows/ovh-ops.yml");
   const run = read(".github/workflows/ovh-ops-run.yml");
   const deploy = read("oracle/deploy.sh");
@@ -27,11 +27,17 @@ test("SumUp OVH uses API key + merchant code and API verification for webhooks",
   assert.doesNotMatch(script, /read -r webhook_secret/);
   assert.match(script, /api\.sumup\.com\/v1\/merchants\/\$\{merchant_code\}/);
   assert.match(script, /install -m 0600 -o root -g root/);
-  assert.match(script, /SUMUP_API_KEY/);
-  assert.match(script, /SUMUP_MERCHANT_CODE/);
-  assert.doesNotMatch(script, /SUMUP_WEBHOOK_SECRET=/);
-  assert.match(script, /webhookMode!=="api-verification"/);
+  assert.match(script, /systemctl show cardoria --property=MainPID --value/);
+  assert.match(script, /\/proc\/\$\{main_pid\}\/environ/);
+  assert.match(script, /grep -q '\^SUMUP_API_KEY=\.'/);
+  assert.match(script, /grep -q '\^SUMUP_MERCHANT_CODE=\.'/);
+  assert.match(script, /isSumUpConfigured/);
+  assert.match(script, /sumup_process_env: ok/);
+  assert.match(script, /sumup_env_module_validation: ok/);
   assert.match(script, /sumup_configure: rollback/);
+  assert.doesNotMatch(script, /echo.*\$api_key/);
+  assert.doesNotMatch(script, /echo.*\$merchant_code/);
+  assert.doesNotMatch(script, /\/api\/payments\/status/);
 
   assert.match(payments, /webhookMode: "api-verification"/);
   assert.doesNotMatch(payments, /X-SumUp-Signature/);

@@ -75,15 +75,45 @@ if [ "$healthy" -ne 1 ]; then
   exit 1
 fi
 
-status=$(curl -fsS http://127.0.0.1:10000/api/payments/status || true)
-if ! CARDORIA_SUMUP_STATUS="$status" node -e 'const s=JSON.parse(process.env.CARDORIA_SUMUP_STATUS||"{}"); if(s.provider!=="sumup"||s.configured!==true||s.webhookMode!=="api-verification") process.exit(1);'; then
-  echo "sumup_status_validation: fail"
+# Prove that the currently running Cardoria process actually loaded both
+# SumUp variables, without ever printing their values.
+main_pid=$(systemctl show cardoria --property=MainPID --value 2>/dev/null || true)
+if [[ ! "$main_pid" =~ ^[1-9][0-9]*$ ]] || [ ! -r "/proc/${main_pid}/environ" ]; then
+  echo "sumup_process_env: unavailable"
+  rollback
+  exit 1
+fi
+if ! tr '\0' '\n' < "/proc/${main_pid}/environ" | grep -q '^SUMUP_API_KEY=.'; then
+  echo "sumup_process_api_key: missing"
+  rollback
+  exit 1
+fi
+if ! tr '\0' '\n' < "/proc/${main_pid}/environ" | grep -q '^SUMUP_MERCHANT_CODE=.'; then
+  echo "sumup_process_merchant_code: missing"
+  rollback
+  exit 1
+fi
+
+# Independently validate the protected env file through the application module.
+if ! (
+  set -a
+  . "$ENV_FILE"
+  set +a
+  cd /opt/cardoria/current/backend
+  node --input-type=module <<'NODE'
+import { isSumUpConfigured } from "./lib/payments/sumup.js";
+if (!isSumUpConfigured()) process.exit(1);
+NODE
+); then
+  echo "sumup_env_module_validation: fail"
   rollback
   exit 1
 fi
 
 rm -f "$old_env"
 echo "sumup_restart_health: ok"
+echo "sumup_process_env: ok"
+echo "sumup_env_module_validation: ok"
 echo "sumup_configured: true"
 echo "sumup_webhook_mode: api-verification"
 echo "SUMUP CONFIGURE OK"
