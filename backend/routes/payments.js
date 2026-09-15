@@ -9,7 +9,7 @@ const router = Router();
 
 router.get("/status", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  res.json({ ok: true, provider: "sumup", configured: isSumUpConfigured(), webhookConfigured: Boolean(process.env.SUMUP_WEBHOOK_SECRET) });
+  res.json({ ok: true, provider: "sumup", configured: isSumUpConfigured(), webhookMode: "api-verification" });
 });
 
 router.get("/boutique/products", (req, res) => {
@@ -40,8 +40,7 @@ router.get("/sumup/confirm/:checkoutId", async (req, res) => {
 router.post("/sumup/webhook", async (req, res) => {
   try {
     const rawBody = req.rawBody || Buffer.from(JSON.stringify(req.body || {}));
-    const signature = req.get("X-SumUp-Signature") || req.get("SumUp-Signature") || "";
-    res.json(await handleSumUpWebhook(rawBody, signature));
+    res.json(await handleSumUpWebhook(rawBody));
   } catch (e) { res.status(e.status || 500).json({ ok: false, provider: "sumup", error: e.message }); }
 });
 
