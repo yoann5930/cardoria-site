@@ -1,0 +1,20 @@
+name: Cardoria SMTP Production Probe
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  smtp-production-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request a production password reset email
+        run: |
+          code=$(curl -sS -o /tmp/reset.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"cardoria59330@gmail.com"}' \
+            https://www.cardoriashop.fr/api/auth/password/request)
+          echo "reset_http=$code"
+          cat /tmp/reset.json
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/reset.json
