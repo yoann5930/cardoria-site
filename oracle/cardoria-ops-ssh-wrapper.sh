@@ -41,6 +41,9 @@ case "$cmd" in
   smtp-configure)
     exec sudo -n /usr/local/bin/cardoria-ops smtp-configure
     ;;
+  sumup-configure)
+    exec sudo -n /usr/bin/bash /opt/cardoria/current/oracle/sumup-configure.sh
+    ;;
   deploy)
     exec sudo -n /usr/local/bin/cardoria-ops deploy
     ;;
