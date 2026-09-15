@@ -1,0 +1,66 @@
+name: Cardoria Marketplace Core CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  marketplace-core-e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: '10000'
+      CORS_ORIGINS: 'http://127.0.0.1:10000'
+      ALERT_EMAIL: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Install backend
+        run: npm install --omit=dev
+      - name: Marketplace core syntax checks
+        run: |
+          node --check server.js
+          node --check routes/marketplace-v1.js
+          node --check routes/marketplace-paypal.js
+          node --check lib/marketplace/v1/security.js
+          node --check scripts/marketplace-core-e2e.mjs
+      - name: Marketplace routing guards
+        working-directory: .
+        run: |
+          grep -q 'channel: "marketplace"' backend/routes/marketplace-paypal.js
+          grep -q 'expectedProvider' backend/routes/marketplace-paypal.js
+          grep -q 'moderationReason' backend/routes/marketplace-v1.js
+          grep -q 'moderatedBy' backend/routes/marketplace-v1.js
+      - name: Start clean backend
+        run: |
+          rm -rf data
+          node server.js > /tmp/cardoria-marketplace-core.log 2>&1 &
+          echo $! > /tmp/cardoria-marketplace-core.pid
+      - name: Wait for backend
+        run: |
+          ready=false
+          for i in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-marketplace-core-startup.json; then
+              if grep -q '"ready":true' /tmp/cardoria-marketplace-core-startup.json; then ready=true; break; fi
+            fi
+            sleep 1
+          done
+          test "$ready" = "true"
+      - name: Marketplace buyer seller privacy and routing E2E
+        run: node scripts/marketplace-core-e2e.mjs
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-marketplace-core.pid ]; then kill $(cat /tmp/cardoria-marketplace-core.pid) || true; fi
+          cat /tmp/cardoria-marketplace-core.log || true
