@@ -21,6 +21,17 @@ function fail(res, error, fallback = 400) {
   return res.status(error?.status || error?.code || fallback).json({ ok: false, error: error?.message || "Erreur Live", provider: error?.provider || error?.expectedProvider, expectedProvider: error?.expectedProvider, requestedProvider: error?.requestedProvider });
 }
 function sellerActor(req) { const seller = assertSellerSession(req); return { role: "seller", sellerId: seller.id, id: seller.id, email: seller.email, seller }; }
+function assertSellerLiveCanStart(actor, liveId) {
+  const session = getLiveSession(liveId);
+  if (!session) throw Object.assign(new Error("Live introuvable."), { status: 404 });
+  if (session.ownerRole !== "seller" || String(session.ownerId) !== String(actor.sellerId)) {
+    throw Object.assign(new Error("Ce Live appartient à un autre vendeur."), { status: 403 });
+  }
+  if (["ended", "cancelled"].includes(String(session.status || "").toLowerCase())) {
+    throw Object.assign(new Error("Ce Live est fermé et ne peut pas être redémarré."), { status: 409 });
+  }
+  return session;
+}
 function safePublicText(value) { return String(value == null ? "" : value).replace(/[<>]/g, ""); }
 function sanitizePublicValue(value) {
   if (typeof value === "string") return safePublicText(value);
@@ -62,7 +73,7 @@ router.post("/checkout/plan", (req, res) => { try { const body = req.body || {};
 router.get("/seller/sessions", (req, res) => { try { const actor = sellerActor(req); res.json({ ok: true, provider: "paypal", sessions: listLiveSessions({ ownerRole: "seller", ownerId: actor.sellerId }).map(publicLiveSession) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 401); } });
 router.post("/seller/sessions", (req, res) => { try { const actor = sellerActor(req); const body = req.body || {}; const session = createLiveSession({ title: body.title, ownerRole: "seller", ownerId: actor.sellerId, ownerEmail: actor.email, products: body.products, scheduledAt: body.scheduledAt, actor }); logAudit({ type: "live", action: "seller_live_created", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
 router.patch("/seller/sessions/:id", (req, res) => { try { const actor = sellerActor(req); const session = updateLiveSession(req.params.id, req.body || {}, actor); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
-router.post("/seller/sessions/:id/start", (req, res) => { try { const actor = sellerActor(req); const session = setLiveStatus(req.params.id, "live", actor); logAudit({ type: "live", action: "seller_live_started", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
+router.post("/seller/sessions/:id/start", (req, res) => { try { const actor = sellerActor(req); assertSellerLiveCanStart(actor, req.params.id); const session = setLiveStatus(req.params.id, "live", actor); logAudit({ type: "live", action: "seller_live_started", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
 router.post("/seller/sessions/:id/stop", (req, res) => { try { const actor = sellerActor(req); const session = setLiveStatus(req.params.id, "ended", actor); logAudit({ type: "live", action: "seller_live_stopped", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
 router.get("/seller/checkouts", (req, res) => { try { const actor = sellerActor(req); res.json({ ok: true, provider: "paypal", checkouts: listLiveCheckouts({ ownerId: actor.sellerId }) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 401); } });
 export default router;
