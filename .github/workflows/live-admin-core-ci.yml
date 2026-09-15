@@ -1,0 +1,85 @@
+name: Cardoria Live Admin Core CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/routes/live-admin.js"
+      - "backend/routes/live-admin-studio.js"
+      - "backend/routes/live.js"
+      - "backend/lib/live/**"
+      - "backend/lib/payments/routing.js"
+      - "backend/scripts/live-admin-core-e2e.mjs"
+      - "js/admin/admin-live.js"
+      - "backend/public/js/admin/admin-live.js"
+      - ".github/workflows/live-admin-core-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/routes/live-admin.js"
+      - "backend/routes/live-admin-studio.js"
+      - "backend/routes/live.js"
+      - "backend/lib/live/**"
+      - "backend/lib/payments/routing.js"
+      - "backend/scripts/live-admin-core-e2e.mjs"
+      - "js/admin/admin-live.js"
+      - "backend/public/js/admin/admin-live.js"
+      - ".github/workflows/live-admin-core-ci.yml"
+
+jobs:
+  live-admin-core-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      NODE_ENV: test
+      PORT: 10000
+      CORS_ORIGINS: http://127.0.0.1:10000
+      ALERT_EMAIL: "false"
+      ADMIN_REQUIRE_2FA: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+      - name: Install backend
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Live Admin syntax checks
+        run: |
+          node --check backend/routes/live-admin.js
+          node --check backend/routes/live-admin-studio.js
+          node --check backend/lib/live/checkout.js
+          node --check backend/scripts/live-admin-core-e2e.mjs
+      - name: Live Admin payment guards
+        run: |
+          grep -q 'live.status!=="live"' backend/lib/live/checkout.js
+          grep -q 'channel:"live"' backend/lib/live/checkout.js
+          grep -q 'ownerRole:s.ownerRole' backend/lib/live/sessions.js
+      - name: Start clean backend
+        run: |
+          rm -rf backend/data
+          (cd backend && node server.js > /tmp/cardoria-live-admin.log 2>&1 & echo $! > /tmp/cardoria-live-admin.pid)
+      - name: Wait for backend
+        run: |
+          ready=false
+          for i in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-live-admin-startup.json; then
+              if grep -q '"ready":true' /tmp/cardoria-live-admin-startup.json; then ready=true; break; fi
+            fi
+            sleep 1
+          done
+          test "$ready" = "true"
+      - name: Live Admin auth routing actions and lifecycle E2E
+        run: node backend/scripts/live-admin-core-e2e.mjs
+      - name: Existing Live regressions
+        run: |
+          node --test backend/tests/payment-matrix.test.mjs
+          node --test backend/tests/live-studio-v2-contract.test.mjs
+          node --test backend/tests/live-actions.test.mjs
+          node --test backend/tests/live-realtime-contract.test.mjs
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-live-admin.pid ]; then kill $(cat /tmp/cardoria-live-admin.pid) || true; fi
+          cat /tmp/cardoria-live-admin.log || true
