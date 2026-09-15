@@ -1,0 +1,33 @@
+name: OVH Deploy Camera Picker Once
+
+on:
+  push:
+    branches:
+      - ops/deploy-camera-picker-20260916
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: deploy
+      branch: main
+    secrets: inherit
+
+  healthcheck:
+    needs: deploy
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: healthcheck
+      branch: main
+    secrets: inherit
+
+  report:
+    needs: healthcheck
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: report
+      branch: main
+    secrets: inherit
