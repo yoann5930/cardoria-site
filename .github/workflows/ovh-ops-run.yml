@@ -30,6 +30,9 @@ jobs:
           OVH_VPS_SSH_KEY: ${{ secrets.OVH_VPS_SSH_KEY }}
           OVH_VPS_HOST_FINGERPRINT: ${{ secrets.OVH_VPS_HOST_FINGERPRINT }}
           SMTP_PASS: ${{ secrets.OVH_SMTP_PASS }}
+          SUMUP_API_KEY: ${{ secrets.OVH_SUMUP_API_KEY }}
+          SUMUP_MERCHANT_CODE: ${{ secrets.OVH_SUMUP_MERCHANT_CODE }}
+          SUMUP_WEBHOOK_SECRET: ${{ secrets.OVH_SUMUP_WEBHOOK_SECRET }}
           OP: ${{ inputs.action }}
           BRANCH: ${{ inputs.branch }}
         run: |
@@ -41,7 +44,7 @@ jobs:
           test -n "${OVH_VPS_HOST_FINGERPRINT:-}"
 
           case "$OP" in
-            status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure) ;;
+            status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|sumup-configure) ;;
             *) echo "FORBIDDEN action"; exit 1 ;;
           esac
           case "$BRANCH" in
@@ -78,8 +81,14 @@ jobs:
           if [ "$OP" = smtp-configure ]; then
             test -n "${SMTP_PASS:-}"
             printf '%s' "$SMTP_PASS" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
-            unset SMTP_PASS
+            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE SUMUP_WEBHOOK_SECRET
+          elif [ "$OP" = sumup-configure ]; then
+            test -n "${SUMUP_API_KEY:-}"
+            test -n "${SUMUP_MERCHANT_CODE:-}"
+            test -n "${SUMUP_WEBHOOK_SECRET:-}"
+            printf '%s\n%s\n%s\n' "$SUMUP_API_KEY" "$SUMUP_MERCHANT_CODE" "$SUMUP_WEBHOOK_SECRET" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
+            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE SUMUP_WEBHOOK_SECRET
           else
-            unset SMTP_PASS
+            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE SUMUP_WEBHOOK_SECRET
             ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
           fi

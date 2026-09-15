@@ -14,6 +14,10 @@ git fetch --prune origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
 git checkout -B "$BRANCH" "origin/$BRANCH"
 git reset --hard "origin/$BRANCH"
 
+# Install privileged helper from protected repository content as root-owned
+# executable before exposing it through the forced SSH wrapper/sudoers.
+sudo install -m 0755 -o root -g root "$APP_DIR/oracle/sumup-configure.sh" /usr/local/bin/cardoria-sumup-configure
+
 cd backend
 npm install --omit=dev
 node --check server.js

@@ -20,6 +20,8 @@ on:
           - backup-check
           - dns-check
           - https-enable
+          - smtp-configure
+          - sumup-configure
       branch:
         description: Production deploy branch
         required: false
