@@ -1,0 +1,92 @@
+name: Cardoria Live Public CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/routes/live.js"
+      - "backend/routes/live-realtime.js"
+      - "backend/routes/live-actions.js"
+      - "backend/lib/live/**"
+      - "backend/scripts/live-public-e2e.mjs"
+      - "js/cardoria-live-viewer.js"
+      - "backend/public/js/cardoria-live-viewer.js"
+      - "live.html"
+      - "backend/public/live.html"
+      - ".github/workflows/live-public-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/routes/live.js"
+      - "backend/routes/live-realtime.js"
+      - "backend/routes/live-actions.js"
+      - "backend/lib/live/**"
+      - "backend/scripts/live-public-e2e.mjs"
+      - "js/cardoria-live-viewer.js"
+      - "backend/public/js/cardoria-live-viewer.js"
+      - "live.html"
+      - "backend/public/live.html"
+      - ".github/workflows/live-public-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  live-public-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NODE_ENV: test
+      PORT: 10000
+      CORS_ORIGINS: http://127.0.0.1:10000
+      ALERT_EMAIL: "false"
+      MARKETPLACE_DEMO_MODE: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+      - name: Install backend
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Live public syntax checks
+        run: |
+          node --check backend/routes/live.js
+          node --check backend/routes/live-realtime.js
+          node --check backend/routes/live-actions.js
+          node --check backend/scripts/live-public-e2e.mjs
+      - name: Public Live security guards
+        run: |
+          grep -q 'session?.status === "live"' backend/routes/live.js
+          grep -q 'live.status!=="live"' backend/routes/live-realtime.js
+          grep -q 'assertPublicLive' backend/routes/live-actions.js
+          grep -q 'sanitizePublicValue' backend/routes/live.js
+      - name: Start clean backend
+        working-directory: backend
+        run: |
+          rm -rf data
+          node server.js > /tmp/cardoria-live-public.log 2>&1 &
+          echo $! > /tmp/cardoria-live-public.pid
+      - name: Wait for backend
+        run: |
+          ready=false
+          for i in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:10000/api/health/startup > /tmp/cardoria-live-public-startup.json; then
+              if grep -q '"ready":true' /tmp/cardoria-live-public-startup.json; then ready=true; break; fi
+            fi
+            sleep 1
+          done
+          test "$ready" = "true"
+      - name: Live public visibility privacy and viewer E2E
+        working-directory: backend
+        run: node scripts/live-public-e2e.mjs
+      - name: Existing Live realtime regression
+        run: |
+          node --test backend/tests/live-realtime-contract.test.mjs
+          node --test backend/tests/live-architecture.test.mjs
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-live-public.pid ]; then kill $(cat /tmp/cardoria-live-public.pid) || true; fi
+          cat /tmp/cardoria-live-public.log || true
