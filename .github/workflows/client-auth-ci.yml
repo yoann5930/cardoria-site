@@ -20,6 +20,7 @@ jobs:
       LEGACY_ADMIN_CODE: 'false'
       ADMIN_AUTH_DISABLED: 'false'
       BACKUP_INTERVAL_HOURS: '0'
+      CARDORIA_TEST_EMAIL_OUTBOX: '/tmp/cardoria-test-email.json'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -43,6 +44,7 @@ jobs:
       - name: Start backend
         working-directory: backend
         run: |
+          rm -f /tmp/cardoria-test-email.json
           node server.js > /tmp/cardoria-client-auth.log 2>&1 &
           echo $! > /tmp/cardoria-client-auth.pid
       - name: Wait for backend
@@ -95,8 +97,6 @@ jobs:
           test "$code" = "200"
           grep -q '"ok":true' /tmp/login.json
           grep -q '"role":"client"' /tmp/login.json
-          LOGIN_TOKEN=$(node -e "const d=require('fs').readFileSync('/tmp/login.json','utf8');process.stdout.write(JSON.parse(d).token||'')")
-          test -n "$LOGIN_TOKEN"
 
           code=$(curl -sS -o /tmp/bad-login.json -w '%{http_code}' \
             -H 'Content-Type: application/json' \
@@ -104,7 +104,64 @@ jobs:
             http://127.0.0.1:10000/api/auth/login)
           test "$code" = "401"
           grep -q 'Email ou mot de passe incorrect' /tmp/bad-login.json
-      - name: Client password reset contract
+      - name: Client password reset full E2E
+        run: |
+          EMAIL="client-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@cardoria.invalid"
+          OLD_PASSWORD='ClientTest2026!'
+          NEW_PASSWORD='NewClient2026!'
+
+          code=$(curl -sS -o /tmp/pre-reset-login.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"${EMAIL}\",\"password\":\"${OLD_PASSWORD}\"}" \
+            http://127.0.0.1:10000/api/auth/login)
+          test "$code" = "200"
+          PRE_RESET_TOKEN=$(node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/pre-reset-login.json','utf8'));process.stdout.write(d.token||'')")
+          test -n "$PRE_RESET_TOKEN"
+
+          rm -f /tmp/cardoria-test-email.json
+          code=$(curl -sS -o /tmp/reset-request.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"${EMAIL}\"}" \
+            http://127.0.0.1:10000/api/auth/password/request)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/reset-request.json
+          test -s /tmp/cardoria-test-email.json
+
+          RESET_TOKEN=$(node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/cardoria-test-email.json','utf8'));const m=String(d.text||'').match(/https:\/\/www\.cardoriashop\.fr\/reset-password\.html\?token=([a-f0-9]{64})/i);if(!m)process.exit(2);process.stdout.write(m[1]);")
+          test -n "$RESET_TOKEN"
+
+          code=$(curl -sS -o /tmp/reset-confirm.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -d "{\"token\":\"${RESET_TOKEN}\",\"password\":\"${NEW_PASSWORD}\"}" \
+            http://127.0.0.1:10000/api/auth/password/confirm)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/reset-confirm.json
+
+          code=$(curl -sS -o /tmp/session-after-reset.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${PRE_RESET_TOKEN}" \
+            http://127.0.0.1:10000/api/auth/me)
+          test "$code" = "401"
+
+          code=$(curl -sS -o /tmp/old-password.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"${EMAIL}\",\"password\":\"${OLD_PASSWORD}\"}" \
+            http://127.0.0.1:10000/api/auth/login)
+          test "$code" = "401"
+
+          code=$(curl -sS -o /tmp/new-password.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"${EMAIL}\",\"password\":\"${NEW_PASSWORD}\"}" \
+            http://127.0.0.1:10000/api/auth/login)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/new-password.json
+          grep -q '"role":"client"' /tmp/new-password.json
+
+          code=$(curl -sS -o /tmp/reuse-reset-token.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -d "{\"token\":\"${RESET_TOKEN}\",\"password\":\"AnotherClient2026!\"}" \
+            http://127.0.0.1:10000/api/auth/password/confirm)
+          test "$code" = "400"
+      - name: Client password reset negative contract
         run: |
           code=$(curl -sS -o /tmp/reset-unknown.json -w '%{http_code}' \
             -H 'Content-Type: application/json' \
