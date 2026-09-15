@@ -1,6 +1,6 @@
 import { getDb } from "../lib/engine/database.js";
 import { createListingV1 } from "../lib/marketplace/v1/listings.js";
-import { createOrder } from "../lib/marketplace/orders.js";
+import { createOrder, updateOrderStatus } from "../lib/marketplace/orders.js";
 
 const BASE = process.env.TEST_BASE_URL || "http://127.0.0.1:10000";
 const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -96,6 +96,7 @@ const buyerTracking = await auth(buyerA.token, `/api/marketplace/v1/sellers/${se
   body: JSON.stringify({ status: "shipped", tracking: "BUYER-MUST-NOT-EDIT" })
 });
 assert(buyerTracking.response.status === 403, "Buyer can modify seller tracking");
+updateOrderStatus(order.id, "paid", { paymentStatus: "paid", paymentMethod: "paypal" });
 const sellerTracking = await auth(sellerAccountA.token, `/api/marketplace/v1/sellers/${sellerA.id}/orders/${order.id}/tracking`, {
   method: "PUT",
   body: JSON.stringify({ status: "shipped", tracking: "CARDORIA-E2E-TRACK" })

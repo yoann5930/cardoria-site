@@ -35,6 +35,19 @@ function publicListingOrNull(listing) {
   } = listing;
   return publicListing;
 }
+function assertSellerFulfillmentTransition(order, nextStatus) {
+  const allowedStatuses = new Set(["preparing", "shipped", "delivered"]);
+  if (!allowedStatuses.has(nextStatus)) throw Object.assign(new Error("Statut de suivi vendeur invalide."), { code: 400, status: 400 });
+  if (order.paymentStatus !== "paid") throw Object.assign(new Error("La commande doit etre payee avant toute preparation ou expedition."), { code: 409, status: 409 });
+  const transitions = {
+    paid: new Set(["preparing", "shipped"]),
+    preparing: new Set(["shipped"]),
+    shipped: new Set(["delivered"]),
+    delivered: new Set()
+  };
+  if (!transitions[order.status]?.has(nextStatus)) throw Object.assign(new Error(`Transition vendeur invalide: ${order.status} -> ${nextStatus}.`), { code: 409, status: 409 });
+  return nextStatus;
+}
 
 router.get("/v1/plans", (req, res) => res.json({ ok: true, currency: "EUR", billingPeriod: "month", plans: listSellerPlans() }));
 router.get("/v1/stats", (req, res) => res.json({ ok: true, stats: getMarketplaceStats() }));
@@ -103,9 +116,8 @@ router.get("/v1/sellers/:id/orders", (req, res) => {
 });
 router.put("/v1/sellers/:id/orders/:orderId/tracking", (req, res) => {
   try {
-    assertSellerOwnsOrder(req, req.params.orderId, req.params.id);
-    const allowed = new Set(["preparing", "shipped", "delivered"]);
-    const status = allowed.has(req.body?.status) ? req.body.status : "shipped";
+    const { order: currentOrder } = assertSellerOwnsOrder(req, req.params.orderId, req.params.id);
+    const status = assertSellerFulfillmentTransition(currentOrder, String(req.body?.status || "").trim());
     const order = updateOrderStatus(req.params.orderId, status, { tracking: String(req.body?.tracking || "").slice(0, 120), labelUrl: String(req.body?.labelUrl || "").slice(0, 1000) });
     res.json({ ok: true, order });
   } catch (e) { fail(res, e); }
