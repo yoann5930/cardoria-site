@@ -90,20 +90,15 @@ test('unimplemented social eligibility giveaways are not exposed as fake working
   assert.match(controls, /buyer\.hidden=true/);
 });
 
-test('sales control decoration is idempotent and cannot self-trigger an endless MutationObserver loop', () => {
+test('sales control decoration no longer uses a DOM MutationObserver loop', () => {
   assert.match(controls, /game\.dataset\.salesEnhanced!=="1"/);
   assert.match(controls, /game\.dataset\.salesEnhanced="1"/);
-  assert.match(controls, /if\(game\.textContent!=="Jeu de l’énergie"\)game\.textContent="Jeu de l’énergie"/);
-  assert.match(controls, /MutationObserver\(scheduleDecorate\)/);
-  assert.match(controls, /decorateQueued/);
-  assert.doesNotMatch(controls, /MutationObserver\(decorate\)/);
+  assert.doesNotMatch(controls, /new MutationObserver/);
+  assert.match(controls, /setInterval\(decorate,1000\)/);
 });
-
 
 test('live sales editor does not destroy operator interactions with periodic full rerenders', () => {
   const ui = read('js/live-studio-actions-ui.js');
   assert.doesNotMatch(ui, /if \(selected\) loadEditor\(\);/);
   assert.match(ui, /editor is refreshed explicitly after live actions/i);
-  assert.doesNotMatch(controls, /new MutationObserver/);
-  assert.match(controls, /setInterval\(decorate,1000\)/);
 });
