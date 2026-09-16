@@ -1,0 +1,32 @@
+name: Probe Live UI Once
+
+on:
+  push:
+    branches:
+      - ops/probe-live-ui-20260916
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe deployed live UI
+        run: |
+          set -euo pipefail
+          base=https://www.cardoriashop.fr
+          echo '=== admin-live html ==='
+          curl -fsS --max-time 20 "$base/admin-live.html?probe=$(date +%s)" -o /tmp/admin-live.html
+          grep -n "live-studio-actions-ui\|live-studio-sales-controls\|camera-picker" /tmp/admin-live.html || true
+          echo '=== sales controls ==='
+          curl -fsS --max-time 20 "$base/js/live-studio-sales-controls.js?probe=$(date +%s)" -o /tmp/sales.js
+          wc -c /tmp/sales.js
+          grep -n "salesEnhanced\|MutationObserver\|scheduleDecorate\|Box Break\|Jeu de l’énergie" /tmp/sales.js || true
+          echo '=== actions ui ==='
+          curl -fsS --max-time 20 "$base/js/live-studio-actions-ui.js?probe=$(date +%s)" -o /tmp/actions.js
+          wc -c /tmp/actions.js
+          grep -n "activityTimer = setInterval\|if (selected) loadEditor\|lasAdd\|lasBuyNow" /tmp/actions.js || true
+          node --check /tmp/sales.js
+          node --check /tmp/actions.js
