@@ -1,0 +1,46 @@
+name: Probe Spectator Once
+
+on:
+  push:
+    branches:
+      - ops/probe-spectator-20260916
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe spectator runtime and live state
+        run: |
+          set -euo pipefail
+          base=https://www.cardoriashop.fr
+          echo '=== live page ==='
+          curl -fsS "$base/live.html?probe=$(date +%s)" -o /tmp/live.html
+          grep -n "cardoria-live-viewer\|live-energy-spots\|cardoria-live-actions" /tmp/live.html || true
+          echo '=== webrtc status ==='
+          curl -fsS "$base/api/live/webrtc/status" | tee /tmp/status.json
+          echo
+          echo '=== live sessions ==='
+          curl -fsS "$base/api/live/sessions?status=live" | tee /tmp/sessions.json
+          echo
+          python - <<'PY'
+          import json, subprocess
+          data=json.load(open('/tmp/sessions.json'))
+          sessions=data.get('sessions') or []
+          print('live_count=',len(sessions))
+          for s in sessions:
+              lid=str(s.get('id',''))
+              print('session=',lid,'status=',s.get('status'),'streamPublished=',s.get('streamPublished'))
+              if lid:
+                  print(subprocess.check_output(['curl','-fsS',f'https://www.cardoriashop.fr/api/live/webrtc/status/{lid}'],text=True))
+                  p=subprocess.run(['curl','-sS','-X','POST','-H','Content-Type: application/json','-d',json.dumps({'liveSessionId':lid}),f'https://www.cardoriashop.fr/api/live/webrtc/viewer/start'],text=True,capture_output=True)
+                  print('viewer_start_http_payload=',p.stdout)
+          PY
+          echo '=== js syntax ==='
+          curl -fsS "$base/js/cardoria-live-viewer.js?probe=$(date +%s)" -o /tmp/viewer.js
+          curl -fsS "$base/js/live-energy-spots.js?probe=$(date +%s)" -o /tmp/energy.js
+          node --check /tmp/viewer.js
+          node --check /tmp/energy.js
