@@ -1,0 +1,32 @@
+name: External Cardoria Site Probe Once
+
+on:
+  push:
+    branches:
+      - ops/diag-site-down-20260916
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe public HTTPS endpoints
+        run: |
+          set -u
+          for url in \
+            https://cardoriashop.fr/ \
+            https://www.cardoriashop.fr/ \
+            https://www.cardoriashop.fr/api/health/ \
+            https://www.cardoriashop.fr/admin-login.html
+          do
+            echo "=== $url ==="
+            curl -v --connect-timeout 10 --max-time 20 -o /tmp/body -D /tmp/headers "$url" || true
+            echo "--- headers ---"
+            cat /tmp/headers 2>/dev/null || true
+            echo "--- body-head ---"
+            head -c 200 /tmp/body 2>/dev/null || true
+            echo
+          done
