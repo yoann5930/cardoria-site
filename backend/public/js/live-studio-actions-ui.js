@@ -164,7 +164,7 @@
           var active = current && p.id === current.id;
           return "<li class='" + (active ? "is-current" : "") + "'><div>" + (i + 1) + ". " + esc(p.name) + "<br><small>" + esc(modeLabel(p.mode)) + "</small></div><button type='button' data-use-lot='" + esc(p.id) + "'>Relancer</button></li>";
         }).join("") || "<li>File vide</li>") + "</ul>",
-        "<details><summary>Ajouter un lot</summary><div class='live-studio-sheet' style='display:grid;gap:8px'><input id='lasName' placeholder='Nom article / lot'><input id='lasPrice' type='number' min='0' step='0.01' placeholder='Prix'><input id='lasStock' type='number' min='1' value='1' placeholder='Stock'><select id='lasMode'><option value='buy_now'>Achat immédiat</option><option value='auction'>Enchère</option><option value='flash'>Vente flash</option><option value='giveaway'>Giveaway</option><option value='break'>Ouverture / break</option></select><button type='button' id='lasAdd'>Ajouter au Live</button></div></details>",
+        "<details><summary>Ajouter un lot</summary><div class='live-studio-sheet' style='display:grid;gap:8px'><input id='lasName' placeholder='Nom article / lot'><input id='lasPrice' type='number' min='0' step='0.01' placeholder='Prix'><input id='lasStock' type='number' min='1' value='1' placeholder='Stock'><input id='lasShippingWeight' type='number' min='0' max='25000' step='1' value='20' placeholder='Poids expédition par article (g)' title='Poids emballé par article. 20 g par défaut pour les petits envois TCG.'><select id='lasMode'><option value='buy_now'>Achat immédiat</option><option value='auction'>Enchère</option><option value='flash'>Vente flash</option><option value='giveaway'>Giveaway</option><option value='break'>Ouverture / break</option></select><button type='button' id='lasAdd'>Ajouter au Live</button></div></details>",
         "<select id='lasProduct' hidden><option value=''>Choisir un article</option>" + products.map(function (p) {
           return "<option value='" + esc(p.id) + "'" + (current && current.id === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>";
         }).join("") + "</select>",
@@ -261,9 +261,10 @@
       var mode = document.getElementById("lasMode").value;
       var price = Number(document.getElementById("lasPrice").value || 0);
       var stock = Math.max(1, Number(document.getElementById("lasStock").value || 1));
+      var shippingWeightGrams = Math.max(0, Math.min(25000, Number(document.getElementById("lasShippingWeight").value || 0)));
       if (!name) return alert("Nom de l'article obligatoire.");
       if (mode !== "giveaway" && price <= 0) return alert("Prix obligatoire pour cette action.");
-      var next = products.concat([{ id: "LOT-" + Date.now(), name: name, mode: mode, price: mode === "giveaway" ? 0 : price, qty: stock, stock: stock, durationSeconds: 30 }]);
+      var next = products.concat([{ id: "LOT-" + Date.now(), name: name, mode: mode, price: mode === "giveaway" ? 0 : price, qty: stock, stock: stock, durationSeconds: 30, shippingWeightGrams: shippingWeightGrams }]);
       api(patchPath(selected), { method: "PATCH", body: JSON.stringify({ products: next }) }).then(loadEditor).catch(function (e) { alert(e.message); });
     };
     var mode = document.getElementById("lasMode");
