@@ -26,7 +26,13 @@
   function decorate(){
     var actions=document.querySelector(".live-studio-actions");if(!actions)return;
     var game=document.getElementById("lasGame");
-    if(game){game.disabled=false;game.textContent="Jeu de l’énergie";game.title="Utilise automatiquement les énergies configurées sur l’item";game.onclick=startEnergyGame;}
+    if(game&&game.dataset.salesEnhanced!=="1"){
+      game.dataset.salesEnhanced="1";
+      game.disabled=false;
+      if(game.textContent!=="Jeu de l’énergie")game.textContent="Jeu de l’énergie";
+      game.title="Utilise automatiquement les énergies configurées sur l’item";
+      game.onclick=startEnergyGame;
+    }
     if(!document.getElementById("lasEnergyConfig")){
       var cfg=document.createElement("button");cfg.type="button";cfg.id="lasEnergyConfig";cfg.textContent="Énergies item";cfg.title="Définir les énergies réellement présentes dans l’item sélectionné";actions.appendChild(cfg);cfg.onclick=configureEnergyItem;
     }
@@ -35,10 +41,16 @@
       btn.onclick=function(){var c=requireContext();if(!c)return;sheet("Box Break","<label>Nombre de spots <input id='lasBoxSpots' type='number' min='1' max='1000' value='12'></label><label>Prix / spot <input id='lasBoxPrice' type='number' min='0.01' step='0.01' value='1'></label>",function(){startBreak("box_break",Number(document.getElementById("lasBoxSpots").value||0),Number(document.getElementById("lasBoxPrice").value||0),[]);});};
     }
     var follow=document.getElementById("lasGiveFollow"),buyer=document.getElementById("lasGiveBuyer");
-    if(follow){follow.hidden=true;follow.setAttribute("aria-hidden","true");}
-    if(buyer){buyer.hidden=true;buyer.setAttribute("aria-hidden","true");}
+    if(follow&&!follow.hidden){follow.hidden=true;follow.setAttribute("aria-hidden","true");}
+    if(buyer&&!buyer.hidden){buyer.hidden=true;buyer.setAttribute("aria-hidden","true");}
   }
-  var obs=new MutationObserver(decorate);obs.observe(document.documentElement,{childList:true,subtree:true});
+  var decorateQueued=false;
+  function scheduleDecorate(){
+    if(decorateQueued)return;
+    decorateQueued=true;
+    (window.requestAnimationFrame||function(cb){return setTimeout(cb,0);})(function(){decorateQueued=false;decorate();});
+  }
+  var obs=new MutationObserver(scheduleDecorate);obs.observe(document.documentElement,{childList:true,subtree:true});
   document.addEventListener("DOMContentLoaded",decorate);decorate();
   window.CardoriaLiveSalesControls={energySpots:ENERGY_SPOTS.slice(),decorate:decorate};
 })();
