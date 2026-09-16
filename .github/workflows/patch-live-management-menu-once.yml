@@ -1,0 +1,51 @@
+name: Patch Live Management Menu Once
+on:
+  push:
+    branches: [ops/cleanup-live-tests-20260916]
+    paths: ['.github/workflows/patch-live-management-menu-once.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore persistent Live management menu
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          for file in ['js/live-schedule-archive.js','backend/public/js/live-schedule-archive.js']:
+              p=Path(file)
+              s=p.read_text()
+              old='''function root(){return document.querySelector(".admin-main")||document.body;}\n            function ensureUi(){\n              if(document.getElementById("liveScheduleArchivePanel"))return;\n              var panel=document.createElement("section");panel.id="liveScheduleArchivePanel";panel.className="live-schedule-archive";\n              panel.innerHTML="<div class='live-schedule-head'><div><h2>Programmation & archives Live</h2><p>Programme un direct et retrouve automatiquement les achats à la fin du Live pour préparer les envois.</p></div><button type='button' id='liveScheduleBtn' class='btn btn-primary'>Programmer un Live</button></div>'''
+              new='''function root(){return document.querySelector(".admin-main")||document.body;}\n            function ensureUi(){\n              if(document.getElementById("liveScheduleArchivePanel"))return;\n              var panel=document.createElement("section");panel.id="liveScheduleArchivePanel";panel.className="live-schedule-archive live-management-panel";\n              panel.innerHTML="<div class='live-schedule-head'><div><h2>Gestion des Lives</h2><p>Crée, programme, sélectionne et archive tes Lives depuis ce menu permanent.</p></div><div class='live-management-actions'><button type='button' id='liveCreateNowBtn' class='btn btn-primary'>Créer un Live</button><button type='button' id='liveScheduleBtn' class='btn'>Programmer un Live</button><button type='button' id='liveShowSessionsBtn' class='btn'>Liste des Lives</button><button type='button' id='liveShowArchivesBtn' class='btn'>Archives</button></div></div>'''
+              if old not in s:
+                  raise SystemExit(file+': target header not found')
+              s=s.replace(old,new,1)
+              old2='''root().appendChild(panel);\n              document.getElementById("liveScheduleBtn").onclick=function(){'''
+              new2='''var target=document.querySelector(".admin-main")||document.body;\n              var controls=document.querySelector("#liveSelectedSession");\n              var controlsSection=controls&&controls.closest("section");\n              if(controlsSection&&controlsSection.parentNode)controlsSection.parentNode.insertBefore(panel,controlsSection);else target.insertBefore(panel,target.firstChild);\n              document.getElementById("liveCreateNowBtn").onclick=function(){\n                var title=prompt("Titre du Live :","Live Cardoria");\n                if(title===null)return;title=String(title||"").trim();if(!title)return alert("Indique le titre du Live.");\n                A.adminFetch("/api/admin/live/sessions",{method:"POST",body:JSON.stringify({title:title,ownerRole:"admin",products:[]})}).then(function(d){\n                  var id=d&&d.session&&d.session.id||d&&d.id||"";\n                  if(id)try{sessionStorage.setItem("cardoria_live_selected",id);}catch(e){}\n                  location.reload();\n                }).catch(function(e){alert(e.message);});\n              };\n              document.getElementById("liveShowSessionsBtn").onclick=function(){var table=document.getElementById("liveBody");if(table)table.scrollIntoView({behavior:"smooth",block:"center"});};\n              document.getElementById("liveShowArchivesBtn").onclick=function(){var box=document.getElementById("liveArchiveList");if(box)box.scrollIntoView({behavior:"smooth",block:"start"});};\n              document.getElementById("liveScheduleBtn").onclick=function(){'''
+              if old2 not in s:
+                  raise SystemExit(file+': target append not found')
+              s=s.replace(old2,new2,1)
+              p.write_text(s)
+
+          for file in ['css/live-schedule-archive.css','backend/public/css/live-schedule-archive.css']:
+              p=Path(file); s=p.read_text()
+              extra='''\n.live-management-panel{margin-top:12px}.live-management-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.live-management-actions .btn{min-width:140px}@media(max-width:760px){.live-schedule-head{align-items:flex-start;flex-direction:column}.live-management-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.live-management-actions .btn{min-width:0;width:100%}}\n'''
+              if '.live-management-panel{' not in s: s += extra
+              p.write_text(s)
+
+          for file in ['admin-live.html','backend/public/admin-live.html']:
+              p=Path(file); s=p.read_text()
+              s=s.replace('/css/live-schedule-archive.css?v=20260916-live-archive','/css/live-schedule-archive.css?v=20260916-live-menu-v2')
+              s=s.replace('/js/live-schedule-archive.js?v=20260916-live-archive','/js/live-schedule-archive.js?v=20260916-live-menu-v2')
+              p.write_text(s)
+          PY
+          node --check js/live-schedule-archive.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add js/live-schedule-archive.js backend/public/js/live-schedule-archive.js css/live-schedule-archive.css backend/public/css/live-schedule-archive.css admin-live.html backend/public/admin-live.html
+          git commit -m 'fix(live): restore persistent live management menu'
+          git push origin HEAD:ops/cleanup-live-tests-20260916
