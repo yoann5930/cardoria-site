@@ -1,0 +1,46 @@
+name: Patch Live Realtime Persistence Once
+
+on:
+  push:
+    branches:
+      - fix/live-spectator-restart-persistence-20260916
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/live-spectator-restart-persistence-20260916
+      - name: Persist P2P publisher registrations across restarts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('backend/lib/live/realtime-sessions.js')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('import { getLiveSession } from "./sessions.js";','import { getLiveSession } from "./sessions.js";\nimport { readJson, writeJson } from "../storage.js";')
+          s=s.replace('const publishedLives=new Map(),viewerSessions=new Map(),publisherPairs=new Map();','const publishedLives=new Map(),viewerSessions=new Map(),publisherPairs=new Map();\nconst PUBLISHER_STORE_KEY="live-realtime-publishers.json";\nfunction persistPublishedLives(){\n  const lives=[];\n  for(const[liveId,entry]of publishedLives){\n    lives.push({liveId,startedAt:entry.startedAt||"",sources:[...entry.sources.values()].filter(x=>x.mode==="p2p").map(x=>({mode:"p2p",sourceId:x.sourceId,publisherId:x.publisherId,publisherKey:x.publisherKey,tracks:x.tracks||[],startedAt:x.startedAt||""}))});\n  }\n  try{writeJson(PUBLISHER_STORE_KEY,{lives});}catch{}\n}\nfunction hydratePublishedLives(){\n  try{\n    const data=readJson(PUBLISHER_STORE_KEY,{lives:[]});\n    for(const live of data.lives||[]){\n      const session=getLiveSession(live.liveId);\n      if(!session||session.status!=="live")continue;\n      const entry={sources:new Map(),startedAt:live.startedAt||new Date().toISOString()};\n      for(const source of live.sources||[]){\n        if(source.mode!=="p2p"||!source.sourceId||!source.publisherKey)continue;\n        entry.sources.set(source.sourceId,{...source,offers:new Map(),lastSeenAt:Date.now()});\n      }\n      if(entry.sources.size)publishedLives.set(live.liveId,entry);\n    }\n  }catch{}\n}\nhydratePublishedLives();')
+          s=s.replace('function cleanupP2PSources(){const cutoff=Date.now()-PUBLISHER_TTL_MS;for(const[liveId,entry]of publishedLives){for(const[sourceId,source]of entry.sources){if(source.mode==="p2p"&&Number(source.lastSeenAt||0)<cutoff)entry.sources.delete(sourceId);}if(!entry.sources.size)publishedLives.delete(liveId);}}','function cleanupP2PSources(){const cutoff=Date.now()-PUBLISHER_TTL_MS;let changed=false;for(const[liveId,entry]of publishedLives){for(const[sourceId,source]of entry.sources){if(source.mode==="p2p"&&Number(source.lastSeenAt||0)<cutoff){entry.sources.delete(sourceId);changed=true;}}if(!entry.sources.size){publishedLives.delete(liveId);changed=true;}}if(changed)persistPublishedLives();}')
+          s=s.replace('entry.sources.set(normalizedSource,{mode:"p2p",sourceId:normalizedSource,publisherId:String(actor.id||actor.sellerId||"admin"),publisherKey,tracks:(tracks||[]).map((track)=>({kind:track.kind,trackName:track.trackName||`${normalizedSource}-${track.kind}`})),offers:new Map(),startedAt:new Date().toISOString(),lastSeenAt:Date.now()});\n  return{provider:"cardoria-p2p",mode:"p2p",liveId,sourceId:normalizedSource,sourceCount:entry.sources.size,publisherKey};','entry.sources.set(normalizedSource,{mode:"p2p",sourceId:normalizedSource,publisherId:String(actor.id||actor.sellerId||"admin"),publisherKey,tracks:(tracks||[]).map((track)=>({kind:track.kind,trackName:track.trackName||`${normalizedSource}-${track.kind}`})),offers:new Map(),startedAt:new Date().toISOString(),lastSeenAt:Date.now()});\n  persistPublishedLives();\n  return{provider:"cardoria-p2p",mode:"p2p",liveId,sourceId:normalizedSource,sourceCount:entry.sources.size,publisherKey};')
+          s=s.replace('export function stopRealtimePublisher({liveId,actor,sourceId}){const live=getLiveSession(liveId);if(live)assertPublisher(live,actor);const entry=livePublishers(liveId);if(entry){if(sourceId)entry.sources.delete(cleanSourceId(sourceId));else entry.sources.clear();if(!entry.sources.size){publishedLives.delete(liveId);for(const[id,v]of viewerSessions)if(v.liveId===liveId)viewerSessions.delete(id);}}return{ok:true,liveId,sourceId:sourceId?cleanSourceId(sourceId):null,sourceCount:entry?.sources.size||0};}','export function stopRealtimePublisher({liveId,actor,sourceId}){const live=getLiveSession(liveId);if(live)assertPublisher(live,actor);const entry=livePublishers(liveId);if(entry){if(sourceId)entry.sources.delete(cleanSourceId(sourceId));else entry.sources.clear();if(!entry.sources.size){publishedLives.delete(liveId);for(const[id,v]of viewerSessions)if(v.liveId===liveId)viewerSessions.delete(id);}persistPublishedLives();}return{ok:true,liveId,sourceId:sourceId?cleanSourceId(sourceId):null,sourceCount:entry?.sources.size||0};}')
+          p.write_text(s,encoding='utf-8')
+
+          st=Path('backend/lib/storage.js')
+          x=st.read_text(encoding='utf-8')
+          x=x.replace('"live-sessions.json": "live-sessions.json"','"live-sessions.json": "live-sessions.json",\n  "live-realtime-publishers.json": "live-realtime-publishers.json"')
+          st.write_text(x,encoding='utf-8')
+
+          t=Path('tests/live-realtime-persistence.test.mjs')
+          t.write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\nimport fs from "node:fs";\nconst src=fs.readFileSync(new URL("../backend/lib/live/realtime-sessions.js",import.meta.url),"utf8");\ntest("P2P publisher registrations persist across Cardoria restarts",()=>{\n assert.match(src,/PUBLISHER_STORE_KEY/);\n assert.match(src,/hydratePublishedLives\(\)/);\n assert.match(src,/persistPublishedLives\(\)/);\n assert.match(src,/offers:new Map\(\),lastSeenAt:Date\.now\(\)/);\n});\n''',encoding='utf-8')
+          PY
+          node --check backend/lib/live/realtime-sessions.js
+          node --test tests/live-realtime-persistence.test.mjs
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add backend/lib/live/realtime-sessions.js backend/lib/storage.js tests/live-realtime-persistence.test.mjs
+          git commit -m 'fix(live): persist P2P publishers across restarts [skip ci]'
+          git push origin HEAD:fix/live-spectator-restart-persistence-20260916
