@@ -58,6 +58,7 @@ import { applySecurityMiddleware, errorHandler } from "./lib/security/index.js";
 import { apiRateLimit, aiRateLimit } from "./lib/security/rateLimit.js";
 import { migrateAuth } from "./lib/auth/migrate.js";
 import { scheduleAutoBackup } from "./lib/backup/full.js";
+import { cleanupLegacyLiveTestsOnce } from "./lib/live/cleanup-tests.js";
 import { initLaunch, connectionJournalMiddleware, maintenanceMiddleware } from "./lib/launch/index.js";
 import systemRoutes from "./routes/system.js";
 
@@ -76,6 +77,7 @@ const SERVED_SITE_HOSTS = [
   "https://www.cardoriashop.fr",
   "https://cardoriashop.fr"
 ];
+const liveTestCleanup = cleanupLegacyLiveTestsOnce();
 const app = express();
 const startup = { ok: true, ready: false, degraded: [], startedAt: new Date().toISOString() };
 let authReady = false;
