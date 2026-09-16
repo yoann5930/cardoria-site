@@ -98,3 +98,12 @@ test('sales control decoration is idempotent and cannot self-trigger an endless 
   assert.match(controls, /decorateQueued/);
   assert.doesNotMatch(controls, /MutationObserver\(decorate\)/);
 });
+
+
+test('live sales editor does not destroy operator interactions with periodic full rerenders', () => {
+  const ui = read('js/live-studio-actions-ui.js');
+  assert.doesNotMatch(ui, /if \(selected\) loadEditor\(\);/);
+  assert.match(ui, /editor is refreshed explicitly after live actions/i);
+  assert.doesNotMatch(controls, /new MutationObserver/);
+  assert.match(controls, /setInterval\(decorate,1000\)/);
+});

@@ -44,13 +44,11 @@
     if(follow&&!follow.hidden){follow.hidden=true;follow.setAttribute("aria-hidden","true");}
     if(buyer&&!buyer.hidden){buyer.hidden=true;buyer.setAttribute("aria-hidden","true");}
   }
-  var decorateQueued=false;
-  function scheduleDecorate(){
-    if(decorateQueued)return;
-    decorateQueued=true;
-    (window.requestAnimationFrame||function(cb){return setTimeout(cb,0);})(function(){decorateQueued=false;decorate();});
-  }
-  var obs=new MutationObserver(scheduleDecorate);obs.observe(document.documentElement,{childList:true,subtree:true});
+  // Keep enhancement detached from DOM mutation loops. A lightweight idempotent timer
+  // is sufficient to decorate a freshly rendered editor without freezing the Live page.
+  var decorateTimer=setInterval(decorate,1000);
+  window.addEventListener("cardoria-live-selected",function(){setTimeout(decorate,0);});
   document.addEventListener("DOMContentLoaded",decorate);decorate();
+  window.addEventListener("beforeunload",function(){clearInterval(decorateTimer);});
   window.CardoriaLiveSalesControls={energySpots:ENERGY_SPOTS.slice(),decorate:decorate};
 })();
