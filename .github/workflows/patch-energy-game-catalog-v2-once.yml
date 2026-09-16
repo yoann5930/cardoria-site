@@ -1,0 +1,66 @@
+name: Patch Energy Game Catalog V2 Once
+on:
+  push:
+    branches: [fix/energy-game-config-no-lot-20260916]
+    paths: ['.github/workflows/patch-energy-game-catalog-v2-once.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply resilient energy game patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path('backend/lib/live/actions.js'); s=p.read_text()
+          if 'resolveEnergyItems' not in s:
+              s=s.replace('import { decrementLiveStock, getLiveSession } from "./sessions.js";','import { decrementLiveStock, getLiveSession, listLiveCheckouts } from "./sessions.js";\nimport { resolveEnergyItems } from "./energy-catalog.js";')
+          refresh='''function refreshBreakProgress(liveId,state){if(!state?.break)return;if(state.break.breakType==="energy_game"){const active=new Set(["planned","pending","paid","completed","authorized","authorised"]),used=new Set(listLiveCheckouts({liveId}).filter((c)=>c.actionId===state.break.id&&active.has(String(c.status||"").toLowerCase())&&c.spotLabel).map((c)=>String(c.spotLabel)));state.break.soldSpots=Math.min(Number(state.break.spots||0),used.size);state.break.remainingSpots=Math.max(0,Number(state.break.spots||0)-state.break.soldSpots);if(state.break.remainingSpots===0&&state.break.status==="running"){state.break.status="sold_out";state.break.endedAt=nowIso();}return;}const live=getLiveSession(liveId),product=(live?.products||[]).find((p)=>p.id===state.break.productId);if(!product)return;const start=Number(state.break.stockAtStart??state.break.spots),remainingStock=Math.max(0,Number(product.stock||0)),sold=Math.max(0,Math.min(Number(state.break.spots||0),start-remainingStock));state.break.soldSpots=sold;state.break.remainingSpots=Math.max(0,Number(state.break.spots||0)-sold);if(state.break.remainingSpots===0&&state.break.status==="running"){state.break.status="sold_out";state.break.endedAt=nowIso();}}'''
+          s=re.sub(r'function refreshBreakProgress\(liveId,state\)\{.*?\}(?=\nexport function __setLiveActionsStoreForTests)',refresh,s,flags=re.S)
+          if 'export async function startEnergyGame' not in s:
+              fn='''\nexport async function startEnergyGame(liveId,{gamesCount=1,energyGames=[],pricePerSpot}={}){const live=requireLive(liveId),count=Math.max(1,Math.min(100,Math.trunc(Number(gamesCount)||1))),price=money(pricePerSpot);if(price<=0)throw Object.assign(new Error("Prix du spot invalide."),{status:400});if(!Array.isArray(energyGames)||energyGames.length<count)throw Object.assign(new Error("Configure chaque jeu avant de démarrer."),{status:400});const allowed=new Set(["box_break","sealed","unit","other"]),games=[],labels=[];for(let i=0;i<count;i++){const raw=energyGames[i]||{},type=allowed.has(String(raw.type||"").toLowerCase())?String(raw.type).toLowerCase():"other",items=(Array.isArray(raw.items)?raw.items:String(raw.items||"").split(/[+,;\\n]/)).map((x)=>clean(x,120)).filter(Boolean).slice(0,12);if(!items.length)throw Object.assign(new Error(`Jeu ${i+1} : indique au moins un item / une extension Pokémon.`),{status:400});const resolved=await resolveEnergyItems(items);if(!resolved.spots.length)throw Object.assign(new Error(`Jeu ${i+1} : aucune énergie exploitable trouvée.`),{status:409});const game={number:i+1,type,format:type==="box_break"||type==="sealed"?(String(raw.format||"display").toLowerCase()==="case"?"case":"display"):"",units:type==="unit"?Math.max(1,Math.min(1000,Math.trunc(Number(raw.units)||1))):0,detail:type==="other"?clean(raw.detail,120):"",items:resolved.items,spots:[...resolved.spots]};games.push(game);for(const spot of resolved.spots)labels.push(`Jeu ${i+1} — ${spot}`);}const{d,state}=stateFor(live.id,true),id="BRK-"+crypto.randomUUID();state.pinnedProductId="";state.break={id,productId:"ENERGY-"+id,productName:"Jeu de l’énergie",status:"running",breakType:"energy_game",label:"Jeu de l’énergie",virtualProduct:true,shippingWeightGrams:20,gamesCount:count,energyGames:games,spots:labels.length,spotLabels:labels,energySourceProductIds:[],energySourceNames:[],pricePerSpot:price,stockAtStart:labels.length,soldSpots:0,remainingSpots:labels.length,startedAt:nowIso()};state.updatedAt=nowIso();save(d);return structuredClone(state.break);}\n'''
+              s=s.replace('export function startBreak(',fn+'export function startBreak(',1)
+          p.write_text(s)
+
+          p=Path('backend/routes/live-admin-studio.js'); s=p.read_text()
+          s=s.replace('startAuction, startBreak, startFlashSale, startGiveaway, stopAuction','startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, stopAuction')
+          s=re.sub(r'router\.post\("/:liveId/actions/break/start",\(req,res\)=>\{try\{actorFor\(req,req\.params\.liveId\);res\.json\(\{ok:true,break:startBreak\(req\.params\.liveId,req\.body\|\|\{\}\)\}\);\}catch\(error\)\{fail\(res,error\);\}\}\);','router.post("/:liveId/actions/break/start",async(req,res)=>{try{actorFor(req,req.params.liveId);const body=req.body||{},result=String(body.breakType||"").toLowerCase()==="energy_game"?await startEnergyGame(req.params.liveId,body):startBreak(req.params.liveId,body);res.json({ok:true,break:result});}catch(error){fail(res,error);}});',s)
+          p.write_text(s)
+
+          p=Path('backend/routes/live-actions.js'); s=p.read_text()
+          s=s.replace('startAuction, startBreak, startFlashSale, startGiveaway, stopAuction','startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, stopAuction')
+          if 'energy-catalog.js' not in s:
+              s=s.replace('import { getLiveSession } from "../lib/live/sessions.js";','import { getLiveSession } from "../lib/live/sessions.js";\nimport { resolveEnergyItems, searchEnergyCatalog } from "../lib/live/energy-catalog.js";')
+          if '/energy-catalog/search' not in s:
+              insert='router.get("/energy-catalog/search",async(req,res)=>{try{res.json({ok:true,items:await searchEnergyCatalog(req.query.q||"",req.query.limit)});}catch(e){fail(res,e,502);}});\nrouter.get("/energy-catalog/resolve",async(req,res)=>{try{const items=String(req.query.items||"").split(/[+,;\\n]/).map((x)=>x.trim()).filter(Boolean);res.json({ok:true,...await resolveEnergyItems(items)});}catch(e){fail(res,e,502);}});\n'
+              s=s.replace('router.get("/:liveId/state"',insert+'router.get("/:liveId/state"',1)
+          s=re.sub(r'router\.post\("/seller/:liveId/break/start",\(req,res\)=>\{try\{assertSellerOwner\(req,req\.params\.liveId\);res\.json\(\{ok:true,break:startBreak\(req\.params\.liveId,req\.body\|\|\{\}\)\}\);\}catch\(e\)\{fail\(res,e,401\);\}\}\);','router.post("/seller/:liveId/break/start",async(req,res)=>{try{assertSellerOwner(req,req.params.liveId);const body=req.body||{},result=String(body.breakType||"").toLowerCase()==="energy_game"?await startEnergyGame(req.params.liveId,body):startBreak(req.params.liveId,body);res.json({ok:true,break:result});}catch(e){fail(res,e,401);}});',s)
+          p.write_text(s)
+
+          p=Path('backend/lib/live/checkout.js'); s=p.read_text()
+          if 'getLiveActionState' not in s:
+              s=s.replace('import { resolveLiveSaleRule } from "./sale-rules.js";','import { resolveLiveSaleRule } from "./sale-rules.js";\nimport { getLiveActionState } from "./actions.js";')
+          s=s.replace('const route=assertSaleProvider({channel:"live",ownerRole:live.ownerRole,requestedProvider}),product=(live.products||[]).find(i=>i.id===String(productId||""));if(!product)throw Object.assign(new Error("Produit Live introuvable."),{status:404});','const route=assertSaleProvider({channel:"live",ownerRole:live.ownerRole,requestedProvider}),actionState=getLiveActionState(live.id),energyBreak=actionState.break?.breakType==="energy_game"&&actionState.break?.status==="running"?actionState.break:null;let product=(live.products||[]).find(i=>i.id===String(productId||""));if(!product&&energyBreak&&String(energyBreak.productId)===String(productId||""))product={id:energyBreak.productId,name:energyBreak.productName||"Jeu de l’énergie",mode:"break",price:energyBreak.pricePerSpot,stock:energyBreak.spots,qty:energyBreak.spots,shippingWeightGrams:Number(energyBreak.shippingWeightGrams||20),virtualProduct:true};if(!product)throw Object.assign(new Error("Produit Live introuvable."),{status:404});')
+          s=s.replace('quoteLiveShipping({liveId:live.id,customerEmail:email,productId:product.id,qty:units})','quoteLiveShipping({liveId:live.id,customerEmail:email,productId:product.id,qty:units,productOverride:product})')
+          s=s.replace('shippingWeightGrams:shipping.totalWeightGrams||0,shippingBundled:true','shippingWeightGrams:shipping.totalWeightGrams||0,shippingUnitWeightGrams:Number(product.shippingWeightGrams||0),shippingBundled:true')
+          p.write_text(s)
+
+          p=Path('backend/lib/live/shipping.js'); s=p.read_text()
+          s=s.replace('export function quoteLiveShipping({liveId,customerEmail,productId,qty=1,excludeCheckoutId=""}={}){','export function quoteLiveShipping({liveId,customerEmail,productId,qty=1,excludeCheckoutId="",productOverride=null}={}){')
+          s=s.replace('const product=(live.products||[]).find((item)=>String(item.id)===String(productId||""));','const product=productOverride||(live.products||[]).find((item)=>String(item.id)===String(productId||""));',1)
+          s=s.replace('priorWeight+=productShippingWeight(priorProduct,checkout.qty);','priorWeight+=priorProduct?productShippingWeight(priorProduct,checkout.qty):Math.max(0,Number(checkout.shippingUnitWeightGrams)||0)*Math.max(1,Number(checkout.qty)||1);')
+          p.write_text(s)
+
+          Path('backend/public/js/live-studio-sales-controls.js').write_text(Path('js/live-studio-sales-controls.js').read_text())
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/lib/live/actions.js backend/lib/live/checkout.js backend/lib/live/shipping.js backend/routes/live-actions.js backend/routes/live-admin-studio.js js/live-studio-sales-controls.js backend/public/js/live-studio-sales-controls.js backend/lib/live/energy-catalog.js
+          git commit -m 'feat(live): energy games without manual lot' || true
+          git push origin HEAD:fix/energy-game-config-no-lot-20260916
