@@ -8,9 +8,22 @@
   function root(){return document.querySelector(".admin-main")||document.body;}
   function ensureUi(){
     if(document.getElementById("liveScheduleArchivePanel"))return;
-    var panel=document.createElement("section");panel.id="liveScheduleArchivePanel";panel.className="live-schedule-archive";
-    panel.innerHTML="<div class='live-schedule-head'><div><h2>Programmation & archives Live</h2><p>Programme un direct et retrouve automatiquement les achats à la fin du Live pour préparer les envois.</p></div><button type='button' id='liveScheduleBtn' class='btn btn-primary'>Programmer un Live</button></div><div id='liveScheduleForm' class='live-schedule-form' hidden><label>Titre du Live<input id='liveScheduleTitle' maxlength='160' placeholder='Ex. Live Pokémon du vendredi'></label><label>Date et heure<input id='liveScheduleAt' type='datetime-local'></label><div><button type='button' id='liveScheduleSave' class='btn btn-primary'>Enregistrer</button> <button type='button' id='liveScheduleCancel' class='btn'>Annuler</button></div></div><div class='live-archive-head'><h3>Archives des Lives terminés</h3><button type='button' id='liveArchiveRefresh' class='btn'>Actualiser</button></div><div id='liveArchiveList' class='live-archive-list'>Chargement…</div><div id='liveArchiveDetail' class='live-archive-detail'></div>";
-    root().appendChild(panel);
+    var panel=document.createElement("section");panel.id="liveScheduleArchivePanel";panel.className="live-schedule-archive live-management-panel";
+    panel.innerHTML="<div class='live-schedule-head'><div><h2>Gestion des Lives</h2><p>Crée, programme, sélectionne et archive tes Lives depuis ce menu permanent.</p></div><div class='live-management-actions'><button type='button' id='liveCreateNowBtn' class='btn btn-primary'>Créer un Live</button><button type='button' id='liveScheduleBtn' class='btn'>Programmer un Live</button><button type='button' id='liveShowSessionsBtn' class='btn'>Liste des Lives</button><button type='button' id='liveShowArchivesBtn' class='btn'>Archives</button></div></div><div id='liveScheduleForm' class='live-schedule-form' hidden><label>Titre du Live<input id='liveScheduleTitle' maxlength='160' placeholder='Ex. Live Pokémon du vendredi'></label><label>Date et heure<input id='liveScheduleAt' type='datetime-local'></label><div><button type='button' id='liveScheduleSave' class='btn btn-primary'>Enregistrer</button> <button type='button' id='liveScheduleCancel' class='btn'>Annuler</button></div></div><div class='live-archive-head'><h3>Archives des Lives terminés</h3><button type='button' id='liveArchiveRefresh' class='btn'>Actualiser</button></div><div id='liveArchiveList' class='live-archive-list'>Chargement…</div><div id='liveArchiveDetail' class='live-archive-detail'></div>";
+    var controls=document.querySelector("#liveSelectedSession");
+    var controlsSection=controls&&controls.closest("section");
+    if(controlsSection&&controlsSection.parentNode)controlsSection.parentNode.insertBefore(panel,controlsSection);else root().insertBefore(panel,root().firstChild);
+    document.getElementById("liveCreateNowBtn").onclick=function(){
+      var title=prompt("Titre du Live :","Live Cardoria");
+      if(title===null)return;title=String(title||"").trim();if(!title)return alert("Indique le titre du Live.");
+      A.adminFetch("/api/admin/live/sessions",{method:"POST",body:JSON.stringify({title:title,ownerRole:"admin",products:[]})}).then(function(d){
+        var id=d&&d.session&&d.session.id||d&&d.id||"";
+        if(id)try{sessionStorage.setItem("cardoria_live_selected",id);}catch(e){}
+        location.reload();
+      }).catch(function(e){alert(e.message);});
+    };
+    document.getElementById("liveShowSessionsBtn").onclick=function(){var table=document.getElementById("liveBody");if(table)table.scrollIntoView({behavior:"smooth",block:"center"});};
+    document.getElementById("liveShowArchivesBtn").onclick=function(){var box=document.getElementById("liveArchiveList");if(box)box.scrollIntoView({behavior:"smooth",block:"start"});};
     document.getElementById("liveScheduleBtn").onclick=function(){document.getElementById("liveScheduleForm").hidden=false;var input=document.getElementById("liveScheduleAt");if(!input.value){var d=new Date(Date.now()+3600000),pad=function(n){return String(n).padStart(2,"0");};input.value=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes());}};
     document.getElementById("liveScheduleCancel").onclick=function(){document.getElementById("liveScheduleForm").hidden=true;};
     document.getElementById("liveScheduleSave").onclick=scheduleLive;
