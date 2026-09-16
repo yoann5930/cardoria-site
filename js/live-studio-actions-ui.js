@@ -314,12 +314,12 @@
     selected = (e.detail && e.detail.id) || "";
     loadEditor();
   });
-  if (!activityTimer) {
-    activityTimer = setInterval(function () {
-      var sheet = document.getElementById("lasSheet");
-      if (sheet && !sheet.hidden) return;
-      if (selected) loadEditor();
-    }, 4000);
+  // Do not rebuild the whole sales editor on a timer. Re-rendering every 4 seconds
+  // destroyed focused inputs, open details and click handlers while the operator was selling.
+  // The editor is refreshed explicitly after live actions and when the selected live changes.
+  if (activityTimer) {
+    clearInterval(activityTimer);
+    activityTimer = null;
   }
   setTimeout(loadAll, 0);
 })();
