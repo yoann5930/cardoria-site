@@ -1,0 +1,62 @@
+name: Patch Live Editor Stability Once
+
+on:
+  push:
+    branches:
+      - fix/live-editor-stability-20260916
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/live-editor-stability-20260916
+      - name: Patch live editor stability
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          files = [Path('js/live-studio-actions-ui.js'), Path('backend/public/js/live-studio-actions-ui.js')]
+          old = '''  if (!activityTimer) {\n    activityTimer = setInterval(function () {\n      var sheet = document.getElementById("lasSheet");\n      if (sheet && !sheet.hidden) return;\n      if (selected) loadEditor();\n    }, 4000);\n  }'''
+          new = '''  // Do not rebuild the whole sales editor on a timer. Re-rendering every 4 seconds\n  // destroyed focused inputs, open details and click handlers while the operator was selling.\n  // The editor is refreshed explicitly after live actions and when the selected live changes.\n  if (activityTimer) {\n    clearInterval(activityTimer);\n    activityTimer = null;\n  }'''
+          for p in files:
+              s = p.read_text(encoding='utf-8')
+              if old not in s:
+                  raise SystemExit(f'polling block not found in {p}')
+              p.write_text(s.replace(old,new), encoding='utf-8')
+
+          sales_files = [Path('js/live-studio-sales-controls.js'), Path('backend/public/js/live-studio-sales-controls.js')]
+          old2 = '''  var decorateQueued=false;\n  function scheduleDecorate(){\n    if(decorateQueued)return;\n    decorateQueued=true;\n    (window.requestAnimationFrame||function(cb){return setTimeout(cb,0);})(function(){decorateQueued=false;decorate();});\n  }\n  var obs=new MutationObserver(scheduleDecorate);obs.observe(document.documentElement,{childList:true,subtree:true});\n  document.addEventListener("DOMContentLoaded",decorate);decorate();'''
+          new2 = '''  // Keep enhancement detached from DOM mutation loops. A lightweight idempotent timer\n  // is sufficient to decorate a freshly rendered editor without freezing the Live page.\n  var decorateTimer=setInterval(decorate,1000);\n  window.addEventListener("cardoria-live-selected",function(){setTimeout(decorate,0);});\n  document.addEventListener("DOMContentLoaded",decorate);decorate();\n  window.addEventListener("beforeunload",function(){clearInterval(decorateTimer);});'''
+          for p in sales_files:
+              s = p.read_text(encoding='utf-8')
+              if old2 not in s:
+                  raise SystemExit(f'observer block not found in {p}')
+              p.write_text(s.replace(old2,new2), encoding='utf-8')
+
+          html_files = [Path('admin-live.html'), Path('backend/public/admin-live.html'), Path('live-vendeur.html'), Path('backend/public/live-vendeur.html')]
+          for p in html_files:
+              s = p.read_text(encoding='utf-8')
+              s = s.replace('live-studio-actions-ui.js?v=20260912-studio-pr1','live-studio-actions-ui.js?v=20260916-editor-stable')
+              s = s.replace('live-studio-sales-controls.js?v=20260916-sales-controls','live-studio-sales-controls.js?v=20260916-sales-controls-v3')
+              p.write_text(s, encoding='utf-8')
+
+          t = Path('tests/live-sales-controls-regression.test.mjs')
+          s = t.read_text(encoding='utf-8')
+          s += '''\n\ntest('live sales editor does not destroy operator interactions with periodic full rerenders', () => {\n  const ui = read('js/live-studio-actions-ui.js');\n  assert.doesNotMatch(ui, /if \(selected\) loadEditor\(\);/);\n  assert.match(ui, /editor is refreshed explicitly after live actions/i);\n  assert.doesNotMatch(controls, /new MutationObserver/);\n  assert.match(controls, /setInterval\(decorate,1000\)/);\n});\n'''
+          t.write_text(s, encoding='utf-8')
+          PY
+          node --check js/live-studio-actions-ui.js
+          node --check js/live-studio-sales-controls.js
+          cmp js/live-studio-actions-ui.js backend/public/js/live-studio-actions-ui.js
+          cmp js/live-studio-sales-controls.js backend/public/js/live-studio-sales-controls.js
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add js/live-studio-actions-ui.js backend/public/js/live-studio-actions-ui.js js/live-studio-sales-controls.js backend/public/js/live-studio-sales-controls.js admin-live.html backend/public/admin-live.html live-vendeur.html backend/public/live-vendeur.html tests/live-sales-controls-regression.test.mjs
+          git commit -m 'fix(live): stop destructive editor rerenders [skip ci]'
+          git push origin HEAD:fix/live-editor-stability-20260916
