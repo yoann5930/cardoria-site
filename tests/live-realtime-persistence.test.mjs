@@ -8,3 +8,4 @@ test("P2P publisher registrations persist across Cardoria restarts",()=>{
  assert.match(src,/persistPublishedLives\(\)/);
  assert.match(src,/offers:new Map\(\),lastSeenAt:Date\.now\(\)/);
 });
+// Regression: OVH/service restarts must not erase an active P2P publisher registration.
