@@ -27,7 +27,9 @@ export const LIVE_SHIPPING_PACKS=Object.freeze([
 export function shippingPackForWeight(weightGrams){
   const grams=Math.max(0,Math.ceil(Number(weightGrams)||0));
   if(!grams)return null;
-  return LIVE_SHIPPING_PACKS.find((pack)=>grams<=pack.maxGrams)||LIVE_SHIPPING_PACKS[LIVE_SHIPPING_PACKS.length-1];
+  const max=LIVE_SHIPPING_PACKS[LIVE_SHIPPING_PACKS.length-1].maxGrams;
+  if(grams>max)throw Object.assign(new Error("Poids total du colis Live supérieur à 25 kg. Séparez l'expédition en plusieurs colis."),{status:409,code:"LIVE_SHIPPING_WEIGHT_LIMIT",maxGrams:max});
+  return LIVE_SHIPPING_PACKS.find((pack)=>grams<=pack.maxGrams)||null;
 }
 export function productShippingWeight(product,qty=1){
   const perUnit=Math.max(0,Math.ceil(Number(product?.shippingWeightGrams)||0));
