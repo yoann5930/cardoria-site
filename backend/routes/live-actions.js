@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { assertSellerSession } from "../lib/marketplace/v1/security.js";
 import { getLiveSession } from "../lib/live/sessions.js";
-import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, setLiveProductEnergyTypes, startAuction, startBreak, startFlashSale, startGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
+import { resolveEnergyItems, searchEnergyCatalog } from "../lib/live/energy-catalog.js";
+import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, setLiveProductEnergyTypes, startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
 
 const router=Router(),rateBuckets=new Map();
 function fail(res,error,fallback=400){res.status(error?.status||fallback).json({ok:false,error:error?.message||"Erreur action Live",minimum:error?.minimum});}
@@ -11,6 +12,8 @@ function assertPublicLive(liveId){const live=getLiveSession(liveId);if(!live||li
 function publicState(state){const copy=structuredClone(state||{});if(copy.auction){copy.auction.bids=(copy.auction.bids||[]).map(({bidderEmail,...bid})=>bid);if(copy.auction.highestBidder)delete copy.auction.highestBidder.email;}if(copy.giveaway){copy.giveaway.entries=(copy.giveaway.entries||[]).map(({email,...entry})=>entry);if(copy.giveaway.winner)delete copy.giveaway.winner.email;}return copy;}
 function requireBidderEmail(body){const email=String(body?.bidderEmail||"").trim().toLowerCase();if(!/^\S+@\S+\.\S+$/.test(email))throw Object.assign(new Error("Email acheteur obligatoire pour pouvoir payer l'enchere gagnee."),{status:400});return{...body,bidderEmail:email};}
 function rateLimit(req,kind,limit,windowMs){const key=[kind,req.params.liveId,String(req.ip||req.socket?.remoteAddress||"unknown")].join(":");const now=Date.now(),entry=rateBuckets.get(key);if(!entry||now-entry.startedAt>=windowMs){rateBuckets.set(key,{startedAt:now,count:1});return;}entry.count++;if(entry.count>limit)throw Object.assign(new Error("Trop de requetes Live. Reessayez dans quelques secondes."),{status:429});if(rateBuckets.size>5000){for(const[k,v]of rateBuckets)if(now-v.startedAt>60_000)rateBuckets.delete(k);}}
+router.get("/energy-catalog/search",async(req,res)=>{try{res.json({ok:true,items:await searchEnergyCatalog(req.query.q||"",req.query.limit)});}catch(e){fail(res,e,502);}});
+router.get("/energy-catalog/resolve",async(req,res)=>{try{const items=String(req.query.items||"").split(/[+,;\n]/).map((x)=>x.trim()).filter(Boolean);res.json({ok:true,...await resolveEnergyItems(items)});}catch(e){fail(res,e,502);}});
 router.get("/:liveId/state",(req,res)=>{try{assertPublicLive(req.params.liveId);res.json({ok:true,state:publicState(getLiveActionState(req.params.liveId))});}catch(e){fail(res,e,404);}});
 router.get("/:liveId/chat",(req,res)=>{try{res.json({ok:true,messages:listLiveChat(req.params.liveId,req.query.limit)});}catch(e){fail(res,e);}});
 router.post("/:liveId/chat",(req,res)=>{try{rateLimit(req,"chat",5,10_000);res.json({ok:true,message:addLiveChatMessage(req.params.liveId,req.body||{})});}catch(e){fail(res,e);}});
@@ -24,5 +27,5 @@ router.post("/seller/:liveId/auction/stop",(req,res)=>{try{assertSellerOwner(req
 router.post("/seller/:liveId/flash/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,flash:startFlashSale(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/giveaway/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,giveaway:startGiveaway(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/giveaway/draw",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,...drawGiveaway(req.params.liveId)});}catch(e){fail(res,e,401);}});
-router.post("/seller/:liveId/break/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,break:startBreak(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
+router.post("/seller/:liveId/break/start",async(req,res)=>{try{assertSellerOwner(req,req.params.liveId);const body=req.body||{},result=String(body.breakType||"").toLowerCase()==="energy_game"?await startEnergyGame(req.params.liveId,body):startBreak(req.params.liveId,body);res.json({ok:true,break:result});}catch(e){fail(res,e,401);}});
 export default router;

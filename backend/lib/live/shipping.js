@@ -42,9 +42,9 @@ function giveawayWeightForCustomer(live,email){
   const product=(live.products||[]).find((item)=>String(item.id)===String(g.productId));
   return productShippingWeight(product,1);
 }
-export function quoteLiveShipping({liveId,customerEmail,productId,qty=1,excludeCheckoutId=""}={}){
+export function quoteLiveShipping({liveId,customerEmail,productId,qty=1,excludeCheckoutId="",productOverride=null}={}){
   const live=getLiveSession(liveId);if(!live)throw Object.assign(new Error("Live introuvable."),{status:404});
-  const product=(live.products||[]).find((item)=>String(item.id)===String(productId||""));
+  const product=productOverride||(live.products||[]).find((item)=>String(item.id)===String(productId||""));
   if(!product)throw Object.assign(new Error("Produit Live introuvable."),{status:404});
   const currentWeight=productShippingWeight(product,qty);
   if(!currentWeight)return{shippingAmount:0,alreadyCharged:0,totalWeightGrams:0,currentWeightGrams:0,pack:null,bundled:true};
@@ -55,7 +55,7 @@ export function quoteLiveShipping({liveId,customerEmail,productId,qty=1,excludeC
   let priorWeight=0,alreadyCharged=0;
   for(const checkout of prior){
     const priorProduct=(live.products||[]).find((item)=>String(item.id)===String(checkout.productId));
-    priorWeight+=productShippingWeight(priorProduct,checkout.qty);
+    priorWeight+=priorProduct?productShippingWeight(priorProduct,checkout.qty):Math.max(0,Number(checkout.shippingUnitWeightGrams)||0)*Math.max(1,Number(checkout.qty)||1);
     alreadyCharged+=Math.max(0,Number(checkout.shippingAmount)||0);
   }
   const giveawayWeight=giveawayWeightForCustomer(live,email);

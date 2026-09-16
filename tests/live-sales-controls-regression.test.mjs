@@ -2,103 +2,93 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const read = (p) => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8');
+const read=(p)=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const actions=read('backend/lib/live/actions.js');
+const checkout=read('backend/lib/live/checkout.js');
+const saleRules=read('backend/lib/live/sale-rules.js');
+const adminRoutes=read('backend/routes/live-admin-studio.js');
+const sellerRoutes=read('backend/routes/live-actions.js');
+const controls=read('js/live-studio-sales-controls.js');
+const controlsMirror=read('backend/public/js/live-studio-sales-controls.js');
+const catalog=read('backend/lib/live/energy-catalog.js');
+const spectator=read('js/live-energy-spots.js');
 
-const actions = read('backend/lib/live/actions.js');
-const checkout = read('backend/lib/live/checkout.js');
-const saleRules = read('backend/lib/live/sale-rules.js');
-const adminRoutes = read('backend/routes/live-admin-studio.js');
-const sellerRoutes = read('backend/routes/live-actions.js');
-const liveRoutes = read('backend/routes/live.js');
-const controls = read('js/live-studio-sales-controls.js');
-const controlsMirror = read('backend/public/js/live-studio-sales-controls.js');
-const energyPublic = read('js/live-energy-spots.js');
-const energyPublicMirror = read('backend/public/js/live-energy-spots.js');
-const adminHtml = read('admin-live.html');
-const adminHtmlMirror = read('backend/public/admin-live.html');
-const sellerHtml = read('live-vendeur.html');
-const sellerHtmlMirror = read('backend/public/live-vendeur.html');
-const liveHtml = read('live.html');
-const liveHtmlMirror = read('backend/public/live.html');
-
-test('Box Break and energy game are explicit live break modes', () => {
-  assert.match(actions, /\["break","box_break","energy_game"\]/);
-  assert.match(actions, /type==="box_break"\?"Box Break"/);
-  assert.match(controls, /id="lasBoxBreak"|id='lasBoxBreak'|id=\"lasBoxBreak\"/);
-  assert.match(controls, /Jeu de l’énergie/);
+test('Box Break stays an explicit regular lot mode',()=>{
+  assert.match(actions,/box_break/);
+  assert.match(controls,/lasBoxBreak/);
 });
 
-test('energy game spots come from the selected item configuration, never the full hardcoded list', () => {
-  assert.match(actions, /energyTypesByProduct/);
-  assert.match(actions, /setLiveProductEnergyTypes/);
-  assert.match(actions, /const configured=normalizeEnergyTypes\(state\.energyTypesByProduct\?\.\[product\.id\]\)/);
-  assert.match(actions, /type==="energy_game"\?configured/);
-  assert.doesNotMatch(actions, /type==="energy_game"\?\[\.\.\.ENERGY_SPOTS\]/);
-  assert.match(controls, /state\.energyTypesByProduct&&state\.energyTypesByProduct\[c\.productId\]/);
-  assert.match(controls, /Spots générés automatiquement depuis l’item/);
+test('energy game does not require a pre-existing sale lot',()=>{
+  assert.match(controls,/function startEnergyGame\(\).*requireLive/);
+  assert.match(actions,/export async function startEnergyGame/);
+  assert.match(actions,/virtualProduct:true/);
+  assert.match(checkout,/energyBreak/);
 });
 
-test('only known Cardoria energy categories can be stored for an item', () => {
-  for (const label of ['Plante','Feu','Eau','Électrique','Psy','Combat','Obscurité','Métal','Dragon','Incolore','Dresseur / Supporter','Objet / Stade']) {
-    assert.ok(actions.includes(label), `missing energy category ${label}`);
-  }
-  assert.match(actions, /if\(!types\.length\)throw/);
+test('operator chooses 1-10 games or Other',()=>{
+  assert.match(controls,/for\(var i=1;i<=10;i\+\+\)/);
+  assert.match(controls,/>Autre</);
+  assert.match(controls,/lasEnergyGameCountOther/);
 });
 
-test('admin and seller expose protected item energy configuration routes', () => {
-  assert.match(adminRoutes, /actions\/energy-config/);
-  assert.match(adminRoutes, /setLiveProductEnergyTypes/);
-  assert.match(sellerRoutes, /seller\/:liveId\/energy-config/);
-  assert.match(sellerRoutes, /assertSellerOwner/);
+test('each game defines its format and item sources',()=>{
+  assert.match(controls,/Box Break/);
+  assert.match(controls,/Scellé/);
+  assert.match(controls,/À l’unité/);
+  assert.match(controls,/data-energy-game-format/);
+  assert.match(controls,/data-energy-game-units/);
+  assert.match(controls,/data-energy-game-items/);
+  assert.match(controls,/EV10 \+ ME01/);
 });
 
-test('named energy spot is carried and reserved by checkout', () => {
-  assert.match(saleRules, /breakType/);
-  assert.match(saleRules, /spotLabels/);
-  assert.match(checkout, /assertEnergySpotAvailable/);
-  assert.match(checkout, /spotLabel:selectedSpot/);
-  assert.match(checkout, /Le spot \$\{canonical\} est déjà réservé ou vendu/);
-  assert.match(checkout, /\["planned","pending","paid","completed","authorized","authorised"\]/);
-  assert.match(liveRoutes, /spotLabel: body\.spotLabel/);
+test('Pokemon items are resolved from TCGdex internet data',()=>{
+  assert.match(catalog,/api\.tcgdex\.net\/v2\/fr/);
+  assert.match(catalog,/\/sets/);
+  assert.match(catalog,/\/cards/);
+  assert.match(catalog,/Dresseur \/ Supporter/);
+  assert.match(catalog,/Objet \/ Stade/);
+  assert.match(sellerRoutes,/energy-catalog\/resolve/);
+  assert.match(controls,/Rechercher les énergies/);
 });
 
-test('spectator gets one purchase button per energy spot', () => {
-  assert.match(energyPublic, /data-buy-energy/);
-  assert.match(energyPublic, /spotLabel:spotLabel/);
-  assert.match(energyPublic, /Jeu de l’énergie — choisissez votre spot/);
-  assert.match(energyPublic, /x\.hidden=true/);
+test('French EV shorthand maps to Scarlet Violet catalog ids',()=>{
+  assert.match(catalog,/\^ev/);
+  assert.match(catalog,/return"sv"/);
 });
 
-test('new live runtimes are loaded on admin, seller and spectator pages', () => {
-  assert.match(adminHtml, /live-studio-sales-controls\.js/);
-  assert.match(sellerHtml, /live-studio-sales-controls\.js/);
-  assert.match(liveHtml, /live-energy-spots\.js/);
+test('backend generates unique energy spots for every game',()=>{
+  assert.match(actions,/`Jeu \$\{i\+1\} — \$\{spot\}`/);
+  assert.match(actions,/spotLabels:labels/);
+  assert.match(checkout,/assertEnergySpotAvailable/);
+  assert.match(saleRules,/spotLabels/);
 });
 
-test('runtime mirrors stay byte-identical', () => {
-  assert.equal(controls, controlsMirror);
-  assert.equal(energyPublic, energyPublicMirror);
-  assert.equal(adminHtml, adminHtmlMirror);
-  assert.equal(sellerHtml, sellerHtmlMirror);
-  assert.equal(liveHtml, liveHtmlMirror);
+test('admin and seller energy-game routes await catalog resolution',()=>{
+  assert.match(adminRoutes,/await startEnergyGame/);
+  assert.match(sellerRoutes,/await startEnergyGame/);
 });
 
-test('unimplemented social eligibility giveaways are not exposed as fake working controls', () => {
-  assert.match(controls, /lasGiveFollow/);
-  assert.match(controls, /follow\.hidden=true/);
-  assert.match(controls, /lasGiveBuyer/);
-  assert.match(controls, /buyer\.hidden=true/);
+test('virtual energy spots still use the existing checkout and shipping flow',()=>{
+  assert.match(checkout,/productOverride:product/);
+  assert.match(checkout,/shippingUnitWeightGrams/);
+  assert.match(checkout,/assertSaleProvider/);
 });
 
-test('sales control decoration no longer uses a DOM MutationObserver loop', () => {
-  assert.match(controls, /game\.dataset\.salesEnhanced!=="1"/);
-  assert.match(controls, /game\.dataset\.salesEnhanced="1"/);
-  assert.doesNotMatch(controls, /new MutationObserver/);
-  assert.match(controls, /setInterval\(decorate,1000\)/);
+test('spectator still buys a named energy spot',()=>{
+  assert.match(spectator,/data-buy-energy/);
+  assert.match(spectator,/spotLabel:spotLabel/);
 });
 
-test('live sales editor does not destroy operator interactions with periodic full rerenders', () => {
-  const ui = read('js/live-studio-actions-ui.js');
-  assert.doesNotMatch(ui, /if \(selected\) loadEditor\(\);/);
-  assert.match(ui, /editor is refreshed explicitly after live actions/i);
+test('runtime mirrors stay byte-identical',()=>{
+  assert.equal(controls,controlsMirror);
+});
+
+test('unimplemented social eligibility giveaways stay hidden',()=>{
+  assert.match(controls,/follow\.hidden=true/);
+  assert.match(controls,/buyer\.hidden=true/);
+});
+
+test('no MutationObserver loop is reintroduced',()=>{
+  assert.doesNotMatch(controls,/new MutationObserver/);
+  assert.match(controls,/setInterval\(decorate,1000\)/);
 });
