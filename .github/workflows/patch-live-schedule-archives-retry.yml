@@ -1,0 +1,30 @@
+name: Patch Live Schedule Archives Retry
+on:
+  push:
+    branches: [feat/live-schedule-archives-20260916]
+    paths: ['.github/workflows/patch-live-schedule-archives-retry.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replay corrected patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          src=Path('.github/workflows/patch-live-schedule-archives-once.yml').read_text().splitlines()
+          start=next(i for i,line in enumerate(src) if line.strip()=='run: |')+1
+          body=[]
+          for line in src[start:]:
+              if line.startswith('          '): body.append(line[10:])
+              elif not line.strip(): body.append('')
+              else: break
+          script='\n'.join(body)
+          script=script.replace('const buyers=[...map.values()].sort((a,b)=>String(a.pseudo).localeCompare(String(b.pseudo),"fr"));','const buyers=[...map.values()].filter((b)=>b.paidPurchases.length).sort((a,b)=>String(a.pseudo).localeCompare(String(b.pseudo),"fr"));')
+          Path('/tmp/cardoria-live-archive-patch.sh').write_text(script)
+          PY
+          bash /tmp/cardoria-live-archive-patch.sh
