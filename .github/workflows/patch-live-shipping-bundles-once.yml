@@ -1,0 +1,176 @@
+name: Patch Live Shipping Bundles Once
+on:
+  push:
+    branches: [fix/live-shipping-bundles-20260916]
+    paths: ['.github/workflows/patch-live-shipping-bundles-once.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Integrate live shipping packs and giveaway shipping policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > backend/lib/live/shipping.js <<'EOF'
+          import { readJson } from "../storage.js";
+          import { getLiveSession, listLiveCheckouts } from "./sessions.js";
+
+          const money=(v)=>Math.round((Number(v)||0)*100)/100;
+          const cleanEmail=(v)=>String(v||"").trim().toLowerCase();
+          const ACTIVE_SHIPPING_STATUSES=new Set(["pending","paid","completed","authorized","authorised"]);
+
+          // Tarifs Cardoria France : base proche du barème Whatnot France 2026,
+          // légèrement majorée pour absorber les packs d'expédition / consommables.
+          // Le prix reste monotone pour permettre le regroupement et ne facturer que le complément.
+          export const LIVE_SHIPPING_PACKS=Object.freeze([
+            {id:"PACK-LS-20",maxGrams:20,price:2.29,carrier:"La Poste Lettre suivie"},
+            {id:"PACK-LS-100",maxGrams:100,price:3.89,carrier:"La Poste Lettre suivie"},
+            {id:"PACK-MR-500",maxGrams:500,price:4.09,carrier:"Mondial Relay"},
+            {id:"PACK-MR-1000",maxGrams:1000,price:4.69,carrier:"Mondial Relay"},
+            {id:"PACK-MR-2000",maxGrams:2000,price:5.29,carrier:"Mondial Relay"},
+            {id:"PACK-MR-3000",maxGrams:3000,price:6.99,carrier:"Mondial Relay"},
+            {id:"PACK-MR-4000",maxGrams:4000,price:7.59,carrier:"Mondial Relay"},
+            {id:"PACK-MR-5000",maxGrams:5000,price:7.99,carrier:"Mondial Relay"},
+            {id:"PACK-MR-7000",maxGrams:7000,price:8.69,carrier:"Mondial Relay"},
+            {id:"PACK-MR-10000",maxGrams:10000,price:11.49,carrier:"Mondial Relay"},
+            {id:"PACK-MR-15000",maxGrams:15000,price:16.49,carrier:"Mondial Relay"},
+            {id:"PACK-MR-20000",maxGrams:20000,price:20.49,carrier:"Mondial Relay"},
+            {id:"PACK-MR-25000",maxGrams:25000,price:25.49,carrier:"Mondial Relay"}
+          ]);
+
+          export function shippingPackForWeight(weightGrams){
+            const grams=Math.max(0,Math.ceil(Number(weightGrams)||0));
+            if(!grams)return null;
+            return LIVE_SHIPPING_PACKS.find((pack)=>grams<=pack.maxGrams)||LIVE_SHIPPING_PACKS[LIVE_SHIPPING_PACKS.length-1];
+          }
+          export function productShippingWeight(product,qty=1){
+            const perUnit=Math.max(0,Math.ceil(Number(product?.shippingWeightGrams)||0));
+            return perUnit*Math.max(1,Math.trunc(Number(qty)||1));
+          }
+          function giveawayWeightForCustomer(live,email){
+            const target=cleanEmail(email);if(!target)return 0;
+            const store=readJson("live-actions.json",{states:{}}),g=store?.states?.[live.id]?.giveaway;
+            if(!g?.winner||cleanEmail(g.winner.email)!==target)return 0;
+            const product=(live.products||[]).find((item)=>String(item.id)===String(g.productId));
+            return productShippingWeight(product,1);
+          }
+          export function quoteLiveShipping({liveId,customerEmail,productId,qty=1,excludeCheckoutId=""}={}){
+            const live=getLiveSession(liveId);if(!live)throw Object.assign(new Error("Live introuvable."),{status:404});
+            const product=(live.products||[]).find((item)=>String(item.id)===String(productId||""));
+            if(!product)throw Object.assign(new Error("Produit Live introuvable."),{status:404});
+            const currentWeight=productShippingWeight(product,qty);
+            if(!currentWeight)return{shippingAmount:0,alreadyCharged:0,totalWeightGrams:0,currentWeightGrams:0,pack:null,bundled:true};
+            const email=cleanEmail(customerEmail);
+            const prior=listLiveCheckouts({liveId:live.id}).filter((c)=>
+              c.id!==excludeCheckoutId&&cleanEmail(c.customerEmail)===email&&ACTIVE_SHIPPING_STATUSES.has(String(c.status||"").toLowerCase())
+            );
+            let priorWeight=0,alreadyCharged=0;
+            for(const checkout of prior){
+              const priorProduct=(live.products||[]).find((item)=>String(item.id)===String(checkout.productId));
+              priorWeight+=productShippingWeight(priorProduct,checkout.qty);
+              alreadyCharged+=Math.max(0,Number(checkout.shippingAmount)||0);
+            }
+            const giveawayWeight=giveawayWeightForCustomer(live,email);
+            const totalWeight=priorWeight+currentWeight+giveawayWeight;
+            const pack=shippingPackForWeight(totalWeight);
+            const target=money(pack?.price||0),charged=money(alreadyCharged),increment=money(Math.max(0,target-charged));
+            return{shippingAmount:increment,alreadyCharged:charged,totalShippingTarget:target,totalWeightGrams:totalWeight,currentWeightGrams:currentWeight,giveawayWeightGrams:giveawayWeight,pack,bundled:true};
+          }
+          export function giveawayShippingPolicy(){return{participantPays:0,winnerPays:0,withoutPurchase:"streamer",withPurchase:"bundle_with_first_purchase",subsequentPurchases:"increment_only_if_pack_changes"};}
+          EOF
+
+          python - <<'PY'
+          from pathlib import Path
+
+          # Preserve every existing live field; only append an optional server-side shipping weight.
+          p=Path('backend/lib/live/sessions.js')
+          s=p.read_text()
+          old='return{id:clean(x?.id,120)||`LOT-${i+1}`,name,qty:Math.max(1,Math.min(1000,Math.trunc(Number(x?.qty)||1))),stock:Math.max(0,Math.trunc(Number(x?.stock??x?.qty??1)||0)),price:mode==="giveaway"?0:price,mode,durationSeconds:Math.max(0,Math.trunc(Number(x?.durationSeconds)||0))};'
+          new='return{id:clean(x?.id,120)||`LOT-${i+1}`,name,qty:Math.max(1,Math.min(1000,Math.trunc(Number(x?.qty)||1))),stock:Math.max(0,Math.trunc(Number(x?.stock??x?.qty??1)||0)),price:mode==="giveaway"?0:price,mode,durationSeconds:Math.max(0,Math.trunc(Number(x?.durationSeconds)||0)),shippingWeightGrams:Math.max(0,Math.min(25000,Math.trunc(Number(x?.shippingWeightGrams)||0)))};'
+          if old not in s: raise SystemExit('sessions normalizeProducts target not found')
+          p.write_text(s.replace(old,new,1))
+
+          # Giveaway remains fully free for participants/winner; streamer bears giveaway-only postage.
+          p=Path('backend/lib/live/actions.js')
+          s=p.read_text()
+          old='state.giveaway={id:"GIV-"+crypto.randomUUID(),productId:product.id,productName:product.name,status:"running",entries:[],winner:null,stockConsumed:false,startedAt:new Date(started).toISOString(),endsAt:new Date(started+duration*1000).toISOString()};'
+          new='state.giveaway={id:"GIV-"+crypto.randomUUID(),productId:product.id,productName:product.name,status:"running",entries:[],winner:null,stockConsumed:false,shippingCustomerAmount:0,shippingPayer:"streamer",shippingPolicy:"free_for_winner_bundle_if_purchase",startedAt:new Date(started).toISOString(),endsAt:new Date(started+duration*1000).toISOString()};'
+          if old not in s: raise SystemExit('giveaway target not found')
+          p.write_text(s.replace(old,new,1))
+
+          # Add a shipment weight field to new Live lots. Existing lots remain untouched (0 = legacy/no automatic shipping charge).
+          for file in ['js/live-studio-actions-ui.js','backend/public/js/live-studio-actions-ui.js']:
+              p=Path(file); s=p.read_text()
+              old="<input id='lasStock' type='number' min='1' value='1' placeholder='Stock'><select id='lasMode'>"
+              new="<input id='lasStock' type='number' min='1' value='1' placeholder='Stock'><input id='lasShippingWeight' type='number' min='0' max='25000' step='1' value='20' placeholder='Poids expédition par article (g)' title='Poids emballé par article. 20 g par défaut pour les petits envois TCG.'><select id='lasMode'>"
+              if old not in s: raise SystemExit(f'{file}: add-lot field target not found')
+              s=s.replace(old,new,1)
+              old='var stock = Math.max(1, Number(document.getElementById("lasStock").value || 1));'
+              new='var stock = Math.max(1, Number(document.getElementById("lasStock").value || 1));\n      var shippingWeightGrams = Math.max(0, Math.min(25000, Number(document.getElementById("lasShippingWeight").value || 0)));'
+              if old not in s: raise SystemExit(f'{file}: add-lot weight variable target not found')
+              s=s.replace(old,new,1)
+              old='qty: stock, stock: stock, durationSeconds: 30 }]);'
+              new='qty: stock, stock: stock, durationSeconds: 30, shippingWeightGrams: shippingWeightGrams }]);'
+              if old not in s: raise SystemExit(f'{file}: add-lot payload target not found')
+              p.write_text(s.replace(old,new,1))
+          PY
+
+          cat > backend/lib/live/checkout.js <<'EOF'
+          /** Checkout Live Cardoria : Live Admin → SumUp, Live vendeur → PayPal. */
+          import crypto from "crypto";
+          import { assertSaleProvider, assertServerAmount, money } from "../payments/routing.js";
+          import { createSumUpCheckout, isSumUpConfigured } from "../payments/sumup.js";
+          import { getPayPalMarketplaceConfig, createLivePayPalOrder } from "../marketplace/paypal.js";
+          import { getLiveCommissionAmount, getSellerPlan } from "../subscriptions/plans.js";
+          import { getSellerPlanState } from "../subscriptions/seller-plans.js";
+          import { getLiveCheckout, getLiveSession, listLiveCheckouts, saveLiveCheckout, withLiveLock } from "./sessions.js";
+          import { resolveLiveSaleRule } from "./sale-rules.js";
+          import { quoteLiveShipping } from "./shipping.js";
+          const clean=(v,m=200)=>String(v==null?"":v).trim().slice(0,m);
+          function validateEmail(v){const e=clean(v,254).toLowerCase();if(!/^\S+@\S+\.\S+$/.test(e))throw Object.assign(new Error("Adresse email invalide."),{status:400});return e;}
+          function commissionFor(live,amount){if(live.ownerRole!=="seller")return{platformFee:0,sellerNet:amount,commissionPercent:0};try{const state=getSellerPlanState(live.ownerId),plan=getSellerPlan(state.planId),platformFee=money(getLiveCommissionAmount(state.planId,amount));return{platformFee,sellerNet:money(amount-platformFee),commissionPercent:Number(plan.liveCommissionRate)*100,planId:plan.id};}catch{const percent=5,platformFee=money(amount*percent/100);return{platformFee,sellerNet:money(amount-platformFee),commissionPercent:percent};}}
+          function reservedUnits(liveId,productId,excludeKey=""){return listLiveCheckouts({liveId}).filter((c)=>c.productId===productId&&c.idempotencyKey!==excludeKey&&["planned","pending"].includes(c.status)).reduce((n,c)=>n+Math.max(1,Number(c.qty)||1),0);}
+          function normalizeSpotLabel(value){return clean(value,80);}
+          function assertEnergySpotAvailable({liveId,productId,rule,spotLabel,excludeKey}){if(rule.breakType!=="energy_game")return"";const label=normalizeSpotLabel(spotLabel);if(!label)throw Object.assign(new Error("Choisissez une énergie disponible avant le paiement."),{status:400});const canonical=(rule.spotLabels||[]).find((item)=>String(item)===label);if(!canonical)throw Object.assign(new Error("Cette énergie ne fait pas partie de l'item sélectionné."),{status:409});const occupied=listLiveCheckouts({liveId}).some((c)=>c.productId===productId&&c.idempotencyKey!==excludeKey&&String(c.spotLabel||"")===canonical&&["planned","pending","paid","completed","authorized","authorised"].includes(String(c.status||"").toLowerCase()));if(occupied)throw Object.assign(new Error(`Le spot ${canonical} est déjà réservé ou vendu.`),{status:409,spotLabel:canonical});return canonical;}
+          export function planLiveCheckout({liveId,productId,qty,spotLabel,customerEmail,customerName,requestedProvider,requestedAmount}){const live=getLiveSession(liveId);if(!live)throw Object.assign(new Error("Live introuvable."),{status:404});if(live.status!=="live")throw Object.assign(new Error("Ce Live doit être en cours pour accepter un paiement."),{status:409});const route=assertSaleProvider({channel:"live",ownerRole:live.ownerRole,requestedProvider}),product=(live.products||[]).find(i=>i.id===String(productId||""));if(!product)throw Object.assign(new Error("Produit Live introuvable."),{status:404});let units=Math.max(1,Math.min(20,Math.trunc(Number(qty)||1)));const email=validateEmail(customerEmail),rule=resolveLiveSaleRule({live,product,customerEmail:email});if(rule.breakType==="energy_game")units=1;const provisionalKey=[live.id,product.id,email,units,rule.actionId||rule.kind,normalizeSpotLabel(spotLabel)].join(":"),selectedSpot=assertEnergySpotAvailable({liveId:live.id,productId:product.id,rule,spotLabel,excludeKey:provisionalKey}),idempotencyKey=[live.id,product.id,email,units,rule.actionId||rule.kind,selectedSpot].join(":"),existing=getLiveCheckout(idempotencyKey);if(existing){if(existing.status==="paid")throw Object.assign(new Error("Ce paiement Live a déjà été traité."),{status:409});if(["pending","planned"].includes(existing.status))return existing;}const available=Math.max(0,Number(product.stock||0)-reservedUnits(live.id,product.id,idempotencyKey));if(available<units)throw Object.assign(new Error(`Stock Live insuffisant pour ${product.name}.`),{status:409,available});const itemAmount=assertServerAmount(money(rule.unitPrice)*units,requestedAmount),shipping=quoteLiveShipping({liveId:live.id,customerEmail:email,productId:product.id,qty:units}),amount=money(itemAmount+shipping.shippingAmount),name=clean(customerName,120)||"Client Live",commission=commissionFor(live,itemAmount);return saveLiveCheckout({id:"LCK-"+crypto.randomUUID(),idempotencyKey,liveId:live.id,liveTitle:live.title,ownerRole:live.ownerRole,ownerId:live.ownerId,channel:route.channel,provider:route.provider,productId:product.id,productName:product.name,qty:units,unitPrice:rule.unitPrice,itemAmount,saleKind:rule.kind,actionId:rule.actionId||"",breakType:rule.breakType||"",spotLabel:selectedSpot,shippingAmount:shipping.shippingAmount,shippingAlreadyCharged:shipping.alreadyCharged||0,shippingPackId:shipping.pack?.id||"",shippingCarrier:shipping.pack?.carrier||"",shippingWeightGrams:shipping.totalWeightGrams||0,shippingBundled:true,amount,...commission,sellerNet:money(commission.sellerNet+shipping.shippingAmount),customerEmail:email,customerName:name,status:"planned",paymentProviderOrderId:"",url:"",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});}
+          export async function createLiveCheckout(input){const planned=planLiveCheckout(input);return withLiveLock(planned.idempotencyKey,async()=>{const current=getLiveCheckout(planned.id)||planned;if(current.status==="paid")throw Object.assign(new Error("Ce paiement Live a déjà été traité."),{status:409});if(current.url&&current.paymentProviderOrderId&&current.status==="pending")return current;if(current.provider==="sumup"){if(!isSumUpConfigured())throw Object.assign(new Error("Paiement SumUp non configuré côté serveur."),{status:503,provider:"sumup"});const payment=await createSumUpCheckout({orderId:current.id,amount:current.amount,description:`Live Cardoria — ${current.productName}${current.spotLabel?` — ${current.spotLabel}`:""}${current.shippingAmount?` — port ${current.shippingAmount.toFixed(2)} EUR`:""}`,customerEmail:current.customerEmail,redirectUrl:String(input.successUrl||"/live.html"),source:"live_cardoria"});current.status="pending";current.paymentProviderOrderId=payment.checkoutId;current.url=payment.url;current.environment="production";current.updatedAt=new Date().toISOString();return saveLiveCheckout(current);}const paypal=getPayPalMarketplaceConfig();if(!paypal.configured)throw Object.assign(new Error("Paiement PayPal non configuré côté serveur."),{status:503,provider:"paypal"});const payment=await createLivePayPalOrder({checkoutId:current.id,amount:current.amount,sellerId:current.ownerId,description:`Live vendeur Cardoria — ${current.productName}${current.spotLabel?` — ${current.spotLabel}`:""}${current.shippingAmount?` — port ${current.shippingAmount.toFixed(2)} EUR`:""}`,successUrl:String(input.successUrl||"/live.html"),cancelUrl:String(input.cancelUrl||"/live.html"),platformFee:current.platformFee});current.status="pending";current.paymentProviderOrderId=payment.id;current.url=payment.url;current.environment=paypal.environment;current.updatedAt=new Date().toISOString();return saveLiveCheckout(current);});}
+          EOF
+
+          cat > tests/live-shipping.test.mjs <<'EOF'
+          import test from "node:test";
+          import assert from "node:assert/strict";
+          import { LIVE_SHIPPING_PACKS, shippingPackForWeight, productShippingWeight, giveawayShippingPolicy } from "../backend/lib/live/shipping.js";
+
+          test("Cardoria shipping packs stay monotone and slightly above source carrier baseline",()=>{
+            let previous=0;
+            for(const pack of LIVE_SHIPPING_PACKS){assert.ok(pack.price>=previous);previous=pack.price;assert.ok(pack.maxGrams>0);}
+            assert.equal(shippingPackForWeight(20).id,"PACK-LS-20");
+            assert.equal(shippingPackForWeight(21).id,"PACK-LS-100");
+            assert.equal(shippingPackForWeight(101).id,"PACK-MR-500");
+            assert.equal(shippingPackForWeight(1000).price,4.69);
+          });
+          test("legacy products without declared shipping weight are not silently charged",()=>{
+            assert.equal(productShippingWeight({name:"legacy"},1),0);
+            assert.equal(productShippingWeight({shippingWeightGrams:20},3),60);
+          });
+          test("giveaway shipping is always free to participant and winner",()=>{
+            const policy=giveawayShippingPolicy();
+            assert.equal(policy.participantPays,0);
+            assert.equal(policy.winnerPays,0);
+            assert.equal(policy.withoutPurchase,"streamer");
+            assert.equal(policy.withPurchase,"bundle_with_first_purchase");
+          });
+          EOF
+
+          node --check backend/lib/live/shipping.js
+          node --check backend/lib/live/checkout.js
+          node --check backend/lib/live/actions.js
+          node --test tests/live-shipping.test.mjs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/lib/live/shipping.js backend/lib/live/checkout.js backend/lib/live/sessions.js backend/lib/live/actions.js js/live-studio-actions-ui.js backend/public/js/live-studio-actions-ui.js tests/live-shipping.test.mjs
+          git commit -m 'feat(live): bundle shipping packs and free giveaway postage'
+          git push origin HEAD:fix/live-shipping-bundles-20260916
