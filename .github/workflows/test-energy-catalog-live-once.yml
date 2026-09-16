@@ -1,0 +1,23 @@
+name: Test Energy Catalog Live Once
+on:
+  push:
+    branches: [fix/energy-game-config-no-lot-20260916]
+    paths: ['.github/workflows/test-energy-catalog-live-once.yml']
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve real Pokemon sets through TCGdex
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { resolveEnergyItems } from './backend/lib/live/energy-catalog.js';
+          const ev10=await resolveEnergyItems(['EV10']);
+          if(!ev10.items?.length||!ev10.spots?.length) throw new Error('EV10 resolution empty');
+          console.log('EV10',ev10.items.map(x=>x.setId+':'+x.setName).join(','),ev10.spots.join(','));
+          const combo=await resolveEnergyItems(['EV10','ME01']);
+          if(combo.items?.length!==2||!combo.spots?.length) throw new Error('combo resolution invalid');
+          console.log('COMBO',combo.items.map(x=>x.setId+':'+x.setName).join(','),combo.spots.join(','));
+          NODE
