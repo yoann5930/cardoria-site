@@ -89,3 +89,12 @@ test('unimplemented social eligibility giveaways are not exposed as fake working
   assert.match(controls, /lasGiveBuyer/);
   assert.match(controls, /buyer\.hidden=true/);
 });
+
+test('sales control decoration is idempotent and cannot self-trigger an endless MutationObserver loop', () => {
+  assert.match(controls, /game\.dataset\.salesEnhanced!=="1"/);
+  assert.match(controls, /game\.dataset\.salesEnhanced="1"/);
+  assert.match(controls, /if\(game\.textContent!=="Jeu de l’énergie"\)game\.textContent="Jeu de l’énergie"/);
+  assert.match(controls, /MutationObserver\(scheduleDecorate\)/);
+  assert.match(controls, /decorateQueued/);
+  assert.doesNotMatch(controls, /MutationObserver\(decorate\)/);
+});
