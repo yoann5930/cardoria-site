@@ -19,7 +19,7 @@ export function resolveLiveSaleRule({ live, product, customerEmail }) {
     return { kind: "flash", unitPrice: money(state.flash.price), actionId: state.flash.id };
   }
   if (state.break?.productId === product.id && state.break.status === "running") {
-    return { kind: "break", unitPrice: money(state.break.pricePerSpot), actionId: state.break.id };
+    return { kind: "break", unitPrice: money(state.break.pricePerSpot), actionId: state.break.id, breakType: String(state.break.breakType || "break"), spotLabels: Array.isArray(state.break.spotLabels) ? [...state.break.spotLabels] : [] };
   }
   return { kind: "buy_now", unitPrice: money(product.price), actionId: "" };
 }

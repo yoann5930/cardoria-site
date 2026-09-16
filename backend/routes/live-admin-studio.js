@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { ADMIN_ROLES } from "../lib/auth.js";
 import { validateSession } from "../lib/auth/session.js";
 import { getLiveSession, listLiveCheckouts, publicLiveSession, resolveAdminLiveAccess, setLiveStatus, updateLiveSession } from "../lib/live/sessions.js";
-import { drawGiveaway, getLiveActionState, pinLiveProduct, startAuction, startBreak, startFlashSale, startGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
+import { drawGiveaway, getLiveActionState, pinLiveProduct, setLiveProductEnergyTypes, startAuction, startBreak, startFlashSale, startGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
 
 const router = Router();
 function token(req){return String(req.headers.authorization||"").replace(/^Bearer\s+/i,"")||String(req.headers["x-session-token"]||"");}
@@ -27,8 +27,11 @@ router.post("/:liveId/products",(req,res)=>{try{
   const price=mode==="giveaway"?0:Math.round((Number(body.price)||0)*100)/100; if(mode!=="giveaway"&&price<=0) throw Object.assign(new Error("Prix du lot obligatoire."),{status:400});
   const stock=Math.max(1,Math.min(1000,Math.trunc(Number(body.stock)||1))),product={id:"LOT-"+crypto.randomUUID(),name,price,qty:stock,stock,mode};
   const session=updateLiveSession(req.params.liveId,{products:[...(live.products||[]),product]},actor,{adminOverride:true});
-  res.json({ok:true,product,session:publicLiveSession(session)});
+  let energyConfig=null;
+  if(Array.isArray(body.energyTypes)&&body.energyTypes.length) energyConfig=setLiveProductEnergyTypes(req.params.liveId,product.id,body.energyTypes);
+  res.json({ok:true,product,energyConfig,session:publicLiveSession(session)});
 }catch(error){fail(res,error);}});
+router.post("/:liveId/actions/energy-config",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,energyConfig:setLiveProductEnergyTypes(req.params.liveId,req.body?.productId,req.body?.energyTypes)});}catch(error){fail(res,error);}});
 router.post("/:liveId/actions/pin",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,state:pinLiveProduct(req.params.liveId,req.body?.productId)});}catch(error){fail(res,error);}});
 router.post("/:liveId/actions/unpin",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,state:unpinLiveProduct(req.params.liveId)});}catch(error){fail(res,error);}});
 router.post("/:liveId/actions/auction/start",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,auction:startAuction(req.params.liveId,req.body||{})});}catch(error){fail(res,error);}});

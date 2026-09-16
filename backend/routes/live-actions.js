@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { assertSellerSession } from "../lib/marketplace/v1/security.js";
 import { getLiveSession } from "../lib/live/sessions.js";
-import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, startAuction, startBreak, startFlashSale, startGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
+import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, setLiveProductEnergyTypes, startAuction, startBreak, startFlashSale, startGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
 
 const router=Router(),rateBuckets=new Map();
 function fail(res,error,fallback=400){res.status(error?.status||fallback).json({ok:false,error:error?.message||"Erreur action Live",minimum:error?.minimum});}
@@ -16,6 +16,7 @@ router.get("/:liveId/chat",(req,res)=>{try{res.json({ok:true,messages:listLiveCh
 router.post("/:liveId/chat",(req,res)=>{try{rateLimit(req,"chat",5,10_000);res.json({ok:true,message:addLiveChatMessage(req.params.liveId,req.body||{})});}catch(e){fail(res,e);}});
 router.post("/:liveId/bids",(req,res)=>{try{rateLimit(req,"bid",20,10_000);const result=placeAuctionBid(req.params.liveId,requireBidderEmail(req.body||{}));res.json({ok:true,auction:publicState({auction:result.auction}).auction,bid:{id:result.bid.id,amount:result.bid.amount,bidderName:result.bid.bidderName,createdAt:result.bid.createdAt}});}catch(e){fail(res,e);}});
 router.post("/:liveId/giveaway/enter",(req,res)=>{try{rateLimit(req,"giveaway",10,60_000);const result=enterGiveaway(req.params.liveId,req.body||{});res.json({ok:true,duplicate:Boolean(result.duplicate),entry:result.entry?{id:result.entry.id,name:result.entry.name,createdAt:result.entry.createdAt}:null,giveaway:publicState({giveaway:result.giveaway}).giveaway});}catch(e){fail(res,e);}});
+router.post("/seller/:liveId/energy-config",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,energyConfig:setLiveProductEnergyTypes(req.params.liveId,req.body?.productId,req.body?.energyTypes)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/pin",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,state:pinLiveProduct(req.params.liveId,req.body?.productId)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/unpin",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,state:unpinLiveProduct(req.params.liveId)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/auction/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,auction:startAuction(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
