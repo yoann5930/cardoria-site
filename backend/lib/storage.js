@@ -15,7 +15,8 @@ const FILES = {
   "rachat-proposals": "rachat-proposals.json",
   "seller-subscriptions": "seller-subscriptions.json",
   "marketplace-captured-sales": "marketplace-captured-sales.json",
-  "live-sessions.json": "live-sessions.json"
+  "live-sessions.json": "live-sessions.json",
+  "live-realtime-publishers.json": "live-realtime-publishers.json"
 };
 
 function ensureDir() {

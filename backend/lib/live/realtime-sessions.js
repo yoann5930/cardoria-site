@@ -1,8 +1,33 @@
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { getLiveSession } from "./sessions.js";
+import { readJson, writeJson } from "../storage.js";
 import { createCloudflareSession, publishCloudflareTracks, subscribeCloudflareTracks, renegotiateCloudflareSession, isCloudflareRealtimeConfigured } from "./cloudflare-realtime.js";
 
 const publishedLives=new Map(),viewerSessions=new Map(),publisherPairs=new Map();
+const PUBLISHER_STORE_KEY="live-realtime-publishers.json";
+function persistPublishedLives(){
+  const lives=[];
+  for(const[liveId,entry]of publishedLives){
+    lives.push({liveId,startedAt:entry.startedAt||"",sources:[...entry.sources.values()].filter(x=>x.mode==="p2p").map(x=>({mode:"p2p",sourceId:x.sourceId,publisherId:x.publisherId,publisherKey:x.publisherKey,tracks:x.tracks||[],startedAt:x.startedAt||""}))});
+  }
+  try{writeJson(PUBLISHER_STORE_KEY,{lives});}catch{}
+}
+function hydratePublishedLives(){
+  try{
+    const data=readJson(PUBLISHER_STORE_KEY,{lives:[]});
+    for(const live of data.lives||[]){
+      const session=getLiveSession(live.liveId);
+      if(!session||session.status!=="live")continue;
+      const entry={sources:new Map(),startedAt:live.startedAt||new Date().toISOString()};
+      for(const source of live.sources||[]){
+        if(source.mode!=="p2p"||!source.sourceId||!source.publisherKey)continue;
+        entry.sources.set(source.sourceId,{...source,offers:new Map(),lastSeenAt:Date.now()});
+      }
+      if(entry.sources.size)publishedLives.set(live.liveId,entry);
+    }
+  }catch{}
+}
+hydratePublishedLives();
 const VIEWER_TTL_MS=90_000,PAIR_TTL_MS=10*60_000,PUBLISHER_TTL_MS=120_000,MAX_PUBLISHERS_PER_LIVE=2;
 const LIVE_PUBLISHER_ADMIN_ROLES=["super_admin","admin","employee"];
 function requireLive(liveId){const live=getLiveSession(liveId);if(!live||live.status!=="live"){const e=new Error("Ce Live n'est pas disponible.");e.status=404;e.code="LIVE_SESSION_NOT_FOUND";throw e;}return live;}
@@ -12,7 +37,7 @@ function livePublishers(liveId,create=false){let entry=publishedLives.get(liveId
 function allPublishedTracks(liveId){const entry=livePublishers(liveId);return entry?[...entry.sources.values()].flatMap((source)=>source.tracks||[]):[];}
 function pairHash(token){return createHash("sha256").update(String(token||"")).digest("hex");}
 function cleanupPairs(){const now=Date.now();for(const[hash,pair]of publisherPairs)if(pair.expiresAt<=now||pair.used)publisherPairs.delete(hash);}
-function cleanupP2PSources(){const cutoff=Date.now()-PUBLISHER_TTL_MS;for(const[liveId,entry]of publishedLives){for(const[sourceId,source]of entry.sources){if(source.mode==="p2p"&&Number(source.lastSeenAt||0)<cutoff)entry.sources.delete(sourceId);}if(!entry.sources.size)publishedLives.delete(liveId);}}
+function cleanupP2PSources(){const cutoff=Date.now()-PUBLISHER_TTL_MS;let changed=false;for(const[liveId,entry]of publishedLives){for(const[sourceId,source]of entry.sources){if(source.mode==="p2p"&&Number(source.lastSeenAt||0)<cutoff){entry.sources.delete(sourceId);changed=true;}}if(!entry.sources.size){publishedLives.delete(liveId);changed=true;}}if(changed)persistPublishedLives();}
 export function cleanupRealtimeViewers(){const cutoff=Date.now()-VIEWER_TTL_MS;for(const[id,v]of viewerSessions)if(v.lastSeenAt<cutoff)viewerSessions.delete(id);cleanupPairs();cleanupP2PSources();}
 const cleanupTimer=setInterval(cleanupRealtimeViewers,30_000);cleanupTimer.unref?.();
 export function realtimeProvider(){return isCloudflareRealtimeConfigured()?"cloudflare-realtime":"cardoria-p2p";}
@@ -28,6 +53,7 @@ export async function startRealtimePublisher({liveId,actor,offer,tracks,sourceId
   }
   const publisherKey=randomBytes(32).toString("base64url");
   entry.sources.set(normalizedSource,{mode:"p2p",sourceId:normalizedSource,publisherId:String(actor.id||actor.sellerId||"admin"),publisherKey,tracks:(tracks||[]).map((track)=>({kind:track.kind,trackName:track.trackName||`${normalizedSource}-${track.kind}`})),offers:new Map(),startedAt:new Date().toISOString(),lastSeenAt:Date.now()});
+  persistPublishedLives();
   return{provider:"cardoria-p2p",mode:"p2p",liveId,sourceId:normalizedSource,sourceCount:entry.sources.size,publisherKey};
 }
 function requireP2PSource({liveId,sourceId,publisherKey}){const entry=livePublishers(String(liveId||"")),source=entry?.sources.get(cleanSourceId(sourceId));if(!source||source.mode!=="p2p"){const e=new Error("Source caméra P2P introuvable.");e.status=404;e.code="LIVE_P2P_SOURCE_NOT_FOUND";throw e;}if(String(source.publisherKey)!==String(publisherKey||"")){const e=new Error("Clé diffuseur invalide.");e.status=401;e.code="LIVE_P2P_PUBLISHER_KEY_INVALID";throw e;}source.lastSeenAt=Date.now();return source;}
@@ -35,7 +61,7 @@ export function pollRealtimePublisherOffers({liveId,sourceId,publisherKey}){cons
 export function submitRealtimePublisherAnswer({liveId,sourceId,publisherKey,viewerId,answer}){const source=requireP2PSource({liveId,sourceId,publisherKey}),item=source.offers.get(String(viewerId||"")),viewer=viewerSessions.get(String(viewerId||""));if(!item||!viewer||viewer.liveId!==liveId){const e=new Error("Spectateur P2P introuvable.");e.status=404;e.code="LIVE_P2P_VIEWER_NOT_FOUND";throw e;}item.answer=answer;item.answeredAt=Date.now();viewer.answers.set(cleanSourceId(sourceId),answer);viewer.lastSeenAt=Date.now();return{ok:true,viewerId,sourceId:cleanSourceId(sourceId)};}
 export function submitRealtimeViewerOffer({viewerId,sourceId,offer}){const viewer=viewerSessions.get(String(viewerId||""));if(!viewer||viewer.mode!=="p2p"){const e=new Error("Session spectateur P2P introuvable.");e.status=404;e.code="LIVE_P2P_VIEWER_NOT_FOUND";throw e;}const entry=livePublishers(viewer.liveId),normalizedSource=cleanSourceId(sourceId),source=entry?.sources.get(normalizedSource);if(!source||source.mode!=="p2p"){const e=new Error("Caméra P2P indisponible.");e.status=404;e.code="LIVE_P2P_SOURCE_NOT_FOUND";throw e;}source.offers.set(String(viewerId),{offer,createdAt:Date.now(),answer:null});viewer.lastSeenAt=Date.now();return{ok:true,viewerId,sourceId:normalizedSource};}
 export function pollRealtimeViewerAnswers(viewerId){const viewer=viewerSessions.get(String(viewerId||""));if(!viewer||viewer.mode!=="p2p"){const e=new Error("Session spectateur P2P introuvable.");e.status=404;e.code="LIVE_P2P_VIEWER_NOT_FOUND";throw e;}viewer.lastSeenAt=Date.now();return{ok:true,viewerId:String(viewerId),liveId:viewer.liveId,answers:Object.fromEntries(viewer.answers)};}
-export function stopRealtimePublisher({liveId,actor,sourceId}){const live=getLiveSession(liveId);if(live)assertPublisher(live,actor);const entry=livePublishers(liveId);if(entry){if(sourceId)entry.sources.delete(cleanSourceId(sourceId));else entry.sources.clear();if(!entry.sources.size){publishedLives.delete(liveId);for(const[id,v]of viewerSessions)if(v.liveId===liveId)viewerSessions.delete(id);}}return{ok:true,liveId,sourceId:sourceId?cleanSourceId(sourceId):null,sourceCount:entry?.sources.size||0};}
+export function stopRealtimePublisher({liveId,actor,sourceId}){const live=getLiveSession(liveId);if(live)assertPublisher(live,actor);const entry=livePublishers(liveId);if(entry){if(sourceId)entry.sources.delete(cleanSourceId(sourceId));else entry.sources.clear();if(!entry.sources.size){publishedLives.delete(liveId);for(const[id,v]of viewerSessions)if(v.liveId===liveId)viewerSessions.delete(id);}persistPublishedLives();}return{ok:true,liveId,sourceId:sourceId?cleanSourceId(sourceId):null,sourceCount:entry?.sources.size||0};}
 export async function startRealtimeViewer(liveId){cleanupRealtimeViewers();requireLive(liveId);const entry=livePublishers(liveId);if(!entry?.sources.size){const e=new Error("La diffusion vidéo n'est pas encore disponible.");e.status=404;e.code="LIVE_STREAM_NOT_PUBLISHED";throw e;}
   const useCloudflare=isCloudflareRealtimeConfigured()&&[...entry.sources.values()].every((source)=>source.mode==="cloudflare");
   if(useCloudflare){const tracks=allPublishedTracks(liveId),subscribed=await subscribeCloudflareTracks({tracks}),viewerId=randomUUID();viewerSessions.set(viewerId,{mode:"cloudflare",liveId,cloudflareSessionId:subscribed.cloudflareSessionId,lastSeenAt:Date.now()});return{provider:"cloudflare-realtime",mode:"cloudflare",viewerId,liveId,offer:subscribed.offer,mids:subscribed.mids,sourceCount:entry.sources.size,viewerCount:viewerCountForLive(liveId)};}
