@@ -1,0 +1,41 @@
+name: OVH Diagnose Site Down Once
+
+on:
+  push:
+    branches:
+      - ops/diag-site-down-20260916
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: status
+      branch: main
+    secrets: inherit
+
+  dns:
+    needs: status
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: dns-check
+      branch: main
+    secrets: inherit
+
+  nginx:
+    needs: dns
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: nginx-test
+      branch: main
+    secrets: inherit
+
+  logs:
+    needs: nginx
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: logs
+      branch: main
+    secrets: inherit
