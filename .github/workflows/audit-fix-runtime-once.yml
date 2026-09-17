@@ -10,86 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply audit fixes
+      - name: Apply live runtime cache fix
         shell: bash
         run: |
           set -euo pipefail
           for file in admin-live.html backend/public/admin-live.html live-vendeur.html backend/public/live-vendeur.html; do
             sed -i -E 's#live-studio-sales-controls\.js\?v=[^" ]+#live-studio-sales-controls.js?v=20260917-energy-catalog-v2#g' "$file"
+            grep -q 'live-studio-sales-controls.js?v=20260917-energy-catalog-v2' "$file"
           done
-          cat > .github/workflows/frontend-runtime-sync.yml <<'EOF'
-          name: Cardoria Frontend Runtime Sync
-
-          on:
-            push:
-              branches: ["main"]
-
-          permissions:
-            contents: write
-            pull-requests: write
-
-          concurrency:
-            group: cardoria-frontend-runtime-sync
-            cancel-in-progress: true
-
-          jobs:
-            sync:
-              runs-on: ubuntu-latest
-              steps:
-                - name: Checkout latest main
-                  uses: actions/checkout@v4
-                  with:
-                    ref: main
-                    fetch-depth: 0
-
-                - name: Mirror public frontend into backend runtime
-                  shell: bash
-                  run: |
-                    set -euo pipefail
-                    rm -rf backend/public
-                    mkdir -p backend/public
-                    shopt -s nullglob
-                    for file in ./*.html ./*.css ./*.js ./*.json ./*.xml ./*.txt ./*.ico ./*.png ./*.jpg ./*.jpeg ./*.webp ./*.svg ./*.webmanifest; do
-                      [ -f "$file" ] && cp -a "$file" backend/public/
-                    done
-                    for dir in assets css js pages images img; do
-                      if [ -d "$dir" ]; then cp -a "$dir" backend/public/; fi
-                    done
-                    printf 'frontend-source-sha=%s\n' "$(git rev-parse HEAD)" > backend/.frontend-runtime-sha
-
-                - name: Validate required runtime pages
-                  shell: bash
-                  run: |
-                    set -euo pipefail
-                    required=(backend/public/index.html backend/public/admin-login.html backend/public/admin.html backend/public/admin-live.html backend/public/live.html backend/public/live-camera.html backend/public/live-vendeur.html backend/public/boutique.html backend/public/client-login.html backend/public/client-orders.html backend/public/reset-password.html backend/public/marketplace.html backend/public/style.css backend/public/css/admin.css backend/public/js/admin/admin-core.js backend/public/js/admin/admin-live.js backend/public/js/cardoria-live-media.js backend/public/js/cardoria-live-publisher.js backend/public/js/live-studio-sales-controls.js)
-                    for file in "${required[@]}"; do test -f "$file" || { echo "Missing runtime file: $file"; exit 1; }; done
-                    if grep -R -n "cardoria\.vercel\.app" backend/public --include='*.html' --include='*.js' --include='*.xml' --include='*.txt'; then
-                      echo "Legacy Vercel production URL still present in runtime frontend."
-                      exit 1
-                    fi
-
-                - name: Create protected sync pull request when changed
-                  env:
-                    GH_TOKEN: ${{ github.token }}
-                  shell: bash
-                  run: |
-                    set -euo pipefail
-                    git add -A backend/public backend/.frontend-runtime-sha
-                    if git diff --cached --quiet; then
-                      echo "Frontend runtime already synchronized."
-                      exit 0
-                    fi
-                    branch="bot/frontend-runtime-sync-${GITHUB_RUN_ID}"
-                    git config user.name "github-actions[bot]"
-                    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                    git checkout -b "$branch"
-                    git commit -m "chore(frontend): sync OVH runtime [frontend-runtime-sync]"
-                    git push origin "$branch"
-                    gh pr create --base main --head "$branch" --title "chore(frontend): sync OVH runtime" --body "Synchronisation automatique du frontend public vers backend/public. Cette PR respecte la protection de main et doit passer les checks requis avant fusion."
-          EOF
-
+          ! grep -E 'live-studio-sales-controls\.js\?v=20260916-(energy-combos-v1|sales-controls-v3)' admin-live.html backend/public/admin-live.html live-vendeur.html backend/public/live-vendeur.html
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add admin-live.html backend/public/admin-live.html live-vendeur.html backend/public/live-vendeur.html .github/workflows/frontend-runtime-sync.yml
-          git commit -m 'fix(audit): force live runtime refresh and protect frontend sync'
+          git add admin-live.html backend/public/admin-live.html live-vendeur.html backend/public/live-vendeur.html
+          git commit -m 'fix(live): force current sales controls runtime'
           git push origin HEAD:fix/audit-runtime-cache-sync-20260917
