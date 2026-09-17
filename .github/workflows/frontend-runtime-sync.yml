@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: cardoria-frontend-runtime-sync
@@ -13,7 +14,6 @@ concurrency:
 
 jobs:
   sync:
-    if: ${{ !contains(github.event.head_commit.message, '[frontend-runtime-sync]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout latest main
@@ -28,18 +28,13 @@ jobs:
           set -euo pipefail
           rm -rf backend/public
           mkdir -p backend/public
-
           shopt -s nullglob
           for file in ./*.html ./*.css ./*.js ./*.json ./*.xml ./*.txt ./*.ico ./*.png ./*.jpg ./*.jpeg ./*.webp ./*.svg ./*.webmanifest; do
             [ -f "$file" ] && cp -a "$file" backend/public/
           done
-
           for dir in assets css js pages images img; do
-            if [ -d "$dir" ]; then
-              cp -a "$dir" backend/public/
-            fi
+            if [ -d "$dir" ]; then cp -a "$dir" backend/public/; fi
           done
-
           printf 'frontend-source-sha=%s\n' "$(git rev-parse HEAD)" > backend/.frontend-runtime-sha
 
       - name: Validate required runtime pages
@@ -50,49 +45,22 @@ jobs:
             backend/public/index.html
             backend/public/admin-login.html
             backend/public/admin.html
-            backend/public/admin-achats-cartes.html
-            backend/public/admin-achats-consommables.html
-            backend/public/admin-achats-materiel.html
-            backend/public/admin-achats-acheteurs.html
-            backend/public/admin-comptabilite.html
-            backend/public/admin-paiements.html
-            backend/public/admin-commandes.html
-            backend/public/admin-stock.html
-            backend/public/admin-estimations.html
-            backend/public/admin-rachat.html
-            backend/public/admin-catalogue.html
-            backend/public/admin-marketplace.html
             backend/public/admin-live.html
             backend/public/live.html
             backend/public/live-camera.html
             backend/public/live-vendeur.html
-            backend/public/admin-utilisateurs.html
-            backend/public/admin-journal.html
-            backend/public/admin-system.html
             backend/public/boutique.html
             backend/public/client-login.html
             backend/public/client-orders.html
             backend/public/reset-password.html
-            backend/public/mes-commandes.html
             backend/public/marketplace.html
-            backend/public/estimation.html
-            backend/public/scanner.html
-            backend/public/comparateur.html
-            backend/public/tendances.html
-            backend/public/pages/contact/index.html
-            backend/public/pages/faq/index.html
-            backend/public/pages/licences/index.html
             backend/public/style.css
             backend/public/css/admin.css
             backend/public/js/admin/admin-core.js
             backend/public/js/admin/admin-live.js
             backend/public/js/cardoria-live-media.js
             backend/public/js/cardoria-live-publisher.js
-            backend/public/js/admin/admin-stock.js
-            backend/public/js/admin/admin-orders.js
-            backend/public/js/client-auth.js
-            backend/public/js/client-orders.js
-            backend/public/js/client-password-reset.js
+            backend/public/js/live-studio-sales-controls.js
           )
           for file in "${required[@]}"; do
             test -f "$file" || { echo "Missing runtime file: $file"; exit 1; }
@@ -102,7 +70,9 @@ jobs:
             exit 1
           fi
 
-      - name: Commit runtime mirror when changed
+      - name: Create protected sync pull request when changed
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -111,7 +81,10 @@ jobs:
             echo "Frontend runtime already synchronized."
             exit 0
           fi
+          branch="bot/frontend-runtime-sync-${GITHUB_RUN_ID}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
           git commit -m "chore(frontend): sync OVH runtime [frontend-runtime-sync]"
-          git push origin HEAD:main
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "chore(frontend): sync OVH runtime" --body "Synchronisation automatique du frontend public vers backend/public. Cette PR respecte la protection de main et doit passer les checks requis avant fusion."
