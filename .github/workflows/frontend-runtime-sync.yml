@@ -35,7 +35,8 @@ jobs:
           for dir in assets css js pages images img; do
             if [ -d "$dir" ]; then cp -a "$dir" backend/public/; fi
           done
-          printf 'frontend-source-sha=%s\n' "$(git rev-parse HEAD)" > backend/.frontend-runtime-sha
+          fingerprint=$(find backend/public -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')
+          printf 'frontend-runtime-sha256=%s\n' "$fingerprint" > backend/.frontend-runtime-sha
 
       - name: Validate required runtime pages
         shell: bash
