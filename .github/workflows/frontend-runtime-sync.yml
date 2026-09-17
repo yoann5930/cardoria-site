@@ -71,7 +71,7 @@ jobs:
             exit 1
           fi
 
-      - name: Create protected sync pull request when changed
+      - name: Prepare protected runtime sync when changed
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -88,4 +88,8 @@ jobs:
           git checkout -b "$branch"
           git commit -m "chore(frontend): sync OVH runtime [frontend-runtime-sync]"
           git push origin "$branch"
-          gh pr create --base main --head "$branch" --title "chore(frontend): sync OVH runtime" --body "Synchronisation automatique du frontend public vers backend/public. Cette PR respecte la protection de main et doit passer les checks requis avant fusion."
+          if gh pr create --base main --head "$branch" --title "chore(frontend): sync OVH runtime" --body "Synchronisation automatique du frontend public vers backend/public. Cette PR respecte la protection de main et doit passer les checks requis avant fusion."; then
+            echo "Runtime sync pull request created."
+          else
+            echo "::warning::GitHub Actions n'est pas autorisé à créer des pull requests dans les paramètres du dépôt. La branche $branch a été créée avec succès et doit être ouverte/fusionnée par un opérateur."
+          fi
