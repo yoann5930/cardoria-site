@@ -1,12 +1,14 @@
 name: SEO sitemap dates CI
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
-      - backend/lib/seo/sitemap.js
+      - backend/lib/seo/**
       - backend/server.js
-      - tests/seo-sitemap-lastmod.test.mjs
-      - tests/seo-license-redirect.test.mjs
+      - js/seo.js
+      - js/carte.js
+      - tests/seo-*.mjs
       - scripts/audit-public-seo.mjs
       - .github/workflows/seo-sitemap-lastmod-ci.yml
 
@@ -16,7 +18,7 @@ permissions:
 jobs:
   seo-sitemap-dates:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,12 +29,20 @@ jobs:
       - name: Check production modules and audit syntax
         run: |
           node --check backend/lib/seo/sitemap.js
+          node --check backend/lib/seo/card-render.js
           node --check backend/server.js
+          node --check js/seo.js
+          node --check js/carte.js
           node --check scripts/audit-public-seo.mjs
-      - name: Install backend packages without lifecycle scripts
-        run: npm --prefix backend install --ignore-scripts --omit=dev --no-audit --no-fund
-      - name: Test sitemap dates and actual Express license routes
-        run: node --experimental-vm-modules --test tests/seo-sitemap-lastmod.test.mjs tests/seo-license-redirect.test.mjs
+      - name: Install test dependencies
+        run: |
+          npm --prefix backend install --ignore-scripts --omit=dev --no-audit --no-fund
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Test sitemaps, redirects, initial HTML and Chromium rendering
+        env:
+          SEO_BROWSER_TESTS: '1'
+        run: node --experimental-vm-modules --test tests/seo-sitemap-lastmod.test.mjs tests/seo-license-redirect.test.mjs tests/seo-card-render.test.mjs
   public-seo-diagnostic:
     runs-on: ubuntu-latest
     timeout-minutes: 4
