@@ -59,6 +59,15 @@ const draftViewer = await json("/api/live/webrtc/viewer/start", {
 });
 assert(draftViewer.response.status === 404, "Viewer can join a draft live");
 
+// An incomplete sender profile must not silently pass the new live prerequisite.
+const incomplete = await auth(token, `/api/live/seller/sessions/${encodeURIComponent(liveId)}/start`, { method: "POST", body: "{}" });
+assert(incomplete.response.status === 409, "Missing sender address did not block live start");
+const sellerId = sellerRegistration.body.seller.id;
+const sender = await auth(token, `/api/marketplace/v1/sellers/${encodeURIComponent(sellerId)}/sender-profile`, {
+  method: "PUT",
+  body: JSON.stringify({ name: "Live Public Seller", addressLine1: "12 rue Test", postalCode: "59330", city: "Hautmont", countryCode: "FR", phone: "0600000000" })
+});
+assert(sender.response.status === 200 && sender.body.ready === true, "Sender profile setup failed");
 const started = await auth(token, `/api/live/seller/sessions/${encodeURIComponent(liveId)}/start`, { method: "POST", body: "{}" });
 assert(started.response.status === 200 && started.body.session?.status === "live", "Seller live start failed");
 
@@ -70,6 +79,7 @@ assert(!/[<>]/.test(String(listed.title || "")), "Public live title contains HTM
 assert(!/[<>]/.test(String(listed.products?.[0]?.name || "")), "Public product name contains HTML markup characters");
 assert(!JSON.stringify(listed).includes("ownerEmail"), "Public live leaks ownerEmail");
 assert(!JSON.stringify(listed).includes("<script") && !JSON.stringify(listed).includes("<img"), "Public live leaks executable markup");
+assert(!JSON.stringify(listed).includes("12 rue Test"), "Public live leaks sender address");
 
 const detail = await json(`/api/live/sessions/${encodeURIComponent(liveId)}`);
 assert(detail.response.status === 200 && detail.body.session?.id === liveId, "Active live public detail unavailable");
@@ -87,13 +97,10 @@ const noCameraViewer = await json("/api/live/webrtc/viewer/start", {
   body: JSON.stringify({ liveSessionId: liveId })
 });
 assert(noCameraViewer.response.status === 404 && noCameraViewer.body.code === "LIVE_STREAM_NOT_PUBLISHED", "Viewer start without a published camera is not rejected correctly");
-
 const anonymousAdminAccess = await json(`/api/live/sessions/${encodeURIComponent(liveId)}/admin-access`);
 assert(anonymousAdminAccess.response.status === 401, "Anonymous viewer obtained admin live access");
-
 const stopped = await auth(token, `/api/live/seller/sessions/${encodeURIComponent(liveId)}/stop`, { method: "POST", body: "{}" });
 assert(stopped.response.status === 200 && stopped.body.session?.status === "ended", "Seller live stop failed");
-
 const endedDirectory = await json("/api/live/sessions");
 assert(!endedDirectory.body.sessions?.some((session) => session.id === liveId), "Ended live remains in public directory");
 const endedDetail = await json(`/api/live/sessions/${encodeURIComponent(liveId)}`);
@@ -102,5 +109,4 @@ const endedRealtime = await json(`/api/live/webrtc/status/${encodeURIComponent(l
 assert(endedRealtime.response.status === 404, "Ended live realtime status remains publicly accessible");
 const endedState = await json(`/api/live/actions/${encodeURIComponent(liveId)}/state`);
 assert(endedState.response.status === 404, "Ended live action state remains publicly accessible");
-
 console.log("LIVE_PUBLIC_E2E_PASS");
