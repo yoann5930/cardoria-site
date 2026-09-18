@@ -45,6 +45,14 @@ const buyer = await register("live-buyer");
 const sellerA = await registerSeller(sellerAccountA, "Live Seller A");
 const sellerB = await registerSeller(sellerAccountB, "Live Seller B");
 
+for (const [account,seller,city] of [[sellerAccountA,sellerA,"Paris"],[sellerAccountB,sellerB,"Lille"]]) {
+  const sender = await auth(account.token, `/api/marketplace/v1/sellers/${seller.id}/sender-profile`, {
+    method: "PUT",
+    body: JSON.stringify({ name: seller.displayName, addressLine1: "1 rue Test", postalCode: city === "Paris" ? "75001" : "59000", city, countryCode: "FR", phone: "0600000000" })
+  });
+  assert(sender.response.status === 200 && sender.body.ready === true, "Seller sender profile setup failed");
+}
+
 const anonymousSessions = await json("/api/live/seller/sessions");
 assert(anonymousSessions.response.status === 401, "Anonymous user can read seller Live sessions");
 
