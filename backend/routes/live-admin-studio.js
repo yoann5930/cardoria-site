@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { ADMIN_ROLES } from "../lib/auth.js";
 import { validateSession } from "../lib/auth/session.js";
 import { getLiveSession, listLiveCheckouts, publicLiveSession, resolveAdminLiveAccess, setLiveStatus, updateLiveSession } from "../lib/live/sessions.js";
-import { drawGiveaway, getLiveActionState, pinLiveProduct, setLiveProductEnergyTypes, startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
+import { drawGiveaway, getLiveActionState, pinLiveProduct, setLiveProductEnergyTypes, startAuction, startBreak, startBuyerGiveaway, startEnergyGame, startFlashSale, startGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
 import { archiveLiveSession } from "../lib/live/archive.js";
 
 const router = Router();
@@ -39,6 +39,7 @@ router.post("/:liveId/actions/auction/start",(req,res)=>{try{actorFor(req,req.pa
 router.post("/:liveId/actions/auction/stop",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,auction:stopAuction(req.params.liveId)});}catch(error){fail(res,error);}});
 router.post("/:liveId/actions/flash/start",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,flash:startFlashSale(req.params.liveId,req.body||{})});}catch(error){fail(res,error);}});
 router.post("/:liveId/actions/giveaway/start",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,giveaway:startGiveaway(req.params.liveId,req.body||{})});}catch(error){fail(res,error);}});
+router.post("/:liveId/actions/giveaway/buyer/start",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,giveaway:startBuyerGiveaway(req.params.liveId,req.body||{})});}catch(error){fail(res,error);}});
 router.post("/:liveId/actions/giveaway/draw",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,...drawGiveaway(req.params.liveId)});}catch(error){fail(res,error);}});
 router.post("/:liveId/actions/break/start",async(req,res)=>{try{actorFor(req,req.params.liveId);const body=req.body||{},result=String(body.breakType||"").toLowerCase()==="energy_game"?await startEnergyGame(req.params.liveId,body):startBreak(req.params.liveId,body);res.json({ok:true,break:result});}catch(error){fail(res,error);}});
 export default router;
