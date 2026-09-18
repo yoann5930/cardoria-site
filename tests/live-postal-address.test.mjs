@@ -26,7 +26,7 @@ function store(){
 test("first Live purchase requires a complete postal address",()=>{
   const s=store();__setLiveStoreForTests(s);__setLiveActionsStoreForTests({states:{}});
   try{
-    assert.throws(()=>planLiveCheckout({liveId:"LIVE-ADDR",productId:"P1",qty:1,customerEmail:"buyer@example.com",customerName:"Pseudo"}),/Adresse postale obligatoire/);
+    assert.throws(()=>planLiveCheckout({liveId:"LIVE-ADDR",productId:"P1",qty:1,customerEmail:"buyer@example.com",customerName:"Pseudo",requireShippingAddress:true}),/Adresse postale obligatoire/);
   } finally {__resetLiveActionsStoreForTests();__resetLiveStoreForTests();}
 });
 
@@ -34,13 +34,13 @@ test("postal address is normalized, persisted and reused for following purchases
   const s=store();__setLiveStoreForTests(s);__setLiveActionsStoreForTests({states:{}});
   try{
     const first=planLiveCheckout({
-      liveId:"LIVE-ADDR",productId:"P1",qty:1,customerEmail:"BUYER@EXAMPLE.COM",customerName:"Pseudo",
+      liveId:"LIVE-ADDR",productId:"P1",qty:1,customerEmail:"BUYER@EXAMPLE.COM",customerName:"Pseudo",requireShippingAddress:true,
       shippingAddress:{recipientName:"Jean Dupont",addressLine1:"12 rue des Cartes",addressLine2:"Appartement 2",postalCode:"59330",city:"Hautmont",countryCode:"fr",phone:"0600000000"}
     });
     assert.equal(first.shippingAddress.recipientName,"Jean Dupont");
     assert.equal(first.shippingAddress.postalCode,"59330");
     assert.equal(first.shippingAddress.countryCode,"FR");
-    const second=planLiveCheckout({liveId:"LIVE-ADDR",productId:"P2",qty:1,customerEmail:"buyer@example.com",customerName:"Pseudo"});
+    const second=planLiveCheckout({liveId:"LIVE-ADDR",productId:"P2",qty:1,customerEmail:"buyer@example.com",customerName:"Pseudo",requireShippingAddress:true});
     assert.deepEqual(second.shippingAddress,first.shippingAddress);
     assert.equal(s.checkouts.length,2);
   } finally {__resetLiveActionsStoreForTests();__resetLiveStoreForTests();}
