@@ -23,6 +23,32 @@ export function placeAuctionBid(liveId,{amount,bidderName,bidderEmail}={}){requi
 export function stopAuction(liveId){requireLive(liveId);const{d,state}=stateFor(liveId,true);if(!state.auction)throw Object.assign(new Error("Aucune enchere."),{status:404});closeExpired(state);if(state.auction.status==="running")state.auction.status="ended";state.auction.endedAt=state.auction.endedAt||nowIso();state.updatedAt=nowIso();save(d);return structuredClone(state.auction);}
 export function startFlashSale(liveId,{productId,price,durationSeconds=60}={}){const live=requireLive(liveId),product=productFor(live,productId),flashPrice=money(price||product.price);if(flashPrice<=0)throw Object.assign(new Error("Prix flash invalide."),{status:400});const duration=Math.max(5,Math.min(3600,Math.trunc(Number(durationSeconds)||60))),started=Date.now(),{d,state}=stateFor(live.id,true);state.pinnedProductId=product.id;state.flash={id:"FLASH-"+crypto.randomUUID(),productId:product.id,productName:product.name,price:flashPrice,status:"running",startedAt:new Date(started).toISOString(),endsAt:new Date(started+duration*1000).toISOString()};state.updatedAt=nowIso();save(d);return structuredClone(state.flash);}
 export function startGiveaway(liveId,{productId,durationSeconds=60}={}){const live=requireLive(liveId),product=productFor(live,productId);if(Number(product.stock||0)<1)throw Object.assign(new Error("Stock giveaway insuffisant."),{status:409});const duration=Math.max(5,Math.min(3600,Math.trunc(Number(durationSeconds)||60))),started=Date.now(),{d,state}=stateFor(live.id,true);state.pinnedProductId=product.id;state.giveaway={id:"GIV-"+crypto.randomUUID(),productId:product.id,productName:product.name,status:"running",entries:[],winner:null,stockConsumed:false,shippingCustomerAmount:0,shippingPayer:"streamer",shippingPolicy:"free_for_winner_bundle_if_purchase",startedAt:new Date(started).toISOString(),endsAt:new Date(started+duration*1000).toISOString()};state.updatedAt=nowIso();save(d);return structuredClone(state.giveaway);}
+export function startBuyerGiveaway(liveId,{productId,durationSeconds=60}={}){
+  const live=requireLive(liveId),product=productFor(live,productId);
+  if(Number(product.stock||0)<1)throw Object.assign(new Error("Stock giveaway insuffisant."),{status:409});
+  const paidStatuses=new Set(["paid","completed","authorized","authorised"]);
+  const seen=new Set(),entries=[];
+  for(const checkout of listLiveCheckouts({liveId:live.id})){
+    if(!paidStatuses.has(String(checkout.status||"").toLowerCase()))continue;
+    const email=publicEmail(checkout.customerEmail||"");
+    const name=clean(checkout.customerName||checkout.pseudo||"Acheteur",80)||"Acheteur";
+    const key=email||("name:"+name.toLowerCase());
+    if(!key||seen.has(key))continue;
+    seen.add(key);
+    entries.push({id:"ENT-"+crypto.randomUUID(),name,email,source:"paid_checkout",createdAt:nowIso()});
+  }
+  if(!entries.length)throw Object.assign(new Error("Aucun acheteur payé n’est éligible à ce Giveaway Acheteur."),{status:409});
+  const duration=Math.max(5,Math.min(3600,Math.trunc(Number(durationSeconds)||60))),started=Date.now(),{d,state}=stateFor(live.id,true);
+  state.pinnedProductId=product.id;
+  state.giveaway={
+    id:"GIV-"+crypto.randomUUID(),productId:product.id,productName:product.name,status:"running",
+    eligibility:"buyer",entries,winner:null,stockConsumed:false,shippingCustomerAmount:0,
+    shippingPayer:"streamer",shippingPolicy:"free_for_winner_bundle_if_purchase",
+    startedAt:new Date(started).toISOString(),endsAt:new Date(started+duration*1000).toISOString()
+  };
+  state.updatedAt=nowIso();save(d);return structuredClone(state.giveaway);
+}
+
 export function enterGiveaway(liveId,{name,email}={}){requireLive(liveId);const{d,state}=stateFor(liveId,true),g=state.giveaway;closeExpired(state);if(!g||g.status!=="running")throw Object.assign(new Error("Giveaway ferme."),{status:409});const e=publicEmail(email),n=clean(name,80)||"Participant";if(e&&g.entries.some((x)=>x.email===e))return{duplicate:true,entry:g.entries.find((x)=>x.email===e),giveaway:structuredClone(g)};const entry={id:"ENT-"+crypto.randomUUID(),name:n,email:e,createdAt:nowIso()};g.entries.push(entry);state.updatedAt=nowIso();save(d);return{entry,giveaway:structuredClone(g)};}
 export function drawGiveaway(liveId){requireLive(liveId);const{d,state}=stateFor(liveId,true),g=state.giveaway;if(!g)throw Object.assign(new Error("Aucun giveaway."),{status:404});if(!g.entries.length)throw Object.assign(new Error("Aucun participant."),{status:409});if(g.winner)return{duplicate:true,giveaway:structuredClone(g)};const index=crypto.randomInt(g.entries.length);g.winner=g.entries[index];g.status="ended";g.endedAt=nowIso();if(!g.stockConsumed){decrementLiveStock(liveId,g.productId,1);g.stockConsumed=true;}state.updatedAt=nowIso();save(d);return{giveaway:structuredClone(g)};}
 
