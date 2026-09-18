@@ -2,7 +2,7 @@
  * Authentification Cardoria — comptes clients/admin, sessions et 2FA facultatif.
  */
 import { Router } from "express";
-import { getUserById, getUserByEmail, createUser, authenticateUser, setTotpSecret, getTotpSecret, ADMIN_ROLES } from "../lib/auth/users.js";
+import { getUserById, getUserByEmail, createUser, authenticateUser, updateClientProfile, setTotpSecret, getTotpSecret, ADMIN_ROLES } from "../lib/auth/users.js";
 import { migrateAuth } from "../lib/auth/migrate.js";
 import { createSession, revokeSession, validateSession } from "../lib/auth/session.js";
 import { generateTotpSecret, verifyTotp, getTotpUri } from "../lib/auth/totp.js";
@@ -31,7 +31,14 @@ function validPassword(value) {
 }
 
 function publicUser(user) {
-  return { id: user.id, email: user.email, role: user.role, name: user.name, totpEnabled: !!user.totpEnabled };
+  return {
+    id: user.id, email: user.email, role: user.role, name: user.name, totpEnabled: !!user.totpEnabled,
+    firstName: user.firstName || "", lastName: user.lastName || "", phone: user.phone || "",
+    address: user.address || "", address2: user.address2 || "", postalCode: user.postalCode || "",
+    city: user.city || "", country: user.country || "France",
+    shippingPreference: user.shippingPreference || "mondial_relay",
+    relay: user.relay || { id: "", name: "", address: "", postalCode: "", city: "" }
+  };
 }
 
 function clientOrderStatus(status) {
@@ -104,11 +111,33 @@ router.post("/register", authRateLimit, (req, res) => {
   try {
     const email = normalizedEmail(req.body?.email);
     const password = String(req.body?.password || "");
-    const name = String(req.body?.name || "").trim().slice(0, 120);
+    const firstName = String(req.body?.firstName || "").trim().slice(0, 80);
+    const lastName = String(req.body?.lastName || "").trim().slice(0, 80);
+    const name = [firstName, lastName].filter(Boolean).join(" ") || String(req.body?.name || "").trim().slice(0, 120);
+    const phone = String(req.body?.phone || "").trim().slice(0, 40);
+    const address = String(req.body?.address || "").trim().slice(0, 300);
+    const address2 = String(req.body?.address2 || "").trim().slice(0, 300);
+    const postalCode = String(req.body?.postalCode || "").trim().slice(0, 20);
+    const city = String(req.body?.city || "").trim().slice(0, 120);
+    const country = String(req.body?.country || "France").trim().slice(0, 80) || "France";
+    const shippingPreference = req.body?.shippingPreference === "home" ? "home" : "mondial_relay";
+    const relay = {
+      id: String(req.body?.relay?.id || "").trim().slice(0, 80),
+      name: String(req.body?.relay?.name || "").trim().slice(0, 160),
+      address: String(req.body?.relay?.address || "").trim().slice(0, 300),
+      postalCode: String(req.body?.relay?.postalCode || "").trim().slice(0, 20),
+      city: String(req.body?.relay?.city || "").trim().slice(0, 120)
+    };
     if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ ok: false, error: "Email invalide." });
     if (!validPassword(password)) return res.status(400).json({ ok: false, error: "Mot de passe: 10 caracteres minimum avec lettres et chiffres." });
+    if (!firstName || !lastName) return res.status(400).json({ ok: false, error: "Prénom et nom obligatoires." });
+    if (!phone) return res.status(400).json({ ok: false, error: "Téléphone obligatoire." });
+    if (!address || !postalCode || !city) return res.status(400).json({ ok: false, error: "Adresse, code postal et ville obligatoires." });
+    if (shippingPreference === "mondial_relay" && (!relay.id || !relay.name || !relay.postalCode || !relay.city)) {
+      return res.status(400).json({ ok: false, error: "Veuillez sélectionner votre Point Relais Mondial Relay." });
+    }
     if (getUserByEmail(email)) return res.status(409).json({ ok: false, error: "Un compte existe deja pour cet email." });
-    const user = createUser({ email, password, role: "client", name });
+    const user = createUser({ email, password, role: "client", name, firstName, lastName, phone, address, address2, postalCode, city, country, shippingPreference, relay });
     const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"] });
     logAudit({ type: "auth", action: "client_register", user: email, detail: "marketplace" });
     res.status(201).json({ ok: true, token: session.token, expiresAt: session.expiresAt, user: publicUser(user) });
@@ -211,6 +240,19 @@ router.get("/me", (req, res) => {
   const user = validateSession(token);
   if (!user) return res.status(401).json({ ok: false, error: "Session expiree." });
   res.json({ ok: true, user });
+});
+
+router.patch("/profile", (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
+  const user = validateSession(token);
+  if (!user) return res.status(401).json({ ok: false, error: "Session expiree." });
+  if (user.role !== "client") return res.status(403).json({ ok: false, error: "Compte client requis." });
+  try {
+    const updated = updateClientProfile(user.id, req.body || {});
+    res.json({ ok: true, user: publicUser(updated) });
+  } catch (e) {
+    res.status(e.status || 400).json({ ok: false, error: e.message });
+  }
 });
 
 router.get("/orders", (req, res) => {
