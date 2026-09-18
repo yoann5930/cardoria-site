@@ -1,4 +1,4 @@
-#lasGiveFollow,#lasGiveBuyer{display:none!important}
+#lasGiveFollow{display:none!important}
 .live-studio-current,.live-studio-queue{min-width:0}
 .live-studio-quick{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px!important;margin:10px 0 12px}
 .live-studio-quick button{min-height:42px;width:100%;padding:8px 10px}
@@ -21,3 +21,5 @@
 .live-studio-file{max-height:330px;overflow:auto;padding-right:3px}
 @media(max-width:1100px){.live-studio-actions{grid-template-columns:1fr 1fr}.live-action-group:last-child{grid-column:1/-1}.live-studio-quick{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.live-studio-actions,.live-studio-quick,.live-energy-grid{grid-template-columns:1fr!important}.live-action-group:last-child{grid-column:auto}}
+
+#lasGiveBuyer{display:block}

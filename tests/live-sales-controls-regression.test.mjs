@@ -83,9 +83,11 @@ test('runtime mirrors stay byte-identical',()=>{
   assert.equal(controls,controlsMirror);
 });
 
-test('unimplemented social eligibility giveaways stay hidden',()=>{
+test('follow giveaway stays hidden while paid-buyer giveaway is enabled for admin',()=>{
   assert.match(controls,/follow\.hidden=true/);
-  assert.match(controls,/buyer\.hidden=true/);
+  assert.match(controls,/buyer\.onclick=startBuyerGiveaway/);
+  assert.match(controls,/giveaway\/buyer\/start/);
+  assert.match(adminRoutes,/giveaway\/buyer\/start/);
 });
 
 test('no MutationObserver loop is reintroduced',()=>{
