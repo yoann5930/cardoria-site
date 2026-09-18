@@ -5,6 +5,7 @@ on:
     paths:
       - backend/lib/seo/sitemap.js
       - tests/seo-sitemap-lastmod.test.mjs
+      - scripts/audit-public-seo.mjs
       - .github/workflows/seo-sitemap-lastmod-ci.yml
 
 permissions:
@@ -21,7 +22,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: backend/.node-version
-      - name: Check production module syntax
-        run: node --check backend/lib/seo/sitemap.js
+      - name: Check production module and audit syntax
+        run: |
+          node --check backend/lib/seo/sitemap.js
+          node --check scripts/audit-public-seo.mjs
       - name: Test sitemap dates, partitioning and public URLs
         run: node --experimental-vm-modules --test tests/seo-sitemap-lastmod.test.mjs
+  public-seo-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: backend/.node-version
+      - name: Read-only public SEO diagnostic (not an indexing guarantee)
+        run: node scripts/audit-public-seo.mjs
