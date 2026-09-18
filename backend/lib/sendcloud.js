@@ -96,16 +96,20 @@ export async function getServicePoint(servicePointId){
   const payload=await api("/service-points/"+encodeURIComponent(String(id)));
   return servicePointView(payload?.data||payload);
 }
-export async function resolveShippingOption({carrierCode,toCountry="FR",fromCountry="FR",weightGrams=1}={}){
-  const payload=await api("/fetch-shipping-options",{method:"POST",body:{
+export async function resolveShippingOption({carrierCode,toCountry="FR",fromCountry="FR",weightGrams=1,servicePointId=null}={}){
+  const body={
     from_country_code:safeCountry(fromCountry),
     to_country_code:safeCountry(toCountry),
-    weight:{value:(Math.max(1,Number(weightGrams)||1)/1000).toFixed(3),unit:"kg"},
-    carrier_code:clean(carrierCode,80)
-  }});
+    parcels:[{weight:{value:(Math.max(1,Number(weightGrams)||1)/1000).toFixed(3),unit:"kg"}}],
+    carrier_code:clean(carrierCode,80),
+    calculate_quotes:false
+  };
+  if(servicePointId)body.to_service_point={id:Number(servicePointId)};
+  if(carrierCode==="mondial_relay")body.functionalities={last_mile:"service_point"};
+  const payload=await api("/shipping-options",{method:"POST",body});
   const options=Array.isArray(payload?.data)?payload.data:[];
   const servicePoint=options.filter((o)=>o?.functionalities?.last_mile==="service_point"||o?.requirements?.is_service_point_required===true);
-  const selected=(carrierCode==="mondial_relay"?servicePoint[0]:options.find((o)=>o?.functionalities?.last_mile!=="service_point"))||options[0];
+  const selected=(carrierCode==="mondial_relay"?servicePoint[0]:options.find((o)=>o?.functionalities?.last_mile!=="service_point"&&o?.requirements?.is_service_point_required!==true))||options[0];
   if(!selected?.code)throw Object.assign(new Error("Aucune option Sendcloud disponible pour ce transporteur et ce poids."),{status:409,code:"SENDCLOUD_SHIPPING_OPTION_UNAVAILABLE"});
   return{code:selected.code,name:selected.name||selected.product?.name||"",contractId:selected.contract?.id||null,carrierCode:selected.carrier?.code||carrierCode};
 }
@@ -117,7 +121,8 @@ export async function createSendcloudShipment({
     carrierCode,
     toCountry:toAddress?.countryCode||"FR",
     fromCountry:fromAddress?.countryCode||"FR",
-    weightGrams
+    weightGrams,
+    servicePointId
   });
   const shipWith={type:"shipping_option_code",properties:{shipping_option_code:option.code}};
   if(option.contractId)shipWith.properties.contract_id=option.contractId;
