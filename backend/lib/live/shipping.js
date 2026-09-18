@@ -64,4 +64,4 @@ export function quoteLiveShipping({liveId,customerEmail,productId,qty=1,excludeC
   const target=money(pack?.price||0),charged=money(alreadyCharged),increment=money(Math.max(0,target-charged));
   return{shippingAmount:increment,alreadyCharged:charged,totalShippingTarget:target,totalWeightGrams:totalWeight,currentWeightGrams:currentWeight,giveawayWeightGrams:giveawayWeight,pack,bundled:true};
 }
-export function giveawayShippingPolicy(){return{participantPays:0,winnerPays:0,withoutPurchase:"streamer",withPurchase:"bundle_with_first_purchase",subsequentPurchases:"increment_only_if_pack_changes"};}
+export function giveawayShippingPolicy(){return{participantPays:0,winnerPays:0,withoutPurchase:"streamer",withPurchaseMinimumEur:10,withQualifyingPurchase:"buyer_pays_shipping_once",subsequentPurchases:"no_additional_shipping_same_live",newLive:"shipping_resets"};}
