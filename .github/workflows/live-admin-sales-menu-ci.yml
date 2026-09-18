@@ -1,0 +1,36 @@
+name: Cardoria Live Admin Sales Menu CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  live-admin-sales-menu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax checks
+        run: |
+          node --check backend/lib/live/actions.js
+          node --check backend/routes/live-admin-studio.js
+          node --check js/live-studio-actions-ui.js
+          node --check js/live-studio-sales-controls.js
+      - name: Sales menu regression and buyer giveaway tests
+        run: |
+          node --test tests/live-admin-sales-menu.test.mjs
+          node --test tests/live-sales-controls-regression.test.mjs
+      - name: Production route smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          for route in /admin-live.html /js/live-studio-actions-ui.js /js/live-studio-sales-controls.js /css/live-studio-clean.css; do
+            code=$(curl -L -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://www.cardoriashop.fr${route}")
+            echo "${route} => ${code}"
+            case "${code}" in 200|204) ;; *) exit 1 ;; esac
+          done
