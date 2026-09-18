@@ -52,6 +52,7 @@
     if (qs("clientProfileCountry")) qs("clientProfileCountry").value = user.country || "FR";
     selectedRelay = user.relay && user.relay.id ? { ...user.relay } : null;
     renderRelay();
+    loadLiveShipments();
   }
 
   function showLoggedOut() {
@@ -199,6 +200,29 @@
       setMessage("Adresse et Point Relais enregistrés.", "success");
     } catch (e) {
       setMessage(e.message, "error");
+    }
+  }
+
+  async function loadLiveShipments() {
+    const host = qs("clientLiveShipments");
+    if (!host || !getToken()) return;
+    try {
+      const data = await api("/api/live/my-shipments", { method: "GET" });
+      const items = Array.isArray(data.shipments) ? data.shipments : [];
+      if (!items.length) {
+        host.innerHTML = "<p>Aucune expédition Live.</p>";
+        return;
+      }
+      host.innerHTML = items.map((s) => {
+        const tracking = s.trackingUrl
+          ? "<a target='_blank' rel='noopener' href='" + String(s.trackingUrl).replace(/"/g, "&quot;") + "'>" + (s.trackingNumber || "Suivre le colis") + "</a>"
+          : (s.trackingNumber || "Suivi en attente");
+        return "<div style='border:1px solid rgba(212,175,55,.25);padding:10px;margin:8px 0;border-radius:8px'><strong>" +
+          (s.carrier || "Expédition Live") + "</strong><br>Statut : " + (s.status || "En préparation") +
+          "<br>Suivi : " + tracking + "</div>";
+      }).join("");
+    } catch (e) {
+      host.textContent = "Suivi Live indisponible : " + e.message;
     }
   }
 
