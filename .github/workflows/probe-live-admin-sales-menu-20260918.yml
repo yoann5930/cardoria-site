@@ -1,0 +1,35 @@
+name: Production Probe Live Admin Sales Menu 20260918
+
+on:
+  push:
+    branches:
+      - ops/probe-live-admin-sales-menu-20260918
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify production Admin Live menu assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://www.cardoriashop.fr"
+          html=$(curl -fsSL --max-time 30 "$base/admin-live.html")
+          controls=$(curl -fsSL --max-time 30 "$base/js/live-studio-sales-controls.js")
+          ui=$(curl -fsSL --max-time 30 "$base/js/live-studio-actions-ui.js")
+          css=$(curl -fsSL --max-time 30 "$base/css/live-studio-clean.css")
+          printf '%s' "$html" | grep -F "20260918-sales-menu-final"
+          printf '%s' "$controls" | grep -F "startBuyerGiveaway"
+          printf '%s' "$controls" | grep -F "giveaway/buyer/start"
+          printf '%s' "$controls" | grep -F '["lasGiveaway","lasGiveBuyer"]'
+          printf '%s' "$ui" | grep -F "Giveaway Acheteur"
+          printf '%s' "$ui" | grep -F "Réservé aux acheteurs ayant un paiement validé"
+          printf '%s' "$css" | grep -F "#lasGiveFollow{display:none!important}"
+          if printf '%s' "$css" | grep -F "#lasGiveFollow,#lasGiveBuyer"; then
+            echo "Buyer giveaway is still hidden by production CSS."
+            exit 1
+          fi
+          echo "PRODUCTION LIVE ADMIN SALES MENU OK"
