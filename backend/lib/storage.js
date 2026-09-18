@@ -17,7 +17,9 @@ const FILES = {
   "marketplace-captured-sales": "marketplace-captured-sales.json",
   "live-sessions.json": "live-sessions.json",
   "live-realtime-publishers.json": "live-realtime-publishers.json",
-  "live-seller-follows": "live-seller-follows.json"
+  "live-seller-follows": "live-seller-follows.json",
+  "live-shipments": "live-shipments.json",
+  "sendcloud-webhooks": "sendcloud-webhooks.json"
 };
 
 function ensureDir() {
