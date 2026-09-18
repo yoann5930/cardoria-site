@@ -9,6 +9,21 @@
   var id = params.get("id");
   var root = document.getElementById("cardPage");
   var currentCardId = null;
+  var serverSeo = !!document.querySelector('meta[name="cardoria:server-seo"][content="true"]');
+  if (!root || !E) return;
+
+  function escape(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
+    });
+  }
+
+  function safeImage(value) {
+    try {
+      var url = new URL(String(value || ""));
+      return /^(https?:)$/.test(url.protocol) && !url.username && !url.password ? url.href : "";
+    } catch (error) { return ""; }
+  }
 
   function loadPriceHistory(cardId, period) {
     currentCardId = cardId;
@@ -25,7 +40,7 @@
             btn.onclick = function () { loadPriceHistory(cardId, btn.dataset.period); };
           });
         }
-      });
+      }).catch(function () { /* Optional history must not erase the card. */ });
   }
 
   function drawHistoryChart(points) {
@@ -55,41 +70,46 @@
         if (!box || !d.trends) return;
         var mine = d.trends.filter(function (t) { return t.cardId === currentCardId; })[0];
         if (mine) box.innerHTML = "<p style='margin-top:12px'>" + trendLabel(mine.direction, mine.changePercent) + " sur 30 jours</p>";
-      });
+      }).catch(function () { /* Optional trend data. */ });
   }
 
   function trendLabel(t, p) {
-    var cls = t || "stable";
-    var txt = cls === "up" ? "Hausse " + p + " %" : cls === "down" ? "Baisse " + Math.abs(p) + " %" : "Stable";
+    var cls = ["up", "down", "stable"].indexOf(t) >= 0 ? t : "stable";
+    var percent = Number.isFinite(Number(p)) ? Number(p) : 0;
+    var txt = cls === "up" ? "Hausse " + percent + " %" : cls === "down" ? "Baisse " + Math.abs(percent) + " %" : "Stable";
     return '<span class="engine-trend ' + cls + '">' + txt + "</span>";
   }
 
   function renderCard(card) {
     applySeo(card);
-    var img = card.imageHd || card.imageThumb
-      ? '<img src="' + card.imageHd + '" alt="' + card.name + '" loading="eager" fetchpriority="high" width="360" height="504">'
-      : '<div class="placeholder">🃏</div>';
+    var image = safeImage(card.imageHd) || safeImage(card.imageThumb);
+    var img = image
+      ? '<img src="' + escape(image) + '" alt="' + escape(card.name) + '" loading="eager" fetchpriority="high" width="360" height="504">'
+      : '<div class="placeholder">Visuel indisponible</div>';
+    var prices = card.prices || {};
+    var licenseSlug = card.license || card.licenseSlug || "pokemon";
 
     var sales = (card.salesHistory || []).map(function (s) {
-      return "<tr><td>" + s.date + "</td><td>" + E.euro(s.price) + "</td><td>" + (s.condition || "—") + "</td><td>" + (s.channel || "Cardoria") + "</td></tr>";
+      return "<tr><td>" + escape(s.date) + "</td><td>" + escape(E.euro(s.price)) + "</td><td>" + escape(s.condition || "—") + "</td><td>" + escape(s.channel || "Cardoria") + "</td></tr>";
     }).join("") || "<tr><td colspan='4'>Aucune vente enregistrée</td></tr>";
 
     root.innerHTML =
-      '<nav class="engine-breadcrumb"><a href="/">Accueil</a> › <a href="/pages/licences/' + card.license + '/">' + (card.licenseName || card.license) + '</a> › ' + card.name + "</nav>" +
-      "<h1>" + card.name + "</h1>" +
+      '<nav class="engine-breadcrumb"><a href="/">Accueil</a> › <a href="/pages/licences/' + encodeURIComponent(licenseSlug) + '/">' + escape(card.licenseName || licenseSlug) + '</a> › ' + escape(card.name) + "</nav>" +
+      "<h1>" + escape(card.name) + "</h1>" +
       '<div class="engine-card-layout">' +
       '<div class="engine-card-visual">' + img + "</div>" +
       "<div>" +
       '<div class="engine-meta-grid">' +
       meta("Extension", card.extension) + meta("Numéro", card.number) + meta("Rareté", card.rarity) + meta("Illustrateur", card.illustration) +
-      meta("État réf.", card.condition) + meta("Licence", card.licenseName || card.license) +
+      meta("État réf.", card.condition) + meta("Licence", card.licenseName || licenseSlug) +
       "</div>" +
       '<div class="engine-prices">' +
-      priceBox("Prix moyen", card.prices.avg) +
-      priceBox("Prix bas", card.prices.low) +
-      priceBox("Prix haut", card.prices.high) +
-      priceBox("Prix conseillé", card.prices.recommended, true) +
+      priceBox("Prix moyen", prices.avg) +
+      priceBox("Prix bas", prices.low) +
+      priceBox("Prix haut", prices.high) +
+      priceBox("Prix conseillé", prices.recommended, true) +
       "</div>" +
+      '<p class="small">Données de référence lorsqu’elles sont disponibles, et non une offre de vente. La valeur dépend notamment de l’état, de la langue et de la version de la carte.</p>' +
       trendLabel(card.marketTrend, card.trendPercent) +
       '<div id="cardIntelligenceBox" style="margin-top:18px"></div>' +
       '<div class="actions" style="margin-top:18px"><a class="btn btn-primary" href="/estimation.html?card=' + encodeURIComponent(card.id) + '">Faire estimer cette carte</a> <a class="btn btn-secondary" href="/rachat-cartes.html">Vendre à Cardoria</a></div>' +
@@ -111,22 +131,28 @@
       .then(function (d) {
         if (!d.ok || !d.intelligence) return;
         box.innerHTML = CardoriaAI.renderIntelligencePanel(d.intelligence);
-      });
+      }).catch(function () { /* Optional enrichment. */ });
   }
 
   function meta(label, val) {
-    return '<div class="engine-meta-item"><label>' + label + '</label><strong>' + (val || "—") + "</strong></div>";
+    return '<div class="engine-meta-item"><label>' + escape(label) + '</label><strong>' + escape(val || "Non renseigné") + "</strong></div>";
   }
 
   function priceBox(label, val, rec) {
-    return '<div class="engine-price-box' + (rec ? " recommended" : "") + '"><label>' + label + "</label><strong>" + E.euro(val) + "</strong></div>";
+    var amount = (typeof val === "number" || typeof val === "string") ? Number(val) : NaN;
+    var text = Number.isFinite(amount) && amount > 0 ? E.euro(amount) : "Non disponible";
+    return '<div class="engine-price-box' + (rec ? " recommended" : "") + '"><label>' + escape(label) + "</label><strong>" + escape(text) + "</strong></div>";
   }
 
   function applySeo(card) {
+    // The server owns canonical metadata and JSON-LD for dynamic card URLs.
+    if (serverSeo) return;
     var title = card.meta?.title || card.name + " — " + card.extension + " | Cardoria";
-    var desc = card.meta?.description || "Prix " + E.euro(card.prices.recommended) + " pour " + card.name + ". Fiche complète Cardoria.";
-    var siteUrl = window.CARDORIA_SEO?.siteUrl || location.origin || "https://www.cardoriashop.fr";
-    var url = siteUrl.replace(/\/$/, "") + "/cartes/" + encodeURIComponent(card.license) + "/" + encodeURIComponent(card.slug);
+    var desc = card.meta?.description || "Fiche " + card.name + " : extension, numéro, rareté et données de prix disponibles sur Cardoria.";
+    var siteUrl = (window.CARDORIA_SEO?.siteUrl || location.origin || "https://www.cardoriashop.fr").replace(/\/$/, "");
+    var licenseSlug = card.license || card.licenseSlug || "pokemon";
+    var url = siteUrl + "/cartes/" + encodeURIComponent(licenseSlug) + "/" + encodeURIComponent(card.slug);
+    var image = safeImage(card.imageHd) || safeImage(card.imageThumb);
     document.title = title;
     setMeta("description", desc);
     setMeta("og:title", title, "property");
@@ -135,41 +161,37 @@
     setMeta("twitter:title", title);
     setMeta("twitter:description", desc);
     setLink("canonical", url);
-    if (card.imageHd) setMeta("og:image", card.imageHd, "property");
+    if (image) setMeta("og:image", image, "property");
 
-    var ldProduct = document.createElement("script");
+    var ldProduct = document.getElementById("cardoria-reference-product") || document.createElement("script");
+    ldProduct.id = "cardoria-reference-product";
     ldProduct.type = "application/ld+json";
+    // Market reference prices and past sales are not current sale offers.
     ldProduct.textContent = JSON.stringify({
       "@context": "https://schema.org",
       "@type": "Product",
       name: card.name,
       description: desc,
-      image: card.imageHd || undefined,
-      brand: { "@type": "Brand", name: card.licenseName || card.license },
-      sku: card.number,
-      url: url,
-      offers: {
-        "@type": "AggregateOffer",
-        priceCurrency: "EUR",
-        lowPrice: card.prices.low,
-        highPrice: card.prices.high,
-        offerCount: card.salesCount || 1
-      }
+      image: image || undefined,
+      brand: { "@type": "Brand", name: card.licenseName || licenseSlug },
+      sku: card.number || card.id,
+      url: url
     });
-    document.head.appendChild(ldProduct);
+    if (!ldProduct.parentNode) document.head.appendChild(ldProduct);
 
-    var ldCrumb = document.createElement("script");
+    var ldCrumb = document.getElementById("cardoria-reference-breadcrumb") || document.createElement("script");
+    ldCrumb.id = "cardoria-reference-breadcrumb";
     ldCrumb.type = "application/ld+json";
     ldCrumb.textContent = JSON.stringify({
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "Accueil", item: siteUrl + "/" },
-        { "@type": "ListItem", position: 2, name: card.licenseName || card.license, item: siteUrl + "/pages/licences/" + card.license + "/" },
+        { "@type": "ListItem", position: 2, name: card.licenseName || licenseSlug, item: siteUrl + "/pages/licences/" + encodeURIComponent(licenseSlug) + "/" },
         { "@type": "ListItem", position: 3, name: card.name, item: url }
       ]
     });
-    document.head.appendChild(ldCrumb);
+    if (!ldCrumb.parentNode) document.head.appendChild(ldCrumb);
   }
 
   function setMeta(name, content, attr) {
@@ -193,6 +215,8 @@
       if (!card) { root.innerHTML = "<div class='panel'><h1>Carte introuvable</h1><p><a href='/licence.html'>Retour au catalogue</a></p></div>"; return; }
       renderCard(card);
     }).catch(function () {
+      // A temporary API failure must not remove the useful server-rendered page.
+      if (root.getAttribute("data-server-rendered") === "true") return;
       root.innerHTML = "<div class='panel'><h1>Erreur de chargement</h1><p>Vérifiez la connexion au moteur Cardoria.</p></div>";
     });
   }
