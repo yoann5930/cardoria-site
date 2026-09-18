@@ -18,15 +18,24 @@ export function getUserById(id) {
   return row ? mapUser(row) : null;
 }
 
-export function createUser({ email, password, role = "client", name = "" }) {
+export function createUser({ email, password, role = "client", name = "", firstName = "", lastName = "", phone = "", address = "", address2 = "", postalCode = "", city = "", country = "France", shippingPreference = "mondial_relay", relay = {} }) {
   if (!ROLES.includes(role)) throw new Error("Rôle invalide");
   const db = getDb();
   const now = new Date().toISOString();
   const id = makeId("usr");
   db.prepare(`
-    INSERT INTO auth_users (id, email, password_hash, role, name, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, email.toLowerCase(), hashPassword(password), role, name, now, now);
+    INSERT INTO auth_users (
+      id, email, password_hash, role, name, first_name, last_name, phone,
+      address_line1, address_line2, postal_code, city, country, shipping_preference,
+      relay_id, relay_name, relay_address, relay_postal_code, relay_city, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, email.toLowerCase(), hashPassword(password), role, name,
+    firstName, lastName, phone, address, address2, postalCode, city, country || "France",
+    shippingPreference || "mondial_relay",
+    relay.id || "", relay.name || "", relay.address || "", relay.postalCode || "", relay.city || "",
+    now, now
+  );
   return getUserById(id);
 }
 
@@ -46,6 +55,33 @@ export function authenticateUser(email, password) {
 
   clearFailedLogin(normalizedEmail);
   return mapUser(row, true);
+}
+
+export function updateClientProfile(userId, patch = {}) {
+  const db = getDb();
+  const current = getUserById(userId);
+  if (!current) throw Object.assign(new Error("Utilisateur introuvable"), { status: 404 });
+  const firstName = String(patch.firstName ?? current.firstName ?? "").trim().slice(0, 80);
+  const lastName = String(patch.lastName ?? current.lastName ?? "").trim().slice(0, 80);
+  const phone = String(patch.phone ?? current.phone ?? "").trim().slice(0, 40);
+  const address = String(patch.address ?? current.address ?? "").trim().slice(0, 300);
+  const address2 = String(patch.address2 ?? current.address2 ?? "").trim().slice(0, 300);
+  const postalCode = String(patch.postalCode ?? current.postalCode ?? "").trim().slice(0, 20);
+  const city = String(patch.city ?? current.city ?? "").trim().slice(0, 120);
+  const country = String(patch.country ?? current.country ?? "France").trim().slice(0, 80) || "France";
+  const shippingPreference = patch.shippingPreference === "home" ? "home" : "mondial_relay";
+  const relay = patch.relay || current.relay || {};
+  db.prepare(`
+    UPDATE auth_users SET name=?, first_name=?, last_name=?, phone=?, address_line1=?, address_line2=?,
+      postal_code=?, city=?, country=?, shipping_preference=?, relay_id=?, relay_name=?, relay_address=?,
+      relay_postal_code=?, relay_city=?, updated_at=? WHERE id=?
+  `).run(
+    [firstName, lastName].filter(Boolean).join(" ") || current.name || "",
+    firstName, lastName, phone, address, address2, postalCode, city, country, shippingPreference,
+    relay.id || "", relay.name || "", relay.address || "", relay.postalCode || "", relay.city || "",
+    new Date().toISOString(), userId
+  );
+  return getUserById(userId);
 }
 
 export function updatePassword(userId, newPassword) {
@@ -122,7 +158,23 @@ function mapUser(row, includeHash = false) {
     active: !!row.active,
     totpEnabled: !!row.totp_enabled,
     createdAt: row.created_at,
-    lastLoginAt: row.last_login_at
+    lastLoginAt: row.last_login_at,
+    firstName: row.first_name || "",
+    lastName: row.last_name || "",
+    phone: row.phone || "",
+    address: row.address_line1 || "",
+    address2: row.address_line2 || "",
+    postalCode: row.postal_code || "",
+    city: row.city || "",
+    country: row.country || "France",
+    shippingPreference: row.shipping_preference || "mondial_relay",
+    relay: {
+      id: row.relay_id || "",
+      name: row.relay_name || "",
+      address: row.relay_address || "",
+      postalCode: row.relay_postal_code || "",
+      city: row.relay_city || ""
+    }
   };
   if (includeHash) u.passwordHash = row.password_hash;
   return u;
