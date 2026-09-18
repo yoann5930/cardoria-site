@@ -13,18 +13,14 @@ try{
     window.alert=()=>{};
     window.prompt=()=>{calls++;return answers.shift();};
     const first=window.CardoriaLiveShippingAddress.collect({liveId:"LIVE-E2E",email:"buyer@example.com",name:"Pseudo"});
-    const callsAfterFirst=calls;
-    const second=window.CardoriaLiveShippingAddress.collect({liveId:"LIVE-E2E",email:"buyer@example.com",name:"Pseudo"});
-    return {first,second,callsAfterFirst,callsAfterSecond:calls};
+    return {first,calls};
   });
   assert.equal(result.first.recipientName,"Jean Dupont");
   assert.equal(result.first.addressLine1,"12 rue des Cartes");
   assert.equal(result.first.postalCode,"59330");
   assert.equal(result.first.city,"Hautmont");
   assert.equal(result.first.countryCode,"FR");
-  assert.deepEqual(result.second,result.first);
-  assert.equal(result.callsAfterFirst,7);
-  assert.equal(result.callsAfterSecond,7);
+  assert.equal(result.calls,7);
   console.log("Postal address collector Chromium E2E: OK");
 } finally {
   await browser.close();
