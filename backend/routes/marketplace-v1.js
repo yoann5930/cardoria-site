@@ -5,7 +5,7 @@ import { Router } from "express";
 import { getCart, addToCart, updateCartQty, removeFromCart, clearCart } from "../lib/marketplace/v1/cart.js";
 import { createListingV1, updateListingV1, getListingV1, getListingV1BySlug, deleteListingV1, listSellerListings, getListingsSitemapEntries } from "../lib/marketplace/v1/listings.js";
 import { searchListings } from "../lib/marketplace/listings.js";
-import { getSeller, getSellerReviews } from "../lib/marketplace/sellers.js";
+import { getSeller, getSellerReviews, getSellerSenderProfile, updateSellerSenderProfile } from "../lib/marketplace/sellers.js";
 import { assertSellerSession, assertSellerOwnsListing, assertBuyerOwnsOrder, assertOrderParticipant, assertSellerOwnsOrder, getMarketplaceUser, MarketplaceAuthError } from "../lib/marketplace/v1/security.js";
 import { getOrdersBySeller, getOrdersByBuyer, updateOrderStatus } from "../lib/marketplace/orders.js";
 import { createInvoiceForOrder, getInvoiceHtmlByOrder } from "../lib/marketplace/v1/invoices.js";
@@ -62,6 +62,20 @@ router.get("/v1/sellers/:id/public", (req, res) => {
   const reviews = getSellerReviews(seller.id, 20).map((review) => ({ rating: review.rating, comment: review.comment || "", createdAt: review.createdAt }));
   res.json({ ok: true, seller: publicSeller(seller), listings, reviews });
 });
+router.get("/v1/sellers/:id/sender-profile", (req, res) => {
+  try {
+    const seller = assertSellerSession(req, req.params.id);
+    res.json({ ok: true, sender: getSellerSenderProfile(seller.id), ready: !!seller.senderReady });
+  } catch (e) { fail(res, e, 403); }
+});
+router.put("/v1/sellers/:id/sender-profile", (req, res) => {
+  try {
+    const seller = assertSellerSession(req, req.params.id);
+    const updated = updateSellerSenderProfile(seller.id, req.body || {});
+    res.json({ ok: true, sender: updated.sender, ready: !!updated.senderReady });
+  } catch (e) { fail(res, e, 400); }
+});
+
 router.get("/v1/sellers/:id/subscription", (req, res) => {
   try { const seller = assertSellerSession(req, req.params.id); res.json({ ok: true, subscription: getSellerPlanState(seller.id) }); }
   catch (e) { fail(res, e, 403); }
