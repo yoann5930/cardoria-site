@@ -12,6 +12,7 @@ import liveAdminStudioRoutes from "./live-admin-studio.js";
 import { isRealtimePublished } from "../lib/live/realtime-sessions.js";
 import { createLiveSession, getLiveSession, listLiveCheckouts, listLiveSessions, publicLiveSession, resolveAdminLiveAccess, setLiveStatus, updateLiveSession } from "../lib/live/sessions.js";
 import { archiveLiveSession, getLiveArchive, listLiveArchives } from "../lib/live/archive.js";
+import { createLiveShipmentsForLive, listLiveShipments } from "../lib/live/shipments.js";
 
 const router = Router();
 router.use("/webrtc", liveRealtimeRoutes);
@@ -67,14 +68,39 @@ router.get("/sessions/:id/admin-access", (req, res) => {
   if (!access) return res.status(401).json({ ok: false, error: "Accès admin Live refusé." });
   res.json({ ok: true, accessRole: access.accessRole, accessContext: access.accessContext, title: safePublicText(session.title), ownerRole: session.ownerRole, paymentProvider: session.paymentProvider, session: publicRealtimeSession(session) });
 });
-router.post("/checkout", async (req, res) => { try { const body = req.body || {}; const checkout = await createLiveCheckout({ liveId: body.liveId, productId: body.productId, qty: body.qty, spotLabel: body.spotLabel, customerEmail: body.customerEmail, customerName: body.customerName, shippingAddress: body.shippingAddress, requireShippingAddress: true, requestedProvider: body.provider, requestedAmount: body.amount ?? body.total, successUrl: body.successUrl, cancelUrl: body.cancelUrl }); res.json({ ok: true, provider: checkout.provider, channel: checkout.channel, checkout }); } catch (error) { fail(res, error); } });
-router.post("/checkout/plan", (req, res) => { try { const body = req.body || {}; const checkout = planLiveCheckout({ liveId: body.liveId, productId: body.productId, qty: body.qty, spotLabel: body.spotLabel, customerEmail: body.customerEmail, customerName: body.customerName, shippingAddress: body.shippingAddress, requestedProvider: body.provider, requestedAmount: body.amount ?? body.total }); res.json({ ok: true, provider: checkout.provider, channel: checkout.channel, checkout }); } catch (error) { fail(res, error); } });
+router.post("/checkout", async (req, res) => { try { const body = req.body || {}; const checkout = await createLiveCheckout({ liveId: body.liveId, productId: body.productId, qty: body.qty, spotLabel: body.spotLabel, customerEmail: body.customerEmail, customerName: body.customerName, shippingAddress: body.shippingAddress, servicePoint: body.servicePoint, requireShippingAddress: true, requestedProvider: body.provider, requestedAmount: body.amount ?? body.total, successUrl: body.successUrl, cancelUrl: body.cancelUrl }); res.json({ ok: true, provider: checkout.provider, channel: checkout.channel, checkout }); } catch (error) { fail(res, error); } });
+router.post("/checkout/plan", (req, res) => { try { const body = req.body || {}; const checkout = planLiveCheckout({ liveId: body.liveId, productId: body.productId, qty: body.qty, spotLabel: body.spotLabel, customerEmail: body.customerEmail, customerName: body.customerName, shippingAddress: body.shippingAddress, servicePoint: body.servicePoint, requestedProvider: body.provider, requestedAmount: body.amount ?? body.total }); res.json({ ok: true, provider: checkout.provider, channel: checkout.channel, checkout }); } catch (error) { fail(res, error); } });
 router.get("/seller/sessions", (req, res) => { try { const actor = sellerActor(req); res.json({ ok: true, provider: "paypal", sessions: listLiveSessions({ ownerRole: "seller", ownerId: actor.sellerId }).map(publicLiveSession) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 401); } });
 router.post("/seller/sessions", (req, res) => { try { const actor = sellerActor(req); const body = req.body || {}; const session = createLiveSession({ title: body.title, ownerRole: "seller", ownerId: actor.sellerId, ownerEmail: actor.email, products: body.products, scheduledAt: body.scheduledAt, actor }); logAudit({ type: "live", action: "seller_live_created", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
 router.patch("/seller/sessions/:id", (req, res) => { try { const actor = sellerActor(req); const session = updateLiveSession(req.params.id, req.body || {}, actor); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
 router.post("/seller/sessions/:id/start", (req, res) => { try { const actor = sellerActor(req); assertSellerLiveCanStart(actor, req.params.id); const session = setLiveStatus(req.params.id, "live", actor); logAudit({ type: "live", action: "seller_live_started", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
-router.post("/seller/sessions/:id/stop", (req, res) => { try { const actor = sellerActor(req); const session = setLiveStatus(req.params.id, "ended", actor); const archive=archiveLiveSession(session.id); logAudit({ type: "live", action: "seller_live_stopped", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session), archive }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
+router.post("/seller/sessions/:id/stop", async (req, res) => { try {
+  const actor = sellerActor(req);
+  const session = setLiveStatus(req.params.id, "ended", actor);
+  const archive=archiveLiveSession(session.id);
+  let shipping={created:[],errors:[],total:0};
+  try { shipping=await createLiveShipmentsForLive(session.id); }
+  catch (shippingError) { shipping.errors=[{code:shippingError?.code||"",error:shippingError?.message||"Création des expéditions impossible."}]; }
+  logAudit({ type: "live", action: "seller_live_stopped", user: actor.email || actor.sellerId, detail: session.id });
+  res.json({ ok: true, provider: "paypal", session: publicLiveSession(session), archive, shipping });
+} catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
 router.get("/seller/archives", (req, res) => { try { const actor=sellerActor(req); res.json({ok:true,provider:"paypal",archives:listLiveArchives({ownerId:actor.sellerId,ownerRole:"seller"})}); } catch(error){ fail(res,error,error instanceof MarketplaceAuthError?error.status:401); } });
 router.get("/seller/archives/:id", (req,res)=>{ try { const actor=sellerActor(req),archive=getLiveArchive(req.params.id); if(!archive||archive.ownerRole!=="seller"||String(archive.ownerId)!==String(actor.sellerId))return res.status(404).json({ok:false,error:"Archive Live introuvable."}); res.json({ok:true,provider:"paypal",archive}); } catch(error){ fail(res,error,error instanceof MarketplaceAuthError?error.status:401); } });
 router.get("/seller/checkouts", (req, res) => { try { const actor = sellerActor(req); res.json({ ok: true, provider: "paypal", checkouts: listLiveCheckouts({ ownerId: actor.sellerId }) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 401); } });
+router.get("/seller/shipments", (req, res) => { try {
+  const actor=sellerActor(req);
+  res.json({ok:true,shipments:listLiveShipments({sellerId:actor.sellerId,liveId:String(req.query.liveId||"")})});
+} catch(error){ fail(res,error,error instanceof MarketplaceAuthError?error.status:401); } });
+router.post("/seller/sessions/:id/shipments/create", async (req,res)=>{ try {
+  const actor=sellerActor(req),session=getLiveSession(req.params.id);
+  if(!session||session.ownerRole!=="seller"||String(session.ownerId)!==String(actor.sellerId))return res.status(404).json({ok:false,error:"Live introuvable."});
+  const shipping=await createLiveShipmentsForLive(session.id);
+  res.json({ok:true,shipping});
+} catch(error){ fail(res,error,error instanceof MarketplaceAuthError?error.status:400); } });
+router.get("/my-shipments", (req,res)=>{ try {
+  const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"")||String(req.headers["x-session-token"]||"");
+  const user=validateSession(token);
+  if(!user||user.role!=="client")return res.status(401).json({ok:false,error:"Connexion client requise."});
+  res.json({ok:true,shipments:listLiveShipments({buyerEmail:user.email})});
+} catch(error){ fail(res,error,401); } });
 export default router;
