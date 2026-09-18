@@ -75,6 +75,27 @@ export function migrateAuth() {
     CREATE INDEX IF NOT EXISTS idx_magic_tokens_user ON auth_magic_tokens(user_id);
   `);
 
+  const userColumns = new Set(db.prepare("PRAGMA table_info(auth_users)").all().map((row) => row.name));
+  const profileColumns = [
+    ["first_name", "TEXT DEFAULT ''"],
+    ["last_name", "TEXT DEFAULT ''"],
+    ["phone", "TEXT DEFAULT ''"],
+    ["address_line1", "TEXT DEFAULT ''"],
+    ["address_line2", "TEXT DEFAULT ''"],
+    ["postal_code", "TEXT DEFAULT ''"],
+    ["city", "TEXT DEFAULT ''"],
+    ["country", "TEXT DEFAULT 'France'"],
+    ["shipping_preference", "TEXT DEFAULT 'mondial_relay'"],
+    ["relay_id", "TEXT DEFAULT ''"],
+    ["relay_name", "TEXT DEFAULT ''"],
+    ["relay_address", "TEXT DEFAULT ''"],
+    ["relay_postal_code", "TEXT DEFAULT ''"],
+    ["relay_city", "TEXT DEFAULT ''"]
+  ];
+  for (const [name, definition] of profileColumns) {
+    if (!userColumns.has(name)) db.exec(`ALTER TABLE auth_users ADD COLUMN ${name} ${definition}`);
+  }
+
   seedDefaultAdmin(db);
 }
 
