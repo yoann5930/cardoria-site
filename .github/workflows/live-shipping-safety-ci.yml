@@ -40,10 +40,14 @@ jobs:
         run: |
           node --check backend/lib/live/checkout.js
           node --check backend/lib/live/checkout-queue.js
+          node --check backend/lib/live/checkout-lifecycle.js
+          node --check backend/lib/live/buyer-identity.js
           node --check backend/lib/live/shipments.js
           node --check backend/routes/sendcloud.js
           node --check backend/lib/sendcloud-webhook-security.js
           node --check backend/lib/sendcloud-tracking.js
           node --check js/live-energy-spots.js
-      - name: Real queue and signed webhook tests (no carrier purchases)
-        run: node --test backend/tests/live-checkout-queue.test.mjs backend/tests/sendcloud-webhook-security.test.mjs
+      - name: Queue and signed webhook tests (no carrier purchases)
+        run: node --test --test-concurrency=1 backend/tests/live-checkout-queue.test.mjs backend/tests/sendcloud-webhook-security.test.mjs
+      - name: Buyer identity and stale or pending checkout tests (no real payments)
+        run: node --test backend/tests/live-buyer-checkout.test.mjs
