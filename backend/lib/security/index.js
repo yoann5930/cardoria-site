@@ -1,4 +1,5 @@
 /** Middleware securite global — headers, CORS, sanitisation, request ID. */
+import { raw } from "express";
 import { sanitizeObject } from "./sanitize.js";
 import { logError } from "../monitoring/errors.js";
 import { LIVE_PERMISSIONS_POLICY } from "../live/camera-media.js";
@@ -32,20 +33,14 @@ export function applySecurityMiddleware(app) {
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("Permissions-Policy", LIVE_PERMISSIONS_POLICY);
-
     const publicPath = String(req.path || "");
     const host = String(req.hostname || req.headers.host || "").split(":")[0].toLowerCase();
     const technicalHost = host.endsWith(".onrender.com") || host === "cardoria.vercel.app";
-
-    // Une seule version publique doit être indexée : www.cardoriashop.fr.
     if (technicalHost || isPrivateIndexPath(publicPath)) {
       res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
     } else {
-      res.setHeader("X-Robots-Tag", "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1");
+      res.setHeader("X-Robots-Tag", "index, follow, max-image-preview:large,max-snippet:-1,max-video-preview:-1");
     }
-
-    // Cache court pour le HTML afin de conserver des pages fraîches tout en évitant
-    // un re-téléchargement complet à chaque navigation/crawl.
     if (req.method === "GET" || req.method === "HEAD") {
       if (publicPath === "/" || publicPath.endsWith(".html") || publicPath.endsWith("/")) {
         res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
@@ -55,9 +50,6 @@ export function applySecurityMiddleware(app) {
         res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=2592000");
       }
     }
-
-    // Le site historique contient encore quelques scripts/styles inline. CSP reste
-    // donc compatible tout en bloquant objets, iframes, base-uri et origines inconnues.
     res.setHeader("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' blob:; connect-src 'self' https: stun: turn:; form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com; upgrade-insecure-requests");
     if (process.env.NODE_ENV === "production") res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     next();
@@ -75,6 +67,10 @@ export function applySecurityMiddleware(app) {
     if (req.method === "OPTIONS") return res.sendStatus(204);
     next();
   });
+
+  // This middleware is installed before server.js calls express.json().
+  // Keep the exact bytes for Sendcloud HMAC, with a tighter request size limit.
+  app.use("/api/sendcloud/webhook", raw({ type: "application/json", limit: "256kb" }));
 
   app.use((req, res, next) => {
     if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
