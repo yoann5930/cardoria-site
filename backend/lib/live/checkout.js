@@ -46,7 +46,7 @@ function sellerPlanShippingCoverage(live,email){
   try{
     const state=getSellerPlanState(live.ownerId);
     if(!state.active)return{covered:false,planId:state.planId||"",buyerLimit:0};
-    const eligibleStatuses=new Set(["planned","pending","paid","completed","authorized","authorised"]);
+    const eligibleStatuses=new Set(["pending","paid","completed","authorized","authorised"]);
     const priorBuyerIds=listLiveCheckouts({liveId:live.id})
       .filter((checkout)=>eligibleStatuses.has(String(checkout.status||"").toLowerCase()))
       .sort((a,b)=>String(a.createdAt||"").localeCompare(String(b.createdAt||"")))
