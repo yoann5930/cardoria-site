@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: cardoria-frontend-runtime-sync-${{ github.event.pull_request.number || github.ref }}
@@ -75,6 +76,8 @@ jobs:
 
       - name: Auto-sync runtime into current pull request branch
         if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -89,6 +92,10 @@ jobs:
           git commit -m "chore(frontend): sync OVH runtime [frontend-runtime-sync]"
           git push origin HEAD:"$branch"
           echo "Frontend runtime synchronized automatically into PR branch $branch."
+          for workflow in cardoria-production-ci.yml security-admin-ci.yml final-audit-ci.yml; do
+            gh workflow run "$workflow" --ref "$branch"
+            echo "Dispatched required workflow: $workflow"
+          done
 
       - name: Verify main remains synchronized
         if: github.event_name == 'push'
