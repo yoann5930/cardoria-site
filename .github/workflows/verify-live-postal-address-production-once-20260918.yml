@@ -1,0 +1,30 @@
+name: Verify Live Postal Address Production Once 20260918
+
+on:
+  push:
+    branches:
+      - ops/deploy-live-postal-address-final-20260918
+    paths:
+      - .github/workflows/verify-live-postal-address-production-once-20260918.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify production Live postal address runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 20 https://www.cardoriashop.fr/live.html -o /tmp/live.html
+          curl -fsS --max-time 20 https://www.cardoriashop.fr/js/live-shipping-address.js -o /tmp/address.js
+          curl -fsS --max-time 20 https://www.cardoriashop.fr/js/cardoria-live-viewer.js -o /tmp/viewer.js
+          curl -fsS --max-time 20 https://www.cardoriashop.fr/js/live-energy-spots.js -o /tmp/energy.js
+          grep -q 'live-shipping-address.js?v=20260918-postal-address' /tmp/live.html
+          grep -q 'recipientName' /tmp/address.js
+          grep -q 'postalCode' /tmp/address.js
+          grep -q 'shippingAddress' /tmp/viewer.js
+          grep -q 'shippingAddress' /tmp/energy.js
+          echo 'LIVE POSTAL ADDRESS PRODUCTION OK'
