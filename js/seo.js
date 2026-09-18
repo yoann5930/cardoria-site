@@ -1,6 +1,10 @@
 (function () {
   "use strict";
 
+  // Dynamic pages already have page-specific metadata in their initial HTML.
+  // Do not replace their canonical with the generic homepage fallback.
+  if (document.querySelector('meta[name="cardoria:server-seo"][content="true"]')) return;
+
   var cfg = window.CARDORIA_SEO;
   if (!cfg) return;
 
