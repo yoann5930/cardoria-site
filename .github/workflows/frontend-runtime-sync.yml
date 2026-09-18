@@ -1,25 +1,28 @@
 name: Cardoria Frontend Runtime Sync
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   push:
     branches: ["main"]
 
 permissions:
   contents: write
-  pull-requests: write
+  actions: write
 
 concurrency:
-  group: cardoria-frontend-runtime-sync
+  group: cardoria-frontend-runtime-sync-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   sync:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout latest main
+      - name: Checkout source branch
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || 'main' }}
           fetch-depth: 0
 
       - name: Mirror public frontend into backend runtime
@@ -71,7 +74,8 @@ jobs:
             exit 1
           fi
 
-      - name: Prepare protected runtime sync when changed
+      - name: Auto-sync runtime into current pull request branch
+        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -82,14 +86,27 @@ jobs:
             echo "Frontend runtime already synchronized."
             exit 0
           fi
-          branch="bot/frontend-runtime-sync-${GITHUB_RUN_ID}"
+          branch="${{ github.event.pull_request.head.ref }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
           git commit -m "chore(frontend): sync OVH runtime [frontend-runtime-sync]"
-          git push origin "$branch"
-          if gh pr create --base main --head "$branch" --title "chore(frontend): sync OVH runtime" --body "Synchronisation automatique du frontend public vers backend/public. Cette PR respecte la protection de main et doit passer les checks requis avant fusion."; then
-            echo "Runtime sync pull request created."
-          else
-            echo "::warning::GitHub Actions n'est pas autorisé à créer des pull requests dans les paramètres du dépôt. La branche $branch a été créée avec succès et doit être ouverte/fusionnée par un opérateur."
+          git push origin HEAD:"$branch"
+          echo "Frontend runtime synchronized automatically into PR branch $branch."
+          for workflow in cardoria-production-ci.yml security-admin-ci.yml final-audit-ci.yml; do
+            gh workflow run "$workflow" --ref "$branch"
+            echo "Dispatched required workflow: $workflow"
+          done
+
+      - name: Verify main remains synchronized
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A backend/public backend/.frontend-runtime-sha
+          if git diff --cached --quiet; then
+            echo "Frontend runtime on main is synchronized."
+            exit 0
           fi
+          echo "::error::Frontend runtime drift detected on protected main. The synchronization must happen inside the pull request before merge."
+          git diff --cached --stat
+          exit 1
