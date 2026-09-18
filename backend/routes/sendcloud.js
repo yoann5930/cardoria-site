@@ -1,18 +1,18 @@
 import { Router } from "express";
+import { createHash } from "node:crypto";
 import { readJson, writeJson } from "../lib/storage.js";
 import { isSendcloudConfigured, searchMondialRelayServicePoints } from "../lib/sendcloud.js";
-import { applySendcloudWebhookToLiveShipment } from "../lib/live/shipments.js";
+import { parseSendcloudWebhook } from "../lib/sendcloud-webhook-security.js";
+import { applySendcloudWebhookToLiveShipment, liveLabelPurchasesEnabled } from "../lib/live/shipments.js";
 
 const router = Router();
 const MAX_EVENTS = 100;
-
-function clean(value, max = 500) {
-  return String(value == null ? "" : value).trim().slice(0, max);
-}
+function clean(value, max = 500) { return String(value == null ? "" : value).trim().slice(0, max); }
+function signatureSecret() { return process.env.SENDCLOUD_WEBHOOK_SECRET || process.env.SENDCLOUD_SECRET_KEY || ""; }
 
 router.get("/status", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  res.json({ ok: true, configured: isSendcloudConfigured(), apiVersion: "v3" });
+  res.json({ ok: true, configured: isSendcloudConfigured(), signatureConfigured: Boolean(signatureSecret()), labelPurchasesEnabled: liveLabelPurchasesEnabled(), providerVerified: false, apiVersion: "v3" });
 });
 
 router.get("/service-points", async (req, res) => {
@@ -36,28 +36,34 @@ router.get("/service-points", async (req, res) => {
 
 router.get("/webhook", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  res.status(200).json({ ok: true, service: "sendcloud-webhook", status: "ready" });
+  res.status(200).json({ ok: true, service: "sendcloud-webhook", reachable: true, signatureConfigured: Boolean(signatureSecret()) });
 });
 
 router.post("/webhook", (req, res) => {
   try {
-    const payload = req.body && typeof req.body === "object" ? req.body : {};
+    const payload = parseSendcloudWebhook(req.body, req.headers["sendcloud-signature"], signatureSecret());
+    const action = clean(payload.action, 120);
+    if (action !== "parcel_status_changed") return res.status(200).json({ ok: true, ignored: true });
+    if (!payload.parcel?.id) return res.status(400).json({ ok: false, code: "SENDCLOUD_PARCEL_REQUIRED", error: "Identifiant colis requis." });
+    const eventHash = createHash("sha256").update(req.body).digest("hex");
     const events = readJson("sendcloud-webhooks", []);
-    events.unshift({
-      receivedAt: new Date().toISOString(),
-      action: clean(payload.action || payload.event || payload.type || "unknown", 120),
-      parcelId: clean(payload.parcel?.id || payload.id || "", 120),
-      trackingNumber: clean(payload.parcel?.tracking_number || payload.tracking_number || "", 160),
-      orderNumber: clean(payload.parcel?.order_number || payload.order_number || "", 160),
-      payload
-    });
+    if (!Array.isArray(events)) throw new Error("Invalid webhook receipt store");
+    if (events.some(event => event.eventHash === eventHash)) return res.status(200).json({ ok: true, duplicate: true });
+    const shipment = applySendcloudWebhookToLiveShipment(payload);
+    if (!shipment) {
+      // A callback can beat the synchronous announcement response. Request a retry
+      // rather than permanently acknowledging and losing the first status update.
+      return res.status(503).json({ ok: false, code: "SHIPMENT_NOT_READY", error: "Expédition non encore rapprochée." });
+    }
+    events.unshift({ eventHash, receivedAt: new Date().toISOString(), action, parcelId: String(payload.parcel.id), applied: shipment.eventApplied === true });
     writeJson("sendcloud-webhooks", events.slice(0, MAX_EVENTS));
-    try { applySendcloudWebhookToLiveShipment(payload); } catch {}
-    res.status(200).json({ ok: true });
+    res.status(200).json({ ok: true, applied: shipment.eventApplied === true });
   } catch (error) {
-    console.error("[sendcloud] webhook_error", error?.message || error);
-    res.status(200).json({ ok: true, stored: false });
+    const status = Number(error?.status);
+    const safeStatus = Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500;
+    // Do not log secrets, customer addresses, or complete carrier payloads.
+    console.warn("[sendcloud] webhook rejected", error?.code || "PROCESSING_FAILED");
+    res.status(safeStatus).json({ ok: false, code: error?.code || "SENDCLOUD_PROCESSING_FAILED", error: safeStatus >= 500 ? "Traitement Sendcloud indisponible." : error.message });
   }
 });
-
 export default router;
