@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - backend/lib/seo/sitemap.js
+      - backend/server.js
       - tests/seo-sitemap-lastmod.test.mjs
+      - tests/seo-license-redirect.test.mjs
       - scripts/audit-public-seo.mjs
       - .github/workflows/seo-sitemap-lastmod-ci.yml
 
@@ -22,12 +24,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: backend/.node-version
-      - name: Check production module and audit syntax
+      - name: Check production modules and audit syntax
         run: |
           node --check backend/lib/seo/sitemap.js
+          node --check backend/server.js
           node --check scripts/audit-public-seo.mjs
-      - name: Test sitemap dates, partitioning and public URLs
-        run: node --experimental-vm-modules --test tests/seo-sitemap-lastmod.test.mjs
+      - name: Install backend packages without lifecycle scripts
+        run: npm --prefix backend install --ignore-scripts --omit=dev --no-audit --no-fund
+      - name: Test sitemap dates and actual Express license routes
+        run: node --experimental-vm-modules --test tests/seo-sitemap-lastmod.test.mjs tests/seo-license-redirect.test.mjs
   public-seo-diagnostic:
     runs-on: ubuntu-latest
     timeout-minutes: 4
