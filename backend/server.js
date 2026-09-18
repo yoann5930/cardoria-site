@@ -410,7 +410,11 @@ app.get("/carte.html", (req, res, next) => {
   if (!req.query.license || !req.query.slug) return next();
   return res.redirect(301, `/cartes/${encodeURIComponent(req.query.license)}/${encodeURIComponent(req.query.slug)}`);
 });
-app.get("/pages/licences/:license", (req, res) => res.redirect(308, `/pages/licences/${encodeURIComponent(req.params.license)}/`));
+app.get("/pages/licences/:license", (req, res, next) => {
+  // Express matches an optional trailing slash: do not redirect the canonical URL to itself.
+  if (req.path.endsWith("/")) return next();
+  return res.redirect(308, `/pages/licences/${encodeURIComponent(req.params.license)}/`);
+});
 app.get("/pages/licences/:license/", sendLicenseSeoPage);
 app.get("/extensions/:license/:slug", sendExtensionSeoPage);
 app.get(["/pages/extension", "/pages/extension/"], (req, res, next) => {
