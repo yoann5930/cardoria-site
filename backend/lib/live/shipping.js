@@ -56,7 +56,7 @@ export function quoteLiveShipping({liveId,customerEmail,productId,qty=1,excludeC
   for(const checkout of prior){
     const priorProduct=(live.products||[]).find((item)=>String(item.id)===String(checkout.productId));
     priorWeight+=priorProduct?productShippingWeight(priorProduct,checkout.qty):Math.max(0,Number(checkout.shippingUnitWeightGrams)||0)*Math.max(1,Number(checkout.qty)||1);
-    alreadyCharged+=Math.max(0,Number(checkout.shippingAmount)||0);
+    alreadyCharged+=Math.max(0,Number(checkout.shippingCostAmount ?? checkout.shippingAmount)||0);
   }
   const giveawayWeight=giveawayWeightForCustomer(live,email);
   const totalWeight=priorWeight+currentWeight+giveawayWeight;

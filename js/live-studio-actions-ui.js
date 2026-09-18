@@ -152,7 +152,7 @@
         "<button type='button' id='lasBreak'>Break</button>",
         "<button type='button' id='lasGame' disabled title='Les jeux TCG arrivent après ce tableau de bord.'>Jeu</button>",
         "<button type='button' id='lasGiveaway'>Giveaway</button>",
-        "<button type='button' id='lasGiveFollow' disabled title='Cardoria ne peut pas encore vérifier qu’un spectateur suit le vendeur.'>Giveaway Follow</button>",
+        "<button type='button' id='lasGiveFollow'>Giveaway Abonné</button>",
         "<button type='button' id='lasGiveBuyer' title='Réservé aux acheteurs ayant un paiement validé pendant ce Live.'>Giveaway Acheteur</button>",
         "</div>",
         "<span class='live-studio-sr'>Achat immédiat</span><span class='live-studio-sr'>Enchère</span><span class='live-studio-sr'>Vente flash</span><span class='live-studio-sr'>Ouverture / break</span>",

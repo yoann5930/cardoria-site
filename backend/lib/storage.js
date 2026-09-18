@@ -16,7 +16,8 @@ const FILES = {
   "seller-subscriptions": "seller-subscriptions.json",
   "marketplace-captured-sales": "marketplace-captured-sales.json",
   "live-sessions.json": "live-sessions.json",
-  "live-realtime-publishers.json": "live-realtime-publishers.json"
+  "live-realtime-publishers.json": "live-realtime-publishers.json",
+  "live-seller-follows": "live-seller-follows.json"
 };
 
 function ensureDir() {

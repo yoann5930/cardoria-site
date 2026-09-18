@@ -114,6 +114,13 @@ export function migrateMarketplace() {
   `);
 
   ensureColumn(db, "mk_sellers", "auth_user_id", "TEXT DEFAULT ''");
+  ensureColumn(db, "mk_sellers", "sender_name", "TEXT DEFAULT ''");
+  ensureColumn(db, "mk_sellers", "sender_address_line1", "TEXT DEFAULT ''");
+  ensureColumn(db, "mk_sellers", "sender_address_line2", "TEXT DEFAULT ''");
+  ensureColumn(db, "mk_sellers", "sender_postal_code", "TEXT DEFAULT ''");
+  ensureColumn(db, "mk_sellers", "sender_city", "TEXT DEFAULT ''");
+  ensureColumn(db, "mk_sellers", "sender_country_code", "TEXT DEFAULT 'FR'");
+  ensureColumn(db, "mk_sellers", "sender_phone", "TEXT DEFAULT ''");
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_mk_sellers_auth_user ON mk_sellers(auth_user_id);
     CREATE INDEX IF NOT EXISTS idx_mk_listings_seller ON mk_listings(seller_id, status);
