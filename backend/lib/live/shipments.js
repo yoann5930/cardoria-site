@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { readJson, writeJson } from "../storage.js";
 import { getUserByEmail } from "../auth/users.js";
 import { getSeller } from "../marketplace/sellers.js";
