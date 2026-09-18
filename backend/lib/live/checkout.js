@@ -11,6 +11,7 @@ import { UNSETTLED_LIVE_PAYMENT_STATUSES, SETTLED_LIVE_PAYMENT_STATUSES, isSameL
 import { resolveLiveSaleRule } from "./sale-rules.js";
 import { getLiveActionState } from "./actions.js";
 import { quoteLiveShipping } from "./shipping.js";
+import { quoteLivePostage } from "./shipping-billing.js";
 const clean=(v,m=200)=>String(v==null?"":v).trim().slice(0,m);
 function validateEmail(v){const e=clean(v,254).toLowerCase();if(!/^\S+@\S+\.\S+$/.test(e))throw Object.assign(new Error("Adresse email invalide."),{status:400});return e;}
 function normalizeShippingAddress(raw,customerName=""){
@@ -54,20 +55,16 @@ function sellerPlanShippingCoverage(live,email){
   const plan=getSellerPlan(state.planId);
   return{covered:isLiveBuyerShippingPaidByCardoria(state.planId,email,priorBuyerIds),planId:state.planId,buyerLimit:Number(plan.liveCardoriaShippingBuyerLimit||0)};
 }
-function liveShippingPaymentPolicy({live,email,customerId,itemAmount,shipping,coverage,actionState}){
-  const prior=listLiveCheckouts({liveId:live.id}).filter(c=>isSameLiveBuyer(c,{customerId,customerEmail:email})&&SETTLED_LIVE_PAYMENT_STATUSES.has(String(c.status||"").toLowerCase()));
-  const priorBuyerPaid=prior.some(c=>c.shippingPaidBy==="buyer"&&Number(c.shippingAmount||0)>0);
-  const priorCardoriaCovered=prior.some(c=>c.shippingCoveredBySellerPlan===true);
+function liveShippingPaymentPolicy({live,email,customerId,itemAmount,shipping,coverage,actionState,excludeCheckoutId}){
   const awards=Array.isArray(actionState?.giveawayAwards)?actionState.giveawayAwards:[];
   const winnerEmail=String(actionState?.giveaway?.winner?.email||"").trim().toLowerCase();
   const giveawayWinner=winnerEmail===email||awards.some(a=>String(a.winner?.email||"").trim().toLowerCase()===email);
-  // The business choice single-purchase vs cumulative 10 EUR remains unresolved.
-  // Preserve the branch's single-purchase behavior; real labels stay disabled.
-  const qualifyingGiveawayPurchase=Number(itemAmount||0)>=10;
-  if(coverage.covered||priorCardoriaCovered)return{buyerAmount:0,payer:"cardoria",giveawayWinner,qualifyingGiveawayPurchase,locked:true};
-  if(priorBuyerPaid)return{buyerAmount:0,payer:"buyer",giveawayWinner,qualifyingGiveawayPurchase,locked:true};
-  if(giveawayWinner&&!qualifyingGiveawayPurchase)return{buyerAmount:0,payer:"streamer",giveawayWinner,qualifyingGiveawayPurchase,locked:false};
-  return{buyerAmount:money(shipping.totalShippingTarget??shipping.shippingAmount),payer:"buyer",giveawayWinner,qualifyingGiveawayPurchase,locked:true};
+  return quoteLivePostage({
+    checkouts:listLiveCheckouts({liveId:live.id}),liveId:live.id,ownerId:live.ownerId,
+    customerId,customerEmail:email,currentItemAmount:itemAmount,
+    shippingTarget:shipping.totalShippingTarget??shipping.shippingAmount,
+    planCovered:coverage.covered,giveawayWinner,excludeCheckoutId
+  });
 }
 function reservedUnits(liveId,productId,excludeKey=""){
   return listLiveCheckouts({liveId}).filter(c=>c.productId===productId&&c.idempotencyKey!==excludeKey&&(c.status==="planned"||UNSETTLED_LIVE_PAYMENT_STATUSES.has(String(c.status||"").toLowerCase()))).reduce((n,c)=>n+Math.max(1,Number(c.qty)||1),0);
@@ -97,24 +94,20 @@ export function planLiveCheckout({liveId,productId,qty,spotLabel,customerId="",c
   if(rule.breakType==="energy_game")units=1;
   const requestId=normalizeCheckoutRequestId(checkoutRequestId);
   const keyFor=label=>[live.id,product.id,email,units,rule.actionId||rule.kind,label,...(requestId?[requestId]:[])].join(":");
-  const provisionalKey=keyFor(normalizeSpotLabel(spotLabel));
-  const provisional=getLiveCheckout(provisionalKey);
-  assertCheckoutOwnership(provisional,buyerId);
-  assertExistingCheckoutReusable(provisional);
+  const provisionalKey=keyFor(normalizeSpotLabel(spotLabel)),provisional=getLiveCheckout(provisionalKey);
+  assertCheckoutOwnership(provisional,buyerId);assertExistingCheckoutReusable(provisional);
   if(provisional?.status==="pending")return provisional;
   const selectedSpot=assertEnergySpotAvailable({liveId:live.id,productId:product.id,rule,spotLabel,excludeKey:provisionalKey});
   const idempotencyKey=keyFor(selectedSpot),existing=getLiveCheckout(idempotencyKey);
-  assertCheckoutOwnership(existing,buyerId);
-  assertExistingCheckoutReusable(existing);
+  assertCheckoutOwnership(existing,buyerId);assertExistingCheckoutReusable(existing);
   if(existing?.status==="pending")return existing;
   assertNoOtherUnsettledCheckout(listLiveCheckouts({liveId:live.id}),{liveId:live.id,customerId:buyerId,customerEmail:email,excludeId:existing?.id||""});
   const available=Math.max(0,Number(product.stock||0)-reservedUnits(live.id,product.id,idempotencyKey));
   if(available<units)throw Object.assign(new Error(`Stock Live insuffisant pour ${product.name}.`),{status:409,available});
-  // A planned quote is always recalculated. It is not an issued payment order.
   const itemAmount=assertServerAmount(money(rule.unitPrice)*units,requestedAmount);
   const shipping=quoteLiveShipping({liveId:live.id,customerEmail:email,productId:product.id,qty:units,excludeCheckoutId:existing?.id||"",productOverride:product});
   const coverage=sellerPlanShippingCoverage(live,email);
-  const paymentPolicy=liveShippingPaymentPolicy({live,email,customerId:buyerId,itemAmount,shipping,coverage,actionState});
+  const paymentPolicy=liveShippingPaymentPolicy({live,email,customerId:buyerId,itemAmount,shipping,coverage,actionState,excludeCheckoutId:existing?.id||""});
   const buyerShippingAmount=paymentPolicy.buyerAmount,amount=money(itemAmount+buyerShippingAmount),name=clean(customerName,120)||"Client Live";
   const history=privateBuyerHistory(live.id,email,buyerId);
   const address=resolveShippingAddress({history,provided:shippingAddress,customerName:name,required:requireShippingAddress});
@@ -122,7 +115,7 @@ export function planLiveCheckout({liveId,productId,qty,spotLabel,customerId="",c
   const commission=commissionFor(live,itemAmount);
   if(shipping.pack?.carrier==="Mondial Relay"&&!selectedServicePoint?.id)throw Object.assign(new Error("Choisissez un Point Relais Mondial Relay pour cet envoi."),{status:400,code:"LIVE_SERVICE_POINT_REQUIRED"});
   const now=new Date().toISOString();
-  return saveLiveCheckout({id:existing?.status==="planned"?existing.id:"LCK-"+crypto.randomUUID(),idempotencyKey,checkoutRequestId:requestId,liveId:live.id,liveTitle:live.title,ownerRole:live.ownerRole,ownerId:live.ownerId,channel:route.channel,provider:route.provider,productId:product.id,productName:product.name,qty:units,unitPrice:rule.unitPrice,itemAmount,saleKind:rule.kind,actionId:rule.actionId||"",breakType:rule.breakType||"",spotLabel:selectedSpot,shippingAmount:buyerShippingAmount,shippingCostAmount:money(shipping.shippingAmount),shippingEstimatedTotal:money(shipping.totalShippingTarget??shipping.shippingAmount),shippingPaidBy:paymentPolicy.payer,shippingCoveredBySellerPlan:paymentPolicy.payer==="cardoria",shippingChargeLockedForLive:paymentPolicy.locked,giveawayWinner:paymentPolicy.giveawayWinner,giveawayShippingPurchaseQualified:paymentPolicy.qualifyingGiveawayPurchase,shippingCoveragePlanId:coverage.planId,shippingCoverageBuyerLimit:coverage.buyerLimit,shippingAlreadyCharged:shipping.alreadyCharged||0,shippingPackId:shipping.pack?.id||"",shippingCarrier:shipping.pack?.carrier||"",shippingWeightGrams:shipping.totalWeightGrams||0,shippingUnitWeightGrams:Number(product.shippingWeightGrams||0),shippingBundled:true,amount,...commission,sellerNet:money(commission.sellerNet+buyerShippingAmount),customerId:buyerId,customerEmail:email,customerName:name,shippingAddress:address,servicePoint:selectedServicePoint,status:"planned",paymentProviderOrderId:"",url:"",createdAt:existing?.status==="planned"?existing.createdAt:now,updatedAt:now});
+  return saveLiveCheckout({id:existing?.status==="planned"?existing.id:"LCK-"+crypto.randomUUID(),idempotencyKey,checkoutRequestId:requestId,liveId:live.id,liveTitle:live.title,ownerRole:live.ownerRole,ownerId:live.ownerId,channel:route.channel,provider:route.provider,productId:product.id,productName:product.name,qty:units,unitPrice:rule.unitPrice,itemAmount,saleKind:rule.kind,actionId:rule.actionId||"",breakType:rule.breakType||"",spotLabel:selectedSpot,shippingAmount:buyerShippingAmount,shippingCostAmount:money(shipping.shippingAmount),shippingEstimatedTotal:money(shipping.totalShippingTarget??shipping.shippingAmount),shippingPaidBy:paymentPolicy.payer,shippingCoveredBySellerPlan:paymentPolicy.payer==="cardoria",shippingChargeLockedForLive:paymentPolicy.locked,shippingPolicyVersion:paymentPolicy.policyVersion,shippingThresholdEur:paymentPolicy.thresholdEur,shippingThresholdMode:"cumulative_paid_items",shippingPaidItemTotalBefore:paymentPolicy.priorPaidItems,shippingItemTotalWithPurchase:paymentPolicy.cumulativeItems,shippingBuyerPostageAlreadyPaid:paymentPolicy.buyerPostageAlreadyPaid,giveawayWinner:paymentPolicy.giveawayWinner,giveawayShippingPurchaseQualified:paymentPolicy.qualifyingGiveawayPurchase,shippingCoveragePlanId:coverage.planId,shippingCoverageBuyerLimit:coverage.buyerLimit,shippingAlreadyCharged:shipping.alreadyCharged||0,shippingPackId:shipping.pack?.id||"",shippingCarrier:shipping.pack?.carrier||"",shippingWeightGrams:shipping.totalWeightGrams||0,shippingUnitWeightGrams:Number(product.shippingWeightGrams||0),shippingBundled:true,amount,...commission,sellerNet:money(commission.sellerNet+buyerShippingAmount),customerId:buyerId,customerEmail:email,customerName:name,shippingAddress:address,servicePoint:selectedServicePoint,status:"planned",paymentProviderOrderId:"",url:"",createdAt:existing?.status==="planned"?existing.createdAt:now,updatedAt:now});
 }
 export async function createLiveCheckout(input){
   return runLiveCheckoutTask("shipping-live:"+String(input?.liveId||""),async()=>{
@@ -135,8 +128,6 @@ export async function createLiveCheckout(input){
       paypal=getPayPalMarketplaceConfig();
       if(!paypal.configured)throw Object.assign(new Error("Paiement PayPal non configuré côté serveur."),{status:503,provider:"paypal"});
     }
-    // Persist the intent BEFORE crossing the provider boundary. An ambiguous
-    // failure cannot be retried blindly, including after process restart.
     saveLiveCheckout({...current,status:"creating",updatedAt:new Date().toISOString()});
     try{
       let payment;
@@ -147,8 +138,6 @@ export async function createLiveCheckout(input){
       }
       const providerId=current.provider==="sumup"?payment.checkoutId:payment.id;
       if(!providerId||!payment.url)throw new Error("Réponse de paiement incomplète.");
-      // A provider callback can arrive before the create response. Never regress
-      // a paid record back to pending in that race.
       const latest=getLiveCheckout(current.id)||current;
       const status=latest.status==="creating"||latest.status==="planned"?"pending":latest.status;
       return saveLiveCheckout({...latest,status,paymentProviderOrderId:providerId,url:payment.url,environment:paypal?.environment||"production",updatedAt:new Date().toISOString()});

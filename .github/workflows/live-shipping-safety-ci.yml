@@ -42,6 +42,8 @@ jobs:
           node --check backend/lib/live/checkout-queue.js
           node --check backend/lib/live/checkout-lifecycle.js
           node --check backend/lib/live/buyer-identity.js
+          node --check backend/lib/live/shipping-billing.js
+          node --check backend/lib/live/giveaway-awards.js
           node --check backend/lib/live/shipments.js
           node --check backend/routes/sendcloud.js
           node --check backend/lib/sendcloud-webhook-security.js
@@ -51,3 +53,5 @@ jobs:
         run: node --test --test-concurrency=1 backend/tests/live-checkout-queue.test.mjs backend/tests/sendcloud-webhook-security.test.mjs
       - name: Buyer identity and stale or pending checkout tests (no real payments)
         run: node --test backend/tests/live-buyer-checkout.test.mjs
+      - name: Cumulative 10 EUR postage and all giveaway awards
+        run: node --test --test-concurrency=1 backend/tests/live-cumulative-postage.test.mjs backend/tests/live-giveaway-fulfillment.test.mjs

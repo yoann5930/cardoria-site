@@ -1,13 +1,11 @@
-import { readJson } from "../storage.js";
 import { getLiveSession, listLiveCheckouts } from "./sessions.js";
+import { getLiveGiveawayAwards } from "./actions.js";
 
-const money=(v)=>Math.round((Number(v)||0)*100)/100;
-const cleanEmail=(v)=>String(v||"").trim().toLowerCase();
-const ACTIVE_SHIPPING_STATUSES=new Set(["pending","paid","completed","authorized","authorised"]);
+const money=v=>Math.round((Number(v)||0)*100)/100;
+const cleanEmail=v=>String(v||"").trim().toLowerCase();
+const ACTIVE_SHIPPING_STATUSES=new Set(["paid","completed"]);
 
-// Tarifs Cardoria France : base proche du barème Whatnot France 2026,
-// légèrement majorée pour absorber les packs d'expédition / consommables.
-// Le prix reste monotone pour permettre le regroupement et ne facturer que le complément.
+// Cardoria's configured estimates, NOT verified carrier quotes.
 export const LIVE_SHIPPING_PACKS=Object.freeze([
   {id:"PACK-LS-20",maxGrams:20,price:2.29,carrier:"La Poste Lettre suivie"},
   {id:"PACK-LS-100",maxGrams:100,price:3.89,carrier:"La Poste Lettre suivie"},
@@ -23,45 +21,39 @@ export const LIVE_SHIPPING_PACKS=Object.freeze([
   {id:"PACK-MR-20000",maxGrams:20000,price:20.49,carrier:"Mondial Relay"},
   {id:"PACK-MR-25000",maxGrams:25000,price:25.49,carrier:"Mondial Relay"}
 ]);
-
 export function shippingPackForWeight(weightGrams){
-  const grams=Math.max(0,Math.ceil(Number(weightGrams)||0));
-  if(!grams)return null;
+  const grams=Math.max(0,Math.ceil(Number(weightGrams)||0));if(!grams)return null;
   const max=LIVE_SHIPPING_PACKS[LIVE_SHIPPING_PACKS.length-1].maxGrams;
   if(grams>max)throw Object.assign(new Error("Poids total du colis Live supérieur à 25 kg. Séparez l'expédition en plusieurs colis."),{status:409,code:"LIVE_SHIPPING_WEIGHT_LIMIT",maxGrams:max});
-  return LIVE_SHIPPING_PACKS.find((pack)=>grams<=pack.maxGrams)||null;
+  return LIVE_SHIPPING_PACKS.find(pack=>grams<=pack.maxGrams)||null;
 }
-export function productShippingWeight(product,qty=1){
-  const perUnit=Math.max(0,Math.ceil(Number(product?.shippingWeightGrams)||0));
-  return perUnit*Math.max(1,Math.trunc(Number(qty)||1));
-}
-function giveawayWeightForCustomer(live,email){
+export function productShippingWeight(product,qty=1){return Math.max(0,Math.ceil(Number(product?.shippingWeightGrams)||0))*Math.max(1,Math.trunc(Number(qty)||1));}
+export function giveawayWeightForCustomer(live,email){
   const target=cleanEmail(email);if(!target)return 0;
-  const store=readJson("live-actions.json",{states:{}}),g=store?.states?.[live.id]?.giveaway;
-  if(!g?.winner||cleanEmail(g.winner.email)!==target)return 0;
-  const product=(live.products||[]).find((item)=>String(item.id)===String(g.productId));
-  return productShippingWeight(product,1);
+  return getLiveGiveawayAwards(live.id,{customerEmail:target}).reduce((sum,award)=>{
+    const grams=Number(award.shippingWeightGrams);
+    if(!Number.isFinite(grams)||grams<=0)throw Object.assign(new Error("Poids d'un cadeau gagné manquant. Il doit être vérifié avant l'expédition."),{status:409,code:"SHIPMENT_WEIGHT_REQUIRED"});
+    return sum+grams*Math.max(1,Number(award.quantity)||1);
+  },0);
 }
 export function quoteLiveShipping({liveId,customerEmail,productId,qty=1,excludeCheckoutId="",productOverride=null}={}){
   const live=getLiveSession(liveId);if(!live)throw Object.assign(new Error("Live introuvable."),{status:404});
-  const product=productOverride||(live.products||[]).find((item)=>String(item.id)===String(productId||""));
+  const product=productOverride||(live.products||[]).find(item=>String(item.id)===String(productId||""));
   if(!product)throw Object.assign(new Error("Produit Live introuvable."),{status:404});
   const currentWeight=productShippingWeight(product,qty);
+  // Legacy zero-weight lots are not silently assigned a carrier price.
   if(!currentWeight)return{shippingAmount:0,alreadyCharged:0,totalWeightGrams:0,currentWeightGrams:0,pack:null,bundled:true};
   const email=cleanEmail(customerEmail);
-  const prior=listLiveCheckouts({liveId:live.id}).filter((c)=>
-    c.id!==excludeCheckoutId&&cleanEmail(c.customerEmail)===email&&ACTIVE_SHIPPING_STATUSES.has(String(c.status||"").toLowerCase())
-  );
-  let priorWeight=0,alreadyCharged=0;
+  const prior=listLiveCheckouts({liveId:live.id}).filter(c=>c.id!==excludeCheckoutId&&cleanEmail(c.customerEmail)===email&&ACTIVE_SHIPPING_STATUSES.has(String(c.status||"").toLowerCase()));
+  let priorWeight=0,estimatedPreviously=0;
   for(const checkout of prior){
-    const priorProduct=(live.products||[]).find((item)=>String(item.id)===String(checkout.productId));
-    priorWeight+=priorProduct?productShippingWeight(priorProduct,checkout.qty):Math.max(0,Number(checkout.shippingUnitWeightGrams)||0)*Math.max(1,Number(checkout.qty)||1);
-    alreadyCharged+=Math.max(0,Number(checkout.shippingCostAmount ?? checkout.shippingAmount)||0);
+    const snapshot=Number(checkout.shippingUnitWeightGrams);
+    const priorProduct=(live.products||[]).find(item=>String(item.id)===String(checkout.productId));
+    priorWeight+=Number.isFinite(snapshot)&&snapshot>0?snapshot*Math.max(1,Number(checkout.qty)||1):productShippingWeight(priorProduct,checkout.qty);
+    estimatedPreviously+=Math.max(0,Number(checkout.shippingCostAmount??checkout.shippingAmount)||0);
   }
-  const giveawayWeight=giveawayWeightForCustomer(live,email);
-  const totalWeight=priorWeight+currentWeight+giveawayWeight;
-  const pack=shippingPackForWeight(totalWeight);
-  const target=money(pack?.price||0),charged=money(alreadyCharged),increment=money(Math.max(0,target-charged));
-  return{shippingAmount:increment,alreadyCharged:charged,totalShippingTarget:target,totalWeightGrams:totalWeight,currentWeightGrams:currentWeight,giveawayWeightGrams:giveawayWeight,pack,bundled:true};
+  const giveawayWeight=giveawayWeightForCustomer(live,email),totalWeight=priorWeight+currentWeight+giveawayWeight,pack=shippingPackForWeight(totalWeight);
+  const target=money(pack?.price||0),previous=money(estimatedPreviously);
+  return{shippingAmount:money(Math.max(0,target-previous)),alreadyCharged:previous,totalShippingTarget:target,totalWeightGrams:totalWeight,currentWeightGrams:currentWeight,giveawayWeightGrams:giveawayWeight,pack,bundled:true};
 }
-export function giveawayShippingPolicy(){return{participantPays:0,winnerPays:0,withoutPurchase:"streamer",withPurchaseMinimumEur:10,withQualifyingPurchase:"buyer_pays_shipping_once",subsequentPurchases:"no_additional_shipping_same_live",newLive:"shipping_resets"};}
+export function giveawayShippingPolicy(){return{participantPays:0,winnerPays:0,withoutPurchase:"streamer",withPurchase:"bundle_with_first_purchase",withPurchaseMinimumEur:10,thresholdMode:"cumulative_paid_items_same_live",excludes:["shipping","giveaway_value","unpaid_orders"],withQualifyingPurchase:"credit_postage_already_paid_then_lock",subsequentPurchases:"no_additional_shipping_after_threshold_same_live",newLive:"shipping_resets"};}
