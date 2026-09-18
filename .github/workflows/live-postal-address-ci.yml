@@ -1,0 +1,42 @@
+name: Cardoria Live Postal Address CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  live-postal-address:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --ignore-scripts
+      - name: Syntax and postal address unit tests
+        run: |
+          node --check backend/lib/live/checkout.js
+          node --check backend/lib/live/archive.js
+          node --check backend/routes/live.js
+          node --check js/live-shipping-address.js
+          node --check js/cardoria-live-viewer.js
+          node --check js/live-energy-spots.js
+          node --test tests/live-postal-address.test.mjs
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Real browser postal address interaction
+        run: node tests/live-postal-address-browser.mjs
+      - name: Existing production Live page smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl -L -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://www.cardoriashop.fr/live.html")
+          echo "/live.html => $code"
+          case "$code" in 200|204) ;; *) exit 1 ;; esac
