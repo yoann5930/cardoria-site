@@ -23,6 +23,9 @@ function fail(res, error, fallback = 400) {
 }
 function sellerActor(req) { const seller = assertSellerSession(req); return { role: "seller", sellerId: seller.id, id: seller.id, email: seller.email, seller }; }
 function assertSellerLiveCanStart(actor, liveId) {
+  if (!actor?.seller?.senderReady) {
+    throw Object.assign(new Error("Renseignez l'adresse d'expédition du vendeur avant de démarrer le Live."), { status: 409, code: "SELLER_SENDER_PROFILE_REQUIRED" });
+  }
   const session = getLiveSession(liveId);
   if (!session) throw Object.assign(new Error("Live introuvable."), { status: 404 });
   if (session.ownerRole !== "seller" || String(session.ownerId) !== String(actor.sellerId)) {
