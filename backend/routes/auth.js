@@ -2,7 +2,7 @@
  * Authentification Cardoria — comptes clients/admin, sessions et 2FA facultatif.
  */
 import { Router } from "express";
-import { getUserById, getUserByEmail, createUser, authenticateUser, setTotpSecret, getTotpSecret, ADMIN_ROLES } from "../lib/auth/users.js";
+import { getUserById, getUserByEmail, createUser, authenticateUser, setTotpSecret, getTotpSecret, updateClientProfile, ADMIN_ROLES } from "../lib/auth/users.js";
 import { migrateAuth } from "../lib/auth/migrate.js";
 import { createSession, revokeSession, validateSession } from "../lib/auth/session.js";
 import { generateTotpSecret, verifyTotp, getTotpUri } from "../lib/auth/totp.js";
@@ -31,7 +31,14 @@ function validPassword(value) {
 }
 
 function publicUser(user) {
-  return { id: user.id, email: user.email, role: user.role, name: user.name, totpEnabled: !!user.totpEnabled };
+  return {
+    id: user.id, email: user.email, role: user.role, name: user.name, totpEnabled: !!user.totpEnabled,
+    firstName: user.firstName || "", lastName: user.lastName || "", phone: user.phone || "",
+    addressLine1: user.addressLine1 || "", addressLine2: user.addressLine2 || "",
+    postalCode: user.postalCode || "", city: user.city || "", country: user.country || "FR",
+    shippingPreference: user.shippingPreference || "mondial_relay",
+    relay: user.relay || null, profileReady: !!user.profileReady, relayReady: !!user.relayReady
+  };
 }
 
 function clientOrderStatus(status) {
@@ -208,9 +215,23 @@ router.post("/logout", (req, res) => {
 
 router.get("/me", (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
-  const user = validateSession(token);
-  if (!user) return res.status(401).json({ ok: false, error: "Session expiree." });
-  res.json({ ok: true, user });
+  const sessionUser = validateSession(token);
+  if (!sessionUser) return res.status(401).json({ ok: false, error: "Session expiree." });
+  const user = getUserById(sessionUser.id) || sessionUser;
+  res.json({ ok: true, user: publicUser(user) });
+});
+
+router.patch("/profile", (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
+    const sessionUser = validateSession(token);
+    if (!sessionUser) return res.status(401).json({ ok: false, error: "Session expiree." });
+    if (sessionUser.role !== "client") return res.status(403).json({ ok: false, error: "Compte client requis." });
+    const user = updateClientProfile(sessionUser.id, req.body || {});
+    res.json({ ok: true, user: publicUser(user) });
+  } catch (e) {
+    res.status(e.status || 400).json({ ok: false, error: e.message });
+  }
 });
 
 router.get("/orders", (req, res) => {
