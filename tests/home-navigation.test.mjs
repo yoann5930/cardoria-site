@@ -17,7 +17,8 @@ const required=[
 ];
 
 test("homepage exposes explicit mobile navigation for all primary destinations",()=>{
-  assert.match(html,/class="home-mobile-nav"/);\n  assert.match(html,/aria-current="page"/);
+  assert.match(html,/class="home-mobile-nav"/);
+  assert.match(html,/aria-current="page"/);
   for(const [href,label] of required){
     assert.ok(html.includes(`href="${href}"`),`missing ${label} -> ${href}`);
   }
