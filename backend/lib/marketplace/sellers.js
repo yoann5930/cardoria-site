@@ -43,6 +43,40 @@ export function updateSellerPayPal(sellerId, patch = {}) {
   db.prepare(`UPDATE mk_sellers SET paypal_merchant_id=COALESCE(?,paypal_merchant_id), paypal_tracking_id=COALESCE(?,paypal_tracking_id), paypal_onboarding_status=COALESCE(?,paypal_onboarding_status), paypal_payments_receivable=COALESCE(?,paypal_payments_receivable), paypal_email_confirmed=COALESCE(?,paypal_email_confirmed), paypal_permissions_granted=COALESCE(?,paypal_permissions_granted), paypal_connected_at=COALESCE(?,paypal_connected_at) WHERE id=?`).run(patch.merchantId ?? null, patch.trackingId ?? null, patch.onboardingStatus ?? null, patch.paymentsReceivable != null ? (patch.paymentsReceivable ? 1 : 0) : null, patch.emailConfirmed != null ? (patch.emailConfirmed ? 1 : 0) : null, patch.permissionsGranted != null ? (patch.permissionsGranted ? 1 : 0) : null, patch.connectedAt ?? null, sellerId);
   return getSeller(sellerId);
 }
+
+function cleanSenderValue(value, max = 160) {
+  return String(value == null ? "" : value).trim().slice(0, max);
+}
+
+export function updateSellerSenderProfile(sellerId, patch = {}) {
+  const seller = getSeller(sellerId);
+  if (!seller) return null;
+  const sender = {
+    name: cleanSenderValue(patch.name || patch.senderName || seller.sender?.name || seller.displayName, 120),
+    addressLine1: cleanSenderValue(patch.addressLine1 || patch.senderAddressLine1, 160),
+    addressLine2: cleanSenderValue(patch.addressLine2 || patch.senderAddressLine2, 160),
+    postalCode: cleanSenderValue(patch.postalCode || patch.senderPostalCode, 24).toUpperCase(),
+    city: cleanSenderValue(patch.city || patch.senderCity, 120),
+    countryCode: cleanSenderValue(patch.countryCode || patch.senderCountryCode || "FR", 2).toUpperCase(),
+    phone: cleanSenderValue(patch.phone || patch.senderPhone, 32)
+  };
+  if (!sender.name || !sender.addressLine1 || !sender.postalCode || !sender.city) {
+    throw Object.assign(new Error("Nom et adresse d'expédition vendeur obligatoires."), { status: 400 });
+  }
+  if (!/^[A-Z]{2}$/.test(sender.countryCode)) {
+    throw Object.assign(new Error("Code pays expéditeur invalide."), { status: 400 });
+  }
+  getDb().prepare(`UPDATE mk_sellers
+    SET sender_name=?, sender_address_line1=?, sender_address_line2=?, sender_postal_code=?, sender_city=?, sender_country_code=?, sender_phone=?
+    WHERE id=?`).run(sender.name, sender.addressLine1, sender.addressLine2, sender.postalCode, sender.city, sender.countryCode, sender.phone, sellerId);
+  return getSeller(sellerId);
+}
+
+export function getSellerSenderProfile(sellerId) {
+  const seller = getSeller(sellerId);
+  if (!seller) return null;
+  return seller.sender;
+}
 export function updateSellerStats(sellerId) {
   const db = getDb();
   const sales = db.prepare("SELECT COUNT(*) AS c FROM mk_orders WHERE seller_id=? AND status IN ('paid','preparing','shipped','delivered')").get(sellerId)?.c ?? 0;
@@ -92,6 +126,16 @@ function toSeller(row) {
     paypalPermissionsGranted: !!row.paypal_permissions_granted,
     paypalConnectedAt: row.paypal_connected_at || "",
     paypalReady: !!(row.paypal_merchant_id && row.paypal_onboarding_status === "ready" && row.paypal_payments_receivable),
+    sender: {
+      name: row.sender_name || row.display_name || "",
+      addressLine1: row.sender_address_line1 || "",
+      addressLine2: row.sender_address_line2 || "",
+      postalCode: row.sender_postal_code || "",
+      city: row.sender_city || "",
+      countryCode: row.sender_country_code || "FR",
+      phone: row.sender_phone || ""
+    },
+    senderReady: !!(row.sender_name && row.sender_address_line1 && row.sender_postal_code && row.sender_city),
     createdAt: row.created_at
   };
 }
