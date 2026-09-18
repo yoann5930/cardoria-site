@@ -1,3 +1,4 @@
+// Final validation trigger: runtime mirrors are synchronized before protected checks.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
