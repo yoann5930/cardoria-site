@@ -262,7 +262,7 @@ function buildLicenseSeoHtml(req, licenseSlug) {
     <nav class="engine-breadcrumb" aria-label="Fil d'Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/">Licences</a> › ${escapeHtml(license.name)}</nav>
     <h1>${escapeHtml(page.h1 || `Cartes ${license.name}`)}</h1>
     <p class="seo-lead">${escapeHtml(page.content?.intro || description)}</p>
-    <div class="seo-links"><a href="/pages/estimation/">Estimer une carte ${escapeHtml(license.name)}</a><a href="/rachat-cartes.html">Vendre à Cardoria</a><a href="/marketplace.html">Marketplace</a></div>
+    <div class="seo-links"><a href="/estimation.html">Estimer une carte ${escapeHtml(license.name)}</a><a href="/rachat-cartes.html">Vendre à Cardoria</a><a href="/marketplace.html">Marketplace</a></div>
     <section class="seo-section"><h2>Extensions ${escapeHtml(license.name)}</h2><p>Parcourez les extensions pour accéder aux listes de cartes, numéros, raretés et fiches détaillées.</p><div class="seo-links">${extensionLinks || "<span>Catalogue en cours de référencement.</span>"}</div></section>
     <section class="seo-section"><h2>Cartes ${escapeHtml(license.name)} référencées</h2><div class="seo-grid">${cardLinks || "<p>Catalogue en cours de synchronisation.</p>"}</div></section>
     <section class="seo-section"><h2>Prix, cote et estimation</h2><p>Les fiches Cardoria regroupent les informations disponibles pour identifier une carte, son extension, son numéro, sa rareté et ses données de prix. Utilisez ensuite l'espace estimation pour analyser une carte que vous possédez.</p></section>
@@ -329,7 +329,7 @@ function buildExtensionSeoHtml(req, licenseSlug, extensionSlug) {
     <nav class="engine-breadcrumb" aria-label="Fil d'Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/${encodeURIComponent(licenseSlug)}/">${escapeHtml(license.name)}</a> › ${escapeHtml(extension.extension)}</nav>
     <h1>Cartes ${escapeHtml(extension.extension)} — ${escapeHtml(license.name)}</h1>
     <p class="seo-lead">Liste des cartes de l'extension ${escapeHtml(extension.extension)} : numéros, raretés, visuels et données de prix disponibles sur Cardoria. ${Number(extension.cardCount || 0)} cartes sont actuellement référencées.</p>
-    <div class="seo-links"><a href="/pages/licences/${encodeURIComponent(licenseSlug)}/">Toutes les extensions ${escapeHtml(license.name)}</a><a href="/pages/estimation/">Estimer une carte</a><a href="/marketplace.html">Marketplace</a></div>
+    <div class="seo-links"><a href="/pages/licences/${encodeURIComponent(licenseSlug)}/">Toutes les extensions ${escapeHtml(license.name)}</a><a href="/estimation.html">Estimer une carte</a><a href="/marketplace.html">Marketplace</a></div>
     <section class="seo-section"><h2>Liste des cartes ${escapeHtml(extension.extension)}</h2><div class="seo-grid">${cardLinks || "<p>Catalogue en cours de synchronisation.</p>"}</div></section>
     <section class="seo-section"><h2>Prix et cote de l'extension ${escapeHtml(extension.extension)}</h2><p>Ouvrez une fiche carte pour consulter les informations disponibles sur son numéro, sa rareté, son image et ses données de prix. Les valeurs peuvent évoluer avec le marché et l'état réel de la carte.</p></section>
   </main>`;
