@@ -1,9 +1,10 @@
-/** Manual Mondial Relay / Sendcloud v3 probe. Never commit secrets or a real mobile number. */
+/** Isolated manual Sendcloud Mondial Relay label. Independent of SENDCLOUD_LIVE_LABELS_ENABLED. */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
   searchMondialRelayServicePoints,
+  getServicePoint,
   resolveShippingOption,
   createSendcloudShipment,
   downloadSendcloudLabel,
@@ -11,9 +12,9 @@ import {
   cancelSendcloudShipment
 } from "../lib/sendcloud.js";
 
-const CREATE = process.argv.includes("--create-label") || process.env.SENDCLOUD_CREATE_TEST_LABEL === "true";
-const reportPath = process.env.SENDCLOUD_TEST_REPORT || path.join(os.tmpdir(), "sendcloud-mondial-relay-real-test.json");
-const pdfPath = process.env.SENDCLOUD_TEST_PDF || path.join(os.tmpdir(), "sendcloud-mondial-relay-real-test.pdf");
+const reportPath = process.env.SENDCLOUD_TEST_REPORT || path.join(os.tmpdir(), "sendcloud-real-label-test.json");
+const pdfPath = process.env.SENDCLOUD_TEST_PDF || path.join(os.tmpdir(), "sendcloud-real-label-test.pdf");
+let announceAttempted = false;
 
 function env(name, fallback = "") {
   return String(process.env[name] || fallback).trim();
@@ -26,25 +27,38 @@ function writeReport(report) {
   console.log(JSON.stringify(report, null, 2));
 }
 
-const phone = env("SENDCLOUD_TEST_MOBILE");
+if (env("SENDCLOUD_ALLOW_REAL_TEST_LABEL") !== "true") {
+  writeReport({
+    status: "blocked",
+    reason: "SENDCLOUD_ALLOW_REAL_TEST_LABEL_REQUIRED",
+    realLabelCreated: false,
+    productionLabelsFlag: env("SENDCLOUD_LIVE_LABELS_ENABLED") === "true"
+  });
+  process.exit(2);
+}
 if (!env("SENDCLOUD_PUBLIC_KEY") || !env("SENDCLOUD_SECRET_KEY")) {
   writeReport({ status: "blocked", reason: "SENDCLOUD_CREDENTIALS_MISSING", realLabelCreated: false });
   process.exit(2);
 }
+const phone = env("SENDCLOUD_TEST_MOBILE");
 if (!phone) {
   writeReport({ status: "blocked", reason: "SENDCLOUD_TEST_MOBILE_MISSING", realLabelCreated: false });
   process.exit(2);
 }
 
+const expectedPostal = env("SENDCLOUD_TEST_POSTAL", "59330");
+const expectedCity = env("SENDCLOUD_TEST_CITY", "Hautmont");
 const search = await searchMondialRelayServicePoints({
   countryCode: "FR",
-  postalCode: env("SENDCLOUD_TEST_POSTAL", "59330"),
-  city: env("SENDCLOUD_TEST_CITY", "Hautmont"),
+  postalCode: expectedPostal,
+  city: expectedCity,
   limit: 30,
   radius: 20000
 });
-const expectedPostal = env("SENDCLOUD_TEST_POSTAL", "59330");
-const matches = search.points.filter((point) => normalize(point.name).includes("allvaps") && String(point.postalCode || "").replace(/\s+/g, "") === expectedPostal);
+const matches = search.points.filter((point) => {
+  const name = normalize(point.name);
+  return name.includes("allvaps") && String(point.postalCode || "").replace(/\s+/g, "") === expectedPostal && normalize(point.city) === normalize(expectedCity);
+});
 if (matches.length !== 1) {
   writeReport({
     status: "blocked",
@@ -55,9 +69,21 @@ if (matches.length !== 1) {
   process.exit(2);
 }
 
-const point = matches[0];
-if (!point.active || point.carrierCode !== "mondial_relay" || point.countryCode !== "FR") {
-  writeReport({ status: "blocked", reason: "SERVICE_POINT_NOT_MONDIAL_RELAY", realLabelCreated: false, servicePoint: { id: point.id, name: point.name } });
+const listed = matches[0];
+if (!listed.active || listed.carrierCode !== "mondial_relay" || listed.countryCode !== "FR") {
+  writeReport({ status: "blocked", reason: "SERVICE_POINT_NOT_MONDIAL_RELAY", realLabelCreated: false, servicePoint: { id: listed.id, name: listed.name } });
+  process.exit(2);
+}
+
+const point = await getServicePoint(listed.id);
+if (
+  point.id !== listed.id
+  || !point.active
+  || point.carrierCode !== "mondial_relay"
+  || point.countryCode !== "FR"
+  || String(point.postalCode || "").replace(/\s+/g, "") !== expectedPostal
+) {
+  writeReport({ status: "blocked", reason: "SERVICE_POINT_MISMATCH", realLabelCreated: false, servicePoint: { id: point.id, name: point.name } });
   process.exit(2);
 }
 
@@ -72,14 +98,14 @@ const fromAddress = {
 };
 const toAddress = {
   recipientName: env("SENDCLOUD_TEST_TO_NAME", "Yoann Thivet"),
-  addressLine1: env("SENDCLOUD_TEST_TO_LINE1", point.street || "Avenue Marcel Aime"),
+  addressLine1: env("SENDCLOUD_TEST_TO_LINE1", point.street),
   houseNumber: env("SENDCLOUD_TEST_TO_HOUSE", point.houseNumber || ""),
-  postalCode: point.postalCode || "59330",
-  city: point.city || "Hautmont",
+  postalCode: point.postalCode,
+  city: point.city,
   countryCode: "FR",
   phone
 };
-const weightGrams = Math.max(1, Number(env("SENDCLOUD_TEST_WEIGHT_GRAMS", "560")) || 560);
+const weightGrams = 560;
 
 let option;
 try {
@@ -111,27 +137,37 @@ try {
   process.exit(error.code === "ACCOUNT_PAYMENT_METHOD_REQUIRED" ? 0 : 2);
 }
 
+if (option.carrierCode !== "mondial_relay" || option.lastMile !== "service_point") {
+  writeReport({
+    status: "blocked",
+    reason: "SHIPPING_OPTION_NOT_MONDIAL_RELAY_SERVICE_POINT",
+    realLabelCreated: false,
+    optionCode: option.code,
+    optionName: option.name
+  });
+  process.exit(2);
+}
+
 const quoteReport = {
-  status: CREATE ? "creating_label" : "QUOTE_ONLY",
-  realLabelCreated: false,
-  servicePoint: { id: point.id, name: point.name },
+  servicePoint: { id: point.id, name: point.name, postalCode: point.postalCode, city: point.city, carrierCode: point.carrierCode, active: point.active },
   optionCode: option.code,
   optionName: option.name,
+  lastMile: option.lastMile,
   weightGrams,
   quote: option.quote,
   contractIdPresent: Boolean(option.contractId)
 };
 
-if (!CREATE) {
-  writeReport({ ...quoteReport, status: "QUOTE_ONLY", reason: "SENDCLOUD_CREATE_TEST_LABEL_NOT_SET" });
-  process.exit(0);
-}
+console.log("READY_TO_CREATE_ONE_REAL_TEST_LABEL");
 
 let shipment = null;
 let cancellation = null;
 let pdfVerified = false;
+let pdfBytes = 0;
 let tracking = null;
 try {
+  if (announceAttempted) throw Object.assign(new Error("Announce already attempted"), { code: "SENDCLOUD_ANNOUNCE_ALREADY_ATTEMPTED" });
+  announceAttempted = true;
   shipment = await createSendcloudShipment({
     orderNumber: `CARDORIA-MANUAL-TEST-${Date.now()}`,
     reference: "Cardoria manual Mondial Relay test",
@@ -146,8 +182,9 @@ try {
     servicePointId: point.id
   });
   const pdf = await downloadSendcloudLabel(shipment.parcelId);
-  pdfVerified = Buffer.isBuffer(pdf) && pdf.subarray(0, 4).toString() === "%PDF" && pdf.length > 500;
-  if (!pdfVerified) throw Object.assign(new Error("Downloaded label is not a PDF"), { code: "SENDCLOUD_LABEL_INVALID" });
+  pdfBytes = pdf.length;
+  pdfVerified = Buffer.isBuffer(pdf) && pdf.subarray(0, 5).toString() === "%PDF-" && pdfBytes > 500 && pdfBytes <= 10000000;
+  if (!pdfVerified) throw Object.assign(new Error("Downloaded label is not a coherent PDF"), { code: "SENDCLOUD_LABEL_INVALID" });
   fs.writeFileSync(pdfPath, pdf);
   tracking = await getSendcloudTracking(shipment.shipmentId);
 } catch (error) {
@@ -162,7 +199,7 @@ try {
   }
   writeReport({
     ...quoteReport,
-    status: "failed",
+    status: error.code === "SENDCLOUD_ANNOUNCEMENT_FAILED" && shipment?.shipmentId ? "MANUAL_CANCELLATION_REQUIRED" : "failed",
     reason: error.code || "LABEL_CREATE_FAILED",
     realLabelCreated: Boolean(shipment?.shipmentId),
     shipmentId: shipment?.shipmentId || null,
@@ -176,16 +213,32 @@ try {
   }
 }
 
+if (!cancellation?.confirmed) {
+  writeReport({
+    ...quoteReport,
+    status: "MANUAL_CANCELLATION_REQUIRED",
+    reason: "SENDCLOUD_CANCEL_UNCONFIRMED",
+    realLabelCreated: Boolean(shipment?.shipmentId),
+    shipmentId: shipment?.shipmentId || null,
+    parcelId: shipment?.parcelId || null,
+    trackingNumber: tracking?.trackingNumber || shipment?.trackingNumber || null,
+    labelPdfVerified: pdfVerified,
+    pdfBytes,
+    cancellation,
+    physicalParcelSent: false
+  });
+  process.exit(4);
+}
+
 writeReport({
   ...quoteReport,
-  status: pdfVerified && cancellation?.confirmed ? "label_created_verified_then_cancelled" : pdfVerified ? "label_created_cancel_unconfirmed" : "failed",
-  realLabelCreated: Boolean(shipment?.shipmentId),
-  shipmentId: shipment?.shipmentId || null,
-  parcelId: shipment?.parcelId || null,
-  trackingNumber: tracking?.trackingNumber || shipment?.trackingNumber || null,
+  status: "label_created_verified_then_cancelled",
+  realLabelCreated: true,
+  shipmentId: shipment.shipmentId,
+  parcelId: shipment.parcelId,
+  trackingNumber: tracking?.trackingNumber || shipment.trackingNumber || null,
   labelPdfVerified: pdfVerified,
+  pdfBytes,
   cancellation,
   physicalParcelSent: false
 });
-if (!pdfVerified) process.exit(3);
-if (!cancellation?.confirmed) process.exit(4);

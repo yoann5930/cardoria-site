@@ -19,17 +19,29 @@ jobs:
       SENDCLOUD_PUBLIC_KEY: ${{ secrets.SENDCLOUD_PUBLIC_KEY }}
       SENDCLOUD_SECRET_KEY: ${{ secrets.SENDCLOUD_SECRET_KEY }}
       SENDCLOUD_TEST_MOBILE: ${{ secrets.SENDCLOUD_TEST_MOBILE }}
+      SENDCLOUD_LIVE_LABELS_ENABLED: "false"
+      SENDCLOUD_TEST_TO_NAME: Yoann Thivet
       SENDCLOUD_CREATE_TEST_LABEL: ${{ github.event.inputs.confirm == 'CREATE_ONE_TEST_LABEL' && 'true' || 'false' }}
+      SENDCLOUD_ALLOW_REAL_TEST_LABEL: ${{ github.event.inputs.confirm == 'CREATE_ONE_TEST_LABEL' && 'true' || 'false' }}
       SENDCLOUD_TEST_REPORT: /tmp/sendcloud-mondial-relay-real-test.json
-      SENDCLOUD_TEST_PDF: /tmp/sendcloud-mondial-relay-real-test.pdf
+      SENDCLOUD_TEST_PDF: /tmp/sendcloud-real-label-test.pdf
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Probe Mondial Relay without printing secrets
+      - name: Probe Mondial Relay without buying a label
+        if: ${{ github.event.inputs.confirm != 'CREATE_ONE_TEST_LABEL' }}
         working-directory: backend
         run: node scripts/sendcloud-mondial-relay-real-test.mjs
+      - name: Create one real test label then cancel
+        if: ${{ github.event.inputs.confirm == 'CREATE_ONE_TEST_LABEL' }}
+        working-directory: backend
+        env:
+          SENDCLOUD_TEST_REPORT: /tmp/sendcloud-real-label-test.json
+        run: |
+          echo READY_TO_CREATE_ONE_REAL_TEST_LABEL
+          node scripts/sendcloud-real-label-test.mjs
       - name: Publish sanitized report
         if: always()
         uses: actions/upload-artifact@v4
@@ -37,6 +49,7 @@ jobs:
           name: sendcloud-mondial-relay-manual-${{ github.run_id }}
           path: |
             /tmp/sendcloud-mondial-relay-real-test.json
-            /tmp/sendcloud-mondial-relay-real-test.pdf
+            /tmp/sendcloud-real-label-test.json
+            /tmp/sendcloud-real-label-test.pdf
           if-no-files-found: warn
           retention-days: 1

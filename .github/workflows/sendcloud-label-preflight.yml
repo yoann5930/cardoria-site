@@ -1,50 +1,51 @@
 name: Sendcloud Requested Label Preflight
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type QUOTE_ONLY or CREATE_ONE_TEST_LABEL. Default is quote-only.
+        required: true
+        default: QUOTE_ONLY
 permissions:
   contents: read
 jobs:
   protected-account-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
+    env:
+      SENDCLOUD_PUBLIC_KEY: ${{ secrets.SENDCLOUD_PUBLIC_KEY }}
+      SENDCLOUD_SECRET_KEY: ${{ secrets.SENDCLOUD_SECRET_KEY }}
+      SENDCLOUD_TEST_MOBILE: ${{ secrets.SENDCLOUD_TEST_MOBILE }}
+      SENDCLOUD_LIVE_LABELS_ENABLED: "false"
+      SENDCLOUD_TEST_TO_NAME: Yoann Thivet
+      SENDCLOUD_TEST_REPORT: /tmp/sendcloud-mondial-relay-real-test.json
+      SENDCLOUD_TEST_PDF: /tmp/sendcloud-real-label-test.pdf
     steps:
-      - name: Check protected API access without printing credentials or buying a label
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.0"
+      - name: Quote Mondial Relay without buying a label
+        if: ${{ github.event.inputs.confirm != 'CREATE_ONE_TEST_LABEL' }}
+        working-directory: backend
+        run: node scripts/sendcloud-mondial-relay-real-test.mjs
+      - name: Create one real test label then cancel
+        if: ${{ github.event.inputs.confirm == 'CREATE_ONE_TEST_LABEL' }}
+        working-directory: backend
         env:
-          SENDCLOUD_PUBLIC_KEY: ${{ secrets.SENDCLOUD_PUBLIC_KEY }}
-          SENDCLOUD_SECRET_KEY: ${{ secrets.SENDCLOUD_SECRET_KEY }}
+          SENDCLOUD_ALLOW_REAL_TEST_LABEL: "true"
+          SENDCLOUD_TEST_REPORT: /tmp/sendcloud-real-label-test.json
         run: |
-          python3 - <<'PY'
-          import base64, json, os, pathlib, urllib.request, urllib.error
-          report = {'requestedCarrier':'mondial_relay','physicalParcel':False,'labelCreated':False,'carrierRequestSent':False}
-          pub=os.environ.get('SENDCLOUD_PUBLIC_KEY','').strip()
-          sec=os.environ.get('SENDCLOUD_SECRET_KEY','').strip()
-          report['protectedCredentialsAvailable']=bool(pub and sec)
-          if not pub or not sec:
-              report.update(status='blocked', reason='SENDCLOUD_CREDENTIALS_NOT_AVAILABLE_IN_THIS_RUNNER')
-          else:
-              url='https://panel.sendcloud.sc/api/v3/service-points?country_code=FR&carrier_code=mondial_relay&address_postal_code=59330&limit=3'
-              req=urllib.request.Request(url,headers={'Accept':'application/json','Authorization':'Basic '+base64.b64encode((pub+':'+sec).encode()).decode()})
-              class NoRedirect(urllib.request.HTTPRedirectHandler):
-                  def redirect_request(self,*args,**kwargs): return None
-              report['carrierRequestSent']=True
-              try:
-                  response=urllib.request.build_opener(NoRedirect).open(req,timeout=20)
-                  raw=response.read(1000000)
-                  data=json.loads(raw)
-                  points=data.get('data',{}).get('results',[])
-                  report.update(status='preflight_only',httpStatus=response.status,servicePointCount=len(points),reason='LABEL_NOT_CREATED_UNTIL_OWN_TEST_RECIPIENT_AND_QUOTE_ARE_VALIDATED')
-              except urllib.error.HTTPError as error:
-                  report.update(status='blocked',httpStatus=error.code,reason='SENDCLOUD_AUTH_OR_API_REJECTED')
-              except Exception:
-                  report.update(status='blocked',reason='SENDCLOUD_PREFLIGHT_TRANSPORT_OR_RESPONSE_FAILURE')
-          pathlib.Path('/tmp/sendcloud-preflight.json').write_text(json.dumps(report,indent=2))
-          print(json.dumps(report,indent=2))
-          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f: f.write('## Requested Mondial Relay label test\n\n```json\n'+json.dumps(report,indent=2)+'\n```\nNo label has been purchased by this preflight.\n')
-          PY
-      - name: Preserve non-sensitive preflight result
+          echo READY_TO_CREATE_ONE_REAL_TEST_LABEL
+          node scripts/sendcloud-real-label-test.mjs
+      - name: Publish sanitized report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sendcloud-label-preflight-${{ github.run_id }}
-          path: /tmp/sendcloud-preflight.json
-          retention-days: 3
+          path: |
+            /tmp/sendcloud-mondial-relay-real-test.json
+            /tmp/sendcloud-real-label-test.json
+            /tmp/sendcloud-real-label-test.pdf
+          if-no-files-found: warn
+          retention-days: 1

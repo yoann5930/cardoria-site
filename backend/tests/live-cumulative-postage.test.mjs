@@ -23,6 +23,12 @@ test("exactly 10 EUR qualifies, including cent-level arithmetic",()=>{
   assert.equal(q.cumulativeItems,10);assert.equal(q.qualifyingGiveawayPurchase,true);assert.equal(q.buyerAmount,4.09);
   assert.equal(quoteLivePostage({...base,giveawayWinner:true,currentItemAmount:3.33,checkouts:[paid("A",3.33),paid("B",3.33)]}).qualifyingGiveawayPurchase,false);
 });
+test("completed purchases count like paid, and a new live resets the threshold",()=>{
+  const completed=quoteLivePostage({...base,currentItemAmount:0.01,checkouts:[paid("C1",9.99,{status:"completed"})]});
+  assert.equal(completed.cumulativeItems,10);assert.equal(completed.locked,true);
+  const otherLive=quoteLivePostage({...base,liveId:"L2",currentItemAmount:6,checkouts:[paid("C1",20)]});
+  assert.equal(otherLive.cumulativeItems,6);assert.equal(otherLive.thresholdReachedBeforePurchase,false);
+});
 test("postage and the value of a free gift never count toward the 10 EUR threshold",()=>{
   const q=quoteLivePostage({...base,giveawayWinner:true,currentItemAmount:0,checkouts:[paid("C1",6,{shippingAmount:4.09,amount:10.09}),paid("G1",0,{productValue:100})]});
   assert.equal(q.cumulativeItems,6);assert.equal(q.qualifyingGiveawayPurchase,false);assert.equal(q.buyerAmount,0);
