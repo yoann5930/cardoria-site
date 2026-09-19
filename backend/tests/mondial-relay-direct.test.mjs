@@ -141,6 +141,8 @@ test("business errors reject creation while warnings do not", () => {
   assert.equal(parseShipmentCreationResponse(warning).shipmentNumber, "1");
   const error = `<ShipmentCreationResponse><StatusList><Status><Code>10060</Code><Level>Error</Level><Message>label failed</Message></Status></StatusList></ShipmentCreationResponse>`;
   assert.throws(() => parseShipmentCreationResponse(error), { code:"MONDIAL_RELAY_CREATION_REJECTED" });
+  const selfClosingError = `<ShipmentCreationResponse><StatusList><Status Code="10060" Level="Error" Message="label failed" /></StatusList></ShipmentCreationResponse>`;
+  assert.throws(() => parseShipmentCreationResponse(selfClosingError), { code:"MONDIAL_RELAY_CREATION_REJECTED" });
 });
 
 test("label download stays server-side, upgrades official HTTP URL and rejects foreign hosts", async () => {
