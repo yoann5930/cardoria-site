@@ -7,9 +7,9 @@ const css=fs.readFileSync("css/home-reference.css","utf8");
 
 const required=[
   ["/","Accueil"],
-  ["/pages/boutique/","Boutique"],
+  ["/boutique.html","Boutique"],
   ["/marketplace.html","Marketplace"],
-  ["/pages/estimation/","Estimation"],
+  ["/estimation.html","Estimation"],
   ["/live.html","Live"],
   ["/client-login.html","Connexion"],
   ["/pages/contact/","Contact"],
@@ -33,9 +33,9 @@ test("mobile navigation is touch friendly and responsive",()=>{
 
 test("homepage primary navigation targets exist in repository",()=>{
   const localTargets=[
-    "pages/boutique/index.html",
+    "boutique.html",
     "marketplace.html",
-    "pages/estimation/index.html",
+    "estimation.html",
     "live.html",
     "client-login.html",
     "pages/contact/index.html",
