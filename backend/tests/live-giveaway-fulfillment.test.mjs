@@ -119,7 +119,7 @@ test("giveaway awards, cumulative postage and private fulfillment",async t=>{
     await t.test("label purchase remains disabled during these tests",async()=>{
       setup();award(alice);sessions.setLiveStatus(live.id,"ended",actor,{adminOverride:true});
       assert.equal(fulfillment.liveLabelPurchasesEnabled(),false);
-      await assert.rejects(fulfillment.createLiveShipment({liveId:live.id,buyerEmail:alice.email}),{code:"LIVE_LABELS_NOT_ACTIVATED"});
+      await assert.rejects(fulfillment.createLiveShipment({liveId:live.id,buyerEmail:alice.email}),{code:"MONDIAL_RELAY_LABELS_NOT_ACTIVATED"});
     });
   }finally{
     if(server)await new Promise(resolve=>server.close(resolve));

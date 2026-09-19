@@ -36,7 +36,7 @@
   }
   async function chooseRelay(address,preferred){
     var query=new URLSearchParams({postalCode:address.postalCode,city:address.city,countryCode:address.countryCode||"FR",limit:"10",radius:"15000"});
-    var data=await api("/api/sendcloud/service-points?"+query.toString(),{method:"GET"});
+    var data=await api("/api/mondial-relay/service-points?"+query.toString(),{method:"GET"});
     var points=Array.isArray(data.points)?data.points:[];
     if(preferred&&preferred.id){
       points.sort(function(a,b){if(String(a.id)===String(preferred.id))return-1;if(String(b.id)===String(preferred.id))return 1;return Number(a.distance||0)-Number(b.distance||0);});

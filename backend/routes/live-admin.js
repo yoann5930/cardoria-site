@@ -37,7 +37,7 @@ router.post("/sessions/:id/cancel", WRITE_ADMIN, (req, res) => { try { const ses
 router.get("/archives", (req, res) => { res.json({ ok: true, archives: listLiveArchives() }); });
 router.get("/archives/:id", (req, res) => { const archive=getLiveArchive(req.params.id); if(!archive)return res.status(404).json({ok:false,error:"Archive Live introuvable."}); res.json({ok:true,archive}); });
 router.get("/checkouts", (req, res) => res.json({ ok: true, checkouts: listLiveCheckouts({ liveId: req.query.liveId }) }));
-router.get("/shipments", (req,res)=>res.json({ok:true,shipments:listLiveShipments({liveId:String(req.query.liveId||"")})}));
+router.get("/shipments", (req,res)=>res.json({ok:true,shipments:listLiveShipments({liveId:String(req.query.liveId||""),audience:"admin"})}));
 router.get("/sessions/:id/actions", (req, res) => { try { res.json({ ok: true, state: getLiveActionState(req.params.id) }); } catch (e) { fail(res, e); } });
 router.post("/sessions/:id/actions/pin", WRITE_ADMIN, (req, res) => { try { res.json({ ok: true, state: pinLiveProduct(req.params.id, req.body?.productId) }); } catch (e) { fail(res, e); } });
 router.post("/sessions/:id/actions/unpin", WRITE_ADMIN, (req, res) => { try { res.json({ ok: true, state: unpinLiveProduct(req.params.id) }); } catch (e) { fail(res, e); } });
