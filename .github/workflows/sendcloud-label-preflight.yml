@@ -1,8 +1,5 @@
 name: Sendcloud Requested Label Preflight
 on:
-  push:
-    branches: [feature/live-shipping-final]
-    paths: ['.github/workflows/sendcloud-label-preflight.yml']
   workflow_dispatch:
 permissions:
   contents: read

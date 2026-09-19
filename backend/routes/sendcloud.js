@@ -39,13 +39,18 @@ router.get("/webhook", (req, res) => {
   res.status(200).json({ ok: true, service: "sendcloud-webhook", reachable: true, signatureConfigured: Boolean(signatureSecret()) });
 });
 
+function webhookRawBody(req) {
+  if (Buffer.isBuffer(req.body) && req.body.length) return req.body;
+  throw Object.assign(new Error("Corps Sendcloud brut requis."), { status: 400, code: "SENDCLOUD_RAW_BODY_REQUIRED" });
+}
 router.post("/webhook", (req, res) => {
   try {
-    const payload = parseSendcloudWebhook(req.body, req.headers["sendcloud-signature"], signatureSecret());
+    const rawBody = webhookRawBody(req);
+    const payload = parseSendcloudWebhook(rawBody, req.headers["sendcloud-signature"], signatureSecret());
     const action = clean(payload.action, 120);
     if (action !== "parcel_status_changed") return res.status(200).json({ ok: true, ignored: true });
     if (!payload.parcel?.id) return res.status(400).json({ ok: false, code: "SENDCLOUD_PARCEL_REQUIRED", error: "Identifiant colis requis." });
-    const eventHash = createHash("sha256").update(req.body).digest("hex");
+    const eventHash = createHash("sha256").update(rawBody).digest("hex");
     const events = readJson("sendcloud-webhooks", []);
     if (!Array.isArray(events)) throw new Error("Invalid webhook receipt store");
     if (events.some(event => event.eventHash === eventHash)) return res.status(200).json({ ok: true, duplicate: true });

@@ -14,8 +14,14 @@ async function mocked(fn, run) {
 }
 test("address and recipient are preserved, not cut to 32 characters", () => {
   const out = sc.normalizeSendcloudAddress(address); assert.equal(out.address_line_1, address.addressLine1); assert.equal(out.name, address.recipientName);
+  assert.equal(out.house_number, "12");
   assert.throws(() => sc.normalizeSendcloudAddress({ ...address, countryCode: "FRANCE" }), { code: "SENDCLOUD_INPUT_INVALID" });
   assert.throws(() => sc.normalizeSendcloudAddress({ ...address, addressLine1: "x".repeat(161) }), { code: "SENDCLOUD_INPUT_INVALID" });
+});
+test("separated house_number is kept without dropping the original street line", () => {
+  const out = sc.normalizeSendcloudAddress({ ...address, houseNumber: "17" });
+  assert.equal(out.house_number, "17");
+  assert.equal(out.address_line_1, address.addressLine1);
 });
 test("Mondial Relay requires mobile rather than a French landline", () => {
   assert.equal(sc.requireMondialRelayMobile("06 00 00 00 00"), "+33600000000");
@@ -25,7 +31,10 @@ test("fractional and unsafe relay ids are rejected without network access", asyn
   for (const id of [-1, 0, 1.1, "../../secrets", "9007199254740993"]) await assert.rejects(sc.getServicePoint(id), { code: "SERVICE_POINT_INVALID" });
 });
 test("search filters a mismatched carrier and country instead of returning it", async () => {
-  await mocked(async () => json({ data: { results: [point, { ...point, id: 124, carrier: { code: "wrong" } }, { ...point, id: 125, address: { ...point.address, country_code: "BE" } }] } }), async () => {
+  await mocked(async (url, init) => {
+    assert.equal(init.headers["Content-Type"], undefined);
+    return json({ data: { results: [point, { ...point, id: 124, carrier: { code: "wrong" } }, { ...point, id: 125, address: { ...point.address, country_code: "BE" } }] } });
+  }, async () => {
     const result = await sc.searchMondialRelayServicePoints({ postalCode: "59330" }); assert.equal(result.points.length, 1); assert.equal(result.points[0].id, 123);
   });
 });
@@ -47,7 +56,36 @@ test("valid contract sends stable idempotency reference and preserves address", 
     const result = await sc.createSendcloudShipment(input);
     assert.equal(result.trackingUrl, ""); assert.equal(result.labelUrl, "https://panel.sendcloud.sc/api/v3/parcels/999/documents/label");
   });
-  const sent = JSON.parse(calls[2].init.body); assert.equal(sent.external_reference_id, input.orderNumber); assert.equal(sent.to_address.address_line_1, address.addressLine1); assert.equal(sent.ship_with.properties.contract_id, 42);
+  assert.equal(JSON.parse(calls[1].init.body).contract_id, undefined);
+  assert.equal(calls[1].init.headers["Content-Type"], "application/json");
+  const optionsBody = JSON.parse(calls[1].init.body);
+  assert.equal(optionsBody.from_address.country_code, "FR");
+  assert.equal(optionsBody.to_address.country_code, "FR");
+  assert.equal(optionsBody.to_service_point.id, "123");
+  assert.equal(optionsBody.functionalities.last_mile, "service_point");
+  assert.equal("from_country_code" in optionsBody, false);
+  assert.equal("to_country_code" in optionsBody, false);
+  const sent = JSON.parse(calls[2].init.body); assert.equal(sent.external_reference_id, input.orderNumber); assert.equal(sent.to_address.address_line_1, address.addressLine1); assert.equal(sent.to_address.house_number, "12"); assert.equal(sent.ship_with.properties.contract_id, 42); assert.equal(sent.to_service_point.id, "123");
+});
+test("missing Sendcloud payment method is explicit and never retried", async () => {
+  let announces = 0;
+  await mocked(async url => {
+    if (url.includes("/service-points/")) return json({ data: point });
+    if (url.endsWith("/shipping-options")) return json({ data: [option] });
+    announces += 1;
+    return json({ errors: [{ code: "no_valid_payment_method", status: "402", detail: "User has no valid payment method. Please add a valid payment method in your billing settings." }] }, 402);
+  }, async () => assert.rejects(sc.createSendcloudShipment(input), { code: "ACCOUNT_PAYMENT_METHOD_REQUIRED", status: 402 }));
+  assert.equal(announces, 1);
+});
+test("shipment retrieve exposes tracking without a second announce", async () => {
+  await mocked(async url => {
+    assert.match(String(url), /\/shipments\/SHIP-1$/);
+    return json({ data: { id: "SHIP-1", carrier: { code: "mondial_relay" }, parcels: [{ id: 999, tracking_number: "MR123", tracking_url: "https://tracking.example/MR123", status: { code: "READY_TO_SEND" } }] } });
+  }, async () => {
+    const tracking = await sc.getSendcloudTracking("SHIP-1");
+    assert.equal(tracking.trackingNumber, "MR123");
+    assert.equal(tracking.trackingUrl, "https://tracking.example/MR123");
+  });
 });
 test("HTTP success with carrier announcement errors is a failure", async () => {
   for (const data of [{ id: "S", errors: [{ detail: "bad" }], parcels: [{ id: 9 }] }, { id: "S", carrier: { code: "mondial_relay" }, parcels: [{ id: 9, status: { code: "ANNOUNCEMENT_FAILED" }, documents: [{ type: "label" }] }] }, { id: "S", carrier: { code: "mondial_relay" }, parcels: [{ id: 9, status: { code: "READY_TO_SEND" }, documents: [{ type: "customs" }] }] }]) {

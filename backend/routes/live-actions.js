@@ -35,7 +35,20 @@ router.get("/:liveId/chat",(req,res)=>{try{res.json({ok:true,messages:listLiveCh
 router.post("/:liveId/chat",(req,res)=>{try{rateLimit(req,"chat",5,10_000);res.json({ok:true,message:addLiveChatMessage(req.params.liveId,req.body||{})});}catch(e){fail(res,e);}});
 router.post("/:liveId/bids",(req,res)=>{try{rateLimit(req,"bid",20,10_000);const result=placeAuctionBid(req.params.liveId,requireBidderEmail(req.body||{}));res.json({ok:true,auction:publicState({auction:result.auction}).auction,bid:{id:result.bid.id,amount:result.bid.amount,bidderName:result.bid.bidderName,createdAt:result.bid.createdAt}});}catch(e){fail(res,e);}});
 router.get("/:liveId/follow",(req,res)=>{try{const live=liveSeller(req.params.liveId),user=clientActor(req);res.json({ok:true,sellerId:live.ownerId,following:isFollowingSeller({sellerId:live.ownerId,userId:user.id})});}catch(e){fail(res,e,401);}});
-router.post("/:liveId/follow",(req,res)=>{try{rateLimit(req,"follow",10,60_000);const live=liveSeller(req.params.liveId),user=clientActor(req),follow=followSeller({sellerId:live.ownerId,userId:user.id,email:user.email,name:user.name});res.json({ok:true,sellerId:live.ownerId,following:true,duplicate:Boolean(follow.duplicate)});}catch(e){fail(res,e,401);}});
+router.post("/:liveId/follow",(req,res)=>{try{
+  rateLimit(req,"follow",10,60_000);
+  const live=liveSeller(req.params.liveId),user=clientActor(req),follow=followSeller({sellerId:live.ownerId,userId:user.id,email:user.email,name:user.name});
+  let giveaway=null,entered=false;
+  if(req.body?.enterGiveaway===true){
+    const g=getLiveActionState(live.id)?.giveaway;
+    if(g?.eligibility==="subscriber"&&g.status==="running"){
+      const result=enterGiveaway(live.id,{name:user.name||"Participant",email:user.email});
+      giveaway=publicState({giveaway:result.giveaway}).giveaway;
+      entered=true;
+    }
+  }
+  res.json({ok:true,sellerId:live.ownerId,following:true,duplicate:Boolean(follow.duplicate),entered,giveaway});
+}catch(e){fail(res,e,401);}});
 router.post("/:liveId/giveaway/enter",(req,res)=>{try{
   rateLimit(req,"giveaway",10,60_000);
   const live=assertPublicLive(req.params.liveId),g=getLiveActionState(req.params.liveId)?.giveaway;

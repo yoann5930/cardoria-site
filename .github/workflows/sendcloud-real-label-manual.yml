@@ -1,0 +1,42 @@
+name: Sendcloud Real Mondial Relay Manual Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type QUOTE_ONLY or CREATE_ONE_TEST_LABEL. Default is quote-only.
+        required: true
+        default: QUOTE_ONLY
+
+permissions:
+  contents: read
+
+jobs:
+  mondial-relay-manual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SENDCLOUD_PUBLIC_KEY: ${{ secrets.SENDCLOUD_PUBLIC_KEY }}
+      SENDCLOUD_SECRET_KEY: ${{ secrets.SENDCLOUD_SECRET_KEY }}
+      SENDCLOUD_TEST_MOBILE: ${{ secrets.SENDCLOUD_TEST_MOBILE }}
+      SENDCLOUD_CREATE_TEST_LABEL: ${{ github.event.inputs.confirm == 'CREATE_ONE_TEST_LABEL' && 'true' || 'false' }}
+      SENDCLOUD_TEST_REPORT: /tmp/sendcloud-mondial-relay-real-test.json
+      SENDCLOUD_TEST_PDF: /tmp/sendcloud-mondial-relay-real-test.pdf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Probe Mondial Relay without printing secrets
+        working-directory: backend
+        run: node scripts/sendcloud-mondial-relay-real-test.mjs
+      - name: Publish sanitized report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sendcloud-mondial-relay-manual-${{ github.run_id }}
+          path: |
+            /tmp/sendcloud-mondial-relay-real-test.json
+            /tmp/sendcloud-mondial-relay-real-test.pdf
+          if-no-files-found: warn
+          retention-days: 1

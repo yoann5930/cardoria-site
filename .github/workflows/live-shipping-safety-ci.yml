@@ -48,9 +48,12 @@ jobs:
           node --check backend/routes/sendcloud.js
           node --check backend/lib/sendcloud-webhook-security.js
           node --check backend/lib/sendcloud-tracking.js
+          node --check backend/lib/sendcloud.js
+          node --check backend/scripts/sendcloud-mondial-relay-real-test.mjs
+          node --check backend/scripts/live-seller-client-journey-e2e.mjs
           node --check js/live-energy-spots.js
       - name: Queue and signed webhook tests (no carrier purchases)
-        run: node --test --test-concurrency=1 backend/tests/live-checkout-queue.test.mjs backend/tests/sendcloud-webhook-security.test.mjs
+        run: node --test --test-concurrency=1 backend/tests/live-checkout-queue.test.mjs backend/tests/sendcloud-webhook-security.test.mjs backend/tests/sendcloud-adapter.test.mjs
       - name: Buyer identity and stale or pending checkout tests (no real payments)
         run: node --test backend/tests/live-buyer-checkout.test.mjs
       - name: Cumulative 10 EUR postage and all giveaway awards

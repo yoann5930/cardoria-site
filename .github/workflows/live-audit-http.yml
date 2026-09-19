@@ -1,8 +1,9 @@
 name: Cardoria Live Audit HTTP
 on:
-  push:
-    branches: [feature/live-shipping-final]
-    paths: ['backend/**', '.github/workflows/live-audit-http.yml']
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/live-audit-http.yml'
   workflow_dispatch:
 permissions:
   contents: read

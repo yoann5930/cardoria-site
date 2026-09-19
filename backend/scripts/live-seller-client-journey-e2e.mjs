@@ -34,10 +34,9 @@ const subStart=await auth(sellerAccount.token,`/api/live/actions/seller/${liveId
 assert(subStart.response.status===200&&subStart.body.giveaway?.eligibility==="subscriber","Subscriber giveaway did not start");
 const beforeFollow=await auth(buyer.token,`/api/live/actions/${liveId}/giveaway/enter`,{method:"POST",body:JSON.stringify({name:"Fake",email:"fake@example.invalid"})});
 assert(beforeFollow.response.status===403&&beforeFollow.body.code==="FOLLOW_REQUIRED","Non-follower entered subscriber giveaway");
-const follow=await auth(buyer.token,`/api/live/actions/${liveId}/follow`,{method:"POST",body:"{}"});
-assert(follow.response.status===200&&follow.body.following===true,"Buyer could not follow seller");
-const entered=await auth(buyer.token,`/api/live/actions/${liveId}/giveaway/enter`,{method:"POST",body:JSON.stringify({name:"Fake",email:"fake@example.invalid"})});
-assert(entered.response.status===200&&entered.body.entry?.name==="Client Test Cardoria","Follower did not enter subscriber giveaway with authenticated identity");
+const follow=await auth(buyer.token,`/api/live/actions/${liveId}/follow`,{method:"POST",body:JSON.stringify({enterGiveaway:true})});
+assert(follow.response.status===200&&follow.body.following===true&&follow.body.entered===true,"Follow did not enter the subscriber giveaway automatically");
+assert(follow.body.giveaway?.entries?.length===1,"Authenticated follower was not entered exactly once");
 const subDraw=await auth(sellerAccount.token,`/api/live/actions/seller/${liveId}/giveaway/draw`,{method:"POST",body:"{}"});
 assert(subDraw.response.status===200&&subDraw.body.giveaway?.winner,"Subscriber giveaway draw failed");
 
@@ -69,6 +68,9 @@ const third=await plan("BUY-2",2);
 assert(third.shippingItemTotalWithPurchase===13&&third.shippingAmount===0&&third.shippingChargeLockedForLive===true,"Post-threshold purchase incorrectly charged shipping");
 sessions.saveLiveCheckout({...third,status:"paid",paymentProviderOrderId:"TEST-PAY-3",paymentProviderTransactionId:"TEST-CAP-3",updatedAt:new Date().toISOString()});
 
+const stopped=await auth(sellerAccount.token,`/api/live/seller/sessions/${liveId}/stop`,{method:"POST",body:"{}"});
+assert(stopped.response.status===200&&stopped.body.session?.status==="ended","Seller Live did not stop");
+assert(stopped.body.shipping?.errors?.some(e=>e.code==="LIVE_LABELS_NOT_ACTIVATED"),"Test environment unexpectedly attempted a real label purchase");
 const group=shipments.prepareLiveShipmentGroup(liveId,buyer.email);
 assert(group&&group.checkouts.length===3,"Shipment did not group all three paid purchases");
 assert(group.gifts.length===2,"Shipment did not group both giveaway prizes");
@@ -77,10 +79,7 @@ assert(group.pack?.id==="PACK-MR-1000","560 g shipment should select PACK-MR-100
 assert(group.payer==="buyer"&&group.buyerPostagePaid===4.09,"Shipment financing is inconsistent with paid postage");
 assert(group.recipient.recipientName==="Client Test Cardoria","Shipment recipient identity is wrong");
 assert(String(group.relay?.id)==="12345","Shipment relay is missing");
-
-const stopped=await auth(sellerAccount.token,`/api/live/seller/sessions/${liveId}/stop`,{method:"POST",body:"{}"});
-assert(stopped.response.status===200&&stopped.body.session?.status==="ended","Seller Live did not stop");
-assert(stopped.body.shipping?.errors?.some(e=>e.code==="LIVE_LABELS_NOT_ACTIVATED"),"Test environment unexpectedly attempted a real label purchase");
+assert(process.env.SENDCLOUD_LIVE_LABELS_ENABLED !== "true", "Real Sendcloud labels must stay disabled in this journey");
 const ended=await json(`/api/live/sessions/${liveId}`);
 assert(ended.response.status===404,"Ended Live is still public");
 console.log(JSON.stringify({
