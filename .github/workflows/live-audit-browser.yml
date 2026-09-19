@@ -1,0 +1,24 @@
+name: Cardoria Live Audit Browser
+on:
+  push:
+    branches: [feature/live-shipping-final]
+    paths: ['js/**', 'css/**', 'tests/live-audit-browser.mjs', '.github/workflows/live-audit-browser.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Install existing project browser test version
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Verify computed seller visibility and safe tracking DOM
+        run: node tests/live-audit-browser.mjs

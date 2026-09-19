@@ -1,0 +1,56 @@
+name: Apply Reviewed Live Audit Fixes
+on:
+  push:
+    branches: [feature/live-shipping-final]
+    paths: ['scripts/apply-live-audit-fixes.mjs', '.github/workflows/apply-live-audit-fixes-once.yml']
+permissions:
+  contents: write
+concurrency:
+  group: reviewed-live-audit-fixes
+  cancel-in-progress: false
+jobs:
+  apply-reviewed-patches:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      NODE_ENV: test
+      ALERT_EMAIL: 'false'
+      ADMIN_REQUIRE_2FA: 'false'
+      SENDCLOUD_LIVE_LABELS_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/live-shipping-final
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Guard exact branch and apply anchored changes
+        run: |
+          test "${GITHUB_REF}" = refs/heads/feature/live-shipping-final
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          node scripts/apply-live-audit-fixes.mjs
+          git diff --check
+          python3 - <<'PY'
+          import json, subprocess
+          for p in json.load(open('/tmp/cardoria-audit-patched-files.json')):
+              if p.endswith(('.js','.mjs')): subprocess.run(['node','--check',p],check=True)
+          PY
+      - name: Install test dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Check corrected initial failures and carrier adapter
+        run: node --test --test-concurrency=1 backend/tests/paypal-webhooks-3b.test.mjs tests/ovh-smtp-bridge.test.mjs tests/live-admin-sales-menu.test.mjs backend/tests/sendcloud-adapter.test.mjs
+      - name: Commit only the reviewed files to feature branch without force
+        run: |
+          git config user.name 'Cardoria Audit'
+          git config user.email 'audit@cardoria.invalid'
+          python3 - <<'PY'
+          import json, subprocess
+          files=json.load(open('/tmp/cardoria-audit-patched-files.json'))
+          subprocess.run(['git','add','--',*files],check=True)
+          PY
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(live): apply tested audit corrections for payments, labels, storage and UI"
+            git push origin HEAD:refs/heads/feature/live-shipping-final
+          fi
