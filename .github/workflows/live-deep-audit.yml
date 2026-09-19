@@ -16,6 +16,7 @@ jobs:
       ADMIN_REQUIRE_2FA: 'false'
       SENDCLOUD_LIVE_LABELS_ENABLED: 'false'
       MARKETPLACE_DEMO_MODE: 'false'
+      SEO_BROWSER_TESTS: '1'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -36,6 +37,10 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: npm install --omit=dev
+      - name: Install browser prerequisites required by the tests brought from main
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          npx playwright install --with-deps chromium
       - name: Run every unit and regression test file in a separate process
         run: |
           python3 - <<'PY'
@@ -48,7 +53,7 @@ jobs:
               name = str(test.relative_to(root))
               started = time.monotonic()
               try:
-                  proc = subprocess.run(['node', '--test', str(test)], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=45)
+                  proc = subprocess.run(['node', '--experimental-vm-modules', '--test', str(test)], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=45)
                   code, log = proc.returncode, proc.stdout
               except subprocess.TimeoutExpired as error:
                   code = 124
