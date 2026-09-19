@@ -30,7 +30,7 @@ jobs:
           set -euo pipefail
           node --input-type=module <<'NODE'
           import fs from "node:fs";
-          import { searchMondialRelayServicePoints, resolveShippingOption } from "./lib/sendcloud.js";
+          import { searchMondialRelayServicePoints } from "./lib/sendcloud.js";
 
           const pub=String(process.env.SENDCLOUD_PUBLIC_KEY||"").trim();
           const sec=String(process.env.SENDCLOUD_SECRET_KEY||"").trim();
@@ -53,16 +53,6 @@ jobs:
           }
           const point=matches[0];
 
-          const option=await resolveShippingOption({
-            carrierCode:"mondial_relay",
-            toCountry:"FR",
-            fromCountry:"FR",
-            fromPostalCode:"59530",
-            toPostalCode:point.postalCode,
-            weightGrams:560,
-            servicePointId:point.id
-          });
-
           const auth="Basic "+Buffer.from(pub+":"+sec).toString("base64");
           async function api(path,{method="GET",body,pdf=false}={}){
             const r=await fetch("https://panel.sendcloud.sc/api/v3"+path,{method,headers:{Authorization:auth,Accept:pdf?"application/pdf":"application/json","Content-Type":"application/json"},body:body?JSON.stringify(body):undefined,redirect:"error"});
@@ -74,6 +64,20 @@ jobs:
             }
             return pdf?b:JSON.parse(b.toString("utf8"));
           }
+
+          const optionPayload=await api("/shipping-options",{method:"POST",body:{
+            from_address:{country_code:"FR",postal_code:"59530",city:"Le Quesnoy"},
+            to_address:{country_code:"FR",postal_code:point.postalCode,city:point.city},
+            carrier_code:"mondial_relay",
+            parcels:[{weight:{value:"0.560",unit:"kg"}}],
+            "functionalities.last_mile":"service_point",
+            to_service_point_id:point.id,
+            calculate_quotes:true
+          }});
+          const options=Array.isArray(optionPayload.data)?optionPayload.data:[];
+          if(!options.length) throw new Error("No Mondial Relay service-point shipping option returned");
+          const option=options[0];
+          console.log(JSON.stringify({selectedShippingOption:{code:option.code,name:option.name||option.product?.name||"",contractId:option.contract?.id||null,quoteCount:Array.isArray(option.quotes)?option.quotes.length:Object.keys(option.quotes||{}).length}},null,2));
 
           const orderId="CARDORIA-REAL-TEST-"+process.env.GITHUB_RUN_ID;
           const announceBody={
@@ -108,7 +112,7 @@ jobs:
             parcels:[{weight:{value:"0.560",unit:"kg"}}],
             to_service_point:{id:point.id}
           };
-          if(option.contractId) announceBody.ship_with.properties.contract_id=option.contractId;
+          if(option.contract?.id) announceBody.ship_with.properties.contract_id=option.contract.id;
 
           let shipment=null,cancel=null,pdfOk=false;
           try{
