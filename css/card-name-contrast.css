@@ -1,6 +1,31 @@
-/* Cardoria — noms de cartes lisibles sous les visuels */
+/* Cardoria — nom de carte hors du cadre visuel */
+body.shop-v1 .product{
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+body.shop-v1 .product::before{display:none!important}
+body.shop-v1 .product:hover{
+  transform:translateY(-3px);
+  border:0!important;
+  background:transparent!important;
+}
+
 body.shop-v1 .product .product-img{
-  margin-bottom:12px!important;
+  min-height:206px;
+  margin:0 0 14px!important;
+  padding:14px;
+  border:1px solid rgba(255,255,255,.07)!important;
+  border-radius:9px!important;
+  background:radial-gradient(circle at 50% 45%,rgba(201,165,68,.055),transparent 48%),#050505!important;
+  overflow:hidden;
+}
+
+body.shop-v1 .product:hover .product-img{
+  border-color:rgba(201,165,68,.32)!important;
+  background:radial-gradient(circle at 50% 45%,rgba(201,165,68,.075),transparent 48%),#070707!important;
 }
 
 body.shop-v1 .product h3,
@@ -8,8 +33,8 @@ body.shop-v1 .product .product-name{
   position:static!important;
   inset:auto!important;
   display:block;
-  margin:0 0 4px!important;
-  padding:0 6px;
+  margin:0 0 5px!important;
+  padding:0 8px;
   border:0!important;
   background:transparent!important;
   color:#fffbe8;
@@ -29,8 +54,16 @@ body.shop-v1 .product:hover .product-name{
 }
 
 body.shop-v1 .product .product-meta{
-  margin-top:0!important;
+  margin:0!important;
+  padding:0 8px;
   text-align:center;
+}
+
+body.shop-v1 .product .product-stock-row,
+body.shop-v1 .product .price,
+body.shop-v1 .product .primary{
+  margin-left:8px;
+  margin-right:8px;
 }
 
 body.shop-v1 .pokemon-product-visual[role="button"]{cursor:zoom-in;outline:none}
