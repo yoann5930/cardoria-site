@@ -15,9 +15,12 @@ const FILES = {
   "rachat-proposals": "rachat-proposals.json",
   "seller-subscriptions": "seller-subscriptions.json",
   "marketplace-captured-sales": "marketplace-captured-sales.json",
+  "live-actions.json": "live-actions.json",
   "live-sessions.json": "live-sessions.json",
   "live-realtime-publishers.json": "live-realtime-publishers.json",
-  "live-seller-follows": "live-seller-follows.json"
+  "live-seller-follows": "live-seller-follows.json",
+  "live-shipments": "live-shipments.json",
+  "sendcloud-webhooks": "sendcloud-webhooks.json"
 };
 
 function ensureDir() {
@@ -34,7 +37,12 @@ export function readJson(key, fallback) {
     return fallback;
   }
   try { return JSON.parse(fs.readFileSync(file, "utf8")); }
-  catch { return fallback; }
+  catch (error) {
+    if (["live-shipments", "live-sessions.json", "live-actions.json", "seller-subscriptions"].includes(key)) {
+      throw Object.assign(new Error("Critical Live storage cannot be read; recovery required."), { status: 503, code: "LIVE_STORAGE_CORRUPT", cause: error });
+    }
+    return fallback;
+  }
 }
 
 export function writeJson(key, data) {

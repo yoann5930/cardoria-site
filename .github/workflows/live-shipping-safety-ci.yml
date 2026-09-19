@@ -1,0 +1,57 @@
+name: Cardoria Live Shipping Safety CI
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'js/**'
+      - 'tests/**'
+      - '.github/workflows/live-shipping-safety-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'tests/**'
+      - '.github/workflows/live-shipping-safety-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-shipping-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      NODE_ENV: test
+      ALERT_EMAIL: 'false'
+      ADMIN_REQUIRE_2FA: 'false'
+      SENDCLOUD_LIVE_LABELS_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Syntax checks
+        run: |
+          node --check backend/lib/live/checkout.js
+          node --check backend/lib/live/checkout-queue.js
+          node --check backend/lib/live/checkout-lifecycle.js
+          node --check backend/lib/live/buyer-identity.js
+          node --check backend/lib/live/shipping-billing.js
+          node --check backend/lib/live/giveaway-awards.js
+          node --check backend/lib/live/shipments.js
+          node --check backend/routes/sendcloud.js
+          node --check backend/lib/sendcloud-webhook-security.js
+          node --check backend/lib/sendcloud-tracking.js
+          node --check js/live-energy-spots.js
+      - name: Queue and signed webhook tests (no carrier purchases)
+        run: node --test --test-concurrency=1 backend/tests/live-checkout-queue.test.mjs backend/tests/sendcloud-webhook-security.test.mjs
+      - name: Buyer identity and stale or pending checkout tests (no real payments)
+        run: node --test backend/tests/live-buyer-checkout.test.mjs
+      - name: Cumulative 10 EUR postage and all giveaway awards
+        run: node --test --test-concurrency=1 backend/tests/live-cumulative-postage.test.mjs backend/tests/live-giveaway-fulfillment.test.mjs

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
+import { migrateMarketplace } from "../lib/marketplace/migrate.js";
+import { migrateMarketplaceV1 } from "../lib/marketplace/v1/migrate.js";
+import { migratePayments } from "../lib/payments/migrate.js";
 import { getDb } from "../lib/engine/database.js";
 import { createListing, getListing } from "../lib/marketplace/listings.js";
 import { createOrder, getOrder, updateOrderStatus } from "../lib/marketplace/orders.js";
@@ -126,6 +129,10 @@ function captureResource({ captureId, paypalOrderId, customId, status }) {
 }
 
 test("paypal webhook 3B setup", async (t) => {
+  // Run the production migration order even when this test file runs alone.
+  migrateMarketplace();
+  migrateMarketplaceV1();
+  migratePayments();
   const previousWebhookId = process.env.PAYPAL_WEBHOOK_ID;
   process.env.PAYPAL_WEBHOOK_ID = "wh_test_3b";
   __setPayPalWebhookVerifyForTests(mockSignedVerify);

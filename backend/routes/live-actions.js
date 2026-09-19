@@ -4,7 +4,7 @@ import { validateSession } from "../lib/auth/session.js";
 import { followSeller, isFollowingSeller } from "../lib/live/follows.js";
 import { getLiveSession } from "../lib/live/sessions.js";
 import { resolveEnergyItems, searchEnergyCatalog } from "../lib/live/energy-catalog.js";
-import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, setLiveProductEnergyTypes, startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
+import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, setLiveProductEnergyTypes, startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, startBuyerGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
 
 const router=Router(),rateBuckets=new Map();
 function fail(res,error,fallback=400){res.status(error?.status||fallback).json({ok:false,error:error?.message||"Erreur action Live",code:error?.code||"",minimum:error?.minimum});}
@@ -15,18 +15,21 @@ function clientActor(req){
   if(!user||user.role!=="client")throw Object.assign(new Error("Connexion client requise."),{status:401,code:"CLIENT_LOGIN_REQUIRED"});
   return user;
 }
-function liveSeller(liveId){
-  const live=assertPublicLive(liveId);
-  if(live.ownerRole!=="seller"||!live.ownerId)throw Object.assign(new Error("Ce Live n'appartient pas à un vendeur."),{status:409,code:"LIVE_SELLER_REQUIRED"});
-  return live;
-}
+function liveSeller(liveId){const live=assertPublicLive(liveId);if(live.ownerRole!=="seller"||!live.ownerId)throw Object.assign(new Error("Ce Live n'appartient pas à un vendeur."),{status:409,code:"LIVE_SELLER_REQUIRED"});return live;}
 function assertSellerOwner(req,liveId){const actor=sellerActor(req),live=getLiveSession(liveId);if(!live)throw Object.assign(new Error("Live introuvable."),{status:404});if(live.ownerRole!=="seller"||String(live.ownerId)!==String(actor.sellerId))throw Object.assign(new Error("Ce Live appartient a un autre vendeur."),{status:403});return actor;}
 function assertPublicLive(liveId){const live=getLiveSession(liveId);if(!live||live.status!=="live")throw Object.assign(new Error("Live introuvable."),{status:404});return live;}
-function publicState(state){const copy=structuredClone(state||{});if(copy.auction){copy.auction.bids=(copy.auction.bids||[]).map(({bidderEmail,...bid})=>bid);if(copy.auction.highestBidder)delete copy.auction.highestBidder.email;}if(copy.giveaway){copy.giveaway.entries=(copy.giveaway.entries||[]).map(({email,...entry})=>entry);if(copy.giveaway.winner)delete copy.giveaway.winner.email;}return copy;}
+function publicState(state){
+  const copy=structuredClone(state||{});
+  // This is a private fulfillment ledger, not public spectator data.
+  delete copy.giveawayAwards;
+  if(copy.auction){copy.auction.bids=(copy.auction.bids||[]).map(({bidderEmail,...bid})=>bid);if(copy.auction.highestBidder)delete copy.auction.highestBidder.email;}
+  if(copy.giveaway){copy.giveaway.entries=(copy.giveaway.entries||[]).map(({email,...entry})=>entry);if(copy.giveaway.winner)delete copy.giveaway.winner.email;}
+  return copy;
+}
 function requireBidderEmail(body){const email=String(body?.bidderEmail||"").trim().toLowerCase();if(!/^\S+@\S+\.\S+$/.test(email))throw Object.assign(new Error("Email acheteur obligatoire pour pouvoir payer l'enchere gagnee."),{status:400});return{...body,bidderEmail:email};}
 function rateLimit(req,kind,limit,windowMs){const key=[kind,req.params.liveId,String(req.ip||req.socket?.remoteAddress||"unknown")].join(":");const now=Date.now(),entry=rateBuckets.get(key);if(!entry||now-entry.startedAt>=windowMs){rateBuckets.set(key,{startedAt:now,count:1});return;}entry.count++;if(entry.count>limit)throw Object.assign(new Error("Trop de requetes Live. Reessayez dans quelques secondes."),{status:429});if(rateBuckets.size>5000){for(const[k,v]of rateBuckets)if(now-v.startedAt>60_000)rateBuckets.delete(k);}}
 router.get("/energy-catalog/search",async(req,res)=>{try{res.json({ok:true,items:await searchEnergyCatalog(req.query.q||"",req.query.limit)});}catch(e){fail(res,e,502);}});
-router.get("/energy-catalog/resolve",async(req,res)=>{try{const items=String(req.query.items||"").split(/[+,;\n]/).map((x)=>x.trim()).filter(Boolean);res.json({ok:true,...await resolveEnergyItems(items)});}catch(e){fail(res,e,502);}});
+router.get("/energy-catalog/resolve",async(req,res)=>{try{const items=String(req.query.items||"").split(/[+,;\n]/).map(x=>x.trim()).filter(Boolean);res.json({ok:true,...await resolveEnergyItems(items)});}catch(e){fail(res,e,502);}});
 router.get("/:liveId/state",(req,res)=>{try{assertPublicLive(req.params.liveId);res.json({ok:true,state:publicState(getLiveActionState(req.params.liveId))});}catch(e){fail(res,e,404);}});
 router.get("/:liveId/chat",(req,res)=>{try{res.json({ok:true,messages:listLiveChat(req.params.liveId,req.query.limit)});}catch(e){fail(res,e);}});
 router.post("/:liveId/chat",(req,res)=>{try{rateLimit(req,"chat",5,10_000);res.json({ok:true,message:addLiveChatMessage(req.params.liveId,req.body||{})});}catch(e){fail(res,e);}});
@@ -35,13 +38,16 @@ router.get("/:liveId/follow",(req,res)=>{try{const live=liveSeller(req.params.li
 router.post("/:liveId/follow",(req,res)=>{try{rateLimit(req,"follow",10,60_000);const live=liveSeller(req.params.liveId),user=clientActor(req),follow=followSeller({sellerId:live.ownerId,userId:user.id,email:user.email,name:user.name});res.json({ok:true,sellerId:live.ownerId,following:true,duplicate:Boolean(follow.duplicate)});}catch(e){fail(res,e,401);}});
 router.post("/:liveId/giveaway/enter",(req,res)=>{try{
   rateLimit(req,"giveaway",10,60_000);
-  const live=assertPublicLive(req.params.liveId),state=getLiveActionState(req.params.liveId),g=state?.giveaway;
+  const live=assertPublicLive(req.params.liveId),g=getLiveActionState(req.params.liveId)?.giveaway;
   let payload=req.body||{};
-  if(g?.eligibility==="subscriber"){
+  if(g?.eligibility==="subscriber"||g?.eligibility==="buyer"){
     const user=clientActor(req);
-    if(live.ownerRole!=="seller"||!live.ownerId)throw Object.assign(new Error("Giveaway Abonné indisponible sur ce Live."),{status:409,code:"LIVE_SELLER_REQUIRED"});
-    if(!isFollowingSeller({sellerId:live.ownerId,userId:user.id}))throw Object.assign(new Error("Suivez le vendeur pour participer à ce Giveaway Abonné."),{status:403,code:"FOLLOW_REQUIRED"});
-    payload={name:user.name||payload.name||"Participant",email:user.email};
+    if(g.eligibility==="subscriber"){
+      if(live.ownerRole!=="seller"||!live.ownerId)throw Object.assign(new Error("Giveaway Abonné indisponible sur ce Live."),{status:409,code:"LIVE_SELLER_REQUIRED"});
+      if(!isFollowingSeller({sellerId:live.ownerId,userId:user.id}))throw Object.assign(new Error("Suivez le vendeur pour participer à ce Giveaway Abonné."),{status:403,code:"FOLLOW_REQUIRED"});
+    }
+    // The body cannot impersonate a paying buyer or an existing follower.
+    payload={name:user.name||"Participant",email:user.email};
   }
   const result=enterGiveaway(req.params.liveId,payload);
   res.json({ok:true,duplicate:Boolean(result.duplicate),entry:result.entry?{id:result.entry.id,name:result.entry.name,createdAt:result.entry.createdAt}:null,giveaway:publicState({giveaway:result.giveaway}).giveaway});
@@ -52,7 +58,8 @@ router.post("/seller/:liveId/unpin",(req,res)=>{try{assertSellerOwner(req,req.pa
 router.post("/seller/:liveId/auction/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,auction:startAuction(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/auction/stop",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,auction:stopAuction(req.params.liveId)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/flash/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,flash:startFlashSale(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
-router.post("/seller/:liveId/giveaway/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,giveaway:startGiveaway(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
+router.post("/seller/:liveId/giveaway/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);const body=req.body||{};const giveaway=body.eligibility==="buyer"?startBuyerGiveaway(req.params.liveId,body):startGiveaway(req.params.liveId,body);res.json({ok:true,giveaway});}catch(e){fail(res,e,401);}});
+router.post("/seller/:liveId/giveaway/buyer/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,giveaway:startBuyerGiveaway(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/giveaway/draw",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,...drawGiveaway(req.params.liveId)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/break/start",async(req,res)=>{try{assertSellerOwner(req,req.params.liveId);const body=req.body||{},result=String(body.breakType||"").toLowerCase()==="energy_game"?await startEnergyGame(req.params.liveId,body):startBreak(req.params.liveId,body);res.json({ok:true,break:result});}catch(e){fail(res,e,401);}});
 export default router;

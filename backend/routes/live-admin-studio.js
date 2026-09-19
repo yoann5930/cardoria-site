@@ -5,6 +5,7 @@ import { validateSession } from "../lib/auth/session.js";
 import { getLiveSession, listLiveCheckouts, publicLiveSession, resolveAdminLiveAccess, setLiveStatus, updateLiveSession } from "../lib/live/sessions.js";
 import { drawGiveaway, getLiveActionState, pinLiveProduct, setLiveProductEnergyTypes, startAuction, startBreak, startBuyerGiveaway, startEnergyGame, startFlashSale, startGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
 import { archiveLiveSession } from "../lib/live/archive.js";
+import { createLiveShipmentsForLive } from "../lib/live/shipments.js";
 
 const router = Router();
 function token(req){return String(req.headers.authorization||"").replace(/^Bearer\s+/i,"")||String(req.headers["x-session-token"]||"");}
@@ -20,7 +21,14 @@ function fail(res,error){const raw=Number(error?.status||error?.code),status=Num
 function snapshot(liveId){const live=getLiveSession(liveId);return{session:publicLiveSession(live),checkouts:listLiveCheckouts({liveId}),actions:getLiveActionState(liveId)};}
 router.get("/:liveId",(req,res)=>{try{actorFor(req,req.params.liveId);res.json({ok:true,...snapshot(req.params.liveId)});}catch(error){fail(res,error);}});
 router.post("/:liveId/start",(req,res)=>{try{const {actor}=actorFor(req,req.params.liveId);const session=setLiveStatus(req.params.liveId,"live",actor,{adminOverride:true});res.json({ok:true,session:publicLiveSession(session)});}catch(error){fail(res,error);}});
-router.post("/:liveId/stop",(req,res)=>{try{const {actor}=actorFor(req,req.params.liveId);const session=setLiveStatus(req.params.liveId,"ended",actor,{adminOverride:true});const archive=archiveLiveSession(session.id);res.json({ok:true,session:publicLiveSession(session),archive});}catch(error){fail(res,error);}});
+router.post("/:liveId/stop",async(req,res)=>{try{
+  const {actor}=actorFor(req,req.params.liveId);
+  const session=setLiveStatus(req.params.liveId,"ended",actor,{adminOverride:true});
+  const archive=archiveLiveSession(session.id);
+  let shipping={created:[],errors:[],total:0};
+  try{shipping=await createLiveShipmentsForLive(session.id);}catch(shippingError){shipping.errors=[{code:shippingError?.code||"",error:shippingError?.message||"Création des expéditions impossible."}];}
+  res.json({ok:true,session:publicLiveSession(session),archive,shipping});
+}catch(error){fail(res,error);}});
 router.post("/:liveId/products",(req,res)=>{try{
   const {actor,live}=actorFor(req,req.params.liveId),body=req.body||{};
   const name=String(body.name||"").trim().slice(0,160); if(!name) throw Object.assign(new Error("Nom du lot obligatoire."),{status:400});

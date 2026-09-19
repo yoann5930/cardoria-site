@@ -104,7 +104,7 @@ router.post("/v1/listings", (req, res) => {
     if (req.body?.status !== "draft") assertActiveSellerPlan(seller.id);
     if (req.body?.status !== "draft" && !seller.paypalReady && !isMarketplaceDemoMode()) throw new MarketplaceAuthError("Activez d'abord votre compte vendeur PayPal avant de publier une annonce.", 409);
     const listing = createListingV1({ ...(req.body || {}), sellerId: seller.id, sellerEmail: seller.email });
-    res.status(201).json({ ok: true, listing, seller, demoMode: isMarketplaceDemoMode() });
+    res.status(201).json({ ok: true, listing, seller: publicSeller(seller), demoMode: isMarketplaceDemoMode() });
   } catch (e) { fail(res, e); }
 });
 router.put("/v1/listings/:id", (req, res) => {

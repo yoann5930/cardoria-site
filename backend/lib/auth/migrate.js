@@ -8,6 +8,11 @@ import { hashPassword } from "./password.js";
 export const ROLES = ["super_admin", "admin", "employee", "client"];
 export const ADMIN_ROLES = ["super_admin", "admin", "employee"];
 
+function ensureColumn(db, table, column, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name);
+  if (!columns.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
 export function migrateAuth() {
   const db = getDb();
   db.exec(`
@@ -74,6 +79,24 @@ export function migrateAuth() {
     CREATE INDEX IF NOT EXISTS idx_magic_tokens_hash ON auth_magic_tokens(token_hash);
     CREATE INDEX IF NOT EXISTS idx_magic_tokens_user ON auth_magic_tokens(user_id);
   `);
+
+  ensureColumn(db, "auth_users", "first_name", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "last_name", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "phone", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "address_line1", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "address_line2", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "postal_code", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "city", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "country", "TEXT DEFAULT 'FR'");
+  ensureColumn(db, "auth_users", "shipping_preference", "TEXT DEFAULT 'mondial_relay'");
+  ensureColumn(db, "auth_users", "relay_id", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "relay_name", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "relay_address", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "relay_postal_code", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "relay_city", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "relay_country", "TEXT DEFAULT 'FR'");
+  ensureColumn(db, "auth_users", "relay_carrier_code", "TEXT DEFAULT 'mondial_relay'");
+  ensureColumn(db, "auth_users", "relay_carrier_service_point_id", "TEXT DEFAULT ''");
 
   seedDefaultAdmin(db);
 }

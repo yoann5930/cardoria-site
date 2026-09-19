@@ -1,0 +1,82 @@
+name: Cardoria Live Deep Audit
+on:
+  push:
+    branches: [feature/live-shipping-final]
+    paths: ['backend/**', 'tests/**', 'js/**', 'css/**', '.github/workflows/live-deep-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  complete-test-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      ALERT_EMAIL: 'false'
+      ADMIN_REQUIRE_2FA: 'false'
+      SENDCLOUD_LIVE_LABELS_ENABLED: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+      SEO_BROWSER_TESTS: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Record exact tracked source before tests
+        run: |
+          mkdir -p /tmp/cardoria-deep-audit
+          git rev-parse HEAD > /tmp/cardoria-deep-audit/commit.txt
+          git archive --format=zip HEAD > /tmp/cardoria-source.zip
+      - name: Preserve source for reproducibility (no runner credentials)
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-audit-source-${{ github.sha }}
+          path: /tmp/cardoria-source.zip
+          retention-days: 3
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Install browser prerequisites required by the tests brought from main
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Run every unit and regression test file in a separate process
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, re, subprocess, time
+          root = pathlib.Path.cwd()
+          out = pathlib.Path('/tmp/cardoria-deep-audit')
+          files = sorted(set(list(root.glob('backend/tests/*.test.mjs')) + list(root.glob('tests/*.test.mjs'))))
+          results = []
+          for test in files:
+              name = str(test.relative_to(root))
+              started = time.monotonic()
+              try:
+                  proc = subprocess.run(['node', '--experimental-vm-modules', '--test', str(test)], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=45)
+                  code, log = proc.returncode, proc.stdout
+              except subprocess.TimeoutExpired as error:
+                  code = 124
+                  raw = error.stdout or b''
+                  log = raw.decode(errors='replace') if isinstance(raw, bytes) else raw
+                  log += '\nAUDIT_TIMEOUT_AFTER_45_SECONDS\n'
+              log_name = name.replace('/', '__') + '.log'
+              (out / log_name).write_text(log)
+              counts = {key: int(value) for key,value in re.findall(r'^# (tests|pass|fail|skipped|cancelled) (\d+)$', log, re.M)}
+              results.append({'file': name, 'exitCode': code, 'seconds': round(time.monotonic() - started, 2), 'log': log_name, 'tapCounts': counts})
+              (out / 'test-results.json').write_text(json.dumps(results, indent=2))
+              print(('PASS' if code == 0 else 'FAIL') + ' ' + name, flush=True)
+          failed = [row for row in results if row['exitCode'] != 0]
+          summary = {'commit': os.environ['GITHUB_SHA'], 'files': len(results), 'passedFiles': len(results)-len(failed), 'failedFiles': len(failed), 'tapCounts': {key: sum(row['tapCounts'].get(key,0) for row in results) for key in ['tests','pass','fail','skipped','cancelled']}, 'externalCarrier': 'simulated or not called', 'realLabelCreated': False, 'failures': [r['file'] for r in failed]}
+          (out / 'summary.json').write_text(json.dumps(summary, indent=2))
+          print(json.dumps(summary, indent=2))
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f: f.write('```json\n'+json.dumps(summary,indent=2)+'\n```\nTAP counts include parent tests. No physical shipment or real label was created.\n')
+          raise SystemExit(bool(failed))
+          PY
+      - name: Preserve all test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-deep-audit-${{ github.sha }}
+          path: /tmp/cardoria-deep-audit/
+          retention-days: 3

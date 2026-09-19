@@ -66,17 +66,33 @@
         <p class="client-auth-kicker">COMPTE CONNECTÉ</p>
         <h2 id="clientAccountName">Mon compte</h2>
         <p id="clientAccountEmail"></p>
+        <details id="clientShippingProfile" style="margin:16px 0">
+          <summary><strong>Adresse d’envoi & Point Relais</strong></summary>
+          <form id="clientProfileForm" class="client-auth-form" style="margin-top:12px">
+            <label>Nom complet<input id="clientProfileName" type="text" maxlength="120" autocomplete="name"></label>
+            <label>Téléphone<input id="clientProfilePhone" type="tel" maxlength="32" autocomplete="tel"></label>
+            <label>Adresse<input id="clientProfileAddress1" type="text" maxlength="160" autocomplete="street-address"></label>
+            <label>Complément<input id="clientProfileAddress2" type="text" maxlength="160"></label>
+            <label>Code postal<input id="clientProfilePostalCode" type="text" maxlength="24" autocomplete="postal-code"></label>
+            <label>Ville<input id="clientProfileCity" type="text" maxlength="120" autocomplete="address-level2"></label>
+            <label>Pays<input id="clientProfileCountry" type="text" maxlength="2" value="FR"></label>
+            <p id="clientRelaySummary" class="client-auth-help">Aucun Point Relais préféré.</p>
+            <button id="clientChooseRelay" class="client-auth-secondary" type="button">Choisir mon Point Relais Mondial Relay</button>
+            <button class="client-auth-primary" type="submit">Enregistrer mon adresse</button>
+          </form>
+        </details>
         <div class="client-account-actions">
           <a href="/client-orders.html">Commandes Boutique</a>
           <a href="/mes-commandes.html">Commandes Marketplace</a>
           <a href="/boutique.html">Boutique</a>
           <a href="/marketplace.html">Marketplace</a>
         </div>
+        <section style="margin:18px 0"><h3>Expéditions Live</h3><div id="clientLiveShipments"><p>Aucune expédition Live.</p></div></section>
         <button id="clientLogoutButton" class="client-auth-secondary" type="button">Se déconnecter</button>
       </div>
     </section>
   </main>
 
-  <script src="/js/client-auth.js?v=20260908-3"></script>
+  <script src="/js/client-auth.js?v=20260918-live-shipping"></script>
 </body>
 </html>

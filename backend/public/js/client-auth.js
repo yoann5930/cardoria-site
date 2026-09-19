@@ -3,9 +3,15 @@
   const API = window.CARDORIA_BACKEND || window.location.origin;
   const TOKEN_KEY = "cardoria_client_session";
   const qs = (id) => document.getElementById(id);
+  let selectedRelay = null;
+  let currentUser = null;
 
   function setMessage(text, type) {
-    const el = qs("clientAuthMessage");
+    let el = qs("clientAuthMessage");
+    if (qs("clientAccountCard") && !qs("clientAccountCard").hidden) {
+      el = qs("clientProfileMessage");
+      if (!el) { el = document.createElement("p"); el.id = "clientProfileMessage"; el.setAttribute("role", "status"); qs("clientAccountCard").prepend(el); }
+    }
     if (!el) return;
     el.textContent = text || "";
     el.className = "client-auth-message" + (type ? ` is-${type}` : "");
@@ -36,10 +42,21 @@
   }
 
   function showAccount(user) {
+    currentUser = user;
     qs("clientAuthCard").hidden = true;
     qs("clientAccountCard").hidden = false;
     qs("clientAccountName").textContent = user.name || "Mon compte";
     qs("clientAccountEmail").textContent = user.email || "";
+    if (qs("clientProfileName")) qs("clientProfileName").value = user.name || "";
+    if (qs("clientProfilePhone")) qs("clientProfilePhone").value = user.phone || "";
+    if (qs("clientProfileAddress1")) qs("clientProfileAddress1").value = user.addressLine1 || "";
+    if (qs("clientProfileAddress2")) qs("clientProfileAddress2").value = user.addressLine2 || "";
+    if (qs("clientProfilePostalCode")) qs("clientProfilePostalCode").value = user.postalCode || "";
+    if (qs("clientProfileCity")) qs("clientProfileCity").value = user.city || "";
+    if (qs("clientProfileCountry")) qs("clientProfileCountry").value = user.country || "FR";
+    selectedRelay = user.relay && user.relay.id ? { ...user.relay } : null;
+    renderRelay();
+    loadLiveShipments();
   }
 
   function showLoggedOut() {
@@ -124,6 +141,100 @@
     }
   }
 
+  function renderRelay() {
+    const node = qs("clientRelaySummary");
+    if (!node) return;
+    if (!selectedRelay || !selectedRelay.id) {
+      node.textContent = "Aucun Point Relais préféré.";
+      return;
+    }
+    node.textContent = "Point Relais préféré : " + (selectedRelay.name || "") + " — " + (selectedRelay.postalCode || "") + " " + (selectedRelay.city || "");
+  }
+
+  async function chooseRelay() {
+    try {
+      const postalCode = qs("clientProfilePostalCode").value.trim();
+      const city = qs("clientProfileCity").value.trim();
+      const countryCode = (qs("clientProfileCountry").value.trim() || "FR").toUpperCase();
+      if (!postalCode && !city) throw new Error("Renseignez d’abord votre code postal ou votre ville.");
+      const data = await api("/api/sendcloud/service-points?" + new URLSearchParams({ postalCode, city, countryCode, limit: "10", radius: "15000" }), { method: "GET" });
+      const points = Array.isArray(data.points) ? data.points : [];
+      if (!points.length) throw new Error("Aucun Point Relais Mondial Relay trouvé.");
+      const lines = points.map((point, index) => (index + 1) + ". " + point.name + " — " + [point.street, point.houseNumber, point.postalCode, point.city].filter(Boolean).join(" "));
+      const answer = window.prompt("Choisissez votre Point Relais :\n\n" + lines.join("\n") + "\n\nNuméro :", "1");
+      if (answer === null) return;
+      const point = points[Math.trunc(Number(answer)) - 1];
+      if (!point) throw new Error("Choix de Point Relais invalide.");
+      selectedRelay = {
+        id: String(point.id),
+        carrierServicePointId: point.carrierServicePointId || "",
+        name: point.name || "",
+        address: [point.street, point.houseNumber].filter(Boolean).join(" "),
+        postalCode: point.postalCode || "",
+        city: point.city || "",
+        countryCode: point.countryCode || "FR",
+        carrierCode: point.carrierCode || "mondial_relay"
+      };
+      renderRelay();
+    } catch (e) {
+      setMessage(e.message, "error");
+    }
+  }
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    setMessage("Enregistrement du profil...");
+    try {
+      const data = await api("/api/auth/profile", {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: qs("clientProfileName").value.trim(),
+          phone: qs("clientProfilePhone").value.trim(),
+          addressLine1: qs("clientProfileAddress1").value.trim(),
+          addressLine2: qs("clientProfileAddress2").value.trim(),
+          postalCode: qs("clientProfilePostalCode").value.trim(),
+          city: qs("clientProfileCity").value.trim(),
+          country: (qs("clientProfileCountry").value.trim() || "FR").toUpperCase(),
+          shippingPreference: "mondial_relay",
+          relay: selectedRelay
+        })
+      });
+      currentUser = data.user;
+      showAccount(data.user);
+      setMessage("Adresse et Point Relais enregistrés.", "success");
+    } catch (e) {
+      setMessage(e.message, "error");
+    }
+  }
+
+  async function loadLiveShipments() {
+    const host = qs("clientLiveShipments");
+    if (!host || !getToken()) return;
+    try {
+      const data = await api("/api/live/my-shipments", { method: "GET" });
+      const items = Array.isArray(data.shipments) ? data.shipments : [];
+      if (!items.length) {
+        host.innerHTML = "<p>Aucune expédition Live.</p>";
+        return;
+      }
+      host.replaceChildren();
+      for (const s of items) {
+        const box = document.createElement("div"), title = document.createElement("strong"), state = document.createElement("p"), tracking = document.createElement("p");
+        title.textContent = s.carrier || "Expédition Live";
+        state.textContent = "Statut : " + (s.status || "En préparation");
+        tracking.textContent = "Suivi : ";
+        let url = null;
+        try { const candidate = new URL(s.trackingUrl); if (candidate.protocol === "https:" && !candidate.username && !candidate.password) url = candidate; } catch {}
+        const link = document.createElement(url ? "a" : "span");
+        link.textContent = s.trackingNumber || (url ? "Suivre le colis" : "Suivi en attente");
+        if (url) { link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer"; }
+        tracking.appendChild(link); box.append(title, state, tracking); host.appendChild(box);
+      }
+    } catch (e) {
+      host.textContent = "Suivi Live indisponible : " + e.message;
+    }
+  }
+
   async function logout() {
     try {
       if (getToken()) await api("/api/auth/logout", { method: "POST", body: "{}" });
@@ -140,6 +251,8 @@
     qs("clientLoginForm")?.addEventListener("submit", login);
     qs("clientRegisterForm")?.addEventListener("submit", register);
     qs("clientLogoutButton")?.addEventListener("click", logout);
+    qs("clientProfileForm")?.addEventListener("submit", saveProfile);
+    qs("clientChooseRelay")?.addEventListener("click", chooseRelay);
     restore();
   }
 

@@ -2,26 +2,70 @@ import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import path from "node:path";
 
-const browser=await chromium.launch({headless:true});
-try{
-  const page=await browser.newPage();
-  await page.setContent("<!doctype html><html><body></body></html>");
-  await page.addScriptTag({path:path.resolve("js/live-shipping-address.js")});
-  const result=await page.evaluate(()=>{
-    const answers=["Jean Dupont","12 rue des Cartes","","59330","Hautmont","FR","0600000000"];
-    let calls=0;
-    window.alert=()=>{};
-    window.prompt=()=>{calls++;return answers.shift();};
-    const first=window.CardoriaLiveShippingAddress.collect({liveId:"LIVE-E2E",email:"buyer@example.com",name:"Pseudo"});
-    return {first,calls};
+// Only the external relay response is a fixture. The real browser collector is loaded.
+const browser = await chromium.launch({ headless: true });
+try {
+  const page = await browser.newPage();
+  let relaySearches = 0;
+  let unavailable = false;
+  await page.route("https://cardoria.test/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === "/api/sendcloud/service-points") {
+      relaySearches++;
+      assert.equal(url.searchParams.get("postalCode"), "59330");
+      assert.equal(url.searchParams.get("countryCode"), "FR");
+      return route.fulfill({ status: unavailable ? 503 : 200, contentType: "application/json", body: JSON.stringify(unavailable
+        ? { ok: false, code: "SENDCLOUD_NOT_CONFIGURED", error: "Sendcloud indisponible pour le test" }
+        : { ok: true, points: [{ id: 10001, name: "Relais fictif de test", street: "rue Test", houseNumber: "1", postalCode: "59330", city: "Hautmont", countryCode: "FR", carrierCode: "mondial_relay" }] }) });
+    }
+    if (url.pathname !== "/") throw new Error(`Unexpected HTTP request: ${url.pathname}`);
+    return route.fulfill({ contentType: "text/html", body: "<!doctype html><html><body></body></html>" });
   });
-  assert.equal(result.first.recipientName,"Jean Dupont");
-  assert.equal(result.first.addressLine1,"12 rue des Cartes");
-  assert.equal(result.first.postalCode,"59330");
-  assert.equal(result.first.city,"Hautmont");
-  assert.equal(result.first.countryCode,"FR");
-  assert.equal(result.calls,7);
-  console.log("Postal address collector Chromium E2E: OK");
+  await page.goto("https://cardoria.test/");
+  await page.addScriptTag({ path: path.resolve("js/live-shipping-address.js") });
+  const result = await page.evaluate(async () => {
+    const answers = ["Jean Dupont", "12 rue des Cartes", "", "59330", "Hautmont", "FR", "0600000000", "1"];
+    let calls = 0;
+    window.alert = () => {};
+    window.prompt = () => { calls++; return answers.shift(); };
+    const first = await window.CardoriaLiveShippingAddress.collect({ liveId: "LIVE-E2E", email: "buyer@example.com", name: "Pseudo" });
+    return { first, calls };
+  });
+  assert.equal(result.first.address.recipientName, "Jean Dupont");
+  assert.equal(result.first.address.addressLine1, "12 rue des Cartes");
+  assert.equal(result.first.address.postalCode, "59330");
+  assert.equal(result.first.address.city, "Hautmont");
+  assert.equal(result.first.address.countryCode, "FR");
+  assert.equal(result.first.servicePoint.id, "10001");
+  assert.equal(result.first.email, "buyer@example.com");
+  assert.equal(result.calls, 8);
+  assert.equal(relaySearches, 1);
+
+  const cached = await page.evaluate(async () => {
+    window.confirm = () => true;
+    window.prompt = () => { throw new Error("Confirmed cached selection should not prompt again"); };
+    return window.CardoriaLiveShippingAddress.collect({ liveId: "LIVE-E2E", email: "buyer@example.com", name: "Pseudo" });
+  });
+  assert.equal(cached.servicePoint.id, "10001");
+  assert.equal(relaySearches, 1);
+
+  const cancelled = await page.evaluate(async () => {
+    window.prompt = () => null;
+    return window.CardoriaLiveShippingAddress.collect({ liveId: "LIVE-CANCEL", email: "buyer@example.com", name: "Pseudo" });
+  });
+  assert.equal(cancelled, null);
+
+  unavailable = true;
+  const failure = await page.evaluate(async () => {
+    const answers = ["Jean Dupont", "12 rue des Cartes", "", "59330", "Hautmont", "FR", "0600000000"];
+    window.prompt = () => answers.shift();
+    try {
+      await window.CardoriaLiveShippingAddress.collect({ liveId: "LIVE-FAIL", email: "buyer@example.com", name: "Pseudo" });
+      return { unexpectedSuccess: true };
+    } catch (error) { return { code: error.code }; }
+  });
+  assert.equal(failure.code, "SENDCLOUD_NOT_CONFIGURED");
+  console.log("Postal address and relay Chromium E2E: PASS (external Sendcloud response mocked)");
 } finally {
   await browser.close();
 }
