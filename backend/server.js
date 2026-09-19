@@ -63,6 +63,7 @@ import { cleanupLegacyLiveTestsOnce } from "./lib/live/cleanup-tests.js";
 import { initLaunch, connectionJournalMiddleware, maintenanceMiddleware } from "./lib/launch/index.js";
 import systemRoutes from "./routes/system.js";
 import sendcloudRoutes from "./routes/sendcloud.js";
+import mondialRelayRoutes from "./routes/mondial-relay.js";
 
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
@@ -101,6 +102,7 @@ app.use(connectionJournalMiddleware());
 app.use("/api/health", healthRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/sendcloud", sendcloudRoutes);
+app.use("/api/mondial-relay", mondialRelayRoutes);
 
 safeInit("auth-migration", migrateAuth);
 app.use("/api/auth", marketplacePersistenceMiddleware, (req, res, next) => {

@@ -108,7 +108,7 @@ router.get("/seller/archives/:id", (req,res)=>{ try { const actor=sellerActor(re
 router.get("/seller/checkouts", (req, res) => { try { const actor = sellerActor(req); res.json({ ok: true, provider: "paypal", checkouts: listLiveCheckouts({ ownerId: actor.sellerId }) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 401); } });
 router.get("/seller/shipments", (req, res) => { try {
   const actor=sellerActor(req);
-  res.json({ok:true,shipments:listLiveShipments({sellerId:actor.sellerId,liveId:String(req.query.liveId||"")})});
+  res.json({ok:true,shipments:listLiveShipments({sellerId:actor.sellerId,liveId:String(req.query.liveId||""),audience:"seller"})});
 } catch(error){ fail(res,error,error instanceof MarketplaceAuthError?error.status:401); } });
 router.post("/seller/sessions/:id/shipments/create", async (req,res)=>{ try {
   const actor=sellerActor(req),session=getLiveSession(req.params.id);
@@ -120,6 +120,6 @@ router.get("/my-shipments", (req,res)=>{ try {
   const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"")||String(req.headers["x-session-token"]||"");
   const user=validateSession(token);
   if(!user||user.role!=="client")return res.status(401).json({ok:false,error:"Connexion client requise."});
-  res.json({ok:true,shipments:listLiveShipments({buyerEmail:user.email})});
+  res.json({ok:true,shipments:listLiveShipments({buyerEmail:user.email,audience:"buyer"})});
 } catch(error){ fail(res,error,401); } });
 export default router;
