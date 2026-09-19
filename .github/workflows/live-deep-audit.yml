@@ -1,11 +1,8 @@
 name: Cardoria Live Deep Audit
 on:
-  pull_request:
-    paths:
-      - 'backend/**'
-      - 'tests/**'
-      - 'js/**'
-      - '.github/workflows/live-deep-audit.yml'
+  push:
+    branches: [feature/live-shipping-final]
+    paths: ['backend/**', 'tests/**', 'js/**', '.github/workflows/live-deep-audit.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -29,14 +26,20 @@ jobs:
         run: |
           mkdir -p /tmp/cardoria-deep-audit
           git rev-parse HEAD > /tmp/cardoria-deep-audit/commit.txt
-          git archive --format=zip HEAD > /tmp/cardoria-deep-audit/source.zip
+          git archive --format=zip HEAD > /tmp/cardoria-source.zip
+      - name: Keep tracked source for reproducibility (no runner credentials)
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-audit-source-${{ github.sha }}
+          path: /tmp/cardoria-source.zip
+          retention-days: 3
       - name: Install backend dependencies
         working-directory: backend
         run: npm install --omit=dev
       - name: Run every unit and regression test file in isolated processes
         run: |
           python3 - <<'PY'
-          import json, os, pathlib, subprocess, time
+          import json, pathlib, subprocess, time
           root = pathlib.Path.cwd()
           out = pathlib.Path('/tmp/cardoria-deep-audit')
           files = sorted(set(list(root.glob('backend/tests/*.test.mjs')) + list(root.glob('tests/*.test.mjs'))))
@@ -55,13 +58,13 @@ jobs:
               log_name = name.replace('/', '__') + '.log'
               (out / log_name).write_text(log)
               results.append({'file': name, 'exitCode': code, 'seconds': round(time.monotonic() - started, 2), 'log': log_name})
+              (out / 'test-results.json').write_text(json.dumps(results, indent=2))
               print(('PASS' if code == 0 else 'FAIL') + ' ' + name, flush=True)
-          (out / 'test-results.json').write_text(json.dumps(results, indent=2))
           failed = [row for row in results if row['exitCode'] != 0]
           print(json.dumps({'files': len(results), 'passed': len(results)-len(failed), 'failed': failed}, indent=2))
           raise SystemExit(bool(failed))
           PY
-      - name: Keep exact source and test evidence (no credentials)
+      - name: Keep all test evidence (no credentials)
         if: always()
         uses: actions/upload-artifact@v4
         with:
