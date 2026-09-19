@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [live-admin-core-e2e, live-seller-core-e2e, live-public-e2e]
+        scenario: [live-admin-core-e2e, live-seller-core-e2e, live-public-e2e, live-seller-client-journey-e2e]
     env:
       NODE_ENV: test
       PORT: '10000'
