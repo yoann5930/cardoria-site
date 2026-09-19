@@ -11,7 +11,7 @@ test("SMTP OVH remains a fixed allowlisted stdin-only operation", () => {
   const wrapper = read("oracle/cardoria-ops-ssh-wrapper.sh");
   const sudoers = read("oracle/sudoers-cardoria-ops");
 
-  assert.match(run, /smtp-configure\) ;;/);
+  assert.match(run, /(?:^|\|)smtp-configure(?:\||\) ;;)/m);
   assert.match(run, /SMTP_PASS: \$\{\{ secrets\.OVH_SMTP_PASS \}\}/);
   assert.match(run, /printf '%s' "\$SMTP_PASS" \| ssh/);
   assert.doesNotMatch(run, /remote_cmd=.*SMTP_PASS/);

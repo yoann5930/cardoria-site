@@ -1,4 +1,5 @@
 /** PayPal webhooks + remboursements Marketplace Cardoria. */
+import { handleVerifiedLiveFinancialEvent } from "../live/paypal-capture-validation.js";
 import { getDb } from "../engine/database.js";
 import { getSeller } from "./sellers.js";
 import { getOrder, updateOrderStatus, markOrderPaymentStatus } from "./orders.js";
@@ -65,6 +66,8 @@ export async function handlePayPalWebhook(headers, event) {
   if (!await verifyPayPalWebhook(headers, event)) throw Object.assign(new Error("Signature webhook PayPal invalide."), { status: 400 });
   const type = String(event?.event_type || "");
   const resource = event?.resource || {};
+  const liveFinancial = handleVerifiedLiveFinancialEvent(type, resource);
+  if (liveFinancial) return { received: true, type, live: liveFinancial };
   if (type === "CHECKOUT.ORDER.APPROVED" && resource.id) {
     const existing = getDb().prepare("SELECT COUNT(*) AS n FROM mk_orders WHERE paypal_order_id=? AND payment_status='paid'").get(resource.id)?.n || 0;
     const total = getDb().prepare("SELECT COUNT(*) AS n FROM mk_orders WHERE paypal_order_id=?").get(resource.id)?.n || 0;

@@ -15,7 +15,7 @@ test("buyer giveaway is enabled and subscriber giveaway remains restricted to se
   assert.match(controls,/buyer\.onclick=startBuyerGiveaway/);
   assert.match(controls,/if\(!isAdmin\(\)\)\{follow\.hidden=false/);
   assert.match(controls,/else\{follow\.hidden=true;follow\.style\.display="none"/);
-  assert.match(css,/#lasGiveFollow\{display:none!important\}/);
+  assert.match(css,/#lasGiveFollow\[hidden\]\{display:none!important\}/);
   assert.doesNotMatch(css,/#lasGiveFollow,#lasGiveBuyer/);
 });
 test("admin runtime uses cache-busted final sales menu assets",()=>{assert.match(adminHtml,/live-studio-clean\.css\?v=20260918-sales-menu-final/);assert.match(adminHtml,/live-studio-actions-ui\.js\?v=20260918-sales-menu-final/);assert.match(adminHtml,/live-studio-sales-controls\.js\?v=20260918-sales-menu-final/);});

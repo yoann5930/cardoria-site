@@ -7,7 +7,11 @@
   let currentUser = null;
 
   function setMessage(text, type) {
-    const el = qs("clientAuthMessage");
+    let el = qs("clientAuthMessage");
+    if (qs("clientAccountCard") && !qs("clientAccountCard").hidden) {
+      el = qs("clientProfileMessage");
+      if (!el) { el = document.createElement("p"); el.id = "clientProfileMessage"; el.setAttribute("role", "status"); qs("clientAccountCard").prepend(el); }
+    }
     if (!el) return;
     el.textContent = text || "";
     el.className = "client-auth-message" + (type ? ` is-${type}` : "");
@@ -213,14 +217,19 @@
         host.innerHTML = "<p>Aucune expédition Live.</p>";
         return;
       }
-      host.innerHTML = items.map((s) => {
-        const tracking = s.trackingUrl
-          ? "<a target='_blank' rel='noopener' href='" + String(s.trackingUrl).replace(/"/g, "&quot;") + "'>" + (s.trackingNumber || "Suivre le colis") + "</a>"
-          : (s.trackingNumber || "Suivi en attente");
-        return "<div style='border:1px solid rgba(212,175,55,.25);padding:10px;margin:8px 0;border-radius:8px'><strong>" +
-          (s.carrier || "Expédition Live") + "</strong><br>Statut : " + (s.status || "En préparation") +
-          "<br>Suivi : " + tracking + "</div>";
-      }).join("");
+      host.replaceChildren();
+      for (const s of items) {
+        const box = document.createElement("div"), title = document.createElement("strong"), state = document.createElement("p"), tracking = document.createElement("p");
+        title.textContent = s.carrier || "Expédition Live";
+        state.textContent = "Statut : " + (s.status || "En préparation");
+        tracking.textContent = "Suivi : ";
+        let url = null;
+        try { const candidate = new URL(s.trackingUrl); if (candidate.protocol === "https:" && !candidate.username && !candidate.password) url = candidate; } catch {}
+        const link = document.createElement(url ? "a" : "span");
+        link.textContent = s.trackingNumber || (url ? "Suivre le colis" : "Suivi en attente");
+        if (url) { link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer"; }
+        tracking.appendChild(link); box.append(title, state, tracking); host.appendChild(box);
+      }
     } catch (e) {
       host.textContent = "Suivi Live indisponible : " + e.message;
     }

@@ -2,6 +2,7 @@
  * PayPal Marketplace Cardoria — onboarding vendeurs, commissions et checkout multi-vendeurs.
  * Les secrets PayPal restent exclusivement côté serveur via variables d'environnement.
  */
+import { applyVerifiedLiveCapture } from "../live/paypal-capture-validation.js";
 import { getDb } from "../engine/database.js";
 import { getMarketplaceFeeQuote, recordMarketplaceCapture } from "../subscriptions/seller-plans.js";
 import { getSeller, updateSellerPayPal } from "./sellers.js";
@@ -325,7 +326,7 @@ export async function captureLivePayPalOrder(paypalOrderId) {
   const { applyLivePaymentStatus, listLiveCheckouts } = await import("../live/sessions.js");
   const checkout = listLiveCheckouts().find((item) => item.paymentProviderOrderId === paypalOrderId);
   if (!checkout) throw Object.assign(new Error("Paiement Live PayPal introuvable."), { status: 404 });
-  if (checkout.status === "paid") return { provider: "paypal", alreadyPaid: true, checkout };
+  if (["paid", "completed", "refunded", "refund_reconciliation_required"].includes(checkout.status)) return { provider: "paypal", alreadyPaid: true, checkout };
   const seller = ensureSellerCanReceive({ sellerId: checkout.ownerId, total: checkout.amount, shippingCost: 0 });
   const result = await paypalRequest(`/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
     method: "POST",
@@ -334,12 +335,9 @@ export async function captureLivePayPalOrder(paypalOrderId) {
     sellerMerchantId: seller.paypalMerchantId
   });
   const capture = result.purchase_units?.[0]?.payments?.captures?.[0];
-  const captureStatus = String(capture?.status || result.status || "").toUpperCase();
+  const captureStatus = String(capture?.status || "").toUpperCase();
   if (captureStatus === "COMPLETED") {
-    applyLivePaymentStatus(checkout.id, "paid", {
-      paymentProviderOrderId: paypalOrderId,
-      paymentProviderTransactionId: capture?.id || ""
-    });
+    applyVerifiedLiveCapture(checkout, capture, { paypalOrderId, merchantId: seller.paypalMerchantId });
   }
   return { provider: "paypal", id: result.id, status: result.status, captureId: capture?.id || "", checkout: listLiveCheckouts().find((item) => item.id === checkout.id) };
 }

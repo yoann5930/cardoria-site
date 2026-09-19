@@ -7,6 +7,7 @@ import { MarketplaceAuthError, assertSellerSession } from "../lib/marketplace/v1
 import { PAYMENT_MATRIX } from "../lib/payments/routing.js";
 import { createLiveCheckout, planLiveCheckout } from "../lib/live/checkout.js";
 import { authenticatedCheckoutInput } from "../lib/live/buyer-identity.js";
+import liveLabelRoutes from "./live-labels.js";
 import liveRealtimeRoutes from "./live-realtime.js";
 import liveActionRoutes from "./live-actions.js";
 import liveAdminStudioRoutes from "./live-admin-studio.js";
@@ -16,6 +17,7 @@ import { archiveLiveSession, getLiveArchive, listLiveArchives } from "../lib/liv
 import { createLiveShipmentsForLive, listLiveShipments } from "../lib/live/shipments.js";
 
 const router = Router();
+router.use(liveLabelRoutes);
 router.use("/webrtc", liveRealtimeRoutes);
 router.use("/actions", liveActionRoutes);
 router.use("/admin-studio", liveAdminStudioRoutes);

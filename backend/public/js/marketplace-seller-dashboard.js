@@ -20,11 +20,13 @@
       "<button type='submit'>Enregistrer l'adresse d'expédition</button></form><p id='sp-state'></p></section>";
   }
 
+  function safeTrackingUrl(value) { try { var url=new URL(value); return url.protocol==="https:"&&!url.username&&!url.password?url.href:""; } catch(e) { return ""; } }
   function renderShipments(items) {
     if (!items || !items.length) return "<p>Aucune expédition Live.</p>";
     return items.map(function (s) {
-      var label = s.labelUrl ? " · <a target='_blank' rel='noopener' href='" + M.esc(s.labelUrl) + "'>Étiquette PDF</a>" : "";
-      var tracking = s.trackingUrl ? "<a target='_blank' rel='noopener' href='" + M.esc(s.trackingUrl) + "'>" + M.esc(s.trackingNumber || "Suivi") + "</a>" : M.esc(s.trackingNumber || "—");
+      var label = s.sendcloudParcelId ? " · <button type='button' data-live-label='" + M.esc(s.id) + "'>Étiquette PDF</button>" : "";
+      var trackingUrl = safeTrackingUrl(s.trackingUrl);
+      var tracking = trackingUrl ? "<a target='_blank' rel='noopener' href='" + M.esc(trackingUrl) + "'>" + M.esc(s.trackingNumber || "Suivi") + "</a>" : M.esc(s.trackingNumber || "—");
       return "<div style='border:1px solid rgba(212,175,55,.25);padding:12px;margin:8px 0;border-radius:8px'><strong>" + M.esc(s.buyerName || s.buyerEmail) +
         "</strong> — " + M.esc(s.carrier || s.carrierCode || "") + " — " + M.esc(s.status || "") +
         "<p>Suivi : " + tracking + label + "</p><p>Payeur port : " + M.esc(s.payer || "") + " · " + M.esc(String(s.weightGrams || 0)) + " g</p></div>";
@@ -35,7 +37,7 @@
   Promise.all([
     M.api("/v1/sellers/" + encodeURIComponent(seller.id) + "/orders"),
     M.api("/v1/sellers/" + encodeURIComponent(seller.id) + "/sender-profile"),
-    fetch((window.CARDORIA_BACKEND || location.origin) + "/api/live/seller/shipments", { headers: { Authorization: "Bearer " + M.getToken(), Accept: "application/json" }, cache: "no-store" }).then(function (r) { return r.json(); }).catch(function () { return { shipments: [] }; })
+    fetch((window.CARDORIA_BACKEND || location.origin) + "/api/live/seller/shipments", { headers: { Authorization: "Bearer " + M.getToken(), Accept: "application/json" }, cache: "no-store" }).then(function (r) { return r.json().then(function (d) { if (!r.ok || d.ok === false) throw new Error(d.error || "Expéditions Live indisponibles."); return d; }); })
   ]).then(function (r) {
     var d = r[0], profile = r[1], liveShipping = r[2];
     root.innerHTML = "<p><strong>" + M.esc(seller.displayName) + "</strong> " + M.sellerBadge(seller) + "</p>" +
@@ -46,6 +48,17 @@
         return "<div style='border:1px solid rgba(212,175,55,.25);padding:12px;margin:8px 0;border-radius:8px'><strong>" + M.esc(o.id) + "</strong> — " + M.esc(o.listingTitle) + " — " + M.euro(o.total) + " — " + M.esc(o.status) + ((o.status === "paid" || o.status === "preparing") ? "<div style='margin-top:8px'><input placeholder='N° suivi' id='tr-" + M.esc(o.id) + "'><button type='button' data-oid='" + M.esc(o.id) + "'>Marquer expédié</button></div>" : "") + (o.shippingTracking ? "<p>Suivi : " + M.esc(o.shippingTracking) + "</p>" : "") + "</div>";
       }).join("") || "<p>Aucune commande.</p>");
 
+    root.querySelectorAll("button[data-live-label]").forEach(function(button) {
+      button.onclick = async function() {
+        button.disabled = true;
+        try {
+          var response = await fetch((window.CARDORIA_BACKEND || location.origin) + "/api/live/seller/shipments/" + encodeURIComponent(button.dataset.liveLabel) + "/label", { headers: { Authorization: "Bearer " + M.getToken(), Accept: "application/pdf" }, cache: "no-store" });
+          if (!response.ok || !(response.headers.get("content-type") || "").startsWith("application/pdf")) throw new Error("Étiquette PDF indisponible.");
+          var url = URL.createObjectURL(await response.blob()), link = document.createElement("a");
+          link.href=url; link.download="etiquette-live.pdf"; document.body.appendChild(link); link.click(); link.remove(); setTimeout(function(){URL.revokeObjectURL(url);},30000);
+        } catch(error) { alert(error.message); } finally { button.disabled=false; }
+      };
+    });
     var form = document.getElementById("sellerSenderForm");
     if (form) form.onsubmit = function (event) {
       event.preventDefault();

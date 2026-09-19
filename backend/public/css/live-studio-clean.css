@@ -1,4 +1,4 @@
-#lasGiveFollow{display:none!important}
+#lasGiveFollow[hidden]{display:none!important}
 .live-studio-current,.live-studio-queue{min-width:0}
 .live-studio-quick{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px!important;margin:10px 0 12px}
 .live-studio-quick button{min-height:42px;width:100%;padding:8px 10px}
