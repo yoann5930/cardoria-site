@@ -43,6 +43,15 @@ test("wrong carrier, return, labelless and home options never act as silent fall
     await mocked(async () => json({ data: [{ ...option, ...changed }] }), async () => assert.rejects(sc.resolveShippingOption({ carrierCode: "mondial_relay", weightGrams: 500, servicePointId: 123 }), { code: "SENDCLOUD_SHIPPING_OPTION_UNAVAILABLE" }));
   }
 });
+test("domestic Mondial Relay is preferred over an international service-point option", async () => {
+  const international = { ...option, code: "mondial_relay:service_point,international_dualapi/c2c", name: "Mondial Relay Point Relais International" };
+  const domestic = { ...option, code: "mondial_relay:service_point,dualapi/size=l,c2c", name: "Mondial Relay Point Relais" };
+  await mocked(async () => json({ data: [international, domestic] }), async () => {
+    const selected = await sc.resolveShippingOption({ carrierCode: "mondial_relay", weightGrams: 560, servicePointId: 123, fromAddress: { country_code: "FR", postal_code: "59530" }, toAddress: { country_code: "FR", postal_code: "59330" } });
+    assert.equal(selected.code, domestic.code);
+    assert.doesNotMatch(selected.name.toLowerCase(), /international/);
+  });
+});
 test("foreign relay prevents any announcement request", async () => {
   const calls = []; await mocked(async url => { calls.push(url); return json({ data: { ...point, carrier: { code: "other" } } }); }, async () => assert.rejects(sc.createSendcloudShipment(input), { code: "SERVICE_POINT_MISMATCH" })); assert.equal(calls.length, 1);
 });

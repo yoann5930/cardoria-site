@@ -220,8 +220,11 @@ export async function getServicePoint(id) {
   return point;
 }
 
-function selectCompatibleOption(options, carrier, mondialRelay) {
-  const compatible = options.filter((option) => {
+function optionText(option) {
+  return `${option?.code || ""} ${option?.name || ""} ${option?.product?.name || ""}`.toLowerCase();
+}
+function selectCompatibleOption(options, carrier, mondialRelay, { domestic = false } = {}) {
+  let compatible = options.filter((option) => {
     if (!option?.code || option.carrier?.code !== carrier) return false;
     if (option.functionalities?.returns === true || option.functionalities?.labelless === true) return false;
     if (mondialRelay) {
@@ -231,6 +234,10 @@ function selectCompatibleOption(options, carrier, mondialRelay) {
     }
     return option.functionalities?.last_mile !== "service_point" && option.requirements?.is_service_point_required !== true;
   });
+  if (domestic) {
+    const local = compatible.filter((option) => !optionText(option).includes("international"));
+    if (local.length) compatible = local;
+  }
   if (!compatible.length) throw failure("SENDCLOUD_SHIPPING_OPTION_UNAVAILABLE", "Aucune méthode compatible avec le transporteur et la destination demandés.", 409);
   const withQuote = compatible.map((option) => ({ option, quote: quoteAmount(option) }));
   withQuote.sort((a, b) => {
@@ -273,7 +280,7 @@ export async function resolveShippingOption({
   });
   const payload = await request("/shipping-options", { method: "POST", body });
   const options = Array.isArray(payload.data) ? payload.data : [];
-  const selected = selectCompatibleOption(options, carrier, mondialRelay);
+  const selected = selectCompatibleOption(options, carrier, mondialRelay, { domestic: from.country_code === to.country_code });
   return {
     code: text(selected.option.code, 240, true),
     name: text(selected.option.name || selected.option.product?.name, 240),
