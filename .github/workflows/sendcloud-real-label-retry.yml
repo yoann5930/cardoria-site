@@ -1,0 +1,157 @@
+name: Sendcloud Real Label Retry
+
+on:
+  push:
+    branches: [sendcloud-real-label-test-20260919]
+    paths: ['.github/workflows/sendcloud-real-label-retry.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  real-label-retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SENDCLOUD_PUBLIC_KEY: ${{ secrets.SENDCLOUD_PUBLIC_KEY }}
+      SENDCLOUD_SECRET_KEY: ${{ secrets.SENDCLOUD_SECRET_KEY }}
+      SENDCLOUD_TEST_MOBILE: ${{ secrets.SENDCLOUD_TEST_MOBILE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Create real Mondial Relay label, verify PDF, then cancel
+        working-directory: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import { searchMondialRelayServicePoints, resolveShippingOption } from "./lib/sendcloud.js";
+
+          const pub=String(process.env.SENDCLOUD_PUBLIC_KEY||"").trim();
+          const sec=String(process.env.SENDCLOUD_SECRET_KEY||"").trim();
+          const phone=String(process.env.SENDCLOUD_TEST_MOBILE||"").trim();
+          if(!pub||!sec||!phone) throw new Error("Protected Sendcloud test secrets missing");
+
+          // Reuse the recipient name already stored in the isolated one-time test branch,
+          // without printing it or duplicating personal data into this workflow.
+          const prior=fs.readFileSync("../.github/workflows/sendcloud-real-label-test.yml","utf8");
+          const nameMatch=prior.match(/recipientName:\s*"([^"]+)"/);
+          if(!nameMatch) throw new Error("Test recipient name unavailable");
+          const recipientName=nameMatch[1];
+
+          const norm=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+          const search=await searchMondialRelayServicePoints({countryCode:"FR",postalCode:"59330",city:"Hautmont",limit:30,radius:20000});
+          const matches=search.points.filter(p=>norm(p.name).includes("allvaps"));
+          if(matches.length!==1){
+            fs.writeFileSync("/tmp/sendcloud-real-label-report.json",JSON.stringify({status:"blocked",reason:"SERVICE_POINT_NOT_UNIQUE",matches:matches.map(p=>({id:p.id,name:p.name,postalCode:p.postalCode,city:p.city}))},null,2));
+            throw new Error("All Vap's service point not uniquely identified");
+          }
+          const point=matches[0];
+
+          const option=await resolveShippingOption({
+            carrierCode:"mondial_relay",
+            toCountry:"FR",
+            fromCountry:"FR",
+            fromPostalCode:"59530",
+            toPostalCode:point.postalCode,
+            weightGrams:560,
+            servicePointId:point.id
+          });
+
+          const auth="Basic "+Buffer.from(pub+":"+sec).toString("base64");
+          async function api(path,{method="GET",body,pdf=false}={}){
+            const r=await fetch("https://panel.sendcloud.sc/api/v3"+path,{method,headers:{Authorization:auth,Accept:pdf?"application/pdf":"application/json","Content-Type":"application/json"},body:body?JSON.stringify(body):undefined,redirect:"error"});
+            const b=Buffer.from(await r.arrayBuffer());
+            if(!r.ok){
+              let details=""; try{const parsed=JSON.parse(b.toString("utf8")); details=JSON.stringify(parsed).slice(0,3000);}catch{}
+              console.error("Sendcloud request failed",r.status,details);
+              throw new Error("Sendcloud HTTP "+r.status);
+            }
+            return pdf?b:JSON.parse(b.toString("utf8"));
+          }
+
+          const orderId="CARDORIA-REAL-TEST-"+process.env.GITHUB_RUN_ID;
+          const announceBody={
+            label_details:{mime_type:"application/pdf",dpi:72},
+            to_address:{
+              name:recipientName,
+              company_name:"",
+              address_line_1:point.street,
+              house_number:point.houseNumber||"",
+              postal_code:point.postalCode,
+              city:point.city,
+              country_code:"FR",
+              phone_number:phone.startsWith("0")?"+33"+phone.slice(1):phone,
+              email:"cardoria59330@gmail.com"
+            },
+            from_address:{
+              name:"Cardoria Test Liveur",
+              company_name:"Cardoria",
+              address_line_1:"Rue Leon Gambetta",
+              house_number:"10",
+              postal_code:"59530",
+              city:"Le Quesnoy",
+              country_code:"FR",
+              phone_number:phone.startsWith("0")?"+33"+phone.slice(1):phone,
+              email:"cardoria59330@gmail.com"
+            },
+            ship_with:{type:"shipping_option_code",properties:{shipping_option_code:option.code}},
+            order_number:orderId,
+            external_reference_id:orderId,
+            reference:"Cardoria real MR test",
+            total_order_price:{currency:"EUR",value:"13.00"},
+            parcels:[{weight:{value:"0.560",unit:"kg"}}],
+            to_service_point:{id:point.id}
+          };
+          if(option.contractId) announceBody.ship_with.properties.contract_id=option.contractId;
+
+          let shipment=null,cancel=null,pdfOk=false;
+          try{
+            const created=await api("/shipments/announce",{method:"POST",body:announceBody});
+            shipment=created.data;
+            const parcel=shipment?.parcels?.[0];
+            if(!shipment?.id||!parcel?.id) throw new Error("Shipment or parcel id missing");
+            const pdf=await api("/parcels/"+parcel.id+"/documents/label?dpi=72",{pdf:true});
+            pdfOk=pdf.subarray(0,5).toString()==="%PDF-"&&pdf.length>500;
+            if(!pdfOk) throw new Error("Invalid label PDF");
+            fs.writeFileSync("/tmp/cardoria-mondial-relay-real-test-label.pdf",pdf);
+          } finally {
+            if(shipment?.id){
+              try{const c=await api("/shipments/"+encodeURIComponent(shipment.id)+"/cancel",{method:"POST"});cancel={status:c.data?.status||"",confirmed:c.data?.status==="cancelled"};}
+              catch(e){cancel={status:"cancel_failed",confirmed:false};}
+            }
+          }
+
+          const parcel=shipment?.parcels?.[0]||{};
+          const report={
+            status:pdfOk?"label_created_and_verified":"failed",
+            realLabelCreated:Boolean(shipment?.id),
+            carrier:shipment?.carrier?.code||"mondial_relay",
+            servicePoint:{id:point.id,name:point.name,postalCode:point.postalCode,city:point.city},
+            shipmentId:shipment?.id||null,
+            parcelId:parcel?.id||null,
+            trackingNumber:parcel?.tracking_number||null,
+            labelPdfVerified:pdfOk,
+            cancellation:cancel,
+            physicalParcelSent:false
+          };
+          fs.writeFileSync("/tmp/sendcloud-real-label-report.json",JSON.stringify(report,null,2));
+          console.log(JSON.stringify(report,null,2));
+          if(!pdfOk||!cancel?.confirmed) process.exit(4);
+          NODE
+
+      - name: Upload verified label and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sendcloud-real-label-retry-${{ github.run_id }}
+          path: |
+            /tmp/cardoria-mondial-relay-real-test-label.pdf
+            /tmp/sendcloud-real-label-report.json
+          if-no-files-found: warn
+          retention-days: 1
