@@ -321,12 +321,24 @@ export async function createLivePayPalOrder({ checkoutId, amount, sellerId, desc
   return { provider: "paypal", id: result.id, status: result.status, url, platformFee: fee, sellerNet: round2(amount - fee) };
 }
 
+export function liveCaptureReplayState(checkout) {
+  const status = String(checkout?.status || "").toLowerCase();
+  if (["refunded", "refund_reconciliation_required"].includes(status)) {
+    return { provider: "paypal", alreadyPaid: false, protected: true, checkout };
+  }
+  if (["paid", "completed"].includes(status)) {
+    return { provider: "paypal", alreadyPaid: true, checkout };
+  }
+  return null;
+}
+
 export async function captureLivePayPalOrder(paypalOrderId) {
   if (!paypalOrderId) throw Object.assign(new Error("Identifiant de paiement PayPal requis."), { status: 400 });
   const { applyLivePaymentStatus, listLiveCheckouts } = await import("../live/sessions.js");
   const checkout = listLiveCheckouts().find((item) => item.paymentProviderOrderId === paypalOrderId);
   if (!checkout) throw Object.assign(new Error("Paiement Live PayPal introuvable."), { status: 404 });
-  if (["paid", "completed", "refunded", "refund_reconciliation_required"].includes(checkout.status)) return { provider: "paypal", alreadyPaid: true, checkout };
+  const replayState = liveCaptureReplayState(checkout);
+  if (replayState) return replayState;
   const seller = ensureSellerCanReceive({ sellerId: checkout.ownerId, total: checkout.amount, shippingCost: 0 });
   const result = await paypalRequest(`/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
     method: "POST",
