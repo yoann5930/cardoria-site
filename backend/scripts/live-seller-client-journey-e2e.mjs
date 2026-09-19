@@ -37,7 +37,7 @@ assert(beforeFollow.response.status===403&&beforeFollow.body.code==="FOLLOW_REQU
 const follow=await auth(buyer.token,`/api/live/actions/${liveId}/follow`,{method:"POST",body:"{}"});
 assert(follow.response.status===200&&follow.body.following===true,"Buyer could not follow seller");
 const entered=await auth(buyer.token,`/api/live/actions/${liveId}/giveaway/enter`,{method:"POST",body:JSON.stringify({name:"Fake",email:"fake@example.invalid"})});
-assert(entered.response.status===200&&entered.body.entry?.name==="client-test","Follower did not enter subscriber giveaway with authenticated identity");
+assert(entered.response.status===200&&entered.body.entry?.name==="Client Test Cardoria","Follower did not enter subscriber giveaway with authenticated identity");
 const subDraw=await auth(sellerAccount.token,`/api/live/actions/seller/${liveId}/giveaway/draw`,{method:"POST",body:"{}"});
 assert(subDraw.response.status===200&&subDraw.body.giveaway?.winner,"Subscriber giveaway draw failed");
 
