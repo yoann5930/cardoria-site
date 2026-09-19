@@ -77,7 +77,10 @@ test("API V2 XML creates one 24R parcel to the selected Point Relais", () => {
   assert.match(xml, /<OutputFormat>10x15<\/OutputFormat>/);
   assert.match(xml, /<AddressAdd1>JEAN TEST<\/AddressAdd1>/);
   const order = xml.match(/<OrderNo>([^<]+)<\/OrderNo>/)?.[1] || "";
+  const customerNo = xml.match(/<CustomerNo>([^<]+)<\/CustomerNo>/)?.[1] || "";
   assert.ok(order.length > 0 && order.length <= 15);
+  assert.ok(customerNo.length > 0 && customerNo.length <= 9);
+  assert.match(customerNo, /^[0-9A-Z]+$/);
   assert.doesNotMatch(xml, /<ShipmentValue>/);
 });
 
