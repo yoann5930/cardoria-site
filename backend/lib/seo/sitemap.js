@@ -62,6 +62,12 @@ function urlEntry(base, path, opts = {}) {
   if (opts.lastmod) xml += "    <lastmod>" + xmlEscape(opts.lastmod) + "</lastmod>\n";
   if (opts.changefreq) xml += "    <changefreq>" + opts.changefreq + "</changefreq>\n";
   if (opts.priority) xml += "    <priority>" + opts.priority + "</priority>\n";
+  if (opts.image) {
+    xml += "    <image:image>\n";
+    xml += "      <image:loc>" + xmlEscape(opts.image) + "</image:loc>\n";
+    if (opts.imageTitle) xml += "      <image:title>" + xmlEscape(opts.imageTitle) + "</image:title>\n";
+    xml += "    </image:image>\n";
+  }
   xml += "  </url>\n";
   return xml;
 }
@@ -130,14 +136,18 @@ export function generateCardsSitemapXml(siteUrl = SITE, page = 1, pageSize = CAR
 
   getSitemapCards(safePageSize, offset).forEach((card) => {
     const cardUrl = `/cartes/${encodeURIComponent(card.license_slug)}/${encodeURIComponent(card.slug)}`;
+    const image = String(card.image_hd || card.image_thumb || "").trim();
+    const imageTitle = [card.name, card.extension, card.number].filter(Boolean).join(" — ");
     urls += urlEntry(base, cardUrl, {
       lastmod: storedLastmod(card.updated_at),
       changefreq: "weekly",
-      priority: card.license_slug === "pokemon" ? "0.72" : "0.66"
+      priority: card.license_slug === "pokemon" ? "0.72" : "0.66",
+      image,
+      imageTitle
     });
   });
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}</urlset>`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${urls}</urlset>`;
 }
 
 export function generateSitemapXml(siteUrl = SITE) {
