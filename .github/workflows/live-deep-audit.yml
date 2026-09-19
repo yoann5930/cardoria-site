@@ -1,0 +1,70 @@
+name: Cardoria Live Deep Audit
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'tests/**'
+      - 'js/**'
+      - '.github/workflows/live-deep-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  complete-test-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      ALERT_EMAIL: 'false'
+      ADMIN_REQUIRE_2FA: 'false'
+      SENDCLOUD_LIVE_LABELS_ENABLED: 'false'
+      MARKETPLACE_DEMO_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          package-manager-cache: false
+      - name: Record exact tracked source before tests
+        run: |
+          mkdir -p /tmp/cardoria-deep-audit
+          git rev-parse HEAD > /tmp/cardoria-deep-audit/commit.txt
+          git archive --format=zip HEAD > /tmp/cardoria-deep-audit/source.zip
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Run every unit and regression test file in isolated processes
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess, time
+          root = pathlib.Path.cwd()
+          out = pathlib.Path('/tmp/cardoria-deep-audit')
+          files = sorted(set(list(root.glob('backend/tests/*.test.mjs')) + list(root.glob('tests/*.test.mjs'))))
+          results = []
+          for test in files:
+              name = str(test.relative_to(root))
+              started = time.monotonic()
+              try:
+                  proc = subprocess.run(['node', '--test', str(test)], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=45)
+                  code, log = proc.returncode, proc.stdout
+              except subprocess.TimeoutExpired as error:
+                  code = 124
+                  raw = error.stdout or b''
+                  log = raw.decode(errors='replace') if isinstance(raw, bytes) else raw
+                  log += '\nAUDIT_TIMEOUT_AFTER_45_SECONDS\n'
+              log_name = name.replace('/', '__') + '.log'
+              (out / log_name).write_text(log)
+              results.append({'file': name, 'exitCode': code, 'seconds': round(time.monotonic() - started, 2), 'log': log_name})
+              print(('PASS' if code == 0 else 'FAIL') + ' ' + name, flush=True)
+          (out / 'test-results.json').write_text(json.dumps(results, indent=2))
+          failed = [row for row in results if row['exitCode'] != 0]
+          print(json.dumps({'files': len(results), 'passed': len(results)-len(failed), 'failed': failed}, indent=2))
+          raise SystemExit(bool(failed))
+          PY
+      - name: Keep exact source and test evidence (no credentials)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-deep-audit-${{ github.sha }}
+          path: /tmp/cardoria-deep-audit/
+          retention-days: 3
