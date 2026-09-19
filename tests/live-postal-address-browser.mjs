@@ -10,12 +10,15 @@ try {
   let unavailable = false;
   await page.route("https://cardoria.test/**", async (route) => {
     const url = new URL(route.request().url());
-    if (url.pathname === "/api/sendcloud/service-points") {
+    if (url.pathname === "/api/mondial-relay/service-points") {
       relaySearches++;
       assert.equal(url.searchParams.get("postalCode"), "59330");
       assert.equal(url.searchParams.get("countryCode"), "FR");
+      assert.equal(url.searchParams.get("city"), "Hautmont");
+      assert.equal(url.searchParams.get("limit"), "10");
+      assert.equal(url.searchParams.get("radius"), "15000");
       return route.fulfill({ status: unavailable ? 503 : 200, contentType: "application/json", body: JSON.stringify(unavailable
-        ? { ok: false, code: "SENDCLOUD_NOT_CONFIGURED", error: "Sendcloud indisponible pour le test" }
+        ? { ok: false, code: "MONDIAL_RELAY_NOT_CONFIGURED", error: "Mondial Relay indisponible pour le test" }
         : { ok: true, points: [{ id: 10001, name: "Relais fictif de test", street: "rue Test", houseNumber: "1", postalCode: "59330", city: "Hautmont", countryCode: "FR", carrierCode: "mondial_relay" }] }) });
     }
     if (url.pathname !== "/") throw new Error(`Unexpected HTTP request: ${url.pathname}`);
@@ -64,8 +67,8 @@ try {
       return { unexpectedSuccess: true };
     } catch (error) { return { code: error.code }; }
   });
-  assert.equal(failure.code, "SENDCLOUD_NOT_CONFIGURED");
-  console.log("Postal address and relay Chromium E2E: PASS (external Sendcloud response mocked)");
+  assert.equal(failure.code, "MONDIAL_RELAY_NOT_CONFIGURED");
+  console.log("Postal address and relay Chromium E2E: PASS (external Mondial Relay response mocked)");
 } finally {
   await browser.close();
 }
