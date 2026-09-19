@@ -326,7 +326,10 @@ export async function captureLivePayPalOrder(paypalOrderId) {
   const { applyLivePaymentStatus, listLiveCheckouts } = await import("../live/sessions.js");
   const checkout = listLiveCheckouts().find((item) => item.paymentProviderOrderId === paypalOrderId);
   if (!checkout) throw Object.assign(new Error("Paiement Live PayPal introuvable."), { status: 404 });
-  if (["paid", "completed", "refunded", "refund_reconciliation_required"].includes(checkout.status)) return { provider: "paypal", alreadyPaid: true, checkout };
+  if (["refunded", "refund_reconciliation_required"].includes(checkout.status)) {
+    return { provider: "paypal", alreadyPaid: false, protected: true, checkout };
+  }
+  if (["paid", "completed"].includes(checkout.status)) return { provider: "paypal", alreadyPaid: true, checkout };
   const seller = ensureSellerCanReceive({ sellerId: checkout.ownerId, total: checkout.amount, shippingCost: 0 });
   const result = await paypalRequest(`/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
     method: "POST",

@@ -59,14 +59,37 @@ export function liveShipmentRecipientEmails(liveId){
   for(const gift of getLiveGiveawayAwards(liveId))if(gift.winner?.email)emails.add(emailKey(gift.winner.email));
   return [...emails];
 }
-export function listLiveShipments({liveId="",sellerId="",buyerEmail=""}={}){let rows=load();if(liveId)rows=rows.filter(r=>r.liveId===String(liveId));if(sellerId)rows=rows.filter(r=>r.sellerId===String(sellerId));if(buyerEmail)rows=rows.filter(r=>emailKey(r.buyerEmail)===emailKey(buyerEmail));return rows.map(r=>({...r}));}
+export function presentLiveShipment(row,audience="seller"){
+  const presented={
+    id:row.id,liveId:row.liveId,status:row.status,trackingNumber:row.trackingNumber||"",trackingUrl:row.trackingUrl||"",
+    carrier:row.carrier,carrierCode:row.carrierCode,weightGrams:row.weightGrams,createdAt:row.createdAt,updatedAt:row.updatedAt,
+    labelAvailable:Boolean(row.sendcloudParcelId),
+    servicePoint:row.servicePoint?{id:String(row.servicePoint.id||""),name:row.servicePoint.name||"",city:row.servicePoint.city||"",postalCode:row.servicePoint.postalCode||""}:null
+  };
+  if(audience!=="buyer"){
+    presented.sellerId=row.sellerId;presented.buyerName=row.buyerName;presented.buyerEmail=row.buyerEmail;
+    presented.recipientAddress=row.recipientAddress;presented.checkoutIds=row.checkoutIds;presented.giveawayIds=row.giveawayIds;
+    presented.payer=row.payer;presented.buyerPostagePaid=row.buyerPostagePaid;
+    presented.labelPath=row.sendcloudParcelId?`/api/live/seller/shipments/${row.id}/label`:"";
+  }
+  return presented;
+}
+export function listLiveShipments({liveId="",sellerId="",buyerEmail="",audience=""}={}){
+  let rows=load();
+  if(liveId)rows=rows.filter(r=>r.liveId===String(liveId));
+  if(sellerId)rows=rows.filter(r=>r.sellerId===String(sellerId));
+  if(buyerEmail)rows=rows.filter(r=>emailKey(r.buyerEmail)===emailKey(buyerEmail));
+  if(audience)return rows.map(r=>presentLiveShipment(r,audience));
+  return rows.map(r=>{const{labelUrl,...safe}=r;return safe;});
+}
 export async function createLiveShipment({liveId,buyerEmail}={}){
   const live=getLiveSession(liveId);if(!live)throw Object.assign(new Error("Live introuvable."),{status:404});
+  if(live.status==="cancelled")throw Object.assign(new Error("Un Live annulé ne peut pas générer d'étiquette."),{status:409,code:"LIVE_CANCELLED"});
   if(live.status!=="ended")throw Object.assign(new Error("Le Live doit être terminé, non annulé, avant de créer les étiquettes."),{status:409,code:"LIVE_NOT_CLOSED"});
   const email=emailKey(buyerEmail),groupKey=liveShipmentGroupKey({liveId:live.id,sellerId:live.ownerId,buyerId:email});
   return runShipmentTask(groupKey,async()=>{
     const existing=load().find(r=>r.groupKey===groupKey);
-    if(existing?.sendcloudShipmentId)return{...existing,duplicate:true};
+    if(existing?.sendcloudShipmentId){const{labelUrl,...safe}=existing;return{...safe,duplicate:true};}
     if(existing)throw Object.assign(new Error("Une tentative d'étiquette existe déjà. Vérifiez Sendcloud avant toute nouvelle création."),{status:409,code:"SHIPMENT_RECONCILIATION_REQUIRED"});
     if(!liveLabelPurchasesEnabled())throw Object.assign(new Error("Création réelle d'étiquettes désactivée : validation transporteur et facturation nécessaire."),{status:503,code:"LIVE_LABELS_NOT_ACTIVATED"});
     if(!isSendcloudConfigured())throw Object.assign(new Error("Sendcloud non configuré côté serveur."),{status:503,code:"SENDCLOUD_NOT_CONFIGURED"});
@@ -78,8 +101,12 @@ export async function createLiveShipment({liveId,buyerEmail}={}){
     try{
       const sc=await createSendcloudShipment({orderNumber:id,reference:id,toAddress:data.recipient,toEmail:email,fromAddress:sender.address,fromEmail:sender.email,fromCompanyName:sender.companyName,weightGrams:data.weight,totalOrderValue:data.totalOrderValue,carrierCode:data.carrierCode,servicePointId:data.carrierCode==="mondial_relay"?Number(data.relay.id):null});
       if(!sc.shipmentId||!sc.parcelId)throw new Error("Réponse Sendcloud incomplète : rapprochement requis.");
-      return persist({...intent,sendcloudShipmentId:sc.shipmentId,sendcloudParcelId:sc.parcelId,trackingNumber:sc.trackingNumber,trackingUrl:sc.trackingUrl,labelUrl:sc.labelUrl,status:sc.status||"READY_TO_SEND",shippingOptionCode:sc.shippingOptionCode,updatedAt:new Date().toISOString()});
-    }catch(error){persist({...intent,status:"reconciliation_required",updatedAt:new Date().toISOString()});throw Object.assign(new Error("Création non confirmée. Contrôlez Sendcloud avant de réessayer pour éviter une double facturation."),{status:502,code:"SHIPMENT_RECONCILIATION_REQUIRED"});}
+      return persist({...intent,sendcloudShipmentId:sc.shipmentId,sendcloudParcelId:sc.parcelId,trackingNumber:sc.trackingNumber,trackingUrl:sc.trackingUrl,status:sc.status||"READY_TO_SEND",shippingOptionCode:sc.shippingOptionCode,updatedAt:new Date().toISOString()});
+    }catch(error){
+      persist({...intent,status:"reconciliation_required",updatedAt:new Date().toISOString()});
+      if(error?.code==="ACCOUNT_PAYMENT_METHOD_REQUIRED")throw error;
+      throw Object.assign(new Error("Création non confirmée. Contrôlez Sendcloud avant de réessayer pour éviter une double facturation."),{status:502,code:"SHIPMENT_RECONCILIATION_REQUIRED"});
+    }
   });
 }
 export async function createLiveShipmentsForLive(liveId){

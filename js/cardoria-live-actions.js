@@ -16,10 +16,11 @@ function showFollowSellerPrompt(liveId,entry){
   document.getElementById("claFollowCancel").onclick=closeFollowSellerPrompt;
   document.getElementById("claFollowSeller").onclick=function(){
     var button=this,state=document.getElementById("claFollowState");button.disabled=true;if(state)state.textContent="Abonnement en cours…";
-    post("/api/live/actions/"+encodeURIComponent(liveId)+"/follow",{}).then(function(){
+    post("/api/live/actions/"+encodeURIComponent(liveId)+"/follow",{enterGiveaway:true}).then(function(d){
+      if(d&&d.entered){closeFollowSellerPrompt();refresh();return;}
       if(state)state.textContent="Abonné. Inscription au giveaway…";
-      return post("/api/live/actions/"+encodeURIComponent(liveId)+"/giveaway/enter",entry);
-    }).then(function(){closeFollowSellerPrompt();refresh();}).catch(function(e){
+      return post("/api/live/actions/"+encodeURIComponent(liveId)+"/giveaway/enter",entry).then(function(){closeFollowSellerPrompt();refresh();});
+    }).catch(function(e){
       button.disabled=false;
       if(e.code==="CLIENT_LOGIN_REQUIRED"||e.status===401){if(state)state.innerHTML='Connexion client requise. <a href="/client-login.html" style="color:#e6c25a">Se connecter</a> puis revenez sur le Live.';}
       else if(state)state.textContent=e.message;

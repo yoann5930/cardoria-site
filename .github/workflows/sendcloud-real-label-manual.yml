@@ -1,4 +1,5 @@
-name: Sendcloud Requested Label Preflight
+name: Sendcloud Real Mondial Relay Manual Test
+
 on:
   workflow_dispatch:
     inputs:
@@ -6,10 +7,12 @@ on:
         description: Type QUOTE_ONLY or CREATE_ONE_TEST_LABEL. Default is quote-only.
         required: true
         default: QUOTE_ONLY
+
 permissions:
   contents: read
+
 jobs:
-  protected-account-check:
+  mondial-relay-manual:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -18,14 +21,16 @@ jobs:
       SENDCLOUD_TEST_MOBILE: ${{ secrets.SENDCLOUD_TEST_MOBILE }}
       SENDCLOUD_LIVE_LABELS_ENABLED: "false"
       SENDCLOUD_TEST_TO_NAME: Yoann Thivet
+      SENDCLOUD_CREATE_TEST_LABEL: ${{ github.event.inputs.confirm == 'CREATE_ONE_TEST_LABEL' && 'true' || 'false' }}
+      SENDCLOUD_ALLOW_REAL_TEST_LABEL: ${{ github.event.inputs.confirm == 'CREATE_ONE_TEST_LABEL' && 'true' || 'false' }}
       SENDCLOUD_TEST_REPORT: /tmp/sendcloud-mondial-relay-real-test.json
       SENDCLOUD_TEST_PDF: /tmp/sendcloud-real-label-test.pdf
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22.22.0"
-      - name: Quote Mondial Relay without buying a label
+          node-version: 22
+      - name: Probe Mondial Relay without buying a label
         if: ${{ github.event.inputs.confirm != 'CREATE_ONE_TEST_LABEL' }}
         working-directory: backend
         run: node scripts/sendcloud-mondial-relay-real-test.mjs
@@ -33,7 +38,6 @@ jobs:
         if: ${{ github.event.inputs.confirm == 'CREATE_ONE_TEST_LABEL' }}
         working-directory: backend
         env:
-          SENDCLOUD_ALLOW_REAL_TEST_LABEL: "true"
           SENDCLOUD_TEST_REPORT: /tmp/sendcloud-real-label-test.json
         run: |
           echo READY_TO_CREATE_ONE_REAL_TEST_LABEL
@@ -42,7 +46,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sendcloud-label-preflight-${{ github.run_id }}
+          name: sendcloud-mondial-relay-manual-${{ github.run_id }}
           path: |
             /tmp/sendcloud-mondial-relay-real-test.json
             /tmp/sendcloud-real-label-test.json

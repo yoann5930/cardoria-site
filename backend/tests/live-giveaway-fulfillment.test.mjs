@@ -116,6 +116,18 @@ test("giveaway awards, cumulative postage and private fulfillment",async t=>{
       setup();const a=purchase("A");sessions.saveLiveCheckout({...a,status:"paid"});actions.startBuyerGiveaway(live.id,{productId:"G1"});sessions.saveLiveCheckout({...a,status:"refunded"});
       assert.throws(()=>actions.drawGiveaway(live.id),/Aucun participant/);assert.equal(actions.getLiveGiveawayAwards(live.id).length,0);
     });
+    await t.test("cancelled lives cannot buy labels", async () => {
+      setup();award(alice);sessions.setLiveStatus(live.id,"cancelled",actor,{adminOverride:true});
+      await assert.rejects(fulfillment.createLiveShipment({liveId:live.id,buyerEmail:alice.email}),{code:"LIVE_CANCELLED"});
+    });
+    await t.test("shipment presentations never expose Sendcloud label URLs", () => {
+      const row = { id:"LSH-1", liveId:live.id, sellerId:"seller-1", buyerEmail:alice.email, buyerName:"Alice", sendcloudParcelId:"999", labelUrl:"https://evil.invalid/steal", trackingNumber:"MR1", status:"READY_TO_SEND", servicePoint:{id:"12345",name:"Relais",city:"Hautmont",postalCode:"59330"} };
+      const sellerView = fulfillment.presentLiveShipment(row,"seller");
+      const buyerView = fulfillment.presentLiveShipment(row,"buyer");
+      assert.equal("labelUrl" in sellerView, false); assert.equal("labelUrl" in buyerView, false);
+      assert.equal(sellerView.labelPath, "/api/live/seller/shipments/LSH-1/label");
+      assert.equal("buyerEmail" in buyerView, false); assert.equal("labelPath" in buyerView, false);
+    });
     await t.test("label purchase remains disabled during these tests",async()=>{
       setup();award(alice);sessions.setLiveStatus(live.id,"ended",actor,{adminOverride:true});
       assert.equal(fulfillment.liveLabelPurchasesEnabled(),false);
