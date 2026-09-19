@@ -66,6 +66,11 @@ function orderReference(value) {
   if (normalized.length <= 15) return normalized;
   return "CRD" + crypto.createHash("sha256").update(source, "utf8").digest("hex").slice(0, 12).toUpperCase();
 }
+function customerReference(value) {
+  const normalized = mrText(value, 200, { required: true }).replace(/[^0-9A-Z]/g, "");
+  if (normalized.length <= 9) return normalized;
+  return "CRD" + crypto.createHash("sha256").update(rawText(value), "utf8").digest("hex").slice(0, 6).toUpperCase();
+}
 function grams(value) {
   const n = Number(value);
   if (!Number.isSafeInteger(n) || n < 10 || n > 25000) throw failure("SHIPMENT_WEIGHT_REQUIRED", "Poids Mondial Relay entier compris entre 10 g et 25 kg requis.", 400);
@@ -241,7 +246,7 @@ export function buildShipmentCreationXml({ orderNumber, reference = "", toAddres
   const customerId = requiredEnv("MONDIAL_RELAY_API_V2_CUSTOMER_ID");
   const relay = relayNumber(servicePointId);
   const order = orderReference(orderNumber);
-  const customerNo = orderReference(reference || orderNumber);
+  const customerNo = customerReference(reference || orderNumber);
   const parcelWeight = grams(weightGrams);
   const amount = Number(totalOrderValue);
   if (!Number.isFinite(amount) || amount < 0) throw failure("MONDIAL_RELAY_INPUT_INVALID", "Valeur de commande Mondial Relay invalide.", 400);
