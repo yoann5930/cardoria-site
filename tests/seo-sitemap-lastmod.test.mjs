@@ -123,3 +123,33 @@ test('robots keeps public cards crawlable and advertises the canonical sitemap',
   assert.match(robots, /Disallow: \/admin/);
   assert.ok(robots.endsWith(`Sitemap: ${SITE}/sitemap.xml`));
 });
+
+
+test('card sitemap exposes only real catalogue images with escaped metadata', async () => {
+  const { api } = await load({ cards: [
+    {
+      license_slug: 'pokemon',
+      slug: 'image-card',
+      name: 'Pikachu & Friends',
+      extension: 'Test <Set>',
+      number: '1/100',
+      image_hd: 'https://images.example/card?a=1&b=2',
+      image_thumb: '',
+      updated_at: '2026-09-19'
+    },
+    {
+      license_slug: 'pokemon',
+      slug: 'no-image',
+      name: 'No image',
+      image_hd: '',
+      image_thumb: '',
+      updated_at: '2026-09-19'
+    }
+  ] });
+  const xml = api.generateCardsSitemapXml();
+  assert.match(xml, /xmlns:image="http:\/\/www\.google\.com\/schemas\/sitemap-image\/1\.1"/);
+  assert.match(xml, /<image:image>/);
+  assert.match(xml, /<image:loc>https:\/\/images\.example\/card\?a=1&amp;b=2<\/image:loc>/);
+  assert.match(xml, /<image:title>Pikachu &amp; Friends — Test &lt;Set&gt; — 1\/100<\/image:title>/);
+  assert.equal((xml.match(/<image:image>/g) || []).length, 1);
+});
