@@ -232,21 +232,19 @@ export function buildShipmentCreationXml({ orderNumber, reference = "", toAddres
   const password = requiredEnv("MONDIAL_RELAY_API_V2_PASSWORD");
   const customerId = requiredEnv("MONDIAL_RELAY_API_V2_CUSTOMER_ID");
   const relay = relayNumber(servicePointId);
-  const order = mrText(orderNumber, 15, { required: true });
-  const customerNo = mrText(reference || orderNumber, 15);
+  const order = orderReference(orderNumber);
+  const customerNo = orderReference(reference || orderNumber);
   const parcelWeight = grams(weightGrams);
   const amount = Number(totalOrderValue);
   if (!Number.isFinite(amount) || amount < 0) throw failure("MONDIAL_RELAY_INPUT_INVALID", "Valeur de commande Mondial Relay invalide.", 400);
   const outputFormat = ["A4","A5","10X15"].includes(rawText(process.env.MONDIAL_RELAY_LABEL_FORMAT || "10x15").toUpperCase()) ? rawText(process.env.MONDIAL_RELAY_LABEL_FORMAT || "10x15") : "10x15";
   const sender = addressXml(fromAddress, fromEmail, fromCompanyName || fromAddress?.recipientName || fromAddress?.name);
   const recipient = addressXml(toAddress, toEmail, toAddress?.recipientName || toAddress?.name);
-  const valueXml = amount > 0 ? "<ShipmentValue><Amount>" + amount.toFixed(2) + "</Amount><Currency>EUR</Currency></ShipmentValue>" : "";
   return '<?xml version="1.0" encoding="utf-8"?>' +
     '<ShipmentCreationRequest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.example.org/Request">' +
     "<Context><Login>" + xmlEscape(login) + "</Login><Password>" + xmlEscape(password) + "</Password><CustomerId>" + xmlEscape(customerId) + "</CustomerId><Culture>fr-FR</Culture><VersionAPI>1.0</VersionAPI></Context>" +
     "<OutputOptions><OutputFormat>" + xmlEscape(outputFormat) + "</OutputFormat><OutputType>PdfUrl</OutputType></OutputOptions>" +
     "<ShipmentsList><Shipment><OrderNo>" + xmlEscape(order) + "</OrderNo><CustomerNo>" + xmlEscape(customerNo) + "</CustomerNo><ParcelCount>1</ParcelCount>" +
-    valueXml +
     '<DeliveryMode Mode="24R" Location="' + xmlEscape(country(toAddress?.countryCode || "FR") + "-" + relay) + '" />' +
     '<CollectionMode Mode="CCC" Location="" />' +
     "<Parcels><Parcel><Content>" + xmlEscape(mrText(content, 40)) + "</Content><Weight Value=\"" + parcelWeight + "\" Unit=\"gr\" /></Parcel></Parcels>" +
@@ -263,7 +261,7 @@ function parseStatuses(xml) {
 export function parseShipmentCreationResponse(xml) {
   const body = String(xml || "");
   const statuses = parseStatuses(body);
-  const fatal = statuses.find(item => /error|critical/i.test(item.level || "") || (item.code && item.code !== "0"));
+  const fatal = statuses.find(item => /error|critical/i.test(item.level || "") || (!item.level && item.code && item.code !== "0"));
   if (fatal) throw failure("MONDIAL_RELAY_CREATION_REJECTED", "Mondial Relay a refusé la création de l'étiquette.", 502, { providerCode: fatal.code || "", providerLevel: fatal.level || "" });
   const shipmentMatch = body.match(/<(?:\w+:)?Shipment\b[^>]*\bShipmentNumber="([^"]+)"/i);
   const shipmentNumber = shipmentMatch ? xmlDecode(shipmentMatch[1]) : "";
