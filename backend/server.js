@@ -411,6 +411,7 @@ function sendPublicFile(req, res, next) {
 }
 
 app.get(["/boutique", "/boutique/", "/pages/boutique", "/pages/boutique/"], (req, res) => res.redirect(308, "/boutique.html"));
+app.get(["/estimation", "/estimation/", "/pages/estimation", "/pages/estimation/"], (req, res) => res.redirect(308, "/estimation.html"));
 app.get("/index.html", (req, res) => res.redirect(301, "/"));
 app.get("/cartes/:license/:slug", sendCardSeoPage);
 app.get("/carte.html", (req, res, next) => {
