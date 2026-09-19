@@ -58,6 +58,9 @@ test('static, license and extension pages do not pretend to change every day', a
   assert.ok(tags(xml, 'loc').includes(`${SITE}/boutique.html`));
   assert.ok(tags(xml, 'loc').includes(`${SITE}/pages/licences/pokemon/`));
   assert.ok(tags(xml, 'loc').includes(`${SITE}/extensions/pokemon/test`));
+  // URLs carrying explicit noindex directives must never be advertised as sitemap targets.
+  assert.ok(!tags(xml, 'loc').includes(`${SITE}/rachat-cartes.html`));
+  assert.ok(!tags(xml, 'loc').includes(`${SITE}/licence.html`));
 });
 
 test('blog keeps genuine update and creation dates', async () => {
