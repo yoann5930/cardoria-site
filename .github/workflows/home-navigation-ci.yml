@@ -16,16 +16,16 @@ jobs:
         with:
           node-version: '22'
       - name: Home navigation regression tests
-        run: node --test tests/home-navigation.test.mjs
+        run: node --test tests/home-navigation.test.mjs tests/seo-canonical-navigation.test.mjs
       - name: Validate primary production routes
         shell: bash
         run: |
           set -euo pipefail
           routes=(
             /
-            /pages/boutique/
+            /boutique.html
             /marketplace.html
-            /pages/estimation/
+            /estimation.html
             /live.html
             /client-login.html
             /pages/contact/
