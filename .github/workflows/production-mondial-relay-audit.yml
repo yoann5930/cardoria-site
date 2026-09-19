@@ -1,0 +1,46 @@
+name: Cardoria Production Mondial Relay Audit
+
+on:
+  push:
+    branches:
+      - audit/mondial-relay-production-status-20260920
+
+permissions:
+  contents: read
+
+jobs:
+  production-mondial-relay-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check production Mondial Relay status
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 3 --retry-delay 2 https://www.cardoriashop.fr/api/mondial-relay/status -o /tmp/mr-status.json
+          cat /tmp/mr-status.json
+          node <<'NODE'
+          const fs = require('fs');
+          const s = JSON.parse(fs.readFileSync('/tmp/mr-status.json','utf8'));
+          if (s.ok !== true) throw new Error('Mondial Relay status endpoint not OK');
+          if (s.provider !== 'mondial_relay_direct') throw new Error('Unexpected provider: ' + s.provider);
+          if (s.labelPurchasesEnabled !== false) throw new Error('Real label purchasing must remain disabled during audit');
+          if (s.servicePointSearchConfigured !== true) throw new Error('MONDIAL_RELAY_SERVICE_POINT_NOT_CONFIGURED');
+          if (s.shipmentApiConfigured !== true) throw new Error('MONDIAL_RELAY_SHIPMENT_API_NOT_CONFIGURED');
+          console.log('STATUS_OK');
+          NODE
+
+      - name: Check real WSI4 Point Relais search
+        run: |
+          set -euo pipefail
+          url='https://www.cardoriashop.fr/api/mondial-relay/service-points?postalCode=59330&city=Hautmont&countryCode=FR&limit=3&radius=15000'
+          curl -fsS --retry 3 --retry-delay 2 "$url" -o /tmp/mr-points.json
+          cat /tmp/mr-points.json
+          node <<'NODE'
+          const fs = require('fs');
+          const r = JSON.parse(fs.readFileSync('/tmp/mr-points.json','utf8'));
+          if (r.ok !== true) throw new Error('WSI4 search returned ok=false: ' + (r.code || '') + ' ' + (r.error || ''));
+          if (!Array.isArray(r.points) || r.points.length < 1) throw new Error('No Mondial Relay service point returned for Hautmont');
+          const p = r.points[0];
+          if (!p.id || !p.name || !p.postalCode || !p.city) throw new Error('Incomplete service point payload');
+          console.log('WSI4_OK', { id: String(p.id), name: p.name, postalCode: p.postalCode, city: p.city });
+          NODE
