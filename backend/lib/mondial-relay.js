@@ -229,6 +229,8 @@ export async function searchMondialRelayServicePoints(input = {}) {
   });
   const xml = await boundedText(response);
   if (!response.ok) throw failure("MONDIAL_RELAY_API_ERROR", "Recherche Point Relais refusée (HTTP " + response.status + ").", 502, { providerStatus: response.status });
+  const fault = xmlValue(xml, "faultstring");
+  if (fault) throw failure("MONDIAL_RELAY_API_ERROR", "Mondial Relay a refusé la recherche Point Relais.", 502);
   const points = parseServicePointSearchResponse(xml);
   return { points, count: points.length };
 }
@@ -257,12 +259,22 @@ export function buildShipmentCreationXml({ orderNumber, reference = "", toAddres
     "<Sender>" + sender + "</Sender><Recipient>" + recipient + "</Recipient></Shipment></ShipmentsList></ShipmentCreationRequest>";
 }
 function parseStatuses(xml) {
-  const statusBlocks = [...String(xml || "").matchAll(/<(?:\w+:)?Status\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?Status>/gi)];
-  return statusBlocks.map(match => ({
-    code: xmlAttribute("<Status " + match[1] + ">", "Status", "Code") || xmlValue(match[2], "Code"),
-    level: xmlAttribute("<Status " + match[1] + ">", "Status", "Level") || xmlValue(match[2], "Level"),
-    message: xmlAttribute("<Status " + match[1] + ">", "Status", "Message") || xmlValue(match[2], "Message")
-  }));
+  const body=String(xml || ""),result=[];
+  for (const match of body.matchAll(/<(?:\w+:)?Status\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?Status>/gi)) {
+    result.push({
+      code: xmlAttribute("<Status " + match[1] + ">", "Status", "Code") || xmlValue(match[2], "Code"),
+      level: xmlAttribute("<Status " + match[1] + ">", "Status", "Level") || xmlValue(match[2], "Level"),
+      message: xmlAttribute("<Status " + match[1] + ">", "Status", "Message") || xmlValue(match[2], "Message")
+    });
+  }
+  for (const match of body.matchAll(/<(?:\w+:)?Status\b([^>]*)\/>/gi)) {
+    result.push({
+      code: xmlAttribute("<Status " + match[1] + ">", "Status", "Code"),
+      level: xmlAttribute("<Status " + match[1] + ">", "Status", "Level"),
+      message: xmlAttribute("<Status " + match[1] + ">", "Status", "Message")
+    });
+  }
+  return result;
 }
 export function parseShipmentCreationResponse(xml) {
   const body = String(xml || "");
