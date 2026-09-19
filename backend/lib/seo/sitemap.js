@@ -45,6 +45,19 @@ function normalizeBase(siteUrl) {
   return String(siteUrl || SITE).replace(/\/$/, "");
 }
 
+// A sitemap lastmod describes a real content update, not sitemap generation.
+// Unknown or malformed dates are omitted rather than advertised as fresh.
+function storedLastmod(value) {
+  if (typeof value !== "string") return undefined;
+  const match = /^(\d{4}-\d{2}-\d{2})(?:$|[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$)/.exec(value.trim());
+  if (!match) return undefined;
+  const day = match[1];
+  const parsed = new Date(day + "T00:00:00Z");
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== day) return undefined;
+  if (!Number.isFinite(Date.parse(value.trim()))) return undefined;
+  return day;
+}
+
 function urlEntry(base, path, opts = {}) {
   const loc = path.startsWith("http") ? path : base + path;
   let xml = "  <url>\n    <loc>" + xmlEscape(loc) + "</loc>\n";
@@ -70,27 +83,24 @@ export function getCardSitemapPageCount(pageSize = CARD_SITEMAP_PAGE_SIZE) {
 
 export function generateSitemapIndexXml(siteUrl = SITE) {
   const base = normalizeBase(siteUrl);
-  const today = new Date().toISOString().slice(0, 10);
-  let maps = sitemapEntry(base, "/api/seo/core.xml", today);
+  let maps = sitemapEntry(base, "/api/seo/core.xml");
   const cardPages = getCardSitemapPageCount();
   for (let page = 1; page <= cardPages; page += 1) {
-    maps += sitemapEntry(base, `/api/seo/cards-${page}.xml`, today);
+    maps += sitemapEntry(base, `/api/seo/cards-${page}.xml`);
   }
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${maps}</sitemapindex>`;
 }
 
 export function generateCoreSitemapXml(siteUrl = SITE) {
   const base = normalizeBase(siteUrl);
-  const today = new Date().toISOString().slice(0, 10);
   let urls = "";
 
   STATIC_PAGES.forEach((page) => {
-    urls += urlEntry(base, page.loc, { lastmod: today, changefreq: page.changefreq, priority: page.priority });
+    urls += urlEntry(base, page.loc, { changefreq: page.changefreq, priority: page.priority });
   });
 
   listLicenses().forEach((license) => {
     urls += urlEntry(base, `/pages/licences/${license.slug}/`, {
-      lastmod: today,
       changefreq: "weekly",
       priority: license.slug === "pokemon" ? "0.95" : "0.88"
     });
@@ -98,13 +108,13 @@ export function generateCoreSitemapXml(siteUrl = SITE) {
 
   listExtensions().forEach((extension) => {
     if (!extension?.url) return;
-    urls += urlEntry(base, extension.url, { lastmod: today, changefreq: "weekly", priority: extension.license === "pokemon" ? "0.8" : "0.72" });
+    urls += urlEntry(base, extension.url, { changefreq: "weekly", priority: extension.license === "pokemon" ? "0.8" : "0.72" });
   });
 
   listBlogPosts({ publishedOnly: true, limit: 5000 }).forEach((post) => {
     if (!post?.url) return;
     urls += urlEntry(base, post.url, {
-      lastmod: String(post.updatedAt || post.createdAt || today).slice(0, 10),
+      lastmod: storedLastmod(post.updatedAt || post.createdAt),
       changefreq: "monthly",
       priority: "0.75"
     });
@@ -118,13 +128,12 @@ export function generateCardsSitemapXml(siteUrl = SITE, page = 1, pageSize = CAR
   const safePage = Math.max(1, Number(page) || 1);
   const safePageSize = Math.min(45000, Math.max(1, Number(pageSize) || CARD_SITEMAP_PAGE_SIZE));
   const offset = (safePage - 1) * safePageSize;
-  const today = new Date().toISOString().slice(0, 10);
   let urls = "";
 
   getSitemapCards(safePageSize, offset).forEach((card) => {
     const cardUrl = `/cartes/${encodeURIComponent(card.license_slug)}/${encodeURIComponent(card.slug)}`;
     urls += urlEntry(base, cardUrl, {
-      lastmod: String(card.updated_at || today).slice(0, 10),
+      lastmod: storedLastmod(card.updated_at),
       changefreq: "weekly",
       priority: card.license_slug === "pokemon" ? "0.72" : "0.66"
     });

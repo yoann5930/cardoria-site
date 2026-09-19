@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { cleanSeoTemplate, renderCardMain, positivePrice, safeImage } from "./lib/seo/card-render.js";
 import estimationRoutes from "./routes/estimation.js";
 import rachatRoutes from "./routes/rachat.js";
 import rachatAdminRoutes from "./routes/rachat-admin.js";
@@ -152,7 +153,8 @@ function seoHead({ title, description, canonical, image, type = "website", jsonL
     `<meta property="og:image" content="${escapeHtml(image)}">`,
     `<meta name="twitter:card" content="summary_large_image">`,
     `<meta name="twitter:title" content="${escapeHtml(title)}">`,
-    `<meta name="twitter:description" content="${escapeHtml(description)}">`
+    `<meta name="twitter:description" content="${escapeHtml(description)}">`,
+    `<meta name="twitter:image" content="${escapeHtml(image)}">`
   ];
   if (bootstrap) parts.push(`<script>${bootstrap}</script>`);
   for (const item of jsonLd) parts.push(`<script type="application/ld+json">${safeJson(item)}</script>`);
@@ -160,11 +162,11 @@ function seoHead({ title, description, canonical, image, type = "website", jsonL
 }
 
 function injectSeoIntoTemplate(template, { title, description, head, mainHtml, mainPattern }) {
-  let html = template
-    .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`)
-    .replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?\s*>/i, `<meta name="description" content="${escapeHtml(description)}">`)
-    .replace("</head>", `${head}\n</head>`);
-  if (mainPattern && mainHtml) html = html.replace(mainPattern, mainHtml);
+  let html = cleanSeoTemplate(template)
+    .replace(/<title>[\s\S]*?<\/title>/i, () => `<title>${escapeHtml(title)}</title>`)
+    .replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?\s*>/i, () => `<meta name="description" content="${escapeHtml(description)}">`)
+    .replace("</head>", () => `${head}\n</head>`);
+  if (mainPattern && mainHtml) html = html.replace(mainPattern, () => mainHtml);
   return html;
 }
 
@@ -177,8 +179,9 @@ function buildCardSeoHtml(req, card) {
   const extension = card.extension || "Pokémon";
   const title = card.meta?.title || `${card.name}${cardNumber} — Prix, cote et rareté ${extension} | Cardoria`;
   const description = card.meta?.description || `Prix, cote, rareté et historique de ${card.name}${cardNumber}, carte de l'extension ${extension}. Consultez sa fiche complète sur Cardoria.`;
-  const image = card.imageHd || card.imageThumb || `${siteUrl}/assets/logo/cardoria-premium.png`;
+  const image = safeImage(card.imageHd) || safeImage(card.imageThumb) || `${siteUrl}/assets/logo/cardoria-premium.png`;
   const prices = card.prices || {};
+  const recommended = positivePrice(prices.recommended);
   const product = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -192,7 +195,7 @@ function buildCardSeoHtml(req, card) {
     additionalProperty: [
       { "@type": "PropertyValue", name: "Extension", value: extension },
       { "@type": "PropertyValue", name: "Rareté", value: card.rarity || "Non renseignée" },
-      { "@type": "PropertyValue", name: "Prix conseillé", value: Number(prices.recommended || 0), unitText: "EUR" }
+      ...(recommended === null ? [] : [{ "@type": "PropertyValue", name: "Prix conseillé", value: recommended, unitText: "EUR" }])
     ]
   };
   const breadcrumbs = {
@@ -213,7 +216,11 @@ function buildCardSeoHtml(req, card) {
     bootstrap: `window.CARDORIA_CARD_ROUTE=${safeJson({ license: licenseSlug, slug: card.slug })};`,
     jsonLd: [product, breadcrumbs]
   });
-  return injectSeoIntoTemplate(template, { title, description, head });
+  return injectSeoIntoTemplate(template, {
+    title, description, head,
+    mainHtml: renderCardMain(card),
+    mainPattern: /<main\b[^>]*\bid="cardPage"[^>]*>[\s\S]*?<\/main>/i
+  });
 }
 
 function sendCardSeoPage(req, res, next) {
@@ -410,7 +417,11 @@ app.get("/carte.html", (req, res, next) => {
   if (!req.query.license || !req.query.slug) return next();
   return res.redirect(301, `/cartes/${encodeURIComponent(req.query.license)}/${encodeURIComponent(req.query.slug)}`);
 });
-app.get("/pages/licences/:license", (req, res) => res.redirect(308, `/pages/licences/${encodeURIComponent(req.params.license)}/`));
+app.get("/pages/licences/:license", (req, res, next) => {
+  // Express matches an optional trailing slash: do not redirect the canonical URL to itself.
+  if (req.path.endsWith("/")) return next();
+  return res.redirect(308, `/pages/licences/${encodeURIComponent(req.params.license)}/`);
+});
 app.get("/pages/licences/:license/", sendLicenseSeoPage);
 app.get("/extensions/:license/:slug", sendExtensionSeoPage);
 app.get(["/pages/extension", "/pages/extension/"], (req, res, next) => {
