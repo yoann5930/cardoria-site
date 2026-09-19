@@ -2,7 +2,7 @@ name: Cardoria Live Audit Browser
 on:
   push:
     branches: [feature/live-shipping-final]
-    paths: ['js/**', 'css/**', 'tests/live-audit-browser.mjs', '.github/workflows/live-audit-browser.yml']
+    paths: ['js/**', 'css/**', 'backend/**', 'tests/live-audit-browser.mjs', 'tests/live-postal-address-browser.mjs', '.github/workflows/live-audit-browser.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,9 +16,11 @@ jobs:
         with:
           node-version: '22.22.0'
           package-manager-cache: false
-      - name: Install existing project browser test version
+      - name: Install the existing project browser test version
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
-      - name: Verify computed seller visibility and safe tracking DOM
+      - name: Verify computed giveaway button visibility and safe tracking DOM
         run: node tests/live-audit-browser.mjs
+      - name: Recheck the existing address and relay browser scenarios
+        run: node tests/live-postal-address-browser.mjs
