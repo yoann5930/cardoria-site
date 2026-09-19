@@ -10,7 +10,14 @@ test("admin sales menu exposes all implemented operator controls",()=>{
   for(const id of["lasBuyNow","lasAuction","lasFlash","lasBreak","lasGame","lasGiveaway","lasGiveBuyer"])assert.ok(ui.includes(`id='${id}'`)||controls.includes(`id="${id}"`)||controls.includes(id),`missing ${id}`);
   assert.match(controls,/lasGroupSales/);assert.match(controls,/lasGroupGames/);assert.match(controls,/lasGroupPromo/);assert.match(controls,/\["lasGiveaway","lasGiveBuyer"\]/);
 });
-test("buyer giveaway is visible for admin and follow giveaway remains hidden",()=>{assert.doesNotMatch(ui,/id='lasGiveBuyer' disabled/);assert.match(controls,/buyer\.onclick=startBuyerGiveaway/);assert.match(controls,/if\(isAdmin\(\)\)/);assert.match(css,/#lasGiveFollow\{display:none!important\}/);assert.doesNotMatch(css,/#lasGiveFollow,#lasGiveBuyer/);});
+test("buyer giveaway is enabled and subscriber giveaway remains restricted to seller UI",()=>{
+  assert.doesNotMatch(ui,/id='lasGiveBuyer' disabled/);
+  assert.match(controls,/buyer\.onclick=startBuyerGiveaway/);
+  assert.match(controls,/if\(!isAdmin\(\)\)\{follow\.hidden=false/);
+  assert.match(controls,/else\{follow\.hidden=true;follow\.style\.display="none"/);
+  assert.match(css,/#lasGiveFollow\{display:none!important\}/);
+  assert.doesNotMatch(css,/#lasGiveFollow,#lasGiveBuyer/);
+});
 test("admin runtime uses cache-busted final sales menu assets",()=>{assert.match(adminHtml,/live-studio-clean\.css\?v=20260918-sales-menu-final/);assert.match(adminHtml,/live-studio-actions-ui\.js\?v=20260918-sales-menu-final/);assert.match(adminHtml,/live-studio-sales-controls\.js\?v=20260918-sales-menu-final/);});
 test("sales editor keeps destructive rerender loops disabled",()=>{assert.doesNotMatch(ui,/setInterval\s*\(\s*loadEditor/);assert.doesNotMatch(controls,/new MutationObserver/);});
 test("buyer giveaway route exists and only uses validated paid buyers",()=>{assert.match(routes,/giveaway\/buyer\/start/);assert.match(routes,/startBuyerGiveaway/);});
