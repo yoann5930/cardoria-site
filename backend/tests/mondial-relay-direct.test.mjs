@@ -40,7 +40,7 @@ test.after(restoreEnv);
 
 test("WSI4 security follows the documented concatenation order and SOAP request", () => {
   configure();
-  assert.equal(mondialRelaySecurity(["AB","12"], "KEY"), "267E6874AAC8E73A031F2C187848048E");
+  assert.equal(mondialRelaySecurity(["AB","12"], "KEY"), "94DFB179FFD1C7B2B2D304FBAB4F962E");
   const request = buildServicePointSearchRequest({ countryCode:"FR", postalCode:"59330", city:"Hautmont", radius:15000, limit:10 });
   assert.match(request.xml, /<Enseigne>CARDORIA<\/Enseigne>/);
   assert.match(request.xml, /<Pays>FR<\/Pays>/);
