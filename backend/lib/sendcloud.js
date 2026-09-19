@@ -69,8 +69,8 @@ function mapApiError(status, data) {
   const errors = Array.isArray(data?.errors) ? data.errors : [];
   const codes = errors.map((item) => String(item?.code || "").toLowerCase());
   const details = errors.map((item) => String(item?.detail || item?.title || "")).join(" ").toLowerCase();
-  if (codes.includes("no_valid_payment_method") || details.includes("no valid payment method")) {
-    return failure("ACCOUNT_PAYMENT_METHOD_REQUIRED", "Le compte Sendcloud n'a pas de moyen de paiement valide.", 402);
+  if (status === 402 || codes.includes("no_valid_payment_method") || details.includes("no valid payment method")) {
+    return Object.assign(failure("ACCOUNT_PAYMENT_METHOD_REQUIRED", "Le compte Sendcloud n'a pas de moyen de paiement valide.", 402), { sendcloudStatus: status, sendcloudErrorCode: codes[0] || "no_valid_payment_method" });
   }
   return Object.assign(failure("SENDCLOUD_API_ERROR", "Requête Sendcloud refusée (HTTP " + status + ")."), { sendcloudStatus: status, sendcloudErrorCode: codes[0] || "" });
 }

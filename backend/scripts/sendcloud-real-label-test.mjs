@@ -172,9 +172,9 @@ try {
     orderNumber: `CARDORIA-MANUAL-TEST-${Date.now()}`,
     reference: "Cardoria manual Mondial Relay test",
     toAddress,
-    toEmail: env("SENDCLOUD_TEST_EMAIL", "cardoria-test@invalid.local"),
+    toEmail: env("SENDCLOUD_TEST_EMAIL", "cardoria-test@cardoriashop.fr"),
     fromAddress,
-    fromEmail: env("SENDCLOUD_TEST_EMAIL", "cardoria-test@invalid.local"),
+    fromEmail: env("SENDCLOUD_TEST_EMAIL", "cardoria-test@cardoriashop.fr"),
     fromCompanyName: "Cardoria",
     weightGrams,
     totalOrderValue: 13,
@@ -193,6 +193,8 @@ try {
       ...quoteReport,
       status: "ACCOUNT_PAYMENT_METHOD_REQUIRED",
       reason: "SENDCLOUD_BILLING_PAYMENT_METHOD_REQUIRED",
+      sendcloudStatus: error.sendcloudStatus || 402,
+      sendcloudErrorCode: error.sendcloudErrorCode || "no_valid_payment_method",
       realLabelCreated: false
     });
     process.exit(0);
@@ -201,6 +203,8 @@ try {
     ...quoteReport,
     status: error.code === "SENDCLOUD_ANNOUNCEMENT_FAILED" && shipment?.shipmentId ? "MANUAL_CANCELLATION_REQUIRED" : "failed",
     reason: error.code || "LABEL_CREATE_FAILED",
+    sendcloudStatus: error.sendcloudStatus || null,
+    sendcloudErrorCode: error.sendcloudErrorCode || "",
     realLabelCreated: Boolean(shipment?.shipmentId),
     shipmentId: shipment?.shipmentId || null,
     parcelId: shipment?.parcelId || null

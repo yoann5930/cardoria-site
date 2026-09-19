@@ -86,6 +86,11 @@ test("missing Sendcloud payment method is explicit and never retried", async () 
   }, async () => assert.rejects(sc.createSendcloudShipment(input), { code: "ACCOUNT_PAYMENT_METHOD_REQUIRED", status: 402 }));
   assert.equal(announces, 1);
 });
+test("HTTP 402 without a detailed code is still a billing block, not a retry", async () => {
+  await mocked(async url => url.includes("/service-points/") ? json({ data: point }) : url.endsWith("/shipping-options") ? json({ data: [option] }) : json({}, 402), async () => {
+    await assert.rejects(sc.createSendcloudShipment(input), { code: "ACCOUNT_PAYMENT_METHOD_REQUIRED", status: 402 });
+  });
+});
 test("shipment retrieve exposes tracking without a second announce", async () => {
   await mocked(async url => {
     assert.match(String(url), /\/shipments\/SHIP-1$/);
