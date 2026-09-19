@@ -76,7 +76,7 @@ jobs:
               reference: "Cardoria real MR test - cancel after verification",
               toAddress: {
                 recipientName: "Yoann Thivet",
-                addressLine1: "17 avenue Marcel Aime",
+                addressLine1: "Avenue Marcel Aime",\n                houseNumber: "17",
                 postalCode: "59330",
                 city: "Hautmont",
                 countryCode: "FR",
@@ -85,7 +85,7 @@ jobs:
               toEmail: "cardoria59330@gmail.com",
               fromAddress: {
                 recipientName: "Cardoria Test Liveur",
-                addressLine1: "10 rue Leon Gambetta",
+                addressLine1: "Rue Leon Gambetta",\n                houseNumber: "10",
                 postalCode: "59530",
                 city: "Le Quesnoy",
                 countryCode: "FR",
