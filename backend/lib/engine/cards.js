@@ -174,5 +174,5 @@ export function deleteCard(id) {
   db.prepare("DELETE FROM cards WHERE id = ?").run(id); return true;
 }
 
-export function getSitemapCards(limit = 5000, offset = 0) { return getDb().prepare("SELECT id,license_slug,language,slug,updated_at FROM cards WHERE active=1 ORDER BY views DESC,sales_count DESC LIMIT ? OFFSET ?").all(limit, offset); }
+export function getSitemapCards(limit = 5000, offset = 0) { return getDb().prepare("SELECT id,license_slug,language,slug,name,extension,number,image_hd,image_thumb,updated_at FROM cards WHERE active=1 ORDER BY views DESC,sales_count DESC LIMIT ? OFFSET ?").all(limit, offset); }
 export function getCardCount() { return getDb().prepare("SELECT COUNT(*) AS c FROM cards WHERE active=1").get()?.c ?? 0; }
