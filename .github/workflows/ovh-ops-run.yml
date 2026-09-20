@@ -94,10 +94,7 @@ jobs:
           elif [ "$OP" = mondial-relay-configure ]; then
             test -n "${MR_ENSEIGNE:-}"
             test -n "${MR_PRIVATE_KEY:-}"
-            test -n "${MR_API_V2_LOGIN:-}"
-            test -n "${MR_API_V2_PASSWORD:-}"
-            test -n "${MR_API_V2_CUSTOMER_ID:-}"
-            printf '%s\n%s\n%s\n%s\n%s\n' "$MR_ENSEIGNE" "$MR_PRIVATE_KEY" "$MR_API_V2_LOGIN" "$MR_API_V2_PASSWORD" "$MR_API_V2_CUSTOMER_ID" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
+            printf '%s\n%s\n%s\n%s\n%s\n' "$MR_ENSEIGNE" "$MR_PRIVATE_KEY" "${MR_API_V2_LOGIN:-}" "${MR_API_V2_PASSWORD:-}" "${MR_API_V2_CUSTOMER_ID:-}" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
             unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID
           else
             unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID

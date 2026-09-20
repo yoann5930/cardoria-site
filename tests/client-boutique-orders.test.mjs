@@ -62,6 +62,7 @@ test("client login and dashboard are mutually exclusive even with cached layout 
   assert.match(clientAuth,/style\.setProperty\("display", "none", "important"\)/);
   assert.match(clientAuth,/setAuthenticatedUi\(true\)/);
   assert.match(clientAuth,/setAuthenticatedUi\(false\)/);
-  assert.match(clientLogin,/client-auth\.css\?v=20260920-dashboard-2/);
-  assert.match(clientLogin,/client-auth\.js\?v=20260920-dashboard-3/);
+  assert.match(clientLogin,/client-auth\.css\?v=20260920-wsi4/);
+  assert.match(clientLogin,/client-auth\.js\?v=20260920-wsi4/);
+  assert.match(clientLogin,/clientRelayModal/);
 });

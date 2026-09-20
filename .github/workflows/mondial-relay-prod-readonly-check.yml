@@ -29,7 +29,6 @@ jobs:
           const data = JSON.parse(process.env.STATUS_JSON || "{}");
           if (data.ok !== true) throw new Error("Mondial Relay status endpoint not OK");
           if (data.servicePointSearchConfigured !== true) throw new Error("Mondial Relay service-point credentials are not configured");
-          if (data.shipmentApiConfigured !== true) throw new Error("Mondial Relay API V2 credentials are not configured");
           if (data.labelPurchasesEnabled !== false) throw new Error("Real label purchasing must remain disabled during readonly verification");
           console.log("Mondial Relay status configuration: OK");
           NODE

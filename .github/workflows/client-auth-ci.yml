@@ -38,6 +38,11 @@ jobs:
           grep -q '/api/auth/register' js/client-auth.js
           grep -q '/api/auth/me' js/client-auth.js
           grep -q '/api/auth/logout' js/client-auth.js
+          grep -q '/api/mondial-relay/service-points' js/client-auth.js
+          grep -q 'clientRelayModal' js/client-auth.js
+          grep -q 'Choisir ce Point Relais' js/client-auth.js
+          if grep -q '/api/sendcloud/service-points' js/client-auth.js; then echo 'Sendcloud service-points must not be used'; exit 1; fi
+          if grep -q 'window.prompt' js/client-auth.js; then echo 'Point Relais prompt must not be used'; exit 1; fi
           grep -q '/api/auth/password/request' js/client-password-reset.js
           grep -q '/api/auth/password/confirm' js/client-password-reset.js
           grep -q '/reset-password.html' client-login.html

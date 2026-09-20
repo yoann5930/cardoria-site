@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex,follow">
   <meta name="theme-color" content="#030303">
   <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/css/client-auth.css?v=20260920-dashboard-2">
+  <link rel="stylesheet" href="/css/client-auth.css?v=20260920-wsi4">
   <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
 </head>
 <body class="client-auth-page">
@@ -113,6 +113,17 @@
       </div>
     </section>
   </main>
-  <script src="/js/client-auth.js?v=20260920-dashboard-3"></script>
+  <div id="clientRelayModal" class="client-relay-modal" hidden>
+    <div class="client-relay-dialog" role="dialog" aria-modal="true" aria-labelledby="clientRelayModalTitle">
+      <div class="client-relay-dialog-head">
+        <p class="client-auth-kicker">MONDIAL RELAY</p>
+        <h2 id="clientRelayModalTitle">Choisir un Point Relais</h2>
+        <p id="clientRelayModalStatus"></p>
+      </div>
+      <div id="clientRelayModalList" class="client-relay-list"></div>
+      <button id="clientRelayModalClose" class="client-auth-secondary" type="button">Fermer</button>
+    </div>
+  </div>
+  <script src="/js/client-auth.js?v=20260920-wsi4"></script>
 </body>
 </html>
