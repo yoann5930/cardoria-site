@@ -78,6 +78,10 @@ test("client profile Point Relais search uses Mondial Relay direct, never Sendcl
   assert.match(source,/\/api\/mondial-relay\/service-points/);
   assert.equal(source.includes("/api/sendcloud/service-points"),false);
   assert.equal(source,runtime);
-  assert.match(page,/client-auth\.js\?v=20260920-dashboard-3/);
+  assert.match(page,/client-auth\.js\?v=20260920-wsi4/);
+  assert.match(page,/clientRelayModal/);
+  assert.match(source,/clientRelayModal/);
+  assert.match(source,/Choisir ce Point Relais/);
+  assert.equal(source.includes("window.prompt"),false);
   assert.equal(page,runtimePage);
 });

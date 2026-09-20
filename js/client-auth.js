@@ -172,11 +172,75 @@
 
   function renderRelay() {
     const node = qs("clientRelaySummary");
+    if (!node) return;
     if (!selectedRelay || !selectedRelay.id) {
       node.textContent = "Aucun Point Relais préféré.";
       return;
     }
-    node.textContent = [selectedRelay.name, selectedRelay.address, selectedRelay.postalCode, selectedRelay.city].filter(Boolean).join(" — ");
+    node.textContent = [
+      selectedRelay.name,
+      selectedRelay.address,
+      [selectedRelay.postalCode, selectedRelay.city].filter(Boolean).join(" "),
+      selectedRelay.id ? "n° " + selectedRelay.id : ""
+    ].filter(Boolean).join(" — ");
+  }
+
+  function formatRelayDistance(distance) {
+    const value = Number(distance);
+    if (!Number.isFinite(value) || value < 0) return "";
+    if (value >= 1000) return (Math.round(value / 100) / 10).toString().replace(".", ",") + " km";
+    return Math.round(value) + " m";
+  }
+
+  function closeRelayModal() {
+    const modal = qs("clientRelayModal");
+    if (modal) modal.hidden = true;
+  }
+
+  function pickRelay(point) {
+    selectedRelay = {
+      id: String(point.id),
+      carrierServicePointId: point.carrierServicePointId || String(point.id),
+      name: point.name || "",
+      address: [point.street, point.houseNumber].filter(Boolean).join(" "),
+      postalCode: point.postalCode || "",
+      city: point.city || "",
+      countryCode: point.countryCode || "FR",
+      carrierCode: point.carrierCode || "mondial_relay"
+    };
+    renderRelay();
+    closeRelayModal();
+    setMessage("Point Relais sélectionné. Enregistrez votre profil pour le conserver.", "success");
+  }
+
+  function renderRelayChoices(points) {
+    const list = qs("clientRelayModalList");
+    const status = qs("clientRelayModalStatus");
+    const modal = qs("clientRelayModal");
+    if (!list || !modal) throw new Error("Fenêtre Point Relais indisponible.");
+    list.replaceChildren();
+    if (status) status.textContent = points.length + " Point" + (points.length > 1 ? "s" : "") + " Relais Mondial Relay trouvé" + (points.length > 1 ? "s" : "") + ".";
+    points.forEach((point) => {
+      const card = document.createElement("article");
+      card.className = "client-relay-choice";
+      const title = document.createElement("strong");
+      title.textContent = point.name || "Point Relais";
+      const address = document.createElement("p");
+      address.textContent = [point.street, point.houseNumber].filter(Boolean).join(" ");
+      const city = document.createElement("p");
+      city.textContent = [point.postalCode, point.city].filter(Boolean).join(" ");
+      const meta = document.createElement("small");
+      const distance = formatRelayDistance(point.distance);
+      meta.textContent = [distance, point.id ? "n° " + point.id : ""].filter(Boolean).join(" · ");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "client-auth-primary";
+      button.textContent = "Choisir ce Point Relais";
+      button.addEventListener("click", () => pickRelay(point));
+      card.append(title, address, city, meta, button);
+      list.appendChild(card);
+    });
+    modal.hidden = false;
   }
 
   async function chooseRelay() {
@@ -185,20 +249,12 @@
       const city = qs("clientProfileCity").value.trim();
       const countryCode = (qs("clientProfileCountry").value.trim() || "FR").toUpperCase();
       if (!postalCode && !city) throw new Error("Renseignez d’abord votre code postal ou votre ville.");
+      setMessage("Recherche des Points Relais Mondial Relay...");
       const data = await api("/api/mondial-relay/service-points?" + new URLSearchParams({ postalCode, city, countryCode, limit: "10", radius: "15000" }), { method: "GET" });
       const points = Array.isArray(data.points) ? data.points : [];
       if (!points.length) throw new Error("Aucun Point Relais Mondial Relay trouvé.");
-      const lines = points.map((point, index) => (index + 1) + ". " + point.name + " — " + [point.street, point.houseNumber, point.postalCode, point.city].filter(Boolean).join(" "));
-      const answer = window.prompt("Choisissez votre Point Relais :\n\n" + lines.join("\n") + "\n\nNuméro :", "1");
-      if (answer === null) return;
-      const point = points[Math.trunc(Number(answer)) - 1];
-      if (!point) throw new Error("Choix de Point Relais invalide.");
-      selectedRelay = {
-        id: String(point.id), carrierServicePointId: point.carrierServicePointId || "", name: point.name || "",
-        address: [point.street, point.houseNumber].filter(Boolean).join(" "), postalCode: point.postalCode || "",
-        city: point.city || "", countryCode: point.countryCode || "FR", carrierCode: point.carrierCode || "mondial_relay"
-      };
-      renderRelay();
+      renderRelayChoices(points);
+      setMessage("");
     } catch (e) { setMessage(e.message, "error"); }
   }
 
@@ -303,6 +359,10 @@
     qs("clientLogoutButton")?.addEventListener("click", logout);
     qs("clientProfileForm")?.addEventListener("submit", saveProfile);
     qs("clientChooseRelay")?.addEventListener("click", chooseRelay);
+    qs("clientRelayModalClose")?.addEventListener("click", closeRelayModal);
+    qs("clientRelayModal")?.addEventListener("click", (event) => {
+      if (event.target === qs("clientRelayModal")) closeRelayModal();
+    });
     restore();
   }
   document.addEventListener("DOMContentLoaded", init);

@@ -21,6 +21,9 @@ test("Mondial Relay OVH credentials use a fixed stdin-only secure bridge", () =>
   assert.match(run, /MR_API_V2_PASSWORD: \$\{\{ secrets\.OVH_MONDIAL_RELAY_API_V2_PASSWORD \}\}/);
   assert.match(run, /MR_API_V2_CUSTOMER_ID: \$\{\{ secrets\.OVH_MONDIAL_RELAY_API_V2_CUSTOMER_ID \}\}/);
   assert.match(run, /printf '%s\\n%s\\n%s\\n%s\\n%s\\n'/);
+  assert.match(run, /test -n "\$\{MR_ENSEIGNE:-\}"/);
+  assert.match(run, /test -n "\$\{MR_PRIVATE_KEY:-\}"/);
+  assert.doesNotMatch(run, /test -n "\$\{MR_API_V2_LOGIN:-\}"/);
   assert.doesNotMatch(run, /remote_cmd=.*MR_/);
 
   assert.match(script, /IFS= read -r enseigne/);
@@ -31,6 +34,7 @@ test("Mondial Relay OVH credentials use a fixed stdin-only secure bridge", () =>
   assert.match(script, /servicePointSearchConfigured/);
   assert.match(script, /shipmentApiConfigured/);
   assert.match(script, /labelPurchasesEnabled/);
+  assert.match(script, /mondial_relay_shipment_api: skipped/);
   assert.match(script, /mondial_relay_configure: rollback/);
   assert.doesNotMatch(script, /echo.*\$enseigne/);
   assert.doesNotMatch(script, /echo.*\$private_key/);
