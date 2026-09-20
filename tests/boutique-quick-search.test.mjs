@@ -48,7 +48,7 @@ test("quick-search change preserves cart, authentication and SumUp checkout",()=
   assert.match(js,/cardoria_session_token/);
   assert.match(js,/\/api\/auth\/me/);
   assert.match(js,/\/api\/payments\/boutique\/checkout/);
-  assert.match(js,/provider:\\s*"sumup"/);
+  assert.match(js,/provider:\s*"sumup"/);
 });
 
 test("quick-search runtime mirrors are identical",()=>{
