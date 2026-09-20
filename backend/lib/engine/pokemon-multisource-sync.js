@@ -40,7 +40,7 @@ function externalRefs(row) {
 }
 function mergeSource(row, provider, payload = {}) {
   const sources = sourceMap(row);
-  sources[provider] = { ...(sources[provider] || {}), ...payload, seenAt: nowIso() };
+  sources[provider] = { ...(sources[provider] || {}), ...payload };
   return safeJson(sources);
 }
 function mergeRefs(row, refs = {}) {
@@ -157,11 +157,29 @@ function upsertProviderCard(db, providerCard) {
     const sourcesJson = mergeSource(current, provider, providerCard.provenance || {});
     const refsJson = mergeRefs(current, providerCard.refs || {});
     const family = raw(current.hit_family) || pokemonHitFamily(nextRarity, nextName);
-    const changed = db.prepare(`UPDATE cards SET name=?,name_normalized=?,extension=?,extension_code=?,number=?,rarity=?,hit_family=?,
-      illustration=?,image_hd=?,image_thumb=?,catalog_source=?,catalog_source_url=?,catalog_sources_json=?,external_refs_json=?,updated_at=?
-      WHERE id=?`).run(nextName, normalizeText(nextName), nextExtension, raw(current.extension_code) || providerCard.extensionCode,
-        nextNumber, nextRarity, family, nextIllustration, nextImageHd, nextImageThumb, nextCatalogSource, nextSourceUrl,
-        sourcesJson, refsJson, now, current.id).changes || 0;
+    const values = {
+      name: nextName,
+      name_normalized: normalizeText(nextName),
+      extension: nextExtension,
+      extension_code: raw(current.extension_code) || providerCard.extensionCode,
+      number: nextNumber,
+      rarity: nextRarity,
+      hit_family: family,
+      illustration: nextIllustration,
+      image_hd: nextImageHd,
+      image_thumb: nextImageThumb,
+      catalog_source: nextCatalogSource,
+      catalog_source_url: nextSourceUrl,
+      catalog_sources_json: sourcesJson,
+      external_refs_json: refsJson
+    };
+    const changed = Object.entries(values).some(([key, value]) => String(current[key] ?? "") !== String(value ?? ""));
+    if (changed) {
+      db.prepare(`UPDATE cards SET name=@name,name_normalized=@name_normalized,extension=@extension,extension_code=@extension_code,
+        number=@number,rarity=@rarity,hit_family=@hit_family,illustration=@illustration,image_hd=@image_hd,image_thumb=@image_thumb,
+        catalog_source=@catalog_source,catalog_source_url=@catalog_source_url,catalog_sources_json=@catalog_sources_json,
+        external_refs_json=@external_refs_json,updated_at=@updated_at WHERE id=@id`).run({ ...values, updated_at:now, id:current.id });
+    }
     return { matched:1, created:0, updated:changed ? 1 : 0, id:current.id };
   }
 
@@ -170,7 +188,7 @@ function upsertProviderCard(db, providerCard) {
   const number = providerCard.number || "";
   const id = providerCard.id;
   const slug = slugify(`${providerCard.language}-${name}-${extension}-${number}-${id}`);
-  const sourcesJson = safeJson({ [provider]: { ...(providerCard.provenance || {}), seenAt:now } });
+  const sourcesJson = safeJson({ [provider]: { ...(providerCard.provenance || {}) } });
   const refsJson = safeJson(providerCard.refs || {});
   const metaTitle = `${name}${number ? " " + number : ""}${extension ? " — " + extension : ""} | Cardoria`;
   const metaDescription = `Référence Pokémon ${name}${extension ? ", extension " + extension : ""}${number ? ", numéro " + number : ""}, langue ${providerCard.language.toUpperCase()}.`;
