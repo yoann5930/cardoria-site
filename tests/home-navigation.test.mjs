@@ -4,6 +4,7 @@ import fs from "node:fs";
 
 const html=fs.readFileSync("index.html","utf8");
 const css=fs.readFileSync("css/home-reference.css","utf8");
+const sessionJs=fs.readFileSync("js/home-client-session.js","utf8");
 
 const required=[
   ["/","Accueil"],
@@ -65,3 +66,23 @@ test("runtime mirror contains same homepage navigation after sync",()=>{
 });
 
 // The desktop top navigation intentionally uses semantic anchor links rather than image-only hotspots.
+
+
+test("homepage client entry follows the authenticated session without forcing logout",()=>{
+  assert.equal((html.match(/data-home-client-link/g)||[]).length,2);
+  assert.match(html,/home-client-session\.js\?v=20260921-account-1/);
+  assert.match(sessionJs,/cardoria_session_token/);
+  assert.match(sessionJs,/cardoria_client_session/);
+  assert.match(sessionJs,/cardoria_account/);
+  assert.match(sessionJs,/\/api\/auth\/me/);
+  assert.match(sessionJs,/Mon compte/);
+  assert.match(sessionJs,/response\.status === 401 \|\| response\.status === 403/);
+  assert.match(sessionJs,/temporary network failure must never log out a client/i);
+  const catchBlock=sessionJs.match(/catch \(_\) \{([\s\S]*?)\n    \}/);
+  assert.ok(catchBlock,"network catch block missing");
+  assert.doesNotMatch(catchBlock[1],/removeItem\(TOKEN_KEY\)/);
+});
+
+test("homepage session helper is mirrored in the OVH runtime",()=>{
+  assert.equal(fs.readFileSync("backend/public/js/home-client-session.js","utf8"),sessionJs);
+});
