@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex,follow">
   <meta name="theme-color" content="#030303">
   <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/css/client-auth.css?v=20260920-wsi4">
+  <link rel="stylesheet" href="/css/client-auth.css?v=20260920-postal-city">
   <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
 </head>
 <body class="client-auth-page">
@@ -91,8 +91,12 @@
             <label>Adresse<input id="clientProfileAddress1" type="text" maxlength="160" autocomplete="street-address"></label>
             <label>Complément<input id="clientProfileAddress2" type="text" maxlength="160"></label>
             <div class="client-form-row">
-              <label>Code postal<input id="clientProfilePostalCode" type="text" maxlength="24" autocomplete="postal-code"></label>
-              <label>Ville<input id="clientProfileCity" type="text" maxlength="120" autocomplete="address-level2"></label>
+              <label>Code postal<input id="clientProfilePostalCode" type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" autocomplete="postal-code"></label>
+              <label>Ville
+                <input id="clientProfileCity" type="text" maxlength="120" autocomplete="address-level2">
+                <select id="clientProfileCitySelect" autocomplete="address-level2" hidden></select>
+                <small id="clientPostalCityHelp" class="client-field-help">La ville sera proposée à partir du code postal.</small>
+              </label>
             </div>
             <label>Pays<input id="clientProfileCountry" type="text" maxlength="2" value="FR"></label>
             <div class="client-relay-box"><small>POINT RELAIS PRÉFÉRÉ</small><p id="clientRelaySummary">Aucun Point Relais préféré.</p><button id="clientChooseRelay" class="client-auth-secondary is-compact" type="button">Choisir mon Point Relais</button></div>
@@ -124,6 +128,6 @@
       <button id="clientRelayModalClose" class="client-auth-secondary" type="button">Fermer</button>
     </div>
   </div>
-  <script src="/js/client-auth.js?v=20260920-wsi4"></script>
+  <script src="/js/client-auth.js?v=20260920-postal-city"></script>
 </body>
 </html>

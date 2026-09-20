@@ -64,6 +64,7 @@ import { initLaunch, connectionJournalMiddleware, maintenanceMiddleware } from "
 import systemRoutes from "./routes/system.js";
 import sendcloudRoutes from "./routes/sendcloud.js";
 import mondialRelayRoutes from "./routes/mondial-relay.js";
+import locationRoutes from "./routes/location.js";
 
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
@@ -103,6 +104,7 @@ app.use("/api/health", healthRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/sendcloud", sendcloudRoutes);
 app.use("/api/mondial-relay", mondialRelayRoutes);
+app.use("/api/location", locationRoutes);
 
 safeInit("auth-migration", migrateAuth);
 app.use("/api/auth", marketplacePersistenceMiddleware, (req, res, next) => {

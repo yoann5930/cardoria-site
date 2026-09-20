@@ -14,6 +14,7 @@ import { authRateLimit } from "../lib/security/rateLimit.js";
 import { generateCsrfToken } from "../lib/security/csrf.js";
 import { logAudit } from "../lib/audit.js";
 import { readJson } from "../lib/storage.js";
+import { resolveFrenchPostalCity } from "../lib/france-communes.js";
 
 const router = Router();
 const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;
@@ -222,16 +223,29 @@ router.get("/me", (req, res) => {
   res.json({ ok: true, user: publicUser(user) });
 });
 
-router.patch("/profile", (req, res) => {
+router.patch("/profile", async (req, res) => {
   try {
     const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
     const sessionUser = validateSession(token);
     if (!sessionUser) return res.status(401).json({ ok: false, error: "Session expiree." });
     if (sessionUser.role !== "client") return res.status(403).json({ ok: false, error: "Compte client requis." });
-    const user = updateClientProfile(sessionUser.id, req.body || {});
+
+    const patch = { ...(req.body || {}) };
+    const current = getUserById(sessionUser.id);
+    const country = String(patch.country == null ? current?.country || "FR" : patch.country || "FR").trim().toUpperCase();
+    const postalCode = String(patch.postalCode == null ? current?.postalCode || "" : patch.postalCode || "").trim();
+    const city = String(patch.city == null ? current?.city || "" : patch.city || "").trim();
+    if (country === "FR" && (postalCode || city)) {
+      const resolved = await resolveFrenchPostalCity(postalCode, city);
+      patch.postalCode = resolved.postalCode;
+      patch.city = resolved.city;
+      patch.country = "FR";
+    }
+
+    const user = updateClientProfile(sessionUser.id, patch);
     res.json({ ok: true, user: publicUser(user) });
   } catch (e) {
-    res.status(e.status || 400).json({ ok: false, error: e.message });
+    res.status(e.status || 400).json({ ok: false, code: e.code || "", error: e.message });
   }
 });
 

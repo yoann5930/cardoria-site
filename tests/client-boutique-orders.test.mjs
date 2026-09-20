@@ -62,7 +62,18 @@ test("client login and dashboard are mutually exclusive even with cached layout 
   assert.match(clientAuth,/style\.setProperty\("display", "none", "important"\)/);
   assert.match(clientAuth,/setAuthenticatedUi\(true\)/);
   assert.match(clientAuth,/setAuthenticatedUi\(false\)/);
-  assert.match(clientLogin,/client-auth\.css\?v=20260920-wsi4/);
-  assert.match(clientLogin,/client-auth\.js\?v=20260920-wsi4/);
+  assert.match(clientLogin,/client-auth\.css\?v=20260920-postal-city/);
+  assert.match(clientLogin,/client-auth\.js\?v=20260920-postal-city/);
   assert.match(clientLogin,/clientRelayModal/);
+});
+
+
+test("client profile derives French city from postal code",()=>{
+  assert.match(clientLogin,/id="clientProfileCitySelect"/);
+  assert.match(clientLogin,/id="clientPostalCityHelp"/);
+  assert.match(clientLogin,/pattern="\[0-9\]\{5\}"/);
+  assert.match(clientAuth,/\/api\/location\/communes\?postalCode=/);
+  assert.match(clientAuth,/function validatedProfileLocation\(\)/);
+  assert.match(clientAuth,/Sélectionnez la ville correspondant à votre code postal/);
+  assert.match(auth,/resolveFrenchPostalCity/);
 });
