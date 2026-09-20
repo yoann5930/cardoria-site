@@ -287,6 +287,12 @@ export function rowToCard(row, extras = {}) {
     salesCount: row.sales_count,
     views: row.views,
     meta: { title: row.meta_title, description: row.meta_description },
+    catalog: {
+      primarySource: row.catalog_source || "",
+      sourceUrl: row.catalog_source_url || "",
+      sources: (() => { try { return JSON.parse(row.catalog_sources_json || "{}"); } catch { return {}; } })(),
+      externalRefs: (() => { try { return JSON.parse(row.external_refs_json || "{}"); } catch { return {}; } })()
+    },
     active: !!row.active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
