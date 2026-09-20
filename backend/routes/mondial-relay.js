@@ -41,11 +41,14 @@ router.get("/service-points", async (req, res) => {
     res.json({ ok: true, provider: "mondial_relay_direct", carrier: "mondial_relay", ...result });
   } catch (error) {
     const status = Number(error?.status);
-    res.status(Number.isInteger(status) && status >= 400 && status <= 599 ? status : 502).json({
+    const body = {
       ok: false,
       code: error?.code || "MONDIAL_RELAY_SEARCH_FAILED",
       error: error?.message || "Recherche Point Relais indisponible."
-    });
+    };
+    if (error?.providerStat) body.providerStat = error.providerStat;
+    if (error?.providerStatus) body.providerStatus = error.providerStatus;
+    res.status(Number.isInteger(status) && status >= 400 && status <= 599 ? status : 502).json(body);
   }
 });
 

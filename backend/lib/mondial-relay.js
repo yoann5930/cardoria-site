@@ -60,6 +60,11 @@ function relayNumber(value) {
   if (!/^\d{1,8}$/.test(id) || Number(id) <= 0) throw failure("MONDIAL_RELAY_SERVICE_POINT_INVALID", "Identifiant Point Relais Mondial Relay invalide.", 400);
   return id;
 }
+function searchRadiusKm(radius) {
+  const meters = Math.trunc(Number(radius));
+  if (!Number.isFinite(meters) || meters <= 0) return "0";
+  return String(Math.min(9999, Math.max(1, Math.round(meters / 1000))));
+}
 function orderReference(value) {
   const source = rawText(value);
   const normalized = mrText(source, 200, { required: true }).replace(/[^0-9A-Z_-]/g, "");
@@ -181,7 +186,7 @@ export function buildServicePointSearchRequest({ countryCode = "FR", postalCode:
     weightGrams ? String(grams(Math.max(10, Number(weightGrams)))) : "",
     "24R",
     "0",
-    String(Math.min(50000, Math.max(100, Math.trunc(Number(radius) || 15000)))),
+    searchRadiusKm(radius === undefined || radius === "" ? 15000 : radius),
     "", "",
     String(Math.min(30, Math.max(1, Math.trunc(Number(limit) || 10))))
   ];
@@ -195,6 +200,11 @@ export function buildServicePointSearchRequest({ countryCode = "FR", postalCode:
       '<soap:Body><WSI4_PointRelais_Recherche xmlns="http://www.mondialrelay.fr/webservice/">' +
       payload + "<Security>" + security + "</Security></WSI4_PointRelais_Recherche></soap:Body></soap:Envelope>"
   };
+}
+export function parseServicePointSearchStat(xml) {
+  const body = String(xml || "");
+  const result = body.match(/<(?:\w+:)?WSI4_PointRelais_RechercheResult\b[^>]*>([\s\S]*?)<\/(?:\w+:)?WSI4_PointRelais_RechercheResult>/i);
+  return xmlValue(result ? result[1] : body, "STAT");
 }
 export function parseServicePointSearchResponse(xml) {
   const body = String(xml || "");
@@ -236,8 +246,13 @@ export async function searchMondialRelayServicePoints(input = {}) {
   if (!response.ok) throw failure("MONDIAL_RELAY_API_ERROR", "Recherche Point Relais refusée (HTTP " + response.status + ").", 502, { providerStatus: response.status });
   const fault = xmlValue(xml, "faultstring");
   if (fault) throw failure("MONDIAL_RELAY_API_ERROR", "Mondial Relay a refusé la recherche Point Relais.", 502);
+  const stat = parseServicePointSearchStat(xml);
+  if (stat && stat !== "0") {
+    if (stat === "93") return { points: [], count: 0, providerStat: "93" };
+    throw failure("MONDIAL_RELAY_API_ERROR", "Recherche Point Relais refusée par Mondial Relay.", 502, { providerStat: stat });
+  }
   const points = parseServicePointSearchResponse(xml);
-  return { points, count: points.length };
+  return { points, count: points.length, providerStat: stat || "0" };
 }
 
 export function buildShipmentCreationXml({ orderNumber, reference = "", toAddress, toEmail = "", fromAddress, fromEmail = "", fromCompanyName = "", weightGrams, totalOrderValue = 0, servicePointId, content = "CARTES TCG" } = {}) {
