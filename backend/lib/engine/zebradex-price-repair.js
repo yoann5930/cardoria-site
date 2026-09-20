@@ -1,4 +1,5 @@
 import { getDb, normalizeText } from "./database.js";
+import { floorCardPrice } from "../pricing/card-price-floor.js";
 
 const BASE = "https://zebradex.fr";
 const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
@@ -212,7 +213,7 @@ export async function repairJapanesePricesWithZebraDex({ limit = DEFAULT_BATCH }
     for (const { card, price } of results) {
       if (!price) { mark.run(now, now, card.id); unavailable += 1; continue; }
       const trend = price.change7 > 2 ? "up" : price.change7 < -2 ? "down" : "stable";
-      const changed = update.run(price.current, price.low, price.high, price.current, now, now, trend, price.change7, now, now, card.id).changes || 0;
+      const changed = update.run(floorCardPrice(price.current), floorCardPrice(price.low), floorCardPrice(price.high), floorCardPrice(price.current), now, now, trend, price.change7, now, now, card.id).changes || 0;
       if (!changed) continue;
       deleteSource.run(card.id);
       insertSource.run(card.id, price.current, now);
