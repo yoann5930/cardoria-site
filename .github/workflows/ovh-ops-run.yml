@@ -32,6 +32,11 @@ jobs:
           SMTP_PASS: ${{ secrets.OVH_SMTP_PASS }}
           SUMUP_API_KEY: ${{ secrets.OVH_SUMUP_API_KEY }}
           SUMUP_MERCHANT_CODE: ${{ secrets.OVH_SUMUP_MERCHANT_CODE }}
+          MR_ENSEIGNE: ${{ secrets.OVH_MONDIAL_RELAY_ENSEIGNE }}
+          MR_PRIVATE_KEY: ${{ secrets.OVH_MONDIAL_RELAY_PRIVATE_KEY }}
+          MR_API_V2_LOGIN: ${{ secrets.OVH_MONDIAL_RELAY_API_V2_LOGIN }}
+          MR_API_V2_PASSWORD: ${{ secrets.OVH_MONDIAL_RELAY_API_V2_PASSWORD }}
+          MR_API_V2_CUSTOMER_ID: ${{ secrets.OVH_MONDIAL_RELAY_API_V2_CUSTOMER_ID }}
           OP: ${{ inputs.action }}
           BRANCH: ${{ inputs.branch }}
         run: |
@@ -43,7 +48,7 @@ jobs:
           test -n "${OVH_VPS_HOST_FINGERPRINT:-}"
 
           case "$OP" in
-            status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|sumup-configure) ;;
+            status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|sumup-configure|mondial-relay-configure) ;;
             *) echo "FORBIDDEN action"; exit 1 ;;
           esac
           case "$BRANCH" in
@@ -85,8 +90,16 @@ jobs:
             test -n "${SUMUP_API_KEY:-}"
             test -n "${SUMUP_MERCHANT_CODE:-}"
             printf '%s\n%s\n' "$SUMUP_API_KEY" "$SUMUP_MERCHANT_CODE" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
-            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE
+            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID
+          elif [ "$OP" = mondial-relay-configure ]; then
+            test -n "${MR_ENSEIGNE:-}"
+            test -n "${MR_PRIVATE_KEY:-}"
+            test -n "${MR_API_V2_LOGIN:-}"
+            test -n "${MR_API_V2_PASSWORD:-}"
+            test -n "${MR_API_V2_CUSTOMER_ID:-}"
+            printf '%s\n%s\n%s\n%s\n%s\n' "$MR_ENSEIGNE" "$MR_PRIVATE_KEY" "$MR_API_V2_LOGIN" "$MR_API_V2_PASSWORD" "$MR_API_V2_CUSTOMER_ID" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
+            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID
           else
-            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE
+            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID
             ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
           fi

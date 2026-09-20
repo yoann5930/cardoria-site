@@ -44,6 +44,9 @@ case "$cmd" in
   sumup-configure)
     exec sudo -n /usr/local/bin/cardoria-sumup-configure
     ;;
+  mondial-relay-configure)
+    exec sudo -n /usr/local/bin/cardoria-mondial-relay-configure
+    ;;
   deploy)
     exec sudo -n /usr/local/bin/cardoria-ops deploy
     ;;
