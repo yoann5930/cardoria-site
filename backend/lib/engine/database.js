@@ -195,6 +195,10 @@ function migrate(database) {
   ensureColumn(database, "cards", "catalog_source_url", "TEXT DEFAULT ''");
   ensureColumn(database, "cards", "catalog_sources_json", "TEXT DEFAULT '{}'");
   ensureColumn(database, "cards", "external_refs_json", "TEXT DEFAULT '{}'");
+  database.exec("UPDATE cards SET avg_price=1 WHERE avg_price>0 AND avg_price<1");
+  database.exec("UPDATE cards SET low_price=1 WHERE low_price>0 AND low_price<1");
+  database.exec("UPDATE cards SET high_price=1 WHERE high_price>0 AND high_price<1");
+  database.exec("UPDATE cards SET recommended_price=1 WHERE recommended_price>0 AND recommended_price<1");
   database.exec("UPDATE cards SET language='fr' WHERE language IS NULL OR language=''");
   database.exec("CREATE INDEX IF NOT EXISTS idx_cards_language ON cards(license_slug, language, active)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_cards_rarity_hit ON cards(rarity, hit_family, active)");
