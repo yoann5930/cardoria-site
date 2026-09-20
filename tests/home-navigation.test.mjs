@@ -24,6 +24,21 @@ test("homepage exposes explicit mobile navigation for all primary destinations",
   }
 });
 
+
+test("desktop navigation uses visible real buttons instead of transparent top hotspots",()=>{
+  assert.match(html,/class="home-desktop-nav"/);
+  for(const label of ["Accueil","Boutique","Marketplace","Estimation","Connexion","Contact","LIVE","Admin","Estimer"]){
+    assert.ok(html.includes(`>${label}</a>`),`missing visible desktop button ${label}`);
+  }
+  assert.doesNotMatch(html,/class="reference-hotspot hs-home"/);
+  assert.doesNotMatch(html,/class="home-live-button"/);
+  assert.match(css,/\.home-desktop-nav\{/);
+  assert.match(css,/\.home-nav-link\{/);
+  assert.match(css,/\.home-nav-login\{/);
+  assert.match(css,/\.home-nav-live\{/);
+  assert.match(css,/\.home-nav-estimate\{/);
+});
+
 test("mobile navigation is touch friendly and responsive",()=>{
   assert.match(css,/\.home-mobile-nav\{display:none\}/);
   assert.match(css,/@media\(max-width:760px\)[\s\S]*\.home-mobile-nav\{[^}]*display:grid/);
