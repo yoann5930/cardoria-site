@@ -22,6 +22,7 @@ on:
           - https-enable
           - smtp-configure
           - sumup-configure
+          - mondial-relay-configure
       branch:
         description: Production deploy branch
         required: false
