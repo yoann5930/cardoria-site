@@ -1,7 +1,7 @@
 (function(){
 "use strict";
 const API=window.CARDORIA_BACKEND||window.location.origin;
-const TOKEN_KEY="cardoria_client_session";
+const TOKEN_KEY="cardoria_session_token",LEGACY_TOKEN_KEY="cardoria_client_session";
 const message=document.getElementById("clientOrdersMessage");
 const list=document.getElementById("clientOrdersList");
 function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
@@ -63,12 +63,12 @@ function render(orders){
   }).join("");
 }
 async function load(){
-  const token=localStorage.getItem(TOKEN_KEY)||"";
+  let token=localStorage.getItem(TOKEN_KEY)||"";if(!token){token=localStorage.getItem(LEGACY_TOKEN_KEY)||"";if(token){localStorage.setItem(TOKEN_KEY,token);localStorage.removeItem(LEGACY_TOKEN_KEY);}}
   if(!token){message.innerHTML='<h2>Connexion requise</h2><p>Connectez-vous à votre compte client pour consulter uniquement vos commandes Boutique.</p><a class="client-auth-primary client-order-link" href="/client-login.html">Se connecter</a>';return;}
   try{
     const res=await fetch(API+"/api/auth/orders",{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"});
     const data=await res.json().catch(()=>({}));
-    if(res.status===401||res.status===403){localStorage.removeItem(TOKEN_KEY);throw new Error(res.status===403?"Cet espace est réservé aux comptes clients.":"Votre session a expiré. Reconnectez-vous.");}
+    if(res.status===401||res.status===403){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(LEGACY_TOKEN_KEY);throw new Error(res.status===403?"Cet espace est réservé aux comptes clients.":"Votre session a expiré. Reconnectez-vous.");}
     if(!res.ok||data.ok===false)throw new Error(data.error||"Impossible de charger vos commandes.");
     render(data.orders||[]);
   }catch(e){message.innerHTML='<h2>Commandes Boutique</h2><p>'+esc(e.message)+'</p><a class="client-auth-primary client-order-link" href="/client-login.html">Retour à la connexion</a>';}
