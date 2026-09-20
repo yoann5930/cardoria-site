@@ -87,6 +87,11 @@
     var condition = row.querySelector("[data-condition]")?.value || "";
     var boutique = row.querySelector("[data-boutique]")?.value !== "no";
     var boutiquePrice = row.querySelector("[data-price]")?.value || "";
+    if ((item.packaging === "carte_unite" || item.packaging === "lot_cartes") && boutiquePrice !== "" && Number(boutiquePrice) > 0 && Number(boutiquePrice) < 1) {
+      boutiquePrice = "1.00";
+      var priceInput = row.querySelector("[data-price]");
+      if (priceInput) priceInput.value = boutiquePrice;
+    }
     await queuePreferenceSave(item, { condition: condition, boutique: boutique, boutiquePrice: boutiquePrice }, "Enregistrement...");
   }
 
@@ -138,7 +143,7 @@
       var actions = i.stockRemoved
         ? '<button type="button" class="admin-btn admin-btn--small" data-restore-stock>Remettre</button>'
         : '<button type="button" class="admin-btn admin-btn--small" data-edit-stock>Modifier</button> <button type="button" class="admin-btn admin-btn--small admin-btn--danger" data-remove-stock>Supprimer</button>';
-      return '<tr data-stock-row="'+esc(i.key)+'"><td><small>'+esc(i.cardId || i.key)+'</small></td><td><strong>'+esc(i.name)+'</strong><br><small>'+esc([i.extension,i.number?"#"+i.number:""].filter(Boolean).join(" · "))+'</small></td><td>'+esc(i.categoryLabel || i.packaging)+'</td><td><select data-condition '+((i.packaging!=="carte_unite"&&i.packaging!=="lot_cartes")?'disabled':'')+'>'+conditionOptions(i)+'</select></td><td>'+euro(i.averagePurchaseCost)+'</td><td><input data-price type="number" min="0" step="0.01" value="'+(i.boutiquePrice ? Number(i.boutiquePrice).toFixed(2) : '')+'" placeholder="'+(i.catalogPrice ? Number(i.catalogPrice).toFixed(2) : 'Prix requis')+'"><br><small>'+(i.boutiquePrice?'Prix Admin':i.catalogPrice?'Auto Cardoria '+euro(i.catalogPrice):'Prix catalogue indisponible')+'</small></td><td><strong>'+Number(i.stock||0)+'</strong> dispo<br><small>'+Number(i.pendingStock||0)+' réservé · '+Number(i.soldStock||0)+' vendu'+(Number(i.refundHoldStock||0)?' · '+Number(i.refundHoldStock)+' remboursement':'')+'</small><br>'+statusLabel(i)+'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+actions+'</div></td><td><select data-boutique '+(i.stockRemoved?'disabled':'')+'><option value="yes"'+(i.boutiqueEnabled?' selected':'')+'>Oui</option><option value="no"'+(!i.boutiqueEnabled?' selected':'')+'>Non</option></select></td><td>Achats payés<br><small data-save-status></small></td></tr>';
+      return '<tr data-stock-row="'+esc(i.key)+'"><td><small>'+esc(i.cardId || i.key)+'</small></td><td><strong>'+esc(i.name)+'</strong><br><small>'+esc([i.extension,i.number?"#"+i.number:""].filter(Boolean).join(" · "))+'</small></td><td>'+esc(i.categoryLabel || i.packaging)+'</td><td><select data-condition '+((i.packaging!=="carte_unite"&&i.packaging!=="lot_cartes")?'disabled':'')+'>'+conditionOptions(i)+'</select></td><td>'+euro(i.averagePurchaseCost)+'</td><td><input data-price type="number" min="'+((i.packaging==="carte_unite"||i.packaging==="lot_cartes")?"1":"0.01")+'" step="0.01" value="'+(i.boutiquePrice ? Number(i.boutiquePrice).toFixed(2) : '')+'" placeholder="'+(i.catalogPrice ? Number(i.catalogPrice).toFixed(2) : 'Prix requis')+'"><br><small>'+(i.boutiquePrice?'Prix Admin':i.catalogPrice?'Auto Cardoria '+euro(i.catalogPrice):'Prix catalogue indisponible')+'</small></td><td><strong>'+Number(i.stock||0)+'</strong> dispo<br><small>'+Number(i.pendingStock||0)+' réservé · '+Number(i.soldStock||0)+' vendu'+(Number(i.refundHoldStock||0)?' · '+Number(i.refundHoldStock)+' remboursement':'')+'</small><br>'+statusLabel(i)+'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+actions+'</div></td><td><select data-boutique '+(i.stockRemoved?'disabled':'')+'><option value="yes"'+(i.boutiqueEnabled?' selected':'')+'>Oui</option><option value="no"'+(!i.boutiqueEnabled?' selected':'')+'>Non</option></select></td><td>Achats payés<br><small data-save-status></small></td></tr>';
     }).join("") || '<tr><td colspan="9">Aucun stock Boutique.</td></tr>';
 
     A.qs("#stockRows").querySelectorAll("tr[data-stock-row]").forEach(function (row) {
