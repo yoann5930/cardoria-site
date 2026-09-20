@@ -14,6 +14,10 @@ const LANGUAGE_MAP = new Map([
 
 function raw(value) { return String(value == null ? "" : value).trim(); }
 function nowIso() { return new Date().toISOString(); }
+function freshCompletion(state, maxAgeMs = 12 * 60 * 60 * 1000) {
+  const completed = Date.parse(String(state?.completed_at || ""));
+  return state?.status === "complete" && Number.isFinite(completed) && Date.now() - completed < maxAgeMs;
+}
 function parseJson(value, fallback = {}) { try { const parsed = JSON.parse(String(value || "")); return parsed && typeof parsed === "object" ? parsed : fallback; } catch { return fallback; } }
 function safeJson(value) { return JSON.stringify(value && typeof value === "object" ? value : {}); }
 function normalizeLanguage(value, fallback = "en") {
@@ -213,6 +217,7 @@ export async function syncPokemonTcgcsvCatalog({ groupLimit = 12, reset = false 
   const provider = "tcgcsv-tcgplayer";
   if (reset) saveState(db, provider, { cursor:"0",status:"idle",stats_json:"{}",error:"",completed_at:"" });
   const state = readState(db, provider);
+  if (!reset && freshCompletion(state)) return { ok:true, provider, skipped:true, complete:true, reason:"fresh_complete", counts:catalogCounts(db) };
   const groupsPayload = await fetchJson(`${TCGCSV_BASE}/${TCGCSV_CATEGORY}/groups`);
   const groups = Array.isArray(groupsPayload?.results) ? groupsPayload.results : [];
   if (!groups.length) throw new Error("TCGCSV Pokemon groups unavailable");
@@ -298,6 +303,7 @@ export async function syncPokemonScrydexCatalog({ pageLimit = 10, reset = false 
   if (!auth.configured) return { ok:true, provider, skipped:true, reason:"SCRYDEX_API_KEY_or_TEAM_ID_missing", counts:catalogCounts(db) };
   if (reset) saveState(db, provider, { cursor:"1",status:"idle",stats_json:"{}",error:"",completed_at:"" });
   const state = readState(db, provider);
+  if (!reset && freshCompletion(state)) return { ok:true, provider, skipped:true, complete:true, reason:"fresh_complete", counts:catalogCounts(db) };
   let page = Math.max(1, Number(state.cursor || 1));
   const safeLimit = Math.min(Math.max(Number(pageLimit)||10,1),25);
   let pagesProcessed=0,totalCount=0,scanned=0,created=0,matched=0,updated=0;
