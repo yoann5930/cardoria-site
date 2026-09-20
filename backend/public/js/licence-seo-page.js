@@ -123,7 +123,7 @@
 
   Promise.all([
     fetch(BACKEND + "/api/seo/licences/" + encodeURIComponent(slug)).then(function (r) { return r.json(); }),
-    fetch(BACKEND + "/api/engine/cards?license=" + encodeURIComponent(slug) + "&limit=12&sort=views").then(function (r) { return r.json(); }),
+    fetch(BACKEND + "/api/engine/cards?license=" + encodeURIComponent(slug) + "&limit=12&sort=showcase&requireImage=1&featuredOnly=1").then(function (r) { return r.json(); }),
     fetch(BACKEND + "/api/seo/extensions?license=" + encodeURIComponent(slug)).then(function (r) { return r.json(); })
   ]).then(function (results) {
     var pageData = results[0].page || { title: licCfg.name + " | Cardoria", h1: "Cartes " + licCfg.name, metaDescription: "", content: {} };
