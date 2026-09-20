@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { createHash } from "node:crypto";
 import { readJson, writeJson } from "../lib/storage.js";
-import { isSendcloudConfigured, searchMondialRelayServicePoints } from "../lib/sendcloud.js";
+import { isSendcloudConfigured } from "../lib/sendcloud.js";
+import { searchMondialRelayServicePoints } from "../lib/mondial-relay.js";
 import { parseSendcloudWebhook } from "../lib/sendcloud-webhook-security.js";
 import { applySendcloudWebhookToLiveShipment, liveLabelPurchasesEnabled } from "../lib/live/shipments.js";
 
