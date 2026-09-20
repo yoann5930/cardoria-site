@@ -48,3 +48,5 @@ test("client dashboard hidden state cannot be overridden by layout CSS",()=>{
   assert.match(clientAuth,/qs\("clientGuestShell"\)\.hidden = true/);
   assert.match(clientAuth,/qs\("clientAccountCard"\)\.hidden = false/);
 });
+
+// Human-authored hidden-state CI retrigger after frontend runtime sync; no behavior change.
