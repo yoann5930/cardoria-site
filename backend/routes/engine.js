@@ -41,7 +41,21 @@ router.get("/catalog-audit/images", (req, res) => {
 });
 
 router.get("/cards", (req, res) => {
-  const result = searchCards({ q: req.query.q, license: req.query.license, language: req.query.language, extension: req.query.extension, rarity: req.query.rarity, page: req.query.page, limit: req.query.limit, sort: req.query.sort });
+  const truthy = (value) => ["1","true","yes","on"].includes(String(value || "").toLowerCase());
+  const result = searchCards({
+    q: req.query.q,
+    license: req.query.license,
+    language: req.query.language,
+    extension: req.query.extension,
+    rarity: req.query.rarity,
+    hitFamily: req.query.hitFamily || req.query.hit_family,
+    variant: req.query.variant,
+    page: req.query.page,
+    limit: req.query.limit,
+    sort: req.query.sort,
+    requireImage: truthy(req.query.requireImage || req.query.require_image),
+    featuredOnly: truthy(req.query.featuredOnly || req.query.featured_only)
+  });
   res.json({ ok: true, ...result });
 });
 
