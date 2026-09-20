@@ -69,3 +69,15 @@ test("spectator checkout UIs transmit shippingAddress and archive CSV contains p
   assert.match(archiveUi,/Code postal/);
   assert.match(page,/live-shipping-address\.js\?v=20260918-postal-address/);
 });
+
+test("client profile Point Relais search uses Mondial Relay direct, never Sendcloud",()=>{
+  const source=fs.readFileSync("js/client-auth.js","utf8");
+  const runtime=fs.readFileSync("backend/public/js/client-auth.js","utf8");
+  const page=fs.readFileSync("client-login.html","utf8");
+  const runtimePage=fs.readFileSync("backend/public/client-login.html","utf8");
+  assert.match(source,/\/api\/mondial-relay\/service-points/);
+  assert.equal(source.includes("/api/sendcloud/service-points"),false);
+  assert.equal(source,runtime);
+  assert.match(page,/client-auth\.js\?v=20260920-dashboard-3/);
+  assert.equal(page,runtimePage);
+});
