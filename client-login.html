@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mon compte CardoriaShop</title>
-  <meta name="description" content="Connectez-vous ou créez votre compte client CardoriaShop.">
+  <title>Mon espace client — CardoriaShop</title>
+  <meta name="description" content="Tableau de bord client CardoriaShop : commandes, expéditions, profil et services.">
   <meta name="robots" content="noindex,follow">
   <meta name="theme-color" content="#030303">
   <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/css/client-auth.css?v=20260908-3">
+  <link rel="stylesheet" href="/css/client-auth.css?v=20260920-dashboard-1">
   <link rel="icon" href="/assets/logo/cardoria-premium.png" type="image/png">
 </head>
 <body class="client-auth-page">
@@ -17,15 +17,19 @@
       <img src="/assets/logo/cardoria-premium.png" alt="CardoriaShop" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
       <span><strong>CARDORIA</strong><small>ESPACE CLIENT</small></span>
     </a>
-    <a class="client-auth-back" href="/boutique.html">Retour à la boutique</a>
+    <nav class="client-site-nav" aria-label="Navigation Cardoria">
+      <a href="/">Accueil</a><a href="/boutique.html">Boutique</a><a href="/marketplace.html">Marketplace</a><a href="/estimation.html">Estimation</a><a href="/live.html">Live</a>
+    </nav>
+    <a class="client-auth-back" href="/boutique.html">Continuer mes achats</a>
   </header>
 
   <main class="client-auth-main">
-    <section class="client-auth-shell" aria-labelledby="clientAuthTitle">
+    <section class="client-auth-shell" id="clientGuestShell" aria-labelledby="clientAuthTitle">
       <div class="client-auth-intro">
         <p class="client-auth-kicker">CARDORIASHOP</p>
         <h1 id="clientAuthTitle">Votre espace client</h1>
-        <p>Connectez-vous pour retrouver votre compte Cardoria et accéder plus facilement à vos services.</p>
+        <p>Un seul compte pour parcourir Cardoria, acheter dans la Boutique et la Marketplace, retrouver vos commandes et suivre vos expéditions.</p>
+        <div class="client-auth-benefits"><span>Session persistante</span><span>Achats centralisés</span><span>Suivi des colis</span></div>
       </div>
 
       <div class="client-auth-card" id="clientAuthCard">
@@ -33,66 +37,82 @@
           <button id="clientLoginTab" class="is-active" type="button" role="tab" aria-selected="true">Se connecter</button>
           <button id="clientRegisterTab" type="button" role="tab" aria-selected="false">Créer un compte</button>
         </div>
-
         <form id="clientLoginForm" class="client-auth-form" autocomplete="on">
-          <label>Email
-            <input id="clientLoginEmail" type="email" autocomplete="email" required placeholder="vous@exemple.fr">
-          </label>
-          <label>Mot de passe
-            <input id="clientLoginPassword" type="password" autocomplete="current-password" required placeholder="Votre mot de passe">
-          </label>
+          <label>Email<input id="clientLoginEmail" type="email" autocomplete="email" required placeholder="vous@exemple.fr"></label>
+          <label>Mot de passe<input id="clientLoginPassword" type="password" autocomplete="current-password" required placeholder="Votre mot de passe"></label>
           <button class="client-auth-primary" type="submit">Se connecter</button>
           <p class="client-auth-help"><a href="/reset-password.html">Mot de passe oublié ?</a></p>
         </form>
-
         <form id="clientRegisterForm" class="client-auth-form" autocomplete="on" hidden>
-          <label>Nom ou prénom
-            <input id="clientRegisterName" type="text" autocomplete="name" maxlength="120" placeholder="Votre nom">
-          </label>
-          <label>Email
-            <input id="clientRegisterEmail" type="email" autocomplete="email" required placeholder="vous@exemple.fr">
-          </label>
-          <label>Mot de passe
-            <input id="clientRegisterPassword" type="password" autocomplete="new-password" minlength="10" required placeholder="10 caractères minimum">
-          </label>
-          <p class="client-auth-help">Le mot de passe doit contenir au moins 10 caractères, avec des lettres et des chiffres.</p>
+          <label>Nom ou prénom<input id="clientRegisterName" type="text" autocomplete="name" maxlength="120" placeholder="Votre nom"></label>
+          <label>Email<input id="clientRegisterEmail" type="email" autocomplete="email" required placeholder="vous@exemple.fr"></label>
+          <label>Mot de passe<input id="clientRegisterPassword" type="password" autocomplete="new-password" minlength="10" required placeholder="10 caractères minimum"></label>
+          <p class="client-auth-help">10 caractères minimum avec des lettres et des chiffres.</p>
           <button class="client-auth-primary" type="submit">Créer mon compte</button>
         </form>
-
         <p id="clientAuthMessage" class="client-auth-message" aria-live="polite"></p>
       </div>
+    </section>
 
-      <div class="client-account-card" id="clientAccountCard" hidden>
-        <p class="client-auth-kicker">COMPTE CONNECTÉ</p>
-        <h2 id="clientAccountName">Mon compte</h2>
-        <p id="clientAccountEmail"></p>
-        <details id="clientShippingProfile" style="margin:16px 0">
-          <summary><strong>Adresse d’envoi & Point Relais</strong></summary>
-          <form id="clientProfileForm" class="client-auth-form" style="margin-top:12px">
+    <section class="client-dashboard" id="clientAccountCard" hidden>
+      <div class="client-dashboard-hero">
+        <div>
+          <p class="client-auth-kicker">COMPTE CONNECTÉ</p>
+          <h1>Bonjour <span id="clientAccountName">Client</span></h1>
+          <p id="clientAccountEmail"></p>
+        </div>
+        <div class="client-dashboard-session"><span class="client-session-dot"></span><strong>Session Cardoria active</strong><small>Votre connexion reste valable pendant votre navigation.</small></div>
+      </div>
+
+      <div class="client-dashboard-stats">
+        <a href="/client-orders.html"><small>COMMANDES BOUTIQUE</small><strong id="clientStatBoutique">—</strong><span>Voir mes achats →</span></a>
+        <a href="/mes-commandes.html"><small>COMMANDES MARKETPLACE</small><strong id="clientStatMarketplace">—</strong><span>Voir mes achats →</span></a>
+        <div><small>EXPÉDITIONS LIVE</small><strong id="clientStatLive">—</strong><span>Suivi centralisé</span></div>
+        <div><small>PROFIL LIVRAISON</small><strong id="clientStatProfile">—</strong><span id="clientStatProfileText">À compléter</span></div>
+      </div>
+
+      <div class="client-dashboard-grid">
+        <section class="client-dashboard-panel client-dashboard-orders">
+          <div class="client-panel-head"><div><p class="client-auth-kicker">ACTIVITÉ</p><h2>Mes derniers achats</h2></div><a href="/client-orders.html">Tout voir</a></div>
+          <div id="clientRecentOrders" class="client-recent-orders"><p class="client-muted">Chargement des commandes…</p></div>
+          <div class="client-dashboard-actions">
+            <a class="is-primary" href="/boutique.html">Continuer mes achats</a>
+            <a href="/marketplace.html">Explorer la Marketplace</a>
+            <a href="/estimation.html">Estimer une carte</a>
+            <a href="/live.html">Voir le Live</a>
+          </div>
+        </section>
+
+        <aside class="client-dashboard-panel">
+          <div class="client-panel-head"><div><p class="client-auth-kicker">LIVRAISON</p><h2>Adresse & Point Relais</h2></div></div>
+          <form id="clientProfileForm" class="client-auth-form">
             <label>Nom complet<input id="clientProfileName" type="text" maxlength="120" autocomplete="name"></label>
             <label>Téléphone<input id="clientProfilePhone" type="tel" maxlength="32" autocomplete="tel"></label>
             <label>Adresse<input id="clientProfileAddress1" type="text" maxlength="160" autocomplete="street-address"></label>
             <label>Complément<input id="clientProfileAddress2" type="text" maxlength="160"></label>
-            <label>Code postal<input id="clientProfilePostalCode" type="text" maxlength="24" autocomplete="postal-code"></label>
-            <label>Ville<input id="clientProfileCity" type="text" maxlength="120" autocomplete="address-level2"></label>
+            <div class="client-form-row">
+              <label>Code postal<input id="clientProfilePostalCode" type="text" maxlength="24" autocomplete="postal-code"></label>
+              <label>Ville<input id="clientProfileCity" type="text" maxlength="120" autocomplete="address-level2"></label>
+            </div>
             <label>Pays<input id="clientProfileCountry" type="text" maxlength="2" value="FR"></label>
-            <p id="clientRelaySummary" class="client-auth-help">Aucun Point Relais préféré.</p>
-            <button id="clientChooseRelay" class="client-auth-secondary" type="button">Choisir mon Point Relais Mondial Relay</button>
-            <button class="client-auth-primary" type="submit">Enregistrer mon adresse</button>
+            <div class="client-relay-box"><small>POINT RELAIS PRÉFÉRÉ</small><p id="clientRelaySummary">Aucun Point Relais préféré.</p><button id="clientChooseRelay" class="client-auth-secondary is-compact" type="button">Choisir mon Point Relais</button></div>
+            <button class="client-auth-primary" type="submit">Enregistrer mon profil</button>
           </form>
-        </details>
-        <div class="client-account-actions">
-          <a href="/client-orders.html">Commandes Boutique</a>
-          <a href="/mes-commandes.html">Commandes Marketplace</a>
-          <a href="/boutique.html">Boutique</a>
-          <a href="/marketplace.html">Marketplace</a>
-        </div>
-        <section style="margin:18px 0"><h3>Expéditions Live</h3><div id="clientLiveShipments"><p>Aucune expédition Live.</p></div></section>
-        <button id="clientLogoutButton" class="client-auth-secondary" type="button">Se déconnecter</button>
+          <p id="clientProfileMessage" class="client-auth-message" aria-live="polite"></p>
+        </aside>
+      </div>
+
+      <section class="client-dashboard-panel client-live-panel">
+        <div class="client-panel-head"><div><p class="client-auth-kicker">EXPÉDITIONS</p><h2>Mes expéditions Live</h2></div></div>
+        <div id="clientLiveShipments" class="client-live-list"><p class="client-muted">Chargement…</p></div>
+      </section>
+
+      <div class="client-dashboard-footer">
+        <div><strong>Votre compte vous suit partout sur Cardoria.</strong><p>Les commandes liées à votre compte restent accessibles après reconnexion.</p></div>
+        <button id="clientLogoutButton" class="client-auth-secondary is-logout" type="button">Se déconnecter</button>
       </div>
     </section>
   </main>
-
-  <script src="/js/client-auth.js?v=20260918-live-shipping"></script>
+  <script src="/js/client-auth.js?v=20260920-dashboard-1"></script>
 </body>
 </html>

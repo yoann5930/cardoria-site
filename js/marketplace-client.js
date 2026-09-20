@@ -5,6 +5,7 @@
   var USER_KEY = "cardoria_mk_user";
   var SELLER_KEY = "cardoria_mk_seller";
   var TOKEN_KEY = "cardoria_session_token";
+  var LEGACY_TOKEN_KEY = "cardoria_client_session";
   var ACCOUNT_KEY = "cardoria_account";
 
   function uid() { return "USR-" + cryptoRandom() + Date.now().toString(36); }
@@ -15,16 +16,16 @@
   function getUserId() { var id = localStorage.getItem(USER_KEY); if (!id) { id = uid(); localStorage.setItem(USER_KEY, id); } return id; }
   function getSeller() { try { return JSON.parse(localStorage.getItem(SELLER_KEY) || "null"); } catch (_) { return null; } }
   function setSeller(seller) { if (seller) localStorage.setItem(SELLER_KEY, JSON.stringify(seller)); else localStorage.removeItem(SELLER_KEY); }
-  function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
+  function getToken() { var token = localStorage.getItem(TOKEN_KEY) || ""; if (!token) { token = localStorage.getItem(LEGACY_TOKEN_KEY) || ""; if (token) { localStorage.setItem(TOKEN_KEY, token); localStorage.removeItem(LEGACY_TOKEN_KEY); } } return token; }
   function getAccount() { try { return JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch (_) { return null; } }
   function setSession(data) {
     if (!data || !data.token) return;
-    localStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(TOKEN_KEY, data.token); localStorage.removeItem(LEGACY_TOKEN_KEY);
     localStorage.setItem(ACCOUNT_KEY, JSON.stringify(data.user || null));
   }
   function logout() {
     var token = getToken();
-    localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(ACCOUNT_KEY); localStorage.removeItem(SELLER_KEY);
+    localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(LEGACY_TOKEN_KEY); localStorage.removeItem(ACCOUNT_KEY); localStorage.removeItem(SELLER_KEY);
     if (token) fetch(BACKEND + "/api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + token } }).catch(function () {});
   }
   function authHeaders(extra) {

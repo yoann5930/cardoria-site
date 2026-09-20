@@ -17,6 +17,7 @@ import { readJson } from "../lib/storage.js";
 
 const router = Router();
 const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;
+const CLIENT_SESSION_HOURS = Math.max(24, Math.min(24 * 365, Number(process.env.CLIENT_SESSION_DAYS || 30) * 24));
 const REQUIRE_ADMIN_2FA = String(
   process.env.ADMIN_REQUIRE_2FA ?? (process.env.NODE_ENV === "test" ? "true" : "false")
 ).trim().toLowerCase() === "true";
@@ -73,7 +74,7 @@ function rejectTemporaryCodeLogin(res) {
 }
 
 function completeSession(user, req) {
-  const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"] });
+  const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"], ttlHours: user.role === "client" ? CLIENT_SESSION_HOURS : undefined });
   return {
     ok: true,
     token: session.token,
@@ -116,7 +117,7 @@ router.post("/register", authRateLimit, (req, res) => {
     if (!validPassword(password)) return res.status(400).json({ ok: false, error: "Mot de passe: 10 caracteres minimum avec lettres et chiffres." });
     if (getUserByEmail(email)) return res.status(409).json({ ok: false, error: "Un compte existe deja pour cet email." });
     const user = createUser({ email, password, role: "client", name });
-    const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"] });
+    const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"], ttlHours: CLIENT_SESSION_HOURS });
     logAudit({ type: "auth", action: "client_register", user: email, detail: "marketplace" });
     res.status(201).json({ ok: true, token: session.token, expiresAt: session.expiresAt, user: publicUser(user) });
   } catch (e) {
@@ -242,7 +243,7 @@ router.get("/orders", (req, res) => {
 
   const email = normalizedEmail(user.email);
   const orders = readJson("orders", [])
-    .filter((order) => normalizedEmail(order?.email) === email)
+    .filter((order) => String(order?.userId || "") === String(user.id) || normalizedEmail(order?.email) === email)
     .sort((a, b) => String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || "")))
     .map(publicClientOrder);
 
