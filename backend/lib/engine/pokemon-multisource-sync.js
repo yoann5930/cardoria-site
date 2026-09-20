@@ -267,7 +267,7 @@ export async function syncPokemonTcgcsvCatalog({ groupLimit = 12, reset = false 
     const stats = { groupsTotal:groups.length, groupsProcessed:batch.length, cursor:complete ? 0 : next, scannedProducts, cardProducts, created, matched, updated, failures };
     saveState(db, provider, { cursor:String(complete ? 0 : next),status:complete?"complete":"partial",stats_json:safeJson(stats),completed_at:complete?nowIso():"",error:"" });
     if (created || updated) rebuildFts(db);
-    return { ok:true, provider, complete, ...stats, counts:catalogCounts(db) };
+    return { ok:true, provider, complete, authMode:auth.configured?"authenticated":"anonymous-low-rate", ...stats, counts:catalogCounts(db) };
   } catch (error) {
     saveState(db, provider, { status:"error",error:error?.message||String(error),last_run_at:nowIso() });
     throw error;
@@ -318,12 +318,12 @@ export async function syncPokemonScrydexCatalog({ pageLimit = 10, reset = false 
   const db = getDb(); ensureState(db);
   const provider = "scrydex";
   const auth = scrydexHeaders();
-  if (!auth.configured) return { ok:true, provider, skipped:true, reason:"SCRYDEX_API_KEY_or_TEAM_ID_missing", counts:catalogCounts(db) };
   if (reset) saveState(db, provider, { cursor:"1",status:"idle",stats_json:"{}",error:"",completed_at:"" });
   const state = readState(db, provider);
   if (!reset && freshCompletion(state)) return { ok:true, provider, skipped:true, complete:true, reason:"fresh_complete", counts:catalogCounts(db) };
   let page = Math.max(1, Number(state.cursor || 1));
-  const safeLimit = Math.min(Math.max(Number(pageLimit)||10,1),25);
+  const requestedLimit = Math.min(Math.max(Number(pageLimit)||10,1),25);
+  const safeLimit = auth.configured ? requestedLimit : Math.min(requestedLimit, 1);
   let pagesProcessed=0,totalCount=0,scanned=0,created=0,matched=0,updated=0;
   saveState(db, provider, { status:"running",last_run_at:nowIso(),error:"" });
   try {
@@ -367,7 +367,7 @@ export function getPokemonMultiSourceStatus() {
     providers:{
       tcgdex:{ configured:true, role:"primary multilingual catalog" },
       tcgcsv:{ configured:true, role:"English gap filler / TCGplayer references" },
-      scrydex:{ configured:scrydex.configured, role:"optional cross-check and gap filler" },
+      scrydex:{ configured:scrydex.configured, available:true, mode:scrydex.configured?"authenticated":"anonymous-low-rate", role:"cross-check and gap filler" },
       pokemonKorea:{ configured:true, role:"Korean official references" },
       zebraDex:{ configured:true, role:"French/Japanese image and price fallback" }
     },
