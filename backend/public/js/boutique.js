@@ -1,19 +1,559 @@
 (function () {
   "use strict";
-  const BACKEND_URL=window.CARDORIA_BACKEND||window.location.origin,TOKEN_KEY="cardoria_session_token",LEGACY_TOKEN_KEY="cardoria_client_session",CART_KEY="cardoria_boutique_cart",POKEMON_LOGO="https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg";let products=[],cart=[],lastPreviewTrigger=null;
-  const qs=id=>document.getElementById(id),getToken=()=>{let t=localStorage.getItem(TOKEN_KEY)||"";if(!t){t=localStorage.getItem(LEGACY_TOKEN_KEY)||"";if(t){localStorage.setItem(TOKEN_KEY,t);localStorage.removeItem(LEGACY_TOKEN_KEY);}}return t;},saveCart=()=>{try{localStorage.setItem(CART_KEY,JSON.stringify(cart.map(i=>({id:i.id,qty:i.qty}))));}catch{}},euro=v=>Number(v||0).toFixed(2).replace(".",",")+" €",esc=v=>String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#039;");
-  function toggleMenu(){qs("menu")?.classList.toggle("open");}
-  async function loadProducts(){const r=await fetch(`${BACKEND_URL}/api/payments/boutique/products`,{cache:"no-store"}),d=await r.json();if(!r.ok||!d.ok||!Array.isArray(d.products))throw new Error(d.error||"Stock Boutique indisponible");products=d.products;if(!cart.length){try{const saved=JSON.parse(localStorage.getItem(CART_KEY)||"[]");if(Array.isArray(saved))cart=saved;}catch{}}cart=cart.map(i=>{const p=products.find(x=>String(x.id)===String(i.id));return !p||!p.purchasable||Number(p.stock||0)<=0?null:{...p,qty:Math.min(Number(i.qty||1),Number(p.stock||0))};}).filter(Boolean);saveCart();}
-  function getPokemonProducts(){const q=(qs("search")?.value||"").trim().toLowerCase();return products.filter(p=>p.category==="pokemon"&&(!q||[p.name,p.extension,p.number,p.rarity,p.condition].join(" ").toLowerCase().includes(q)));}
-  function renderProducts(){const b=qs("products");if(!b)return;const l=getPokemonProducts();if(!l.length){b.innerHTML='<p class="shop-empty">Aucun produit Pokémon disponible.</p>';return;}b.innerHTML=l.map(p=>{const image=p.image||POKEMON_LOGO,meta=[p.extension,p.number?`#${p.number}`:"",p.rarity].filter(Boolean).join(" · "),stock=Math.max(0,Number(p.stock||0)),can=!!p.purchasable&&stock>0&&Number(p.price||0)>0;return `<article class="product" data-preview-product="${esc(p.id)}"><div class="product-img pokemon-product-visual" data-preview-product="${esc(p.id)}" role="button" tabindex="0"><img src="${esc(image)}" alt="${esc(p.name||"Produit Pokémon")}" loading="lazy" onerror="this.onerror=null;this.src='${POKEMON_LOGO}'"></div><h3 class="product-name">${esc(p.name)}</h3>${meta?`<p class="product-meta">${esc(meta)}</p>`:""}<div class="product-stock-row"><span>État : ${esc(p.condition||"Non renseigné")}</span><span>${stock>0?`En stock : ${stock}`:"Rupture de stock"}</span></div><div class="price">${Number(p.price||0)>0?euro(p.price):"Prix à définir"}</div><button class="primary" type="button" data-add-product="${esc(p.id)}" ${can?"":"disabled"}>${can?"Ajouter au panier":"Indisponible"}</button></article>`;}).join("");}
-  function ensurePreviewModal(){if(qs("cardPreviewModal"))return;const m=document.createElement("div");m.id="cardPreviewModal";m.className="card-preview-modal";m.hidden=true;m.innerHTML='<div class="card-preview-dialog" role="dialog" aria-modal="true"><button class="card-preview-close" id="cardPreviewClose" type="button">×</button><div class="card-preview-visual"><img id="cardPreviewImage"></div><div class="card-preview-copy"><h2 id="cardPreviewTitle"></h2><p id="cardPreviewMeta"></p><p id="cardPreviewCondition"></p><p id="cardPreviewPrice"></p></div></div>';document.body.appendChild(m);qs("cardPreviewClose")?.addEventListener("click",closeCardPreview);m.addEventListener("click",e=>{if(e.target===m)closeCardPreview();});}
-  function openCardPreview(id,t){const p=products.find(x=>String(x.id)===String(id));if(!p)return;ensurePreviewModal();const m=qs("cardPreviewModal");qs("cardPreviewImage").src=p.image||POKEMON_LOGO;qs("cardPreviewTitle").textContent=p.name||"Produit Pokémon";qs("cardPreviewMeta").textContent=[p.extension,p.number?`#${p.number}`:"",p.rarity].filter(Boolean).join(" · ");qs("cardPreviewCondition").textContent=`État : ${p.condition||"Non renseigné"}`;qs("cardPreviewPrice").textContent=euro(p.price);lastPreviewTrigger=t;m.hidden=false;}
-  function closeCardPreview(){const m=qs("cardPreviewModal");if(!m||m.hidden)return;m.hidden=true;lastPreviewTrigger?.focus?.();lastPreviewTrigger=null;}
-  function addToCart(id){const p=products.find(x=>String(x.id)===String(id));if(!p||!p.purchasable||Number(p.stock||0)<=0)return;const e=cart.find(x=>String(x.id)===String(id));if(e){if(e.qty<Number(p.stock||0))e.qty++;}else cart.push({...p,qty:1});saveCart();renderCart();}
-  function renderCart(){const b=qs("cart"),t=qs("cartTotal");if(!b||!t)return;b.innerHTML=cart.length?cart.map(i=>`<li>${i.qty} × ${esc(i.name)} — ${euro(i.qty*i.price)}</li>`).join(""):"<li>Panier vide</li>";t.textContent=euro(cart.reduce((s,i)=>s+i.qty*i.price,0));}
-  function customerPayload(){const p={customerName:qs("shopName")?.value?.trim()||"",customerEmail:qs("shopEmail")?.value?.trim()||"",customerPhone:qs("shopPhone")?.value?.trim()||"",address:qs("shopAddress")?.value?.trim()||"",postalCode:qs("shopPostalCode")?.value?.trim()||"",city:qs("shopCity")?.value?.trim()||"",country:qs("shopCountry")?.value?.trim()||"France"};if(!p.customerName||!p.customerEmail||!p.customerPhone||!p.address||!p.postalCode||!p.city)throw new Error("Nom, email, téléphone et adresse complète sont obligatoires.");if(!/^\S+@\S+\.\S+$/.test(p.customerEmail))throw new Error("Adresse email invalide.");return p;}
-  async function checkoutBoutique(){if(!cart.length)return alert("Panier vide.");const button=qs("shopPayButton"),message=qs("shopPayMsg");try{const customer=customerPayload();button.disabled=true;if(message)message.textContent="Vérification du stock...";await loadProducts();renderProducts();renderCart();if(!cart.length)throw new Error("Les articles du panier ne sont plus disponibles.");const items=cart.map(i=>({ref:i.id,qty:i.qty})),attribution=window.CardoriaAttribution?window.CardoriaAttribution.getPayload():{},token=getToken(),headers={"Content-Type":"application/json"};if(token)headers.Authorization="Bearer "+token;const r=await fetch(`${BACKEND_URL}/api/payments/boutique/checkout`,{method:"POST",headers,body:JSON.stringify({...customer,items,provider:"sumup",shipping:"Standard",successUrl:`${location.origin}/boutique.html?gamme=pokemon`,...attribution})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||"Paiement SumUp indisponible.");if(!d.url)throw new Error("Lien de paiement SumUp non reçu.");sessionStorage.setItem("cardoria_sumup_checkout",d.checkoutId||"");sessionStorage.setItem("cardoria_sumup_order",d.orderId||"");if(message)message.textContent="Ouverture du paiement SumUp...";location.href=d.url;}catch(e){if(message)message.textContent=e.message||"Paiement impossible.";alert(e.message||"Paiement impossible.");try{await loadProducts();renderProducts();renderCart();}catch{}}finally{if(button)button.disabled=false;}}
-  async function confirmReturnedPayment(){const p=new URLSearchParams(location.search),order=p.get("order"),checkout=sessionStorage.getItem("cardoria_sumup_checkout");if(p.get("paid")!=="1"||!order||!checkout)return;const m=qs("shopPayMsg");try{if(m)m.textContent="Vérification du paiement SumUp...";const r=await fetch(`${BACKEND_URL}/api/payments/sumup/confirm/${encodeURIComponent(checkout)}`,{cache:"no-store"}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||"Vérification SumUp impossible.");if(d.status==="paid"){cart=[];saveCart();renderCart();sessionStorage.removeItem("cardoria_sumup_checkout");sessionStorage.removeItem("cardoria_sumup_order");if(m)m.textContent=`Paiement SumUp confirmé. Commande ${order}.`;}else if(m)m.textContent=d.status==="failed"?"Le paiement SumUp a échoué ou a été annulé.":d.status==="refunded"?"Ce paiement SumUp a été remboursé.":"Paiement SumUp en cours de confirmation.";}catch(e){if(m)m.textContent=e.message||"Vérification du paiement impossible.";}}
-  async function restoreClientProfile(){const token=getToken();if(!token)return;try{const r=await fetch(`${BACKEND_URL}/api/auth/me`,{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"}),d=await r.json();if(!r.ok||!d.ok||d.user?.role!=="client")return;const u=d.user;const map=[["shopName",u.name],["shopEmail",u.email],["shopPhone",u.phone],["shopAddress",u.addressLine1],["shopPostalCode",u.postalCode],["shopCity",u.city],["shopCountry",u.country==="FR"?"France":u.country]];for(const [id,val] of map){if(qs(id)&&val)qs(id).value=val;}const a=document.querySelector(".shop-client-account");if(a){a.setAttribute("aria-label","Ouvrir mon espace client");const spans=a.querySelectorAll("span");if(spans[1])spans[1].textContent=u.name||"Mon compte";}}catch{}}function showRangeOverview(){qs("shopRangeView")?.removeAttribute("hidden");qs("shopProductView")?.setAttribute("hidden","");}async function showPokemonRange(){qs("shopRangeView")?.setAttribute("hidden","");qs("shopProductView")?.removeAttribute("hidden");try{await loadProducts();renderProducts();renderCart();}catch{}}
-  function init(){qs("shopMenuButton")?.addEventListener("click",toggleMenu);qs("search")?.addEventListener("input",renderProducts);qs("shopPayButton")?.addEventListener("click",checkoutBoutique);qs("products")?.addEventListener("click",e=>{const b=e.target.closest("[data-add-product]");if(b){addToCart(b.dataset.addProduct);return;}const p=e.target.closest("[data-preview-product]");if(p)openCardPreview(p.dataset.previewProduct,p);});ensurePreviewModal();restoreClientProfile();new URLSearchParams(location.search).get("gamme")==="pokemon"?showPokemonRange():showRangeOverview();confirmReturnedPayment();window.CardoriaAttribution?.trackPageView?.();}document.addEventListener("DOMContentLoaded",init);
+
+  const BACKEND_URL = window.CARDORIA_BACKEND || window.location.origin;
+  const TOKEN_KEY = "cardoria_session_token";
+  const LEGACY_TOKEN_KEY = "cardoria_client_session";
+  const CART_KEY = "cardoria_boutique_cart";
+  const POKEMON_LOGO = "https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg";
+
+  let products = [];
+  let cart = [];
+  let searchIndex = [];
+  let activeSuggestion = -1;
+  let searchFrame = 0;
+  let lastPreviewTrigger = null;
+
+  const qs = (id) => document.getElementById(id);
+  const euro = (value) => Number(value || 0).toFixed(2).replace(".", ",") + " €";
+  const esc = (value) => String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+  function getToken() {
+    let token = localStorage.getItem(TOKEN_KEY) || "";
+    if (!token) {
+      token = localStorage.getItem(LEGACY_TOKEN_KEY) || "";
+      if (token) {
+        localStorage.setItem(TOKEN_KEY, token);
+        localStorage.removeItem(LEGACY_TOKEN_KEY);
+      }
+    }
+    return token;
+  }
+
+  function saveCart() {
+    try {
+      localStorage.setItem(CART_KEY, JSON.stringify(cart.map((item) => ({ id: item.id, qty: item.qty }))));
+    } catch {}
+  }
+
+  function toggleMenu() {
+    qs("menu")?.classList.toggle("open");
+  }
+
+  function normalizeSearch(value) {
+    return String(value == null ? "" : value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  function buildSearchIndex() {
+    searchIndex = products
+      .filter((product) => product.category === "pokemon")
+      .map((product) => {
+        const fields = {
+          name: normalizeSearch(product.name),
+          extension: normalizeSearch(product.extension),
+          number: normalizeSearch(product.number),
+          rarity: normalizeSearch(product.rarity),
+          condition: normalizeSearch(product.condition)
+        };
+        return {
+          product,
+          fields,
+          blob: [fields.name, fields.extension, fields.number, fields.rarity, fields.condition].filter(Boolean).join(" ")
+        };
+      });
+  }
+
+  function scoreSearchEntry(entry, terms, fullQuery) {
+    if (!terms.length) return 0;
+    if (!terms.every((term) => entry.blob.includes(term))) return -1;
+
+    const f = entry.fields;
+    let score = 0;
+    if (f.name === fullQuery) score += 120;
+    if (f.number === fullQuery) score += 90;
+    if (f.extension === fullQuery) score += 70;
+
+    for (const term of terms) {
+      if (f.name.startsWith(term)) score += 45;
+      else if (f.name.includes(term)) score += 30;
+      if (f.number === term) score += 40;
+      else if (f.number.includes(term)) score += 20;
+      if (f.extension.startsWith(term)) score += 22;
+      else if (f.extension.includes(term)) score += 14;
+      if (f.rarity.includes(term)) score += 12;
+      if (f.condition.includes(term)) score += 5;
+    }
+
+    if (Number(entry.product.stock || 0) > 0) score += 2;
+    if (entry.product.purchasable) score += 2;
+    return score;
+  }
+
+  function getPokemonProducts() {
+    const query = normalizeSearch(qs("search")?.value || "");
+    if (!query) return searchIndex.map((entry) => entry.product);
+
+    const terms = query.split(/\s+/).filter(Boolean);
+    return searchIndex
+      .map((entry, position) => ({
+        product: entry.product,
+        position,
+        score: scoreSearchEntry(entry, terms, query)
+      }))
+      .filter((entry) => entry.score >= 0)
+      .sort((a, b) => b.score - a.score || a.position - b.position)
+      .map((entry) => entry.product);
+  }
+
+  function setSuggestionsOpen(open) {
+    const results = qs("shopQuickResults");
+    const input = qs("search");
+    if (results) results.hidden = !open;
+    if (input) input.setAttribute("aria-expanded", open ? "true" : "false");
+    if (!open) activeSuggestion = -1;
+  }
+
+  function updateSuggestionSelection(options) {
+    options.forEach((option, index) => {
+      const selected = index === activeSuggestion;
+      option.setAttribute("aria-selected", selected ? "true" : "false");
+      option.classList.toggle("is-active", selected);
+      if (selected) option.scrollIntoView({ block: "nearest" });
+    });
+  }
+
+  function renderQuickSuggestions(matches) {
+    const results = qs("shopQuickResults");
+    const input = qs("search");
+    if (!results || !input) return;
+
+    const query = normalizeSearch(input.value);
+    if (!query || document.activeElement !== input) {
+      results.replaceChildren();
+      setSuggestionsOpen(false);
+      return;
+    }
+
+    const suggestions = matches.slice(0, 6);
+    if (!suggestions.length) {
+      results.innerHTML = '<div class="shop-quick-empty">Aucun produit correspondant.</div>';
+      setSuggestionsOpen(true);
+      return;
+    }
+
+    results.innerHTML = suggestions.map((product, index) => {
+      const image = product.image || POKEMON_LOGO;
+      const meta = [product.extension, product.number ? "#" + product.number : "", product.rarity].filter(Boolean).join(" · ");
+      const stock = Math.max(0, Number(product.stock || 0));
+      return '<button class="shop-quick-option" type="button" role="option" aria-selected="false" data-quick-product="' + esc(product.id) + '" data-quick-index="' + index + '">' +
+        '<img src="' + esc(image) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'' + POKEMON_LOGO + '\'">' +
+        '<span class="shop-quick-copy"><strong>' + esc(product.name || "Produit Pokémon") + '</strong><small>' + esc(meta || "Pokémon") + '</small></span>' +
+        '<span class="shop-quick-side"><strong>' + (Number(product.price || 0) > 0 ? euro(product.price) : "Prix à définir") + '</strong><small>' + (stock > 0 ? stock + " en stock" : "Indisponible") + '</small></span>' +
+      '</button>';
+    }).join("");
+
+    activeSuggestion = -1;
+    setSuggestionsOpen(true);
+  }
+
+  function updateSearchMeta(matches) {
+    const count = qs("shopSearchCount");
+    const input = qs("search");
+    if (!count || !input) return;
+    const query = input.value.trim();
+    if (!query) {
+      count.textContent = matches.length + (matches.length > 1 ? " produits disponibles" : " produit disponible");
+      return;
+    }
+    count.textContent = matches.length + (matches.length > 1 ? " résultats" : " résultat") + ' pour "' + query + '"';
+  }
+
+  function renderProducts() {
+    const container = qs("products");
+    if (!container) return;
+
+    const matches = getPokemonProducts();
+    updateSearchMeta(matches);
+    renderQuickSuggestions(matches);
+
+    if (!matches.length) {
+      container.innerHTML = '<p class="shop-empty">Aucun produit Pokémon ne correspond à votre recherche.</p>';
+      return;
+    }
+
+    container.innerHTML = matches.map((product) => {
+      const image = product.image || POKEMON_LOGO;
+      const meta = [product.extension, product.number ? "#" + product.number : "", product.rarity].filter(Boolean).join(" · ");
+      const stock = Math.max(0, Number(product.stock || 0));
+      const canBuy = !!product.purchasable && stock > 0 && Number(product.price || 0) > 0;
+      return '<article class="product" data-product-id="' + esc(product.id) + '" data-preview-product="' + esc(product.id) + '">' +
+        '<div class="product-img pokemon-product-visual" data-preview-product="' + esc(product.id) + '" role="button" tabindex="0">' +
+          '<img src="' + esc(image) + '" alt="' + esc(product.name || "Produit Pokémon") + '" loading="lazy" onerror="this.onerror=null;this.src=\'' + POKEMON_LOGO + '\'">' +
+        '</div>' +
+        '<h3 class="product-name">' + esc(product.name) + '</h3>' +
+        (meta ? '<p class="product-meta">' + esc(meta) + '</p>' : '') +
+        '<div class="product-stock-row"><span>État : ' + esc(product.condition || "Non renseigné") + '</span><span>' + (stock > 0 ? "En stock : " + stock : "Rupture de stock") + '</span></div>' +
+        '<div class="price">' + (Number(product.price || 0) > 0 ? euro(product.price) : "Prix à définir") + '</div>' +
+        '<button class="primary" type="button" data-add-product="' + esc(product.id) + '" ' + (canBuy ? "" : "disabled") + '>' + (canBuy ? "Ajouter au panier" : "Indisponible") + '</button>' +
+      '</article>';
+    }).join("");
+  }
+
+  function scheduleSearchRender() {
+    if (searchFrame) cancelAnimationFrame(searchFrame);
+    searchFrame = requestAnimationFrame(() => {
+      searchFrame = 0;
+      renderProducts();
+    });
+  }
+
+  function selectQuickProduct(id) {
+    const product = products.find((item) => String(item.id) === String(id));
+    const input = qs("search");
+    if (!product || !input) return;
+
+    input.value = product.name || "";
+    renderProducts();
+    setSuggestionsOpen(false);
+
+    requestAnimationFrame(() => {
+      const card = document.querySelector('[data-product-id="' + CSS.escape(String(product.id)) + '"]');
+      card?.scrollIntoView({ behavior: "smooth", block: "center" });
+      card?.classList.add("is-search-target");
+      window.setTimeout(() => card?.classList.remove("is-search-target"), 1400);
+    });
+  }
+
+  function handleSearchKeydown(event) {
+    const results = qs("shopQuickResults");
+    const options = results ? Array.from(results.querySelectorAll(".shop-quick-option")) : [];
+
+    if (event.key === "Escape") {
+      setSuggestionsOpen(false);
+      return;
+    }
+
+    if (!options.length || results?.hidden) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      activeSuggestion = (activeSuggestion + 1) % options.length;
+      updateSuggestionSelection(options);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      activeSuggestion = activeSuggestion <= 0 ? options.length - 1 : activeSuggestion - 1;
+      updateSuggestionSelection(options);
+      return;
+    }
+
+    if (event.key === "Enter" && activeSuggestion >= 0) {
+      event.preventDefault();
+      options[activeSuggestion]?.click();
+    }
+  }
+
+  async function loadProducts() {
+    const response = await fetch(BACKEND_URL + "/api/payments/boutique/products", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok || !data.ok || !Array.isArray(data.products)) {
+      throw new Error(data.error || "Stock Boutique indisponible");
+    }
+
+    products = data.products;
+    buildSearchIndex();
+
+    if (!cart.length) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
+        if (Array.isArray(saved)) cart = saved;
+      } catch {}
+    }
+
+    cart = cart.map((item) => {
+      const product = products.find((candidate) => String(candidate.id) === String(item.id));
+      if (!product || !product.purchasable || Number(product.stock || 0) <= 0) return null;
+      return { ...product, qty: Math.min(Number(item.qty || 1), Number(product.stock || 0)) };
+    }).filter(Boolean);
+
+    saveCart();
+  }
+
+  function ensurePreviewModal() {
+    if (qs("cardPreviewModal")) return;
+    const modal = document.createElement("div");
+    modal.id = "cardPreviewModal";
+    modal.className = "card-preview-modal";
+    modal.hidden = true;
+    modal.innerHTML = '<div class="card-preview-dialog" role="dialog" aria-modal="true"><button class="card-preview-close" id="cardPreviewClose" type="button">×</button><div class="card-preview-visual"><img id="cardPreviewImage"></div><div class="card-preview-copy"><h2 id="cardPreviewTitle"></h2><p id="cardPreviewMeta"></p><p id="cardPreviewCondition"></p><p id="cardPreviewPrice"></p></div></div>';
+    document.body.appendChild(modal);
+    qs("cardPreviewClose")?.addEventListener("click", closeCardPreview);
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) closeCardPreview();
+    });
+  }
+
+  function openCardPreview(id, trigger) {
+    const product = products.find((item) => String(item.id) === String(id));
+    if (!product) return;
+    ensurePreviewModal();
+    const modal = qs("cardPreviewModal");
+    qs("cardPreviewImage").src = product.image || POKEMON_LOGO;
+    qs("cardPreviewTitle").textContent = product.name || "Produit Pokémon";
+    qs("cardPreviewMeta").textContent = [product.extension, product.number ? "#" + product.number : "", product.rarity].filter(Boolean).join(" · ");
+    qs("cardPreviewCondition").textContent = "État : " + (product.condition || "Non renseigné");
+    qs("cardPreviewPrice").textContent = euro(product.price);
+    lastPreviewTrigger = trigger;
+    modal.hidden = false;
+  }
+
+  function closeCardPreview() {
+    const modal = qs("cardPreviewModal");
+    if (!modal || modal.hidden) return;
+    modal.hidden = true;
+    lastPreviewTrigger?.focus?.();
+    lastPreviewTrigger = null;
+  }
+
+  function addToCart(id) {
+    const product = products.find((item) => String(item.id) === String(id));
+    if (!product || !product.purchasable || Number(product.stock || 0) <= 0) return;
+    const existing = cart.find((item) => String(item.id) === String(id));
+    if (existing) {
+      if (existing.qty < Number(product.stock || 0)) existing.qty++;
+    } else {
+      cart.push({ ...product, qty: 1 });
+    }
+    saveCart();
+    renderCart();
+  }
+
+  function renderCart() {
+    const container = qs("cart");
+    const total = qs("cartTotal");
+    if (!container || !total) return;
+    container.innerHTML = cart.length
+      ? cart.map((item) => '<li>' + item.qty + " × " + esc(item.name) + " — " + euro(item.qty * item.price) + '</li>').join("")
+      : "<li>Panier vide</li>";
+    total.textContent = euro(cart.reduce((sum, item) => sum + item.qty * item.price, 0));
+  }
+
+  function customerPayload() {
+    const payload = {
+      customerName: qs("shopName")?.value?.trim() || "",
+      customerEmail: qs("shopEmail")?.value?.trim() || "",
+      customerPhone: qs("shopPhone")?.value?.trim() || "",
+      address: qs("shopAddress")?.value?.trim() || "",
+      postalCode: qs("shopPostalCode")?.value?.trim() || "",
+      city: qs("shopCity")?.value?.trim() || "",
+      country: qs("shopCountry")?.value?.trim() || "France"
+    };
+    if (!payload.customerName || !payload.customerEmail || !payload.customerPhone || !payload.address || !payload.postalCode || !payload.city) {
+      throw new Error("Nom, email, téléphone et adresse complète sont obligatoires.");
+    }
+    if (!/^\S+@\S+\.\S+$/.test(payload.customerEmail)) throw new Error("Adresse email invalide.");
+    return payload;
+  }
+
+  async function checkoutBoutique() {
+    if (!cart.length) return alert("Panier vide.");
+    const button = qs("shopPayButton");
+    const message = qs("shopPayMsg");
+    try {
+      const customer = customerPayload();
+      button.disabled = true;
+      if (message) message.textContent = "Vérification du stock...";
+      await loadProducts();
+      renderProducts();
+      renderCart();
+      if (!cart.length) throw new Error("Les articles du panier ne sont plus disponibles.");
+
+      const items = cart.map((item) => ({ ref: item.id, qty: item.qty }));
+      const attribution = window.CardoriaAttribution ? window.CardoriaAttribution.getPayload() : {};
+      const token = getToken();
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = "Bearer " + token;
+
+      const response = await fetch(BACKEND_URL + "/api/payments/boutique/checkout", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          ...customer,
+          items,
+          provider: "sumup",
+          shipping: "Standard",
+          successUrl: location.origin + "/boutique.html?gamme=pokemon",
+          ...attribution
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "Paiement SumUp indisponible.");
+      if (!data.url) throw new Error("Lien de paiement SumUp non reçu.");
+
+      sessionStorage.setItem("cardoria_sumup_checkout", data.checkoutId || "");
+      sessionStorage.setItem("cardoria_sumup_order", data.orderId || "");
+      if (message) message.textContent = "Ouverture du paiement SumUp...";
+      location.href = data.url;
+    } catch (error) {
+      if (message) message.textContent = error.message || "Paiement impossible.";
+      alert(error.message || "Paiement impossible.");
+      try {
+        await loadProducts();
+        renderProducts();
+        renderCart();
+      } catch {}
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function confirmReturnedPayment() {
+    const params = new URLSearchParams(location.search);
+    const order = params.get("order");
+    const checkout = sessionStorage.getItem("cardoria_sumup_checkout");
+    if (params.get("paid") !== "1" || !order || !checkout) return;
+
+    const message = qs("shopPayMsg");
+    try {
+      if (message) message.textContent = "Vérification du paiement SumUp...";
+      const response = await fetch(BACKEND_URL + "/api/payments/sumup/confirm/" + encodeURIComponent(checkout), { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "Vérification SumUp impossible.");
+
+      if (data.status === "paid") {
+        cart = [];
+        saveCart();
+        renderCart();
+        sessionStorage.removeItem("cardoria_sumup_checkout");
+        sessionStorage.removeItem("cardoria_sumup_order");
+        if (message) message.textContent = "Paiement SumUp confirmé. Commande " + order + ".";
+      } else if (message) {
+        message.textContent = data.status === "failed"
+          ? "Le paiement SumUp a échoué ou a été annulé."
+          : data.status === "refunded"
+            ? "Ce paiement SumUp a été remboursé."
+            : "Paiement SumUp en cours de confirmation.";
+      }
+    } catch (error) {
+      if (message) message.textContent = error.message || "Vérification du paiement impossible.";
+    }
+  }
+
+  async function restoreClientProfile() {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const response = await fetch(BACKEND_URL + "/api/auth/me", {
+        headers: { Authorization: "Bearer " + token, Accept: "application/json" },
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok || data.user?.role !== "client") return;
+
+      const user = data.user;
+      const map = [
+        ["shopName", user.name],
+        ["shopEmail", user.email],
+        ["shopPhone", user.phone],
+        ["shopAddress", user.addressLine1],
+        ["shopPostalCode", user.postalCode],
+        ["shopCity", user.city],
+        ["shopCountry", user.country === "FR" ? "France" : user.country]
+      ];
+      for (const [id, value] of map) {
+        if (qs(id) && value) qs(id).value = value;
+      }
+
+      const account = document.querySelector(".shop-client-account");
+      if (account) {
+        account.setAttribute("aria-label", "Ouvrir mon espace client");
+        const spans = account.querySelectorAll("span");
+        if (spans[1]) spans[1].textContent = user.name || "Mon compte";
+      }
+    } catch {}
+  }
+
+  function showRangeOverview() {
+    qs("shopRangeView")?.removeAttribute("hidden");
+    qs("shopProductView")?.setAttribute("hidden", "");
+  }
+
+  async function showPokemonRange() {
+    qs("shopRangeView")?.setAttribute("hidden", "");
+    qs("shopProductView")?.removeAttribute("hidden");
+    try {
+      await loadProducts();
+      renderProducts();
+      renderCart();
+    } catch {
+      const container = qs("products");
+      if (container) container.innerHTML = '<p class="shop-empty">Le stock Boutique est temporairement indisponible.</p>';
+    }
+  }
+
+  function initQuickSearch() {
+    const input = qs("search");
+    const clear = qs("shopSearchClear");
+    const results = qs("shopQuickResults");
+    if (!input || !results) return;
+
+    input.addEventListener("input", scheduleSearchRender);
+    input.addEventListener("focus", renderProducts);
+    input.addEventListener("keydown", handleSearchKeydown);
+
+    clear?.addEventListener("click", () => {
+      input.value = "";
+      renderProducts();
+      input.focus();
+    });
+
+    results.addEventListener("pointerdown", (event) => {
+      const option = event.target.closest("[data-quick-product]");
+      if (!option) return;
+      event.preventDefault();
+      selectQuickProduct(option.dataset.quickProduct);
+    });
+
+    document.addEventListener("pointerdown", (event) => {
+      if (!event.target.closest(".shop-product-search")) setSuggestionsOpen(false);
+    });
+  }
+
+  function init() {
+    qs("shopMenuButton")?.addEventListener("click", toggleMenu);
+    qs("shopPayButton")?.addEventListener("click", checkoutBoutique);
+    qs("products")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-add-product]");
+      if (button) {
+        addToCart(button.dataset.addProduct);
+        return;
+      }
+      const preview = event.target.closest("[data-preview-product]");
+      if (preview) openCardPreview(preview.dataset.previewProduct, preview);
+    });
+
+    ensurePreviewModal();
+    initQuickSearch();
+    restoreClientProfile();
+
+    if (new URLSearchParams(location.search).get("gamme") === "pokemon") showPokemonRange();
+    else showRangeOverview();
+
+    confirmReturnedPayment();
+    window.CardoriaAttribution?.trackPageView?.();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
 })();
