@@ -121,6 +121,11 @@ test("giveaway awards, cumulative postage and private fulfillment",async t=>{
       assert.equal(fulfillment.liveLabelPurchasesEnabled(),false);
       await assert.rejects(fulfillment.createLiveShipment({liveId:live.id,buyerEmail:alice.email}),{code:"MONDIAL_RELAY_LABELS_NOT_ACTIVATED"});
     });
+    await t.test("cancelled lives cannot buy labels",async()=>{
+      setup();award(alice);sessions.saveLiveCheckout({...purchase("A"),status:"paid"});
+      sessions.setLiveStatus(live.id,"cancelled",actor,{adminOverride:true});
+      await assert.rejects(fulfillment.createLiveShipment({liveId:live.id,buyerEmail:alice.email}),{code:"LIVE_CANCELLED"});
+    });
   }finally{
     if(server)await new Promise(resolve=>server.close(resolve));
     if(db)for(const id of users){db.prepare("DELETE FROM auth_sessions WHERE user_id=?").run(id);db.prepare("DELETE FROM auth_users WHERE id=?").run(id);}
