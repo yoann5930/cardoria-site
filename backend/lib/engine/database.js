@@ -81,6 +81,10 @@ function migrate(database) {
       views INTEGER DEFAULT 0,
       meta_title TEXT DEFAULT '',
       meta_description TEXT DEFAULT '',
+      catalog_source TEXT DEFAULT '',
+      catalog_source_url TEXT DEFAULT '',
+      catalog_sources_json TEXT DEFAULT '{}',
+      external_refs_json TEXT DEFAULT '{}',
       active INTEGER DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -125,6 +129,16 @@ function migrate(database) {
       FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS catalog_sync_state (
+      provider TEXT PRIMARY KEY,
+      cursor TEXT DEFAULT '',
+      status TEXT DEFAULT 'idle',
+      stats_json TEXT DEFAULT '{}',
+      last_run_at TEXT DEFAULT '',
+      completed_at TEXT DEFAULT '',
+      error TEXT DEFAULT ''
+    );
+
     CREATE TABLE IF NOT EXISTS sealed_products (
       id TEXT PRIMARY KEY,
       cardmarket_id INTEGER UNIQUE,
@@ -161,6 +175,7 @@ function migrate(database) {
     CREATE INDEX IF NOT EXISTS idx_price_sources_card ON price_sources(card_id);
     CREATE INDEX IF NOT EXISTS idx_sales_card ON sales_history(card_id, sold_at);
     CREATE INDEX IF NOT EXISTS idx_card_price_history_card ON card_price_history(card_id, captured_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_catalog_sync_state_status ON catalog_sync_state(status, last_run_at);
     CREATE INDEX IF NOT EXISTS idx_sealed_active_packaging ON sealed_products(active, packaging);
     CREATE INDEX IF NOT EXISTS idx_sealed_name ON sealed_products(name_normalized);
     CREATE INDEX IF NOT EXISTS idx_sealed_cardmarket ON sealed_products(cardmarket_id);
@@ -175,10 +190,15 @@ function migrate(database) {
   ensureColumn(database, "cards", "market_source", "TEXT DEFAULT ''");
   ensureColumn(database, "cards", "market_updated_at", "TEXT DEFAULT ''");
   ensureColumn(database, "cards", "market_checked_at", "TEXT DEFAULT ''");
+  ensureColumn(database, "cards", "catalog_source", "TEXT DEFAULT ''");
+  ensureColumn(database, "cards", "catalog_source_url", "TEXT DEFAULT ''");
+  ensureColumn(database, "cards", "catalog_sources_json", "TEXT DEFAULT '{}'");
+  ensureColumn(database, "cards", "external_refs_json", "TEXT DEFAULT '{}'");
   database.exec("UPDATE cards SET language='fr' WHERE language IS NULL OR language=''");
   database.exec("CREATE INDEX IF NOT EXISTS idx_cards_language ON cards(license_slug, language, active)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_cards_rarity_hit ON cards(rarity, hit_family, active)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_cards_market_update ON cards(license_slug, market_checked_at, active)");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_cards_catalog_source ON cards(license_slug, catalog_source, active)");
 
   let ftsAvailable = true;
   try {
