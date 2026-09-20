@@ -37,7 +37,7 @@ test("client dashboard exposes Cardoria navigation and account data sections",()
 test("boutique keeps cart and reuses the connected client profile",()=>{
   assert.match(boutique,/cardoria_boutique_cart/);
   assert.match(boutique,/\/api\/auth\/me/);
-  assert.match(boutique,/headers\.Authorization="Bearer "\+token/);
+  assert.match(boutique,/headers\.Authorization\s*=\s*"Bearer "\s*\+\s*token/);
 });
 
 // Human-authored dashboard CI retrigger after frontend runtime sync; no behavior change.
