@@ -39,3 +39,5 @@ test("boutique keeps cart and reuses the connected client profile",()=>{
   assert.match(boutique,/\/api\/auth\/me/);
   assert.match(boutique,/headers\.Authorization="Bearer "\+token/);
 });
+
+// Human-authored dashboard CI retrigger after frontend runtime sync; no behavior change.
