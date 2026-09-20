@@ -8,7 +8,9 @@ import {
   mondialRelayLabelPurchasesEnabled,
   mondialRelaySecurity,
   parseServicePointSearchResponse,
-  parseShipmentCreationResponse
+  parseServicePointSearchStat,
+  parseShipmentCreationResponse,
+  searchMondialRelayServicePoints
 } from "../lib/mondial-relay.js";
 
 const envKeys = [
@@ -46,6 +48,9 @@ test("WSI4 security follows the documented concatenation order and SOAP request"
   assert.match(request.xml, /<Pays>FR<\/Pays>/);
   assert.match(request.xml, /<CP>59330<\/CP>/);
   assert.match(request.xml, /<Action>24R<\/Action>/);
+  assert.match(request.xml, /<RayonRecherche>15<\/RayonRecherche>/);
+  assert.doesNotMatch(request.xml, /<RayonRecherche>15000<\/RayonRecherche>/);
+  assert.match(request.xml, /<NombreResultats>10<\/NombreResultats>/);
   assert.match(request.xml, new RegExp("<Security>" + request.security + "<\\/Security>"));
   assert.equal(request.security.length, 32);
 });
@@ -146,6 +151,21 @@ test("business errors reject creation while warnings do not", () => {
   assert.throws(() => parseShipmentCreationResponse(error), { code:"MONDIAL_RELAY_CREATION_REJECTED" });
   const selfClosingError = `<ShipmentCreationResponse><StatusList><Status Code="10060" Level="Error" Message="label failed" /></StatusList></ShipmentCreationResponse>`;
   assert.throws(() => parseShipmentCreationResponse(selfClosingError), { code:"MONDIAL_RELAY_CREATION_REJECTED" });
+});
+
+test("WSI4 STAT 93 is an empty real result and STAT 97 never returns invented points", async () => {
+  configure();
+  const empty = `<?xml version="1.0"?><soap:Envelope><soap:Body><WSI4_PointRelais_RechercheResult><STAT>93</STAT></WSI4_PointRelais_RechercheResult></soap:Body></soap:Envelope>`;
+  assert.equal(parseServicePointSearchStat(empty), "93");
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => new Response(empty, { status:200, headers:{"Content-Type":"text/xml"} });
+  try {
+    const none = await searchMondialRelayServicePoints({ postalCode:"59330" });
+    assert.equal(none.count, 0);
+    assert.equal(none.providerStat, "93");
+    globalThis.fetch = async () => new Response(`<?xml version="1.0"?><soap:Envelope><soap:Body><WSI4_PointRelais_RechercheResult><STAT>97</STAT><PointsRelais><PointRelais_Details><STAT>0</STAT><Num>001234</Num></PointRelais_Details></PointsRelais></WSI4_PointRelais_RechercheResult></soap:Body></soap:Envelope>`, { status:200, headers:{"Content-Type":"text/xml"} });
+    await assert.rejects(searchMondialRelayServicePoints({ postalCode:"59330" }), { code:"MONDIAL_RELAY_API_ERROR" });
+  } finally { globalThis.fetch = original; }
 });
 
 test("label download stays server-side, upgrades official HTTP URL and rejects foreign hosts", async () => {
