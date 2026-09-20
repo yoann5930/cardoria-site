@@ -69,6 +69,8 @@ jobs:
           node --check lib/auth/magicLink.js
           node --check lib/email.js
           node --check lib/engine/tcgdex-sync.js
+          node --check lib/engine/pokemon-multisource-sync.js
+          node --check lib/engine/pokemon-multisource-schedule.js
           node --check lib/engine/market-schedule.js
           node --check lib/engine/sealed-products.js
           node --check ../script.js
@@ -82,7 +84,7 @@ jobs:
 
       - name: Lot market and catalog regression tests
         working-directory: .
-        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs
+        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs tests/pokemon-multisource-catalog.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs
 
       - name: Reject client-side admin bypass
         working-directory: .

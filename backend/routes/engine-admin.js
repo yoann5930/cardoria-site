@@ -9,6 +9,7 @@ import { searchCards, getCardById, createCard, updateCard, deleteCard, getCatalo
 import { setPriceSources, addSaleRecord, estimatePrice } from "../lib/engine/pricing.js";
 import { syncPokemonCatalog, syncPokemonReferenceCatalog, getMarketPriceStatus, getCardPriceHistory } from "../lib/engine/tcgdex-sync.js";
 import { refreshVisibleCardPrices } from "../lib/engine/visible-prices.js";
+import { getPokemonMultiSourceStatus, syncPokemonMultiSourceCatalog } from "../lib/engine/pokemon-multisource-sync.js";
 import {
   SEALED_PACKAGING_TYPES,
   listSealedProducts,
@@ -27,6 +28,20 @@ router.use(requireAdmin);
 router.get("/licenses", (req, res) => res.json({ ok: true, licenses: listLicenses({ activeOnly: false }) }));
 router.get("/catalog/facets", (req, res) => res.json({ ok: true, ...getCatalogFacets({ license: req.query.license || "pokemon", language: req.query.language || "" }) }));
 router.get("/market-prices/status", (req, res) => res.json({ ok: true, ...getMarketPriceStatus({ language: req.query.language || "fr" }) }));
+router.get("/catalog/multisource/status", (req, res) => res.json({ ok: true, ...getPokemonMultiSourceStatus() }));
+router.post("/catalog/multisource/sync", async (req, res) => {
+  try {
+    const result = await syncPokemonMultiSourceCatalog({
+      tcgcsvGroupLimit: Math.min(Math.max(Number(req.body?.tcgcsvGroupLimit) || 12, 1), 30),
+      scrydexPageLimit: Math.min(Math.max(Number(req.body?.scrydexPageLimit) || 10, 1), 25),
+      reset: Boolean(req.body?.reset)
+    });
+    logAudit({ type: "engine", action: "pokemon_multisource_sync", user: req.authUser?.email || "admin", detail: JSON.stringify(result.counts || {}) });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message || "Synchronisation multi-sources impossible" });
+  }
+});
 router.post("/market-prices/visible", async (req, res) => {
   try {
     const result = await refreshVisibleCardPrices(req.body?.ids || []);
