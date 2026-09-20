@@ -41,3 +41,10 @@ test("boutique keeps cart and reuses the connected client profile",()=>{
 });
 
 // Human-authored dashboard CI retrigger after frontend runtime sync; no behavior change.
+
+test("client dashboard hidden state cannot be overridden by layout CSS",()=>{
+  const css=read("../css/client-auth.css");
+  assert.match(css,/\[hidden\]\{display:none!important\}/);
+  assert.match(clientAuth,/qs\("clientGuestShell"\)\.hidden = true/);
+  assert.match(clientAuth,/qs\("clientAccountCard"\)\.hidden = false/);
+});
