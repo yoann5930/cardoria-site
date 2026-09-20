@@ -6,6 +6,7 @@ import { getListing, createListing, updateListing, deleteListing } from "../list
 import { makeMarketId, syncListingFts } from "../migrate.js";
 import { getSeller } from "../sellers.js";
 import { makeListingSlug, ensureUniqueSlug, buildListingSeoMeta } from "./slug.js";
+import { normalizeCardSalePrice } from "../../pricing/card-price-floor.js";
 
 const STATUS_MAP = {
   draft: "draft",
@@ -70,7 +71,7 @@ export function createListingV1(data) {
   `).run(
     id, data.sellerId, data.cardId || null, data.title, normalizeText(data.title),
     data.license || "", data.extension || "", data.number || "", data.language || "",
-    data.description || "", data.condition || "NM", Number(data.price),
+    data.description || "", data.condition || "NM", normalizeCardSalePrice(data.price),
     data.negotiable ? 1 : 0, Math.max(0, Number(data.stock) || 1), photos, status,
     slug, seoTitle, seoDesc, now, now
   );

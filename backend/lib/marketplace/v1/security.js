@@ -3,6 +3,7 @@ import { validateSession } from "../../auth/session.js";
 import { getSellerByAuthUserId } from "../sellers.js";
 import { getListing } from "../listings.js";
 import { getOrder } from "../orders.js";
+import { floorCardPrice } from "../../pricing/card-price-floor.js";
 
 export class MarketplaceAuthError extends Error {
   constructor(message = "Acces refuse", code = 403) { super(message); this.name = "MarketplaceAuthError"; this.code = code; this.status = code; }
@@ -12,8 +13,8 @@ export function validateServerSidePrice(listingId, expectedUnitPrice, qty = 1) {
   if (!listing || listing.status !== "active") throw Object.assign(new Error("Annonce indisponible"), { status: 409 });
   const safeQty = Math.max(1, Math.min(20, Number(qty) || 1));
   if (Number(listing.stock || 0) < safeQty) throw Object.assign(new Error("Stock insuffisant"), { status: 409 });
-  const serverPrice = Math.round(Number(listing.price || 0) * 100) / 100;
-  const comparedPrice = Math.round(Number(expectedUnitPrice || 0) * 100) / 100;
+  const serverPrice = floorCardPrice(listing.price);
+  const comparedPrice = floorCardPrice(expectedUnitPrice);
   if (serverPrice <= 0 || serverPrice !== comparedPrice) throw Object.assign(new Error("Le prix a change. Rechargez votre panier."), { status: 409 });
   return { listing, qty: safeQty, unitPrice: serverPrice };
 }

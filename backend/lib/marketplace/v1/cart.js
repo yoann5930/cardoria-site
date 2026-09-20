@@ -3,6 +3,7 @@ import { getDb } from "../../engine/database.js";
 import { getListing } from "../listings.js";
 import { createOrder, updateOrderStatus, expireStalePendingOrders } from "../orders.js";
 import { validateServerSidePrice } from "./security.js";
+import { floorCardPrice } from "../../pricing/card-price-floor.js";
 
 export function getCart(userId) {
   expireStalePendingOrders();
@@ -11,7 +12,7 @@ export function getCart(userId) {
   const items = [];
   let subtotal = 0;
   rows.forEach((r) => {
-    const price = Number(r.current_price || 0);
+    const price = floorCardPrice(r.current_price);
     if (r.status !== "active" || Number(r.stock || 0) < Number(r.qty || 0)) return;
     const line = Math.round(price * r.qty * 100) / 100;
     subtotal += line;

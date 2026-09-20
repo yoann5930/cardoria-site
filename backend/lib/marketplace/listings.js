@@ -5,6 +5,7 @@ import { getDb } from "../engine/database.js";
 import { normalizeText } from "../engine/database.js";
 import { makeMarketId, syncListingFts } from "./migrate.js";
 import { getSeller } from "./sellers.js";
+import { floorCardPrice, normalizeCardSalePrice } from "../pricing/card-price-floor.js";
 
 function parsePhotos(raw) {
   try { return JSON.parse(raw || "[]"); } catch { return []; }
@@ -27,7 +28,7 @@ function rowToListing(row, extras = {}) {
     license: row.license_slug,
     description: row.description,
     condition: row.card_condition,
-    price: row.price,
+    price: floorCardPrice(row.price),
     negotiable: !!row.negotiable,
     stock: row.stock,
     photos: parsePhotos(row.photos),
@@ -53,7 +54,7 @@ export function createListing(data) {
   `).run(
     id, data.sellerId, data.cardId || null, data.title, normalizeText(data.title),
     data.license || "", data.description || "", data.condition || "NM",
-    Number(data.price), data.negotiable ? 1 : 0, Math.max(1, Number(data.stock) || 1),
+    normalizeCardSalePrice(data.price), data.negotiable ? 1 : 0, Math.max(1, Number(data.stock) || 1),
     photos, now, now
   );
   const row = db.prepare("SELECT rowid, * FROM mk_listings WHERE id = ?").get(id);
@@ -82,7 +83,7 @@ export function updateListing(id, sellerId, data) {
     WHERE id = ?
   `).run(
     title, normalizeText(title), data.description ?? existing.description,
-    data.condition ?? existing.card_condition, Number(data.price ?? existing.price),
+    data.condition ?? existing.card_condition, normalizeCardSalePrice(data.price ?? existing.price),
     data.negotiable != null ? (data.negotiable ? 1 : 0) : existing.negotiable,
     Math.max(0, Number(data.stock ?? existing.stock)),
     data.photos ? JSON.stringify(data.photos.slice(0, 8)) : existing.photos,

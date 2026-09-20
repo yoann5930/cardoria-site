@@ -1,4 +1,5 @@
 import { getDb, normalizeText } from "./database.js";
+import { floorCardPrice } from "../pricing/card-price-floor.js";
 
 const BASE = "https://tcgcsv.com/tcgplayer";
 const CATEGORY_ID = 3;
@@ -216,7 +217,7 @@ export async function repairEnglishCardsWithTcgcsv({ groupLimit = 8 } = {}) {
           const usd = productPrice(pricesById.get(Number(product?.productId || 0)) || []);
           if (Number(card.recommended_price || 0) <= 0 && usd.market > 0) {
             const market = round2(usd.market * fx), low = round2((usd.low || usd.market) * fx), high = round2((usd.high || usd.market) * fx);
-            const changed = updatePrice.run(market, low, high, market, now, now, now, now, card.id).changes || 0;
+            const changed = updatePrice.run(floorCardPrice(market), floorCardPrice(low), floorCardPrice(high), floorCardPrice(market), now, now, now, now, card.id).changes || 0;
             if (changed) {
               deleteSource.run(card.id); insertSource.run(card.id, market, now); insertHistory.run(card.id, market, market, low, high, now); priced += 1;
             }

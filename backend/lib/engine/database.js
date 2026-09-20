@@ -6,6 +6,7 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { floorCardPrice } from "../pricing/card-price-floor.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "../../data");
@@ -194,6 +195,10 @@ function migrate(database) {
   ensureColumn(database, "cards", "catalog_source_url", "TEXT DEFAULT ''");
   ensureColumn(database, "cards", "catalog_sources_json", "TEXT DEFAULT '{}'");
   ensureColumn(database, "cards", "external_refs_json", "TEXT DEFAULT '{}'");
+  database.exec("UPDATE cards SET avg_price=1 WHERE avg_price>0 AND avg_price<1");
+  database.exec("UPDATE cards SET low_price=1 WHERE low_price>0 AND low_price<1");
+  database.exec("UPDATE cards SET high_price=1 WHERE high_price>0 AND high_price<1");
+  database.exec("UPDATE cards SET recommended_price=1 WHERE recommended_price>0 AND recommended_price<1");
   database.exec("UPDATE cards SET language='fr' WHERE language IS NULL OR language=''");
   database.exec("CREATE INDEX IF NOT EXISTS idx_cards_language ON cards(license_slug, language, active)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_cards_rarity_hit ON cards(rarity, hit_family, active)");
@@ -252,9 +257,9 @@ export function rowToCard(row, extras = {}) {
   if (!row) return null;
   let variants = {};
   try { variants = JSON.parse(row.variants_json || "{}"); } catch {}
-  const current = Number(row.recommended_price || row.avg_price || 0);
-  const avg7 = Number(row.market_avg7 || 0);
-  const avg30 = Number(row.market_avg30 || 0);
+  const current = floorCardPrice(row.recommended_price || row.avg_price || 0);
+  const avg7 = floorCardPrice(row.market_avg7 || 0);
+  const avg30 = floorCardPrice(row.market_avg30 || 0);
   return {
     id: row.id,
     license: row.license_slug,
@@ -271,12 +276,12 @@ export function rowToCard(row, extras = {}) {
     imageHd: row.image_hd,
     imageThumb: row.image_thumb || row.image_hd,
     condition: row.condition_note,
-    prices: { avg: row.avg_price, low: row.low_price, high: row.high_price, recommended: row.recommended_price },
+    prices: { avg: floorCardPrice(row.avg_price), low: floorCardPrice(row.low_price), high: floorCardPrice(row.high_price), recommended: floorCardPrice(row.recommended_price) },
     market: {
       source: row.market_source || "",
       updatedAt: row.market_updated_at || "",
       checkedAt: row.market_checked_at || "",
-      avg1: Number(row.market_avg1 || 0),
+      avg1: floorCardPrice(row.market_avg1 || 0),
       avg7,
       avg30,
       change7: variation(current, avg7),
