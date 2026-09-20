@@ -392,7 +392,7 @@
         body: JSON.stringify({
           ...customer,
           items,
-          provider: "sumup",
+          provider:"sumup",
           shipping: "Standard",
           successUrl: location.origin + "/boutique.html?gamme=pokemon",
           ...attribution
