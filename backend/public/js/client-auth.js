@@ -7,6 +7,10 @@
   const qs = (id) => document.getElementById(id);
   let selectedRelay = null;
   let currentUser = null;
+  let postalLookupSequence = 0;
+  let postalLookupCode = "";
+  let postalCommunes = [];
+  let postalLookupTimer = null;
 
   function migrateToken() {
     const canonical = localStorage.getItem(TOKEN_KEY);
@@ -63,6 +67,134 @@
     el.className = "client-auth-message" + (type ? " is-" + type : "");
   }
 
+  function normalizeCity(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[-'’]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  function currentProfileCity() {
+    const select = qs("clientProfileCitySelect");
+    if (select && !select.hidden) return select.value.trim();
+    return qs("clientProfileCity")?.value.trim() || "";
+  }
+
+  function showFreeCityInput(value = "") {
+    const input = qs("clientProfileCity");
+    const select = qs("clientProfileCitySelect");
+    if (input) {
+      input.hidden = false;
+      if (value) input.value = value;
+    }
+    if (select) {
+      select.hidden = true;
+      select.replaceChildren();
+    }
+  }
+
+  function renderPostalCities(communes, preferredCity = "") {
+    const input = qs("clientProfileCity");
+    const select = qs("clientProfileCitySelect");
+    const help = qs("clientPostalCityHelp");
+    if (!input || !select) return;
+
+    const preferred = normalizeCity(preferredCity || input.value);
+    select.replaceChildren();
+    if (communes.length > 1) {
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Sélectionnez votre ville";
+      select.appendChild(placeholder);
+    }
+
+    let selectedValue = "";
+    communes.forEach((commune) => {
+      const option = document.createElement("option");
+      option.value = commune.name;
+      option.textContent = commune.name;
+      if (preferred && normalizeCity(commune.name) === preferred) selectedValue = commune.name;
+      select.appendChild(option);
+    });
+
+    if (!selectedValue && communes.length === 1) selectedValue = communes[0].name;
+    select.value = selectedValue;
+    input.value = selectedValue || preferredCity || "";
+    input.hidden = true;
+    select.hidden = false;
+
+    if (help) {
+      help.textContent = communes.length === 1
+        ? "Ville détectée automatiquement à partir du code postal."
+        : "Plusieurs communes utilisent ce code postal : sélectionnez votre ville.";
+    }
+  }
+
+  async function loadPostalCities({ preferredCity = "", silent = false } = {}) {
+    const postalInput = qs("clientProfilePostalCode");
+    const countryInput = qs("clientProfileCountry");
+    const help = qs("clientPostalCityHelp");
+    const postalCode = postalInput?.value.trim() || "";
+    const country = (countryInput?.value.trim() || "FR").toUpperCase();
+
+    if (country !== "FR") {
+      postalLookupCode = "";
+      postalCommunes = [];
+      showFreeCityInput(preferredCity || currentProfileCity());
+      if (help) help.textContent = "Ville saisie librement pour une adresse hors de France.";
+      return true;
+    }
+
+    if (!/^\d{5}$/.test(postalCode)) {
+      postalLookupCode = "";
+      postalCommunes = [];
+      showFreeCityInput(preferredCity || currentProfileCity());
+      if (help) help.textContent = postalCode ? "Saisissez un code postal français à 5 chiffres." : "La ville sera proposée à partir du code postal.";
+      return false;
+    }
+
+    if (postalLookupCode === postalCode && postalCommunes.length) {
+      renderPostalCities(postalCommunes, preferredCity || currentProfileCity());
+      return true;
+    }
+
+    const sequence = ++postalLookupSequence;
+    if (!silent && help) help.textContent = "Recherche des villes correspondantes...";
+    const data = await api("/api/location/communes?postalCode=" + encodeURIComponent(postalCode), { method: "GET" });
+    if (sequence !== postalLookupSequence) return false;
+
+    const communes = Array.isArray(data.communes) ? data.communes.filter((item) => item && item.name) : [];
+    if (!communes.length) throw new Error("Aucune ville française trouvée pour ce code postal.");
+    postalLookupCode = postalCode;
+    postalCommunes = communes;
+    renderPostalCities(communes, preferredCity || currentProfileCity());
+    return true;
+  }
+
+  async function validatedProfileLocation() {
+    const postalCode = qs("clientProfilePostalCode").value.trim();
+    const countryCode = (qs("clientProfileCountry").value.trim() || "FR").toUpperCase();
+    if (countryCode !== "FR") return { postalCode, city: currentProfileCity(), countryCode };
+    if (!/^\d{5}$/.test(postalCode)) throw new Error("Saisissez un code postal français à 5 chiffres.");
+    await loadPostalCities({ preferredCity: currentProfileCity(), silent: true });
+    const city = currentProfileCity();
+    if (!city) throw new Error("Sélectionnez la ville correspondant à votre code postal.");
+    if (!postalCommunes.some((item) => normalizeCity(item.name) === normalizeCity(city))) {
+      throw new Error("La ville ne correspond pas au code postal. Sélectionnez une ville proposée.");
+    }
+    return { postalCode, city, countryCode };
+  }
+
+  function schedulePostalLookup() {
+    clearTimeout(postalLookupTimer);
+    postalLookupTimer = setTimeout(() => {
+      loadPostalCities({ preferredCity: currentProfileCity() }).catch((error) => setMessage(error.message, "error"));
+    }, 250);
+  }
+
   function showForm(which) {
     const login = which === "login";
     qs("clientLoginForm").hidden = !login;
@@ -82,6 +214,10 @@
     qs("clientProfilePostalCode").value = user.postalCode || "";
     qs("clientProfileCity").value = user.city || "";
     qs("clientProfileCountry").value = user.country || "FR";
+    showFreeCityInput(user.city || "");
+    loadPostalCities({ preferredCity: user.city || "", silent: true }).catch(() => {
+      showFreeCityInput(user.city || "");
+    });
     selectedRelay = user.relay && user.relay.id ? { ...user.relay } : null;
     renderRelay();
     qs("clientStatProfile").textContent = user.profileReady ? "✓" : "!";
@@ -245,12 +381,16 @@
 
   async function chooseRelay() {
     try {
-      const postalCode = qs("clientProfilePostalCode").value.trim();
-      const city = qs("clientProfileCity").value.trim();
-      const countryCode = (qs("clientProfileCountry").value.trim() || "FR").toUpperCase();
-      if (!postalCode && !city) throw new Error("Renseignez d’abord votre code postal ou votre ville.");
+      const location = await validatedProfileLocation();
+      if (!location.postalCode && !location.city) throw new Error("Renseignez d’abord votre code postal ou votre ville.");
       setMessage("Recherche des Points Relais Mondial Relay...");
-      const data = await api("/api/mondial-relay/service-points?" + new URLSearchParams({ postalCode, city, countryCode, limit: "10", radius: "15000" }), { method: "GET" });
+      const data = await api("/api/mondial-relay/service-points?" + new URLSearchParams({
+        postalCode: location.postalCode,
+        city: location.city,
+        countryCode: location.countryCode,
+        limit: "10",
+        radius: "15000"
+      }), { method: "GET" });
       const points = Array.isArray(data.points) ? data.points : [];
       if (!points.length) throw new Error("Aucun Point Relais Mondial Relay trouvé.");
       renderRelayChoices(points);
@@ -262,13 +402,14 @@
     event.preventDefault();
     setMessage("Enregistrement du profil...");
     try {
+      const location = await validatedProfileLocation();
       const data = await api("/api/auth/profile", {
         method: "PATCH",
         body: JSON.stringify({
           name: qs("clientProfileName").value.trim(), phone: qs("clientProfilePhone").value.trim(),
           addressLine1: qs("clientProfileAddress1").value.trim(), addressLine2: qs("clientProfileAddress2").value.trim(),
-          postalCode: qs("clientProfilePostalCode").value.trim(), city: qs("clientProfileCity").value.trim(),
-          country: (qs("clientProfileCountry").value.trim() || "FR").toUpperCase(),
+          postalCode: location.postalCode, city: location.city,
+          country: location.countryCode,
           shippingPreference: "mondial_relay", relay: selectedRelay
         })
       });
@@ -359,6 +500,21 @@
     qs("clientLogoutButton")?.addEventListener("click", logout);
     qs("clientProfileForm")?.addEventListener("submit", saveProfile);
     qs("clientChooseRelay")?.addEventListener("click", chooseRelay);
+    qs("clientProfilePostalCode")?.addEventListener("input", schedulePostalLookup);
+    qs("clientProfilePostalCode")?.addEventListener("blur", () => {
+      loadPostalCities({ preferredCity: currentProfileCity() }).catch((error) => setMessage(error.message, "error"));
+    });
+    qs("clientProfileCountry")?.addEventListener("change", () => {
+      postalLookupCode = "";
+      postalCommunes = [];
+      loadPostalCities({ preferredCity: currentProfileCity() }).catch((error) => setMessage(error.message, "error"));
+    });
+    qs("clientProfileCitySelect")?.addEventListener("change", () => {
+      const input = qs("clientProfileCity");
+      if (input) input.value = qs("clientProfileCitySelect").value;
+      selectedRelay = null;
+      renderRelay();
+    });
     qs("clientRelayModalClose")?.addEventListener("click", closeRelayModal);
     qs("clientRelayModal")?.addEventListener("click", (event) => {
       if (event.target === qs("clientRelayModal")) closeRelayModal();
