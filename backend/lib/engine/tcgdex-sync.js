@@ -133,12 +133,12 @@ async function syncLanguageCatalog(db, config, { force = false } = {}) {
       const setId = setIdFromCardId(raw.id), set = setMap.get(setId), extension = String(set?.name || setId || ""), localId = String(raw.localId ?? ""), baseImage = String(raw.image || "");
       if (!baseImage) withoutImage += 1;
       const prefix = language === "fr" ? "" : `${language}-`;
-      const next = { id: catalogCardId(language, raw.id), language, slug: slugify(`${prefix}${raw.name}-${extension}-${localId}-${raw.id}`), name: String(raw.name), name_normalized: normalizeText(raw.name), extension, extension_code: setId, number: localId, image_hd: imageUrl(baseImage, "high"), image_thumb: imageUrl(baseImage, "low"), meta_title: `${raw.name} — ${extension} (${config.label}) | Cardoria`, meta_description: `Fiche de la carte Pokémon ${raw.name}${extension ? `, extension ${extension}` : ""}${localId ? `, numéro ${localId}` : ""}, langue ${config.label}.`, catalog_sources_json: JSON.stringify({ tcgdex: { id: String(raw.id), language, seenAt: now } }), external_refs_json: JSON.stringify({ tcgdexId: String(raw.id) }), created_at: now, updated_at: now };
+      const next = { id: catalogCardId(language, raw.id), language, slug: slugify(`${prefix}${raw.name}-${extension}-${localId}-${raw.id}`), name: String(raw.name), name_normalized: normalizeText(raw.name), extension, extension_code: setId, number: localId, image_hd: imageUrl(baseImage, "high"), image_thumb: imageUrl(baseImage, "low"), meta_title: `${raw.name} — ${extension} (${config.label}) | Cardoria`, meta_description: `Fiche de la carte Pokémon ${raw.name}${extension ? `, extension ${extension}` : ""}${localId ? `, numéro ${localId}` : ""}, langue ${config.label}.`, catalog_sources_json: JSON.stringify({ tcgdex: { id: String(raw.id), language } }), external_refs_json: JSON.stringify({ tcgdexId: String(raw.id) }), created_at: now, updated_at: now };
       const current = existingById.get(next.id);
       if (current) {
         next.catalog_source = current.catalog_source || "tcgdex";
         next.catalog_source_url = current.catalog_source_url || "https://tcgdex.dev";
-        next.catalog_sources_json = mergeJsonMap(current.catalog_sources_json, { tcgdex: { id: String(raw.id), language, seenAt: now } });
+        next.catalog_sources_json = mergeJsonMap(current.catalog_sources_json, { tcgdex: { id: String(raw.id), language } });
         next.external_refs_json = mergeJsonMap(current.external_refs_json, { tcgdexId: String(raw.id) });
       } else {
         next.catalog_source = "tcgdex";
