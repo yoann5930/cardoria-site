@@ -86,6 +86,11 @@ function languageCounts(db) {
 }
 
 function sameText(left, right) { return String(left ?? "") === String(right ?? ""); }
+function mergeJsonMap(value, patch) {
+  let current = {};
+  try { const parsed = JSON.parse(String(value || "{}")); if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) current = parsed; } catch {}
+  return JSON.stringify({ ...current, ...patch });
+}
 function catalogRowChanged(current, next) {
   if (!current || Number(current.active || 0) !== 1) return true;
   if (!sameText(current.language, next.language)) return true;
@@ -99,6 +104,10 @@ function catalogRowChanged(current, next) {
   if (next.image_thumb && !sameText(current.image_thumb, next.image_thumb)) return true;
   if (!sameText(current.meta_title, next.meta_title)) return true;
   if (!sameText(current.meta_description, next.meta_description)) return true;
+  if (!sameText(current.catalog_source, next.catalog_source)) return true;
+  if (!sameText(current.catalog_source_url, next.catalog_source_url)) return true;
+  if (!sameText(current.catalog_sources_json, next.catalog_sources_json)) return true;
+  if (!sameText(current.external_refs_json, next.external_refs_json)) return true;
   return false;
 }
 
@@ -110,13 +119,13 @@ async function syncLanguageCatalog(db, config, { force = false } = {}) {
   let sets = [];
   try { sets = await fetchJson(language, "/sets"); } catch { sets = []; }
   const setMap = new Map((Array.isArray(sets) ? sets : []).map((set) => [String(set.id || ""), set]));
-  const existingRows = db.prepare(`SELECT id,language,slug,name,name_normalized,extension,extension_code,number,image_hd,image_thumb,meta_title,meta_description,active
+  const existingRows = db.prepare(`SELECT id,language,slug,name,name_normalized,extension,extension_code,number,image_hd,image_thumb,meta_title,meta_description,catalog_source,catalog_source_url,catalog_sources_json,external_refs_json,active
     FROM cards WHERE license_slug='pokemon' AND language=?`).all(language);
   const existingById = new Map(existingRows.map((row) => [String(row.id || ""), row]));
   const now = new Date().toISOString();
   const upsert = db.prepare(`INSERT INTO cards (id,license_slug,language,slug,name,name_normalized,extension,extension_code,number,rarity,hit_family,variants_json,illustration,image_hd,image_thumb,condition_note,avg_price,low_price,high_price,recommended_price,market_trend,trend_percent,sales_count,views,meta_title,meta_description,catalog_source,catalog_source_url,catalog_sources_json,external_refs_json,active,created_at,updated_at)
     VALUES (@id,'pokemon',@language,@slug,@name,@name_normalized,@extension,@extension_code,@number,'','','{}','',@image_hd,@image_thumb,'NM',0,0,0,0,'stable',0,0,0,@meta_title,@meta_description,'tcgdex','https://tcgdex.dev',@catalog_sources_json,@external_refs_json,1,@created_at,@updated_at)
-    ON CONFLICT(id) DO UPDATE SET license_slug='pokemon',language=excluded.language,slug=excluded.slug,name=excluded.name,name_normalized=excluded.name_normalized,extension=excluded.extension,extension_code=excluded.extension_code,number=excluded.number,image_hd=CASE WHEN excluded.image_hd<>'' THEN excluded.image_hd ELSE cards.image_hd END,image_thumb=CASE WHEN excluded.image_thumb<>'' THEN excluded.image_thumb ELSE cards.image_thumb END,meta_title=excluded.meta_title,meta_description=excluded.meta_description,catalog_source=CASE WHEN cards.catalog_source='' OR cards.catalog_source IS NULL THEN 'tcgdex' ELSE cards.catalog_source END,catalog_source_url=CASE WHEN cards.catalog_source_url='' OR cards.catalog_source_url IS NULL THEN 'https://tcgdex.dev' ELSE cards.catalog_source_url END,catalog_sources_json=excluded.catalog_sources_json,external_refs_json=excluded.external_refs_json,active=1,updated_at=excluded.updated_at`);
+    ON CONFLICT(id) DO UPDATE SET license_slug='pokemon',language=excluded.language,slug=excluded.slug,name=excluded.name,name_normalized=excluded.name_normalized,extension=excluded.extension,extension_code=excluded.extension_code,number=excluded.number,image_hd=CASE WHEN excluded.image_hd<>'' THEN excluded.image_hd ELSE cards.image_hd END,image_thumb=CASE WHEN excluded.image_thumb<>'' THEN excluded.image_thumb ELSE cards.image_thumb END,meta_title=excluded.meta_title,meta_description=excluded.meta_description,catalog_source=excluded.catalog_source,catalog_source_url=excluded.catalog_source_url,catalog_sources_json=excluded.catalog_sources_json,external_refs_json=excluded.external_refs_json,active=1,updated_at=excluded.updated_at`);
   let existing = 0, created = 0, updated = 0, unchanged = 0, failed = 0, withoutImage = 0;
   db.transaction(() => {
     for (const raw of cards) {
@@ -126,6 +135,15 @@ async function syncLanguageCatalog(db, config, { force = false } = {}) {
       const prefix = language === "fr" ? "" : `${language}-`;
       const next = { id: catalogCardId(language, raw.id), language, slug: slugify(`${prefix}${raw.name}-${extension}-${localId}-${raw.id}`), name: String(raw.name), name_normalized: normalizeText(raw.name), extension, extension_code: setId, number: localId, image_hd: imageUrl(baseImage, "high"), image_thumb: imageUrl(baseImage, "low"), meta_title: `${raw.name} — ${extension} (${config.label}) | Cardoria`, meta_description: `Fiche de la carte Pokémon ${raw.name}${extension ? `, extension ${extension}` : ""}${localId ? `, numéro ${localId}` : ""}, langue ${config.label}.`, catalog_sources_json: JSON.stringify({ tcgdex: { id: String(raw.id), language, seenAt: now } }), external_refs_json: JSON.stringify({ tcgdexId: String(raw.id) }), created_at: now, updated_at: now };
       const current = existingById.get(next.id);
+      if (current) {
+        next.catalog_source = current.catalog_source || "tcgdex";
+        next.catalog_source_url = current.catalog_source_url || "https://tcgdex.dev";
+        next.catalog_sources_json = mergeJsonMap(current.catalog_sources_json, { tcgdex: { id: String(raw.id), language, seenAt: now } });
+        next.external_refs_json = mergeJsonMap(current.external_refs_json, { tcgdexId: String(raw.id) });
+      } else {
+        next.catalog_source = "tcgdex";
+        next.catalog_source_url = "https://tcgdex.dev";
+      }
       if (!current) {
         upsert.run(next);
         created += 1;
