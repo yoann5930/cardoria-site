@@ -16,7 +16,9 @@ jobs:
         with:
           node-version: '22'
       - name: Home navigation regression tests
-        run: node --test tests/home-navigation.test.mjs tests/seo-canonical-navigation.test.mjs
+        run: |
+          node --check js/home-client-session.js
+          node --test tests/home-navigation.test.mjs tests/seo-canonical-navigation.test.mjs
       - name: Validate primary production routes
         shell: bash
         run: |
