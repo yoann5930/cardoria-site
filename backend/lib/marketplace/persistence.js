@@ -16,8 +16,8 @@ const RUNTIME_TABLES = ["auth_users","auth_sessions","auth_reset_tokens","auth_m
 // duplicates the whole table in memory. Cards are durably stored by multilingual-card-persistence.
 // Purchases are also excluded here: they have their own durable snapshot and restoring them
 // from this legacy runtime payload caused valid boutique stock to be overwritten with [].
-const ENGINE_TABLES = ["licenses","sealed_products"];
-const ENGINE_CHILD_FIRST = ["sealed_products","licenses"];
+const ENGINE_TABLES = ["licenses","sealed_products","catalog_sync_state"];
+const ENGINE_CHILD_FIRST = ["catalog_sync_state","sealed_products","licenses"];
 const PG_RETRY_DELAY_MS = 800;
 
 let pool = null;
@@ -62,7 +62,7 @@ function runtimePayload() {
 function enginePayload() {
   const tables = {};
   for (const table of ENGINE_TABLES) { try { tables[table] = sqliteRows(table); } catch { tables[table] = []; } }
-  return { version: 5, tables, capturedAt: new Date().toISOString(), catalogPersistence: "cardoria_multilingual_cards" };
+  return { version: 6, tables, capturedAt: new Date().toISOString(), catalogPersistence: "cardoria_multilingual_cards" };
 }
 async function writeRows(client, table, rows) {
   for (const row of rows) {
