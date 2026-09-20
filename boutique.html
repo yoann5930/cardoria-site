@@ -11,7 +11,7 @@
   <link rel="preload" href="/style.css" as="style">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/css/boutique-v1.css?v=20260907-client-account-1">
-  <link rel="stylesheet" href="/css/boutique-v2.css?v=20260902-product-readability-1">
+  <link rel="stylesheet" href="/css/boutique-v2.css?v=20260921-quick-search-2">
   <link rel="stylesheet" href="/css/cardoria-brand-polish.css?v=20260831-1">
   <link rel="stylesheet" href="/css/card-name-contrast.css?v=20260920-2">
   <link rel="stylesheet" href="/css/client-account-button.css?v=20260907-1">
@@ -45,7 +45,7 @@
 
     <section class="shop-main" id="shopProductView" hidden><div class="shop-shell">
       <div class="shop-range-toolbar"><a class="shop-back-link" href="/boutique.html">← Retour aux gammes</a><div class="shop-range-title"><img src="https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg" alt="Pokémon"><span>Pokémon</span></div></div>
-      <div class="shop-search-card shop-product-search"><label class="shop-search-field" for="search"><span>⌕</span><input id="search" type="search" placeholder="Rechercher un produit Pokémon..." autocomplete="off"></label></div>
+      <div class="shop-search-card shop-product-search"><div class="shop-search-input-row"><label class="shop-search-field" for="search"><span>⌕</span><input id="search" type="search" placeholder="Rechercher : Alakazam, 050, Obsidiennes..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="shopQuickResults" aria-expanded="false" aria-haspopup="listbox"></label><button class="shop-search-clear" id="shopSearchClear" type="button" aria-label="Effacer la recherche">×</button></div><div class="shop-quick-results" id="shopQuickResults" role="listbox" hidden></div><div class="shop-quick-filters" aria-label="Filtres rapides Pokémon"><label><span>Extension</span><select id="shopFilterExtension"><option value="">Toutes les extensions</option></select></label><label><span>Rareté</span><select id="shopFilterRarity"><option value="">Toutes les raretés</option></select></label><label><span>État</span><select id="shopFilterCondition"><option value="">Tous les états</option></select></label><label><span>Disponibilité</span><select id="shopFilterAvailability"><option value="">Tous les stocks</option><option value="available">En stock</option><option value="unavailable">Indisponible</option></select></label><button id="shopFilterReset" class="shop-filter-reset" type="button">Réinitialiser</button></div><div class="shop-search-meta"><span id="shopSearchCount" aria-live="polite">Recherche prête</span><span>Nom · extension · numéro · rareté · état</span></div></div>
       <div class="shop-layout shop-product-layout">
         <div class="shop-catalog"><div class="shop-catalog-head"><div><p class="shop-kicker">Pokémon</p><h2>Produits disponibles</h2></div><p class="shop-catalog-note">Disponibilité synchronisée avec le stock CardoriaShop.</p></div><div class="products" id="products" aria-live="polite"></div></div>
         <aside class="shop-cart" aria-label="Panier CardoriaShop">
@@ -72,6 +72,6 @@
   <footer class="shop-footer"><div class="shop-shell shop-footer-grid"><div class="shop-footer-brand"><img src="/assets/logo/cardoria-premium.png" alt="CardoriaShop" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'"><strong>CARDORIA</strong><p>Le Royaume des Collectionneurs.</p></div><div><h3>Boutique</h3><a href="/boutique.html">Gammes</a><a href="/boutique.html?gamme=pokemon">Pokémon</a><a href="/marketplace.html">Marketplace</a></div><div><h3>Services</h3><a href="/estimation.html">Estimation</a><a href="/scanner.html">Scanner</a></div><div><h3>CardoriaShop</h3><a href="/">Accueil</a><a href="/client-login.html">Mon compte</a><a href="/contact.html">Contact</a><a href="/admin-login.html">Admin</a></div></div><div class="shop-shell shop-footer-bottom"><span>© CardoriaShop</span><span>Trading Cards • Collectibles • Premium</span></div></footer>
 
   <script src="/js/attribution.js"></script>
-  <script src="/js/boutique.js?v=20260907-card-preview-1"></script>
+  <script src="/js/boutique.js?v=20260921-quick-search-2"></script>
 </body>
 </html>
