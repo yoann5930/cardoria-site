@@ -1,20 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   buildServicePointSearchRequest,
   buildShipmentCreationXml,
   createMondialRelayShipment,
   downloadMondialRelayLabel,
   mondialRelayLabelPurchasesEnabled,
+  mondialRelayPublicStatus,
   mondialRelaySecurity,
+  mondialRelayTrackingUrl,
   parseServicePointSearchResponse,
-  parseShipmentCreationResponse
+  parseServicePointSearchStat,
+  parseShipmentCreationResponse,
+  searchMondialRelayServicePoints
 } from "../lib/mondial-relay.js";
 
 const envKeys = [
   "MONDIAL_RELAY_ENSEIGNE","MONDIAL_RELAY_PRIVATE_KEY","MONDIAL_RELAY_API_V2_LOGIN",
   "MONDIAL_RELAY_API_V2_PASSWORD","MONDIAL_RELAY_API_V2_CUSTOMER_ID",
-  "MONDIAL_RELAY_API_V2_ENV","MONDIAL_RELAY_LABEL_FORMAT","MONDIAL_RELAY_LIVE_LABELS_ENABLED"
+  "MONDIAL_RELAY_API_V2_ENV","MONDIAL_RELAY_LABEL_FORMAT","MONDIAL_RELAY_LIVE_LABELS_ENABLED",
+  "MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL"
 ];
 const originalEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
 function restoreEnv() {
@@ -32,6 +39,7 @@ function configure() {
   process.env.MONDIAL_RELAY_API_V2_ENV = "sandbox";
   process.env.MONDIAL_RELAY_LABEL_FORMAT = "10x15";
   process.env.MONDIAL_RELAY_LIVE_LABELS_ENABLED = "false";
+  process.env.MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL = "false";
 }
 const sender = { recipientName:"All Vaps", addressLine1:"17 avenue Marcel Aime", postalCode:"59330", city:"Hautmont", countryCode:"FR", phone:"0600000000" };
 const recipient = { recipientName:"Jean Test", addressLine1:"12 rue de la Republique", addressLine2:"Bat A", postalCode:"59000", city:"Lille", countryCode:"FR", phone:"0611223344" };
@@ -46,8 +54,12 @@ test("WSI4 security follows the documented concatenation order and SOAP request"
   assert.match(request.xml, /<Pays>FR<\/Pays>/);
   assert.match(request.xml, /<CP>59330<\/CP>/);
   assert.match(request.xml, /<Action>24R<\/Action>/);
+  assert.match(request.xml, /<RayonRecherche>15<\/RayonRecherche>/);
+  assert.match(request.xml, /<NombreResultats>10<\/NombreResultats>/);
   assert.match(request.xml, new RegExp("<Security>" + request.security + "<\\/Security>"));
   assert.equal(request.security.length, 32);
+  const byId = buildServicePointSearchRequest({ countryCode:"FR", relayId:"1234" });
+  assert.match(byId.xml, /<NumPointRelais>001234<\/NumPointRelais>/);
 });
 
 test("WSI4 response keeps the carrier relay number including leading zeroes", () => {
@@ -121,6 +133,34 @@ test("API V2 creation uses the sandbox once and returns shipment number plus pri
     assert.equal(result.shipmentNumber, "96408887");
     assert.equal(result.trackingNumber, "96408887");
     assert.equal(result.labelUrl, "https://connect.mondialrelay.com/label.pdf");
+    assert.equal(result.trackingUrl, "https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=96408887");
+  } finally { globalThis.fetch = original; }
+});
+
+test("sandbox allow flag can create one test shipment without enabling Live production labels", async () => {
+  configure();
+  process.env.MONDIAL_RELAY_LIVE_LABELS_ENABLED = "false";
+  process.env.MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL = "true";
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async (url) => {
+    calls += 1;
+    assert.equal(String(url), "https://connect-api-sandbox.mondialrelay.com/api/shipment");
+    return new Response(`<?xml version="1.0"?><ShipmentCreationResponse><ShipmentsList><Shipment ShipmentNumber="111"><LabelList><Label><Output>https://connect.mondialrelay.com/a.pdf</Output></Label></LabelList></Shipment></ShipmentsList></ShipmentCreationResponse>`, { status:200, headers:{"Content-Type":"application/xml"} });
+  };
+  try {
+    const result = await createMondialRelayShipment({
+      orderNumber:"LSH-S",reference:"LSH-S",fromAddress:sender,toAddress:recipient,
+      fromEmail:"sender@cardoria.test",toEmail:"buyer@cardoria.test",weightGrams:560,servicePointId:"001234"
+    });
+    assert.equal(calls, 1);
+    assert.equal(result.shipmentNumber, "111");
+    process.env.MONDIAL_RELAY_API_V2_ENV = "production";
+    await assert.rejects(createMondialRelayShipment({
+      orderNumber:"LSH-P",reference:"LSH-P",fromAddress:sender,toAddress:recipient,
+      fromEmail:"sender@cardoria.test",toEmail:"buyer@cardoria.test",weightGrams:560,servicePointId:"001234"
+    }), { code:"MONDIAL_RELAY_LABELS_NOT_ACTIVATED" });
+    assert.equal(calls, 1);
   } finally { globalThis.fetch = original; }
 });
 
@@ -148,6 +188,44 @@ test("business errors reject creation while warnings do not", () => {
   assert.throws(() => parseShipmentCreationResponse(selfClosingError), { code:"MONDIAL_RELAY_CREATION_REJECTED" });
 });
 
+test("status lists missing variable names without values and tracking URL is official", () => {
+  for (const key of envKeys) delete process.env[key];
+  const status = mondialRelayPublicStatus();
+  assert.equal(status.ok, true);
+  assert.equal(status.labelPurchasesEnabled, false);
+  assert.deepEqual(status.missing, [
+    "MONDIAL_RELAY_ENSEIGNE","MONDIAL_RELAY_PRIVATE_KEY","MONDIAL_RELAY_API_V2_LOGIN",
+    "MONDIAL_RELAY_API_V2_PASSWORD","MONDIAL_RELAY_API_V2_CUSTOMER_ID"
+  ]);
+  assert.equal(JSON.stringify(status).includes("PRIVATEKEY"), false);
+  assert.equal(mondialRelayTrackingUrl("96408887"), "https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=96408887");
+});
+
+test("WSI4 STAT 93 is an empty real result and STAT 97 never returns invented points", async () => {
+  configure();
+  const empty = `<?xml version="1.0"?><soap:Envelope><soap:Body><WSI4_PointRelais_RechercheResult><STAT>93</STAT></WSI4_PointRelais_RechercheResult></soap:Body></soap:Envelope>`;
+  assert.equal(parseServicePointSearchStat(empty), "93");
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => new Response(empty, { status:200, headers:{"Content-Type":"text/xml"} });
+  try {
+    const none = await searchMondialRelayServicePoints({ postalCode:"59330" });
+    assert.equal(none.count, 0);
+    globalThis.fetch = async () => new Response(`<?xml version="1.0"?><soap:Envelope><soap:Body><WSI4_PointRelais_RechercheResult><STAT>97</STAT><PointsRelais><PointRelais_Details><STAT>0</STAT><Num>001234</Num></PointRelais_Details></PointsRelais></WSI4_PointRelais_RechercheResult></soap:Body></soap:Envelope>`, { status:200, headers:{"Content-Type":"text/xml"} });
+    await assert.rejects(searchMondialRelayServicePoints({ postalCode:"59330" }), { code:"MONDIAL_RELAY_API_ERROR" });
+  } finally { globalThis.fetch = original; }
+});
+
+test("sandbox label script refuses to run without the explicit allow flag", () => {
+  const result = spawnSync(process.execPath, ["scripts/mondial-relay-sandbox-label-test.mjs"], {
+    cwd: fileURLToPath(new URL("..", import.meta.url)),
+    env: { ...process.env, MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL: "false", MONDIAL_RELAY_LIVE_LABELS_ENABLED: "true" },
+    encoding: "utf8"
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL_REQUIRED/);
+  assert.equal(result.stdout.includes("PRIVATEKEY"), false);
+});
+
 test("label download stays server-side, upgrades official HTTP URL and rejects foreign hosts", async () => {
   configure();
   const original = globalThis.fetch;
@@ -160,6 +238,7 @@ test("label download stays server-side, upgrades official HTTP URL and rejects f
     const bytes = await downloadMondialRelayLabel("http://connect.mondialrelay.com/test.pdf?x=1&amp;y=2");
     assert.ok(Buffer.isBuffer(bytes));
     assert.equal(calls[0], "https://connect.mondialrelay.com/test.pdf?x=1&y=2");
+    assert.equal(bytes.subarray(0, 5).toString(), "%PDF-");
     await assert.rejects(downloadMondialRelayLabel("https://evil.example/label.pdf"), { code:"MONDIAL_RELAY_LABEL_INVALID" });
     assert.equal(calls.length, 1);
   } finally { globalThis.fetch = original; }
