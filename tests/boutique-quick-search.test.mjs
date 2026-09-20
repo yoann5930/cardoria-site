@@ -10,12 +10,12 @@ const css=fs.readFileSync("css/boutique-v2.css","utf8");
 const runtimeCss=fs.readFileSync("backend/public/css/boutique-v2.css","utf8");
 
 test("boutique exposes an accessible instant-search combobox",()=>{
-  for(const id of ["search","shopSearchClear","shopQuickResults","shopSearchCount"]) assert.ok(html.includes('id="'+id+'"'),"missing "+id);
+  for(const id of ["search","shopSearchClear","shopQuickResults","shopSearchCount","shopFilterExtension","shopFilterRarity","shopFilterCondition","shopFilterAvailability","shopFilterReset"]) assert.ok(html.includes('id="'+id+'"'),"missing "+id);
   assert.match(html,/role="combobox"/);
   assert.match(html,/aria-autocomplete="list"/);
   assert.match(html,/aria-controls="shopQuickResults"/);
-  assert.match(html,/boutique\.js\?v=20260921-quick-search-1/);
-  assert.match(html,/boutique-v2\.css\?v=20260921-quick-search-1/);
+  assert.match(html,/boutique\.js\?v=20260921-quick-search-2/);
+  assert.match(html,/boutique-v2\.css\?v=20260921-quick-search-2/);
 });
 
 test("boutique search is local, indexed and accent tolerant",()=>{
@@ -31,6 +31,24 @@ test("boutique search is local, indexed and accent tolerant",()=>{
   assert.match(js,/products = data\.products;\s*buildSearchIndex\(\);/);
   assert.match(js,/input\.addEventListener\("input", scheduleSearchRender\)/);
   assert.match(js,/requestAnimationFrame/);
+});
+
+
+
+test("quick-search dropdown filters are populated from real stock and combine together",()=>{
+  assert.match(js,/function buildQuickFilters\(\)/);
+  assert.match(js,/populateFilterSelect\("shopFilterExtension", "extension"\)/);
+  assert.match(js,/populateFilterSelect\("shopFilterRarity", "rarity"\)/);
+  assert.match(js,/populateFilterSelect\("shopFilterCondition", "condition"\)/);
+  assert.match(js,/function selectedQuickFilters\(\)/);
+  assert.match(js,/entryMatchesQuickFilters/);
+  assert.match(js,/shopFilterAvailability/);
+  assert.match(js,/filters\.availability === "available"/);
+  assert.match(js,/filters\.availability === "unavailable"/);
+  assert.match(js,/shopFilterReset/);
+  assert.match(js,/buildSearchIndex\(\);\s*buildQuickFilters\(\);/);
+  assert.match(css,/\.shop-quick-filters/);
+  assert.match(css,/\.shop-quick-filters select/);
 });
 
 test("quick suggestions show useful buying information and keyboard navigation",()=>{
