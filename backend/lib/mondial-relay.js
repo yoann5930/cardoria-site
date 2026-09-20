@@ -2,10 +2,7 @@ import crypto from "node:crypto";
 
 const SOAP_URL = "https://www.mondialrelay.com/WebService/Web_Services.asmx";
 const SOAP_ACTION = "http://www.mondialrelay.fr/webservice/WSI4_PointRelais_Recherche";
-const SHIPMENT_URLS = Object.freeze({
-  sandbox: "https://connect-api-sandbox.mondialrelay.com/api/shipment",
-  production: "https://connect-api.mondialrelay.com/api/shipment"
-});
+const SHIPMENT_URL = "https://connect-api.mondialrelay.com/api/shipment";
 const LABEL_HOSTS = new Set(["connect.mondialrelay.com", "www.mondialrelay.com", "mondialrelay.com"]);
 
 const failure = (code, message, status = 502, meta = {}) => Object.assign(new Error(message), { code, status, ...meta });
@@ -175,10 +172,7 @@ export function mondialRelayLabelPurchasesEnabled() {
   return process.env.MONDIAL_RELAY_LIVE_LABELS_ENABLED === "true";
 }
 export function mondialRelayApiEnvironment() {
-  return rawText(process.env.MONDIAL_RELAY_API_V2_ENV || "sandbox").toLowerCase() === "production" ? "production" : "sandbox";
-}
-export function mondialRelaySandboxTestAllowed() {
-  return mondialRelayApiEnvironment() === "sandbox" && process.env.MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL === "true";
+  return "production";
 }
 export function mondialRelayMissingEnvNames() {
   return [...SERVICE_POINT_ENV, ...SHIPMENT_ENV].filter(name => !rawText(process.env[name]));
@@ -191,6 +185,7 @@ export function mondialRelayPublicStatus() {
     shipmentApiConfigured: isMondialRelayShipmentConfigured(),
     labelPurchasesEnabled: mondialRelayLabelPurchasesEnabled(),
     shipmentApiVersion: "v2",
+    shipmentApiEnvironment: mondialRelayApiEnvironment(),
     servicePointApi: "WSI4"
   };
   const missing = mondialRelayMissingEnvNames();
@@ -342,8 +337,7 @@ export function parseShipmentCreationResponse(xml) {
   return { shipmentNumber, labelUrl: output, statuses };
 }
 export async function createMondialRelayShipment(input = {}) {
-  const env = mondialRelayApiEnvironment();
-  if (env === "production" ? !mondialRelayLabelPurchasesEnabled() : !mondialRelayLabelPurchasesEnabled() && !mondialRelaySandboxTestAllowed()) {
+  if (!mondialRelayLabelPurchasesEnabled()) {
     throw failure("MONDIAL_RELAY_LABELS_NOT_ACTIVATED", "Création réelle d'étiquettes Mondial Relay désactivée.", 503);
   }
   if (!isMondialRelayShipmentConfigured()) {
@@ -351,7 +345,7 @@ export async function createMondialRelayShipment(input = {}) {
       missing: SHIPMENT_ENV.filter(name => !rawText(process.env[name]))
     });
   }
-  const url = SHIPMENT_URLS[env];
+  const url = SHIPMENT_URL;
   const xml = buildShipmentCreationXml(input);
   const response = await fetchOnce(url, {
     method: "POST",

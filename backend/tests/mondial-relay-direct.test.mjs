@@ -1,12 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import {
   buildServicePointSearchRequest,
   buildShipmentCreationXml,
   createMondialRelayShipment,
   downloadMondialRelayLabel,
+  mondialRelayApiEnvironment,
   mondialRelayLabelPurchasesEnabled,
   mondialRelayPublicStatus,
   mondialRelaySecurity,
@@ -36,10 +35,10 @@ function configure() {
   process.env.MONDIAL_RELAY_API_V2_LOGIN = "api@cardoria.test";
   process.env.MONDIAL_RELAY_API_V2_PASSWORD = "secret-test";
   process.env.MONDIAL_RELAY_API_V2_CUSTOMER_ID = "CARDORIA";
-  process.env.MONDIAL_RELAY_API_V2_ENV = "sandbox";
+  process.env.MONDIAL_RELAY_API_V2_ENV = "production";
   process.env.MONDIAL_RELAY_LABEL_FORMAT = "10x15";
   process.env.MONDIAL_RELAY_LIVE_LABELS_ENABLED = "false";
-  process.env.MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL = "false";
+  delete process.env.MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL;
 }
 const sender = { recipientName:"All Vaps", addressLine1:"17 avenue Marcel Aime", postalCode:"59330", city:"Hautmont", countryCode:"FR", phone:"0600000000" };
 const recipient = { recipientName:"Jean Test", addressLine1:"12 rue de la Republique", addressLine2:"Bat A", postalCode:"59000", city:"Lille", countryCode:"FR", phone:"0611223344" };
@@ -111,9 +110,12 @@ test("real label creation is disabled by default and does not touch the network"
   } finally { globalThis.fetch = original; }
 });
 
-test("API V2 creation uses the sandbox once and returns shipment number plus private PDF URL", async () => {
+test("API V2 creation uses the production Mondial Relay endpoint once and returns shipment number plus private PDF URL", async () => {
   configure();
   process.env.MONDIAL_RELAY_LIVE_LABELS_ENABLED = "true";
+  process.env.MONDIAL_RELAY_API_V2_ENV = "sandbox";
+  process.env.MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL = "true";
+  assert.equal(mondialRelayApiEnvironment(), "production");
   const original = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, init) => {
@@ -126,7 +128,8 @@ test("API V2 creation uses the sandbox once and returns shipment number plus pri
       fromEmail:"sender@cardoria.test",toEmail:"buyer@cardoria.test",weightGrams:560,servicePointId:"001234"
     });
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, "https://connect-api-sandbox.mondialrelay.com/api/shipment");
+    assert.equal(calls[0].url, "https://connect-api.mondialrelay.com/api/shipment");
+    assert.equal(calls[0].url.includes("sandbox"), false);
     assert.equal(calls[0].init.headers.Accept, "application/xml");
     assert.equal(calls[0].init.headers["Content-Type"], "text/xml");
     assert.match(String(calls[0].init.body), /Location="FR-001234"/);
@@ -137,30 +140,20 @@ test("API V2 creation uses the sandbox once and returns shipment number plus pri
   } finally { globalThis.fetch = original; }
 });
 
-test("sandbox allow flag can create one test shipment without enabling Live production labels", async () => {
+test("sandbox allow flag cannot create a shipment without Live labels", async () => {
   configure();
   process.env.MONDIAL_RELAY_LIVE_LABELS_ENABLED = "false";
   process.env.MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL = "true";
+  process.env.MONDIAL_RELAY_API_V2_ENV = "sandbox";
   const original = globalThis.fetch;
   let calls = 0;
-  globalThis.fetch = async (url) => {
-    calls += 1;
-    assert.equal(String(url), "https://connect-api-sandbox.mondialrelay.com/api/shipment");
-    return new Response(`<?xml version="1.0"?><ShipmentCreationResponse><ShipmentsList><Shipment ShipmentNumber="111"><LabelList><Label><Output>https://connect.mondialrelay.com/a.pdf</Output></Label></LabelList></Shipment></ShipmentsList></ShipmentCreationResponse>`, { status:200, headers:{"Content-Type":"application/xml"} });
-  };
+  globalThis.fetch = async () => { calls += 1; throw new Error("must not call"); };
   try {
-    const result = await createMondialRelayShipment({
+    await assert.rejects(createMondialRelayShipment({
       orderNumber:"LSH-S",reference:"LSH-S",fromAddress:sender,toAddress:recipient,
       fromEmail:"sender@cardoria.test",toEmail:"buyer@cardoria.test",weightGrams:560,servicePointId:"001234"
-    });
-    assert.equal(calls, 1);
-    assert.equal(result.shipmentNumber, "111");
-    process.env.MONDIAL_RELAY_API_V2_ENV = "production";
-    await assert.rejects(createMondialRelayShipment({
-      orderNumber:"LSH-P",reference:"LSH-P",fromAddress:sender,toAddress:recipient,
-      fromEmail:"sender@cardoria.test",toEmail:"buyer@cardoria.test",weightGrams:560,servicePointId:"001234"
     }), { code:"MONDIAL_RELAY_LABELS_NOT_ACTIVATED" });
-    assert.equal(calls, 1);
+    assert.equal(calls, 0);
   } finally { globalThis.fetch = original; }
 });
 
@@ -193,6 +186,7 @@ test("status lists missing variable names without values and tracking URL is off
   const status = mondialRelayPublicStatus();
   assert.equal(status.ok, true);
   assert.equal(status.labelPurchasesEnabled, false);
+  assert.equal(status.shipmentApiEnvironment, "production");
   assert.deepEqual(status.missing, [
     "MONDIAL_RELAY_ENSEIGNE","MONDIAL_RELAY_PRIVATE_KEY","MONDIAL_RELAY_API_V2_LOGIN",
     "MONDIAL_RELAY_API_V2_PASSWORD","MONDIAL_RELAY_API_V2_CUSTOMER_ID"
@@ -213,17 +207,6 @@ test("WSI4 STAT 93 is an empty real result and STAT 97 never returns invented po
     globalThis.fetch = async () => new Response(`<?xml version="1.0"?><soap:Envelope><soap:Body><WSI4_PointRelais_RechercheResult><STAT>97</STAT><PointsRelais><PointRelais_Details><STAT>0</STAT><Num>001234</Num></PointRelais_Details></PointsRelais></WSI4_PointRelais_RechercheResult></soap:Body></soap:Envelope>`, { status:200, headers:{"Content-Type":"text/xml"} });
     await assert.rejects(searchMondialRelayServicePoints({ postalCode:"59330" }), { code:"MONDIAL_RELAY_API_ERROR" });
   } finally { globalThis.fetch = original; }
-});
-
-test("sandbox label script refuses to run without the explicit allow flag", () => {
-  const result = spawnSync(process.execPath, ["scripts/mondial-relay-sandbox-label-test.mjs"], {
-    cwd: fileURLToPath(new URL("..", import.meta.url)),
-    env: { ...process.env, MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL: "false", MONDIAL_RELAY_LIVE_LABELS_ENABLED: "true" },
-    encoding: "utf8"
-  });
-  assert.notEqual(result.status, 0);
-  assert.match(result.stdout, /MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL_REQUIRED/);
-  assert.equal(result.stdout.includes("PRIVATEKEY"), false);
 });
 
 test("label download stays server-side, upgrades official HTTP URL and rejects foreign hosts", async () => {

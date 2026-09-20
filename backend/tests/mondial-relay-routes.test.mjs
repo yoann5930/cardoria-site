@@ -40,6 +40,7 @@ test("status and service-point routes never leak secrets and fail closed without
     assert.equal(status.shipmentApiConfigured, false);
     assert.equal(status.labelPurchasesEnabled, false);
     assert.equal(status.shipmentApiVersion, "v2");
+    assert.equal(status.shipmentApiEnvironment, "production");
     assert.equal(status.servicePointApi, "WSI4");
     assert.ok(status.missing.includes("MONDIAL_RELAY_ENSEIGNE"));
     assert.equal(JSON.stringify(status).includes("secret-test"), false);

@@ -46,7 +46,8 @@ awk -F= '
   $1 != "MONDIAL_RELAY_API_V2_PASSWORD" &&
   $1 != "MONDIAL_RELAY_API_V2_CUSTOMER_ID" &&
   $1 != "MONDIAL_RELAY_API_V2_ENV" &&
-  $1 != "MONDIAL_RELAY_LIVE_LABELS_ENABLED"
+  $1 != "MONDIAL_RELAY_LIVE_LABELS_ENABLED" &&
+  $1 != "MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL"
 ' "$ENV_FILE" > "$tmp"
 
 {
@@ -55,7 +56,7 @@ awk -F= '
   printf '%s=%s\n' 'MONDIAL_RELAY_API_V2_LOGIN' "$api_login"
   printf '%s=%s\n' 'MONDIAL_RELAY_API_V2_PASSWORD' "$api_password"
   printf '%s=%s\n' 'MONDIAL_RELAY_API_V2_CUSTOMER_ID' "$customer_id"
-  printf '%s\n' 'MONDIAL_RELAY_API_V2_ENV=sandbox'
+  printf '%s\n' 'MONDIAL_RELAY_API_V2_ENV=production'
   printf '%s\n' 'MONDIAL_RELAY_LIVE_LABELS_ENABLED=false'
 } >> "$tmp"
 
@@ -88,6 +89,6 @@ console.log("mondial_relay_process_config: ok");
 NODE
 
 echo "mondial_relay_env: installed"
-echo "mondial_relay_environment: sandbox"
+echo "mondial_relay_environment: production"
 echo "mondial_relay_label_purchases: disabled"
 echo "MONDIAL RELAY CONFIGURE OK"

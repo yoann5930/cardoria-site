@@ -25,7 +25,7 @@ test("Mondial Relay OVH credentials use a fixed stdin-only secure bridge", () =>
 
   assert.match(script, /IFS= read -r enseigne/);
   assert.match(script, /IFS= read -r private_key/);
-  assert.match(script, /MONDIAL_RELAY_API_V2_ENV=sandbox/);
+  assert.match(script, /MONDIAL_RELAY_API_V2_ENV=production/);
   assert.match(script, /MONDIAL_RELAY_LIVE_LABELS_ENABLED=false/);
   assert.match(script, /install -m 0600 -o root -g root/);
   assert.match(script, /servicePointSearchConfigured/);
@@ -41,6 +41,6 @@ test("Mondial Relay OVH credentials use a fixed stdin-only secure bridge", () =>
   assert.match(wrapper, /sudo -n \/usr\/local\/bin\/cardoria-mondial-relay-configure/);
   assert.match(sudoers, /\/usr\/local\/bin\/cardoria-mondial-relay-configure/);
 
-  assert.match(example, /MONDIAL_RELAY_API_V2_ENV=sandbox/);
+  assert.match(example, /MONDIAL_RELAY_API_V2_ENV=production/);
   assert.match(example, /MONDIAL_RELAY_LIVE_LABELS_ENABLED=false/);
 });

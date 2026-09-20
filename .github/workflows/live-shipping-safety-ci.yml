@@ -28,7 +28,6 @@ jobs:
       ADMIN_REQUIRE_2FA: 'false'
       SENDCLOUD_LIVE_LABELS_ENABLED: 'false'
       MONDIAL_RELAY_LIVE_LABELS_ENABLED: 'false'
-      MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL: 'false'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -50,7 +49,6 @@ jobs:
           node --check backend/routes/sendcloud.js
           node --check backend/routes/mondial-relay.js
           node --check backend/lib/mondial-relay.js
-          node --check backend/scripts/mondial-relay-sandbox-label-test.mjs
           node --check backend/lib/sendcloud-webhook-security.js
           node --check backend/lib/sendcloud-tracking.js
           node --check js/live-energy-spots.js
