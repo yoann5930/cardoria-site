@@ -1,0 +1,50 @@
+name: Mondial Relay Production Readonly Check
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: mondial-relay-prod-readonly
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'mr-readonly-check:')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check Mondial Relay status
+        run: |
+          set -euo pipefail
+          status_json="$(curl -fsS --max-time 20 https://www.cardoriashop.fr/api/mondial-relay/status)"
+          printf '%s\n' "$status_json"
+          STATUS_JSON="$status_json" node - <<'NODE'
+          const data = JSON.parse(process.env.STATUS_JSON || "{}");
+          if (data.ok !== true) throw new Error("Mondial Relay status endpoint not OK");
+          if (data.servicePointSearchConfigured !== true) throw new Error("Mondial Relay service-point credentials are not configured");
+          if (data.shipmentApiConfigured !== true) throw new Error("Mondial Relay API V2 credentials are not configured");
+          if (data.labelPurchasesEnabled !== false) throw new Error("Real label purchasing must remain disabled during readonly verification");
+          console.log("Mondial Relay status configuration: OK");
+          NODE
+
+      - name: Perform real Point Relais search
+        run: |
+          set -euo pipefail
+          search_json="$(curl -fsS --max-time 30 'https://www.cardoriashop.fr/api/mondial-relay/service-points?postalCode=59330&city=Hautmont&countryCode=FR&limit=5&radius=15000')"
+          printf '%s\n' "$search_json"
+          SEARCH_JSON="$search_json" node - <<'NODE'
+          const data = JSON.parse(process.env.SEARCH_JSON || "{}");
+          if (data.ok !== true) throw new Error("Mondial Relay service-point search failed");
+          if (!Array.isArray(data.points) || data.points.length < 1) throw new Error("No real Point Relais returned");
+          for (const point of data.points) {
+            if (!point || !String(point.id || "").trim()) throw new Error("Relay result without id");
+          }
+          console.log("Mondial Relay real service-point search: OK (" + data.points.length + " result(s))");
+          NODE
