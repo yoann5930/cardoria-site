@@ -63,3 +63,5 @@ test("runtime mirror contains same homepage navigation after sync",()=>{
   const runtime=fs.readFileSync("backend/public/index.html","utf8");
   assert.equal(runtime,html);
 });
+
+// The desktop top navigation intentionally uses semantic anchor links rather than image-only hotspots.
