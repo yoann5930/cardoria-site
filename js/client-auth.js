@@ -34,6 +34,24 @@
   }
 
   function isClient(user) { return user && user.role === "client"; }
+
+  function setAuthenticatedUi(authenticated) {
+    const guest = qs("clientGuestShell");
+    const account = qs("clientAccountCard");
+    document.body.classList.toggle("client-is-authenticated", !!authenticated);
+    if (guest) {
+      guest.hidden = !!authenticated;
+      guest.setAttribute("aria-hidden", authenticated ? "true" : "false");
+      if (authenticated) guest.style.setProperty("display", "none", "important");
+      else guest.style.removeProperty("display");
+    }
+    if (account) {
+      account.hidden = !authenticated;
+      account.setAttribute("aria-hidden", authenticated ? "false" : "true");
+      if (authenticated) account.style.removeProperty("display");
+      else account.style.setProperty("display", "none", "important");
+    }
+  }
   function euro(v) { return Number(v || 0).toFixed(2).replace(".", ",") + " €"; }
   function safeText(v) { return String(v == null ? "" : v); }
 
@@ -73,8 +91,7 @@
   function showAccount(user) {
     currentUser = user;
     setAccount(user);
-    qs("clientGuestShell").hidden = true;
-    qs("clientAccountCard").hidden = false;
+    setAuthenticatedUi(true);
     qs("clientAccountName").textContent = user.name || "Client";
     qs("clientAccountEmail").textContent = user.email || "";
     fillProfile(user);
@@ -84,8 +101,7 @@
   function showLoggedOut() {
     currentUser = null;
     setAccount(null);
-    qs("clientGuestShell").hidden = false;
-    qs("clientAccountCard").hidden = true;
+    setAuthenticatedUi(false);
   }
 
   async function api(path, options = {}) {
