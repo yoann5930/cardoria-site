@@ -1,5 +1,6 @@
 import { getDb, normalizeText, slugify } from "./database.js";
 import { ensureDefaultLicenses } from "./licenses.js";
+import { floorCardPrice } from "../pricing/card-price-floor.js";
 
 const API_ROOT = "https://api.tcgdex.net/v2";
 const SOURCE = "tcgdex-multilingual";
@@ -227,7 +228,7 @@ export async function syncPokemonReferenceCatalog({ priceLimit = 120, skipRariti
         if (baseImage && (!candidate.image_hd || !candidate.image_thumb)) imagesRepaired += 1;
         if (!price) { updateWithoutPrice.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), imageHd, imageHd, imageThumb, imageThumb, stampedAt, stampedAt, cardId); detailed += 1; unavailable += 1; return; }
         const direction = marketDirection(price.change7);
-        updateDetail.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), imageHd, imageHd, imageThumb, imageThumb, price.avg, price.low, price.high, price.recommended, price.avg1, price.avg7, price.avg30, "cardmarket", price.updated || stampedAt, stampedAt, direction, price.change7, stampedAt, cardId);
+        updateDetail.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), imageHd, imageHd, imageThumb, imageThumb, floorCardPrice(price.avg), floorCardPrice(price.low), floorCardPrice(price.high), floorCardPrice(price.recommended), floorCardPrice(price.avg1), floorCardPrice(price.avg7), floorCardPrice(price.avg30), "cardmarket", price.updated || stampedAt, stampedAt, direction, price.change7, stampedAt, cardId);
         deleteSource.run(cardId); insertSource.run(cardId, price.recommended, price.updated || stampedAt); insertHistory.run(cardId, price.recommended, price.avg, price.low, price.high, price.avg1, price.avg7, price.avg30, price.updated || stampedAt);
         priced += 1; detailed += 1; if (direction === "up") rising += 1; else if (direction === "down") falling += 1; else stable += 1;
       });
@@ -244,4 +245,4 @@ export function getMarketPriceStatus({ language = "fr" } = {}) {
   return { language: lang, languageLabel: languageLabel(lang), total: Number(totals?.total || 0), priced: Number(totals?.priced || 0), rising: Number(totals?.rising || 0), falling: Number(totals?.falling || 0), stable: Number(totals?.stable || 0), missingImages: Number(totals?.missingImages || 0), lastCheckedAt: totals?.lastCheckedAt || "", lastMarketUpdate: totals?.lastMarketUpdate || "", source: "Cardmarket via TCGdex" };
 }
 
-export function getCardPriceHistory(cardId, limit = 90) { return getDb().prepare(`SELECT source,current_price AS current,avg_price AS avg,low_price AS low,high_price AS high,avg1,avg7,avg30,captured_at AS capturedAt FROM card_price_history WHERE card_id=? ORDER BY captured_at DESC LIMIT ?`).all(cardId, Math.min(Math.max(Number(limit) || 90, 1), 365)); }
+export function getCardPriceHistory(cardId, limit = 90) { return getDb().prepare(`SELECT source,current_price AS current,avg_price AS avg,low_price AS low,high_price AS high,avg1,avg7,avg30,captured_at AS capturedAt FROM card_price_history WHERE card_id=? ORDER BY captured_at DESC LIMIT ?`).all(cardId, Math.min(Math.max(Number(limit) || 90, 1), 365)).map((row) => ({ ...row, current: floorCardPrice(row.current), avg: floorCardPrice(row.avg), low: floorCardPrice(row.low), high: floorCardPrice(row.high), avg1: floorCardPrice(row.avg1), avg7: floorCardPrice(row.avg7), avg30: floorCardPrice(row.avg30) })); }
