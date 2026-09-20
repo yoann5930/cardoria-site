@@ -1,5 +1,6 @@
 import { getDb, normalizeText } from "./database.js";
 import { createCard } from "./cards.js";
+import { floorCardPrice } from "../pricing/card-price-floor.js";
 
 const API_ROOT = "https://api.tcgdex.net/v2";
 const VISIBLE_LIMIT = 100;
@@ -154,7 +155,7 @@ export async function refreshVisibleCardPrices(ids = [], { retryMissingNow = tru
         const variants = raw.variants || {}, rarity = String(raw.rarity || ""), family = hitFamily(rarity, raw.name, variants), price = cardmarketReference(raw.pricing, variants);
         if (!price) { updateWithoutPrice.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), stampedAt, stampedAt, cardId); unavailable += 1; return; }
         const change7 = percent(price.current, price.avg7), direction = marketDirection(change7);
-        update.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), price.avg, price.low, price.high, price.current, price.avg1, price.avg7, price.avg30, "cardmarket", price.updated || stampedAt, stampedAt, direction, change7, stampedAt, cardId);
+        update.run(rarity, family, JSON.stringify(variants), String(raw.illustrator || ""), floorCardPrice(price.avg), floorCardPrice(price.low), floorCardPrice(price.high), floorCardPrice(price.current), floorCardPrice(price.avg1), floorCardPrice(price.avg7), floorCardPrice(price.avg30), "cardmarket", price.updated || stampedAt, stampedAt, direction, change7, stampedAt, cardId);
         deleteSource.run(cardId); insertSource.run(cardId, price.current, price.updated || stampedAt); insertHistory.run(cardId, price.current, price.avg, price.low, price.high, price.avg1, price.avg7, price.avg30, price.updated || stampedAt); priced += 1;
       });
     })();
