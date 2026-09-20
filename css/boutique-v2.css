@@ -165,3 +165,22 @@ body.shop-v1 .product.is-search-target{border-color:rgba(226,198,111,.8);box-sha
   .shop-quick-option img{width:40px;height:54px}
   .shop-quick-side{grid-column:2;align-items:flex-start;flex-direction:row;gap:10px}
 }
+
+
+/* Boutique compact quick filters */
+.shop-quick-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:8px;margin-top:10px}
+.shop-quick-filters label{display:flex;flex-direction:column;gap:5px}
+.shop-quick-filters label>span{padding-left:2px;color:#817b70;font-size:8px;font-weight:700;letter-spacing:.11em;text-transform:uppercase}
+.shop-quick-filters select{width:100%;min-width:0;height:36px;padding:0 28px 0 10px;border:1px solid rgba(201,165,68,.16);border-radius:4px;background:#050505;color:#d8d0c3;font-size:10px;outline:none;cursor:pointer}
+.shop-quick-filters select:hover,.shop-quick-filters select:focus{border-color:rgba(226,198,111,.48);color:#fff1c7}
+.shop-filter-reset{align-self:end;height:36px;padding:0 12px;border:1px solid rgba(201,165,68,.20);border-radius:4px;background:transparent;color:#b6a66f;font-size:9px;font-weight:700;letter-spacing:.045em;text-transform:uppercase;cursor:pointer}
+.shop-filter-reset:hover,.shop-filter-reset:focus-visible{border-color:rgba(226,198,111,.55);background:rgba(201,165,68,.08);color:#f3d873;outline:none}
+
+@media(max-width:900px){
+  .shop-quick-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .shop-filter-reset{width:100%}
+}
+@media(max-width:620px){
+  .shop-quick-filters{grid-template-columns:1fr 1fr}
+  .shop-quick-filters select{height:38px}
+}
