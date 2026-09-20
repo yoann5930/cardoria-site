@@ -4,6 +4,8 @@ import { isSumUpConfigured, syncPaymentFromCheckout, handleSumUpWebhook } from "
 import { listBoutiqueProducts } from "../lib/boutique/catalog.js";
 import { createLiveBoutiqueCheckout } from "../lib/boutique/checkout.js";
 import { assertSaleProvider } from "../lib/payments/routing.js";
+import { validateSession } from "../lib/auth/session.js";
+import { getUserById } from "../lib/auth/users.js";
 
 const router = Router();
 
@@ -22,7 +24,17 @@ router.post("/boutique/checkout", async (req, res) => {
     const body = req.body || {};
     assertSaleProvider({ channel: "boutique", requestedProvider: body.provider });
     if (!isSumUpConfigured()) return res.status(503).json({ ok: false, provider: "sumup", error: "Paiement SumUp non configuré." });
-    const result = await createLiveBoutiqueCheckout({ ...body, requestedProvider: body.provider, requestedAmount: body.amount ?? body.total });
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"] || "";
+    const sessionUser = validateSession(token);
+    const account = sessionUser?.role === "client" ? (getUserById(sessionUser.id) || sessionUser) : null;
+    const result = await createLiveBoutiqueCheckout({
+      ...body,
+      customerEmail: account?.email || body.customerEmail,
+      customerName: body.customerName || account?.name || "",
+      accountUserId: account?.id || "",
+      requestedProvider: body.provider,
+      requestedAmount: body.amount ?? body.total
+    });
     res.json({ ok: true, provider: "sumup", orderId: result.order.id, checkoutId: result.checkoutId, providerOrderId: result.checkoutId, url: result.url, paymentId: result.paymentId });
   } catch (e) {
     res.status(e.status || 500).json({ ok: false, provider: e.provider || "sumup", expectedProvider: e.expectedProvider || "sumup", requestedProvider: e.requestedProvider, error: e.message });
