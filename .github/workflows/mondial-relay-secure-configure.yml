@@ -1,0 +1,24 @@
+name: Mondial Relay Secure Configure
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: mondial-relay-secure-configure
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'mr-configure:')
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: mondial-relay-configure
+      branch: main
+    secrets: inherit
