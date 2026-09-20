@@ -23,7 +23,6 @@ on:
           - smtp-configure
           - sumup-configure
           - mondial-relay-configure
-          - mondial-relay-configure
       branch:
         description: Production deploy branch
         required: false
