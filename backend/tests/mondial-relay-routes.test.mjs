@@ -88,3 +88,5 @@ test("configured search returns WSI4 points as strings and does not call Sendclo
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+// Human-authored CI retrigger after frontend runtime sync; no behavior change.
