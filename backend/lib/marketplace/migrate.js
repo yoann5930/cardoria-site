@@ -113,6 +113,9 @@ export function migrateMarketplace() {
     );
   `);
 
+  // Global Cardoria rule: no card listing may remain below 1 EUR.
+  db.exec("UPDATE mk_listings SET price=1 WHERE price>0 AND price<1");
+
   ensureColumn(db, "mk_sellers", "auth_user_id", "TEXT DEFAULT ''");
   ensureColumn(db, "mk_sellers", "sender_name", "TEXT DEFAULT ''");
   ensureColumn(db, "mk_sellers", "sender_address_line1", "TEXT DEFAULT ''");
