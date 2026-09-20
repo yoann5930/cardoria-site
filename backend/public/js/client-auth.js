@@ -157,7 +157,7 @@
       const city = qs("clientProfileCity").value.trim();
       const countryCode = (qs("clientProfileCountry").value.trim() || "FR").toUpperCase();
       if (!postalCode && !city) throw new Error("Renseignez d’abord votre code postal ou votre ville.");
-      const data = await api("/api/sendcloud/service-points?" + new URLSearchParams({ postalCode, city, countryCode, limit: "10", radius: "15000" }), { method: "GET" });
+      const data = await api("/api/mondial-relay/service-points?" + new URLSearchParams({ postalCode, city, countryCode, limit: "10", radius: "15000" }), { method: "GET" });
       const points = Array.isArray(data.points) ? data.points : [];
       if (!points.length) throw new Error("Aucun Point Relais Mondial Relay trouvé.");
       const lines = points.map((point, index) => (index + 1) + ". " + point.name + " — " + [point.street, point.houseNumber, point.postalCode, point.city].filter(Boolean).join(" "));

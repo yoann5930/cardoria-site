@@ -57,8 +57,18 @@ function postalCode(value) {
 }
 function relayNumber(value) {
   const id = rawText(value);
-  if (!/^\d{1,8}$/.test(id) || Number(id) <= 0) throw failure("MONDIAL_RELAY_SERVICE_POINT_INVALID", "Identifiant Point Relais Mondial Relay invalide.", 400);
-  return id;
+  if (!/^\d{1,6}$/.test(id) || Number(id) <= 0) throw failure("MONDIAL_RELAY_SERVICE_POINT_INVALID", "Identifiant Point Relais Mondial Relay invalide.", 400);
+  return id.padStart(6, "0");
+}
+function searchRadiusKm(radius) {
+  const meters = Math.trunc(Number(radius));
+  if (!Number.isFinite(meters) || meters <= 0) return "0";
+  return String(Math.min(9999, Math.max(1, Math.round(meters / 1000))));
+}
+export function mondialRelayTrackingUrl(shipmentNumber) {
+  const id = rawText(shipmentNumber);
+  if (!/^[0-9A-Z-]{4,20}$/i.test(id)) return "";
+  return "https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=" + encodeURIComponent(id);
 }
 function orderReference(value) {
   const source = rawText(value);
@@ -153,14 +163,39 @@ async function fetchOnce(url, init, { ambiguousCreation = false } = {}) {
   }
 }
 
+const SERVICE_POINT_ENV = ["MONDIAL_RELAY_ENSEIGNE", "MONDIAL_RELAY_PRIVATE_KEY"];
+const SHIPMENT_ENV = ["MONDIAL_RELAY_API_V2_LOGIN", "MONDIAL_RELAY_API_V2_PASSWORD", "MONDIAL_RELAY_API_V2_CUSTOMER_ID"];
 export function isMondialRelayServicePointConfigured() {
-  return Boolean(rawText(process.env.MONDIAL_RELAY_ENSEIGNE) && rawText(process.env.MONDIAL_RELAY_PRIVATE_KEY));
+  return SERVICE_POINT_ENV.every(name => rawText(process.env[name]));
 }
 export function isMondialRelayShipmentConfigured() {
-  return Boolean(rawText(process.env.MONDIAL_RELAY_API_V2_LOGIN) && rawText(process.env.MONDIAL_RELAY_API_V2_PASSWORD) && rawText(process.env.MONDIAL_RELAY_API_V2_CUSTOMER_ID));
+  return SHIPMENT_ENV.every(name => rawText(process.env[name]));
 }
 export function mondialRelayLabelPurchasesEnabled() {
   return process.env.MONDIAL_RELAY_LIVE_LABELS_ENABLED === "true";
+}
+export function mondialRelayApiEnvironment() {
+  return rawText(process.env.MONDIAL_RELAY_API_V2_ENV || "sandbox").toLowerCase() === "production" ? "production" : "sandbox";
+}
+export function mondialRelaySandboxTestAllowed() {
+  return mondialRelayApiEnvironment() === "sandbox" && process.env.MONDIAL_RELAY_ALLOW_SANDBOX_TEST_LABEL === "true";
+}
+export function mondialRelayMissingEnvNames() {
+  return [...SERVICE_POINT_ENV, ...SHIPMENT_ENV].filter(name => !rawText(process.env[name]));
+}
+export function mondialRelayPublicStatus() {
+  const status = {
+    ok: true,
+    provider: "mondial_relay_direct",
+    servicePointSearchConfigured: isMondialRelayServicePointConfigured(),
+    shipmentApiConfigured: isMondialRelayShipmentConfigured(),
+    labelPurchasesEnabled: mondialRelayLabelPurchasesEnabled(),
+    shipmentApiVersion: "v2",
+    servicePointApi: "WSI4"
+  };
+  const missing = mondialRelayMissingEnvNames();
+  if (missing.length) status.missing = missing;
+  return status;
 }
 export function mondialRelaySecurity(params, privateKey = process.env.MONDIAL_RELAY_PRIVATE_KEY) {
   const key = rawText(privateKey);
@@ -181,7 +216,7 @@ export function buildServicePointSearchRequest({ countryCode = "FR", postalCode:
     weightGrams ? String(grams(Math.max(10, Number(weightGrams)))) : "",
     "24R",
     "0",
-    String(Math.min(50000, Math.max(100, Math.trunc(Number(radius) || 15000)))),
+    searchRadiusKm(radius === undefined || radius === "" ? 15000 : radius),
     "", "",
     String(Math.min(30, Math.max(1, Math.trunc(Number(limit) || 10))))
   ];
@@ -195,6 +230,11 @@ export function buildServicePointSearchRequest({ countryCode = "FR", postalCode:
       '<soap:Body><WSI4_PointRelais_Recherche xmlns="http://www.mondialrelay.fr/webservice/">' +
       payload + "<Security>" + security + "</Security></WSI4_PointRelais_Recherche></soap:Body></soap:Envelope>"
   };
+}
+export function parseServicePointSearchStat(xml) {
+  const body = String(xml || "");
+  const result = body.match(/<(?:\w+:)?WSI4_PointRelais_RechercheResult\b[^>]*>([\s\S]*?)<\/(?:\w+:)?WSI4_PointRelais_RechercheResult>/i);
+  return xmlValue(result ? result[1] : body, "STAT");
 }
 export function parseServicePointSearchResponse(xml) {
   const body = String(xml || "");
@@ -225,7 +265,11 @@ export function parseServicePointSearchResponse(xml) {
   }).filter(Boolean);
 }
 export async function searchMondialRelayServicePoints(input = {}) {
-  if (!isMondialRelayServicePointConfigured()) throw failure("MONDIAL_RELAY_NOT_CONFIGURED", "Recherche Point Relais Mondial Relay non configurée.", 503);
+  if (!isMondialRelayServicePointConfigured()) {
+    throw failure("MONDIAL_RELAY_NOT_CONFIGURED", "Recherche Point Relais Mondial Relay non configurée.", 503, {
+      missing: SERVICE_POINT_ENV.filter(name => !rawText(process.env[name]))
+    });
+  }
   const request = buildServicePointSearchRequest(input);
   const response = await fetchOnce(SOAP_URL, {
     method: "POST",
@@ -236,6 +280,11 @@ export async function searchMondialRelayServicePoints(input = {}) {
   if (!response.ok) throw failure("MONDIAL_RELAY_API_ERROR", "Recherche Point Relais refusée (HTTP " + response.status + ").", 502, { providerStatus: response.status });
   const fault = xmlValue(xml, "faultstring");
   if (fault) throw failure("MONDIAL_RELAY_API_ERROR", "Mondial Relay a refusé la recherche Point Relais.", 502);
+  const stat = parseServicePointSearchStat(xml);
+  if (stat && stat !== "0") {
+    if (stat === "93") return { points: [], count: 0 };
+    throw failure("MONDIAL_RELAY_API_ERROR", "Recherche Point Relais refusée par Mondial Relay.", 502, { providerStat: stat });
+  }
   const points = parseServicePointSearchResponse(xml);
   return { points, count: points.length };
 }
@@ -293,10 +342,16 @@ export function parseShipmentCreationResponse(xml) {
   return { shipmentNumber, labelUrl: output, statuses };
 }
 export async function createMondialRelayShipment(input = {}) {
-  if (!mondialRelayLabelPurchasesEnabled()) throw failure("MONDIAL_RELAY_LABELS_NOT_ACTIVATED", "Création réelle d'étiquettes Mondial Relay désactivée.", 503);
-  if (!isMondialRelayShipmentConfigured()) throw failure("MONDIAL_RELAY_NOT_CONFIGURED", "API V2 Mondial Relay non configurée.", 503);
-  const env = rawText(process.env.MONDIAL_RELAY_API_V2_ENV || "sandbox").toLowerCase();
-  const url = SHIPMENT_URLS[env] || SHIPMENT_URLS.sandbox;
+  const env = mondialRelayApiEnvironment();
+  if (env === "production" ? !mondialRelayLabelPurchasesEnabled() : !mondialRelayLabelPurchasesEnabled() && !mondialRelaySandboxTestAllowed()) {
+    throw failure("MONDIAL_RELAY_LABELS_NOT_ACTIVATED", "Création réelle d'étiquettes Mondial Relay désactivée.", 503);
+  }
+  if (!isMondialRelayShipmentConfigured()) {
+    throw failure("MONDIAL_RELAY_NOT_CONFIGURED", "API V2 Mondial Relay non configurée.", 503, {
+      missing: SHIPMENT_ENV.filter(name => !rawText(process.env[name]))
+    });
+  }
+  const url = SHIPMENT_URLS[env];
   const xml = buildShipmentCreationXml(input);
   const response = await fetchOnce(url, {
     method: "POST",
@@ -306,7 +361,8 @@ export async function createMondialRelayShipment(input = {}) {
   const responseXml = await boundedText(response, 2000000);
   if (!response.ok) throw failure("MONDIAL_RELAY_API_ERROR", "Création Mondial Relay refusée (HTTP " + response.status + ").", 502, { providerStatus: response.status });
   const parsed = parseShipmentCreationResponse(responseXml);
-  return { ...parsed, provider: "mondial_relay_direct", status: "READY_TO_SEND", trackingNumber: parsed.shipmentNumber, trackingUrl: "" };
+  const trackingUrl = mondialRelayTrackingUrl(parsed.shipmentNumber);
+  return { ...parsed, provider: "mondial_relay_direct", status: "READY_TO_SEND", trackingNumber: parsed.shipmentNumber, trackingUrl };
 }
 function safeLabelUrl(value) {
   let url;
