@@ -64,6 +64,7 @@ import { initLaunch, connectionJournalMiddleware, maintenanceMiddleware } from "
 import systemRoutes from "./routes/system.js";
 import sendcloudRoutes from "./routes/sendcloud.js";
 import mondialRelayRoutes from "./routes/mondial-relay.js";
+import "./lib/engine/pokemon-multisource-schedule.js";
 import locationRoutes from "./routes/location.js";
 
 dotenv.config();
