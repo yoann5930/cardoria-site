@@ -51,6 +51,7 @@ test("multi-source sync is available to admins and runs progressively in product
 test("provider sync does not require inventing Scrydex secrets", () => {
   assert.match(source, /SCRYDEX_API_KEY/);
   assert.match(source, /SCRYDEX_TEAM_ID/);
-  assert.match(source, /SCRYDEX_API_KEY_or_TEAM_ID_missing/);
+  assert.match(source, /anonymous-low-rate/);
+  assert.match(source, /auth\.configured \? requestedLimit : Math\.min\(requestedLimit, 1\)/);
   assert.doesNotMatch(source, /YOUR_API_KEY|YOUR_TEAM_ID/);
 });
