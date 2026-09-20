@@ -8,12 +8,13 @@ import { hashToken, makeId, ADMIN_ROLES } from "./migrate.js";
 const SESSION_HOURS = Number(process.env.SESSION_HOURS || 12);
 const REQUIRE_ADMIN_2FA = String(process.env.ADMIN_REQUIRE_2FA || "false").trim().toLowerCase() === "true";
 
-export function createSession(userId, { ip = "", userAgent = "" } = {}) {
+export function createSession(userId, { ip = "", userAgent = "", ttlHours = SESSION_HOURS } = {}) {
   const db = getDb();
   const token = crypto.randomBytes(48).toString("base64url");
   const tokenHash = hashToken(token);
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + SESSION_HOURS * 3600000).toISOString();
+  const safeTtlHours = Math.max(1, Math.min(24 * 365, Number(ttlHours) || SESSION_HOURS));
+  const expiresAt = new Date(now.getTime() + safeTtlHours * 3600000).toISOString();
   const id = makeId("sess");
 
   db.prepare(`
