@@ -3,6 +3,7 @@
  */
 import { getDb } from "./database.js";
 import { ingestAdminManualSale } from "../market/ingest.js";
+import { floorCardPrice } from "../pricing/card-price-floor.js";
 
 const SOURCE_WEIGHTS = {
   cardoria: 0.4,
@@ -63,16 +64,23 @@ export function recalculateCardPrices(cardId) {
   const trend = computeMarketTrend(cardId, recommended || avg);
   const now = new Date().toISOString();
 
+  const publicPrices = {
+    avg: floorCardPrice(avg),
+    low: floorCardPrice(low),
+    high: floorCardPrice(high),
+    recommended: floorCardPrice(recommended)
+  };
+
   db.prepare(`
     UPDATE cards SET avg_price = ?, low_price = ?, high_price = ?, recommended_price = ?,
       market_trend = ?, trend_percent = ?, updated_at = ?
     WHERE id = ?
   `).run(
-    round2(avg), round2(low), round2(high), round2(recommended),
+    publicPrices.avg, publicPrices.low, publicPrices.high, publicPrices.recommended,
     trend.trend, trend.percent, now, cardId
   );
 
-  return { avg: round2(avg), low: round2(low), high: round2(high), recommended: round2(recommended), ...trend };
+  return { ...publicPrices, ...trend };
 }
 
 function computeMarketTrend(cardId, currentPrice) {
@@ -106,7 +114,7 @@ export function estimatePrice(cardId, condition = "nm") {
 
   const mult = CONDITION_MULTIPLIERS[normalizeCondition(condition)] ?? 1;
   const base = card.recommended_price || card.avg_price;
-  const adjusted = round2(base * mult);
+  const adjusted = floorCardPrice(base * mult);
 
   const sources = getPriceSources(cardId);
   const variation = card.trend_percent || 0;
@@ -117,8 +125,8 @@ export function estimatePrice(cardId, condition = "nm") {
     conditionMultiplier: mult,
     recommended: adjusted,
     range: {
-      low: round2((card.low_price || adjusted * 0.85) * mult),
-      high: round2((card.high_price || adjusted * 1.15) * mult)
+      low: floorCardPrice((card.low_price || adjusted * 0.85) * mult),
+      high: floorCardPrice((card.high_price || adjusted * 1.15) * mult)
     },
     marketTrend: card.market_trend,
     trendPercent: card.trend_percent,
