@@ -1,5 +1,6 @@
 import { readJson } from "../storage.js";
 import { getCardById } from "../engine/cards.js";
+import { floorCardPrice } from "../pricing/card-price-floor.js";
 
 const DEFAULT_PURCHASES = [];
 const DEFAULT_ORDERS = [];
@@ -368,7 +369,8 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
   const effectiveBaseStock = line.stockRemoved ? committedStock : configuredBaseStock;
   const stock = Math.max(0, effectiveBaseStock - committedStock);
   const oversoldStock = Math.max(0, committedStock - effectiveBaseStock);
-  const price = line.boutiquePrice || line.catalogPrice || 0;
+  const rawPrice = line.boutiquePrice || line.catalogPrice || 0;
+  const price = isCardPackaging(line.packaging) ? floorCardPrice(rawPrice) : money(rawPrice);
   const priceSource = line.boutiquePrice ? "admin" : (line.catalogPriceSource || "missing");
   const boutiqueEnabled = line.stockRemoved ? false : line.boutiqueEnabled !== false;
   const catalogLinked = !isCardPackaging(line.packaging) || Boolean(line.cardId);
@@ -389,7 +391,7 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     stock,
     price: money(price),
     priceSource,
-    catalogPrice: line.catalogPrice,
+    catalogPrice: isCardPackaging(line.packaging) ? floorCardPrice(line.catalogPrice) : line.catalogPrice,
     catalogPriceSource: line.catalogPriceSource,
     image: line.image,
     boutiqueEnabled,
@@ -416,7 +418,7 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     averagePurchaseCost: line.baseStock ? money(line.totalCost / line.baseStock) : 0,
     totalPurchaseCost: money(line.totalCost),
     purchaseIds: line.purchaseIds.slice(),
-    boutiquePrice: line.boutiquePrice,
+    boutiquePrice: line.boutiquePrice == null ? null : (isCardPackaging(line.packaging) ? floorCardPrice(line.boutiquePrice) : money(line.boutiquePrice)),
     latestPurchaseAt: line.latestPurchaseAt,
     inventoryStatus: line.stockRemoved ? "removed" : !identityReady ? "catalog_link_required" : !priceReady ? "catalog_price_required" : oversoldStock > 0 ? "oversold" : stock <= 0 ? "out_of_stock" : allocation.pendingStock > 0 ? "reserved" : "available"
   };
