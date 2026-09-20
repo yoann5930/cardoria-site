@@ -73,6 +73,67 @@
       });
   }
 
+  function filterOptions(field) {
+    const values = new Map();
+    for (const entry of searchIndex) {
+      const label = String(entry.product?.[field] || "").trim();
+      const value = normalizeSearch(label);
+      if (!label || !value) continue;
+      const current = values.get(value);
+      if (current) current.count += 1;
+      else values.set(value, { value, label, count: 1 });
+    }
+    return [...values.values()].sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" }));
+  }
+
+  function populateFilterSelect(id, field) {
+    const select = qs(id);
+    if (!select) return;
+    const previous = select.value;
+    const first = select.options[0]?.cloneNode(true);
+    select.replaceChildren();
+    if (first) select.appendChild(first);
+    for (const item of filterOptions(field)) {
+      const option = document.createElement("option");
+      option.value = item.value;
+      option.textContent = item.label + " (" + item.count + ")";
+      select.appendChild(option);
+    }
+    if ([...select.options].some((option) => option.value === previous)) select.value = previous;
+  }
+
+  function buildQuickFilters() {
+    populateFilterSelect("shopFilterExtension", "extension");
+    populateFilterSelect("shopFilterRarity", "rarity");
+    populateFilterSelect("shopFilterCondition", "condition");
+  }
+
+  function selectedQuickFilters() {
+    return {
+      extension: qs("shopFilterExtension")?.value || "",
+      rarity: qs("shopFilterRarity")?.value || "",
+      condition: qs("shopFilterCondition")?.value || "",
+      availability: qs("shopFilterAvailability")?.value || ""
+    };
+  }
+
+  function entryMatchesQuickFilters(entry, filters) {
+    if (filters.extension && entry.fields.extension !== filters.extension) return false;
+    if (filters.rarity && entry.fields.rarity !== filters.rarity) return false;
+    if (filters.condition && entry.fields.condition !== filters.condition) return false;
+    if (filters.availability) {
+      const available = Number(entry.product.stock || 0) > 0 && !!entry.product.purchasable;
+      if (filters.availability === "available" && !available) return false;
+      if (filters.availability === "unavailable" && available) return false;
+    }
+    return true;
+  }
+
+  function hasActiveQuickFilters() {
+    const filters = selectedQuickFilters();
+    return Boolean(filters.extension || filters.rarity || filters.condition || filters.availability);
+  }
+
   function scoreSearchEntry(entry, terms, fullQuery) {
     if (!terms.length) return 0;
     if (!terms.every((term) => entry.blob.includes(term))) return -1;
@@ -101,18 +162,19 @@
 
   function getPokemonProducts() {
     const query = normalizeSearch(qs("search")?.value || "");
-    if (!query) return searchIndex.map((entry) => entry.product);
+    const terms = query ? query.split(/\s+/).filter(Boolean) : [];
+    const filters = selectedQuickFilters();
 
-    const terms = query.split(/\s+/).filter(Boolean);
     return searchIndex
       .map((entry, position) => ({
+        entry,
         product: entry.product,
         position,
-        score: scoreSearchEntry(entry, terms, query)
+        score: query ? scoreSearchEntry(entry, terms, query) : 0
       }))
-      .filter((entry) => entry.score >= 0)
+      .filter((item) => item.score >= 0 && entryMatchesQuickFilters(item.entry, filters))
       .sort((a, b) => b.score - a.score || a.position - b.position)
-      .map((entry) => entry.product);
+      .map((item) => item.product);
   }
 
   function setSuggestionsOpen(open) {
@@ -172,7 +234,7 @@
     if (!count || !input) return;
     const query = input.value.trim();
     if (!query) {
-      count.textContent = matches.length + (matches.length > 1 ? " produits disponibles" : " produit disponible");
+      count.textContent = matches.length + (matches.length > 1 ? (hasActiveQuickFilters() ? " produits filtrés" : " produits disponibles") : (hasActiveQuickFilters() ? " produit filtré" : " produit disponible"));
       return;
     }
     count.textContent = matches.length + (matches.length > 1 ? " résultats" : " résultat") + ' pour "' + query + '"';
@@ -274,6 +336,7 @@
 
     products = data.products;
     buildSearchIndex();
+    buildQuickFilters();
 
     if (!cart.length) {
       try {
@@ -515,6 +578,24 @@
 
     clear?.addEventListener("click", () => {
       input.value = "";
+      renderProducts();
+      input.focus();
+    });
+
+    ["shopFilterExtension", "shopFilterRarity", "shopFilterCondition", "shopFilterAvailability"].forEach((id) => {
+      qs(id)?.addEventListener("change", () => {
+        setSuggestionsOpen(false);
+        renderProducts();
+      });
+    });
+
+    qs("shopFilterReset")?.addEventListener("click", () => {
+      input.value = "";
+      ["shopFilterExtension", "shopFilterRarity", "shopFilterCondition", "shopFilterAvailability"].forEach((id) => {
+        const select = qs(id);
+        if (select) select.value = "";
+      });
+      setSuggestionsOpen(false);
       renderProducts();
       input.focus();
     });
