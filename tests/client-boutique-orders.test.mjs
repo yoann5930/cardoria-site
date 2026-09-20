@@ -50,3 +50,15 @@ test("client dashboard hidden state cannot be overridden by layout CSS",()=>{
 });
 
 // Human-authored hidden-state CI retrigger after frontend runtime sync; no behavior change.
+
+test("client login and dashboard are mutually exclusive even with cached layout rules",()=>{
+  const css=read("../css/client-auth.css");
+  assert.match(css,/body\.client-is-authenticated #clientGuestShell\{display:none!important\}/);
+  assert.match(css,/body:not\(\.client-is-authenticated\) #clientAccountCard\{display:none!important\}/);
+  assert.match(clientAuth,/function setAuthenticatedUi\(authenticated\)/);
+  assert.match(clientAuth,/style\.setProperty\("display", "none", "important"\)/);
+  assert.match(clientAuth,/setAuthenticatedUi\(true\)/);
+  assert.match(clientAuth,/setAuthenticatedUi\(false\)/);
+  assert.match(clientLogin,/client-auth\.css\?v=20260920-dashboard-2/);
+  assert.match(clientLogin,/client-auth\.js\?v=20260920-dashboard-2/);
+});
