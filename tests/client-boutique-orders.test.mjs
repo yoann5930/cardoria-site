@@ -34,10 +34,14 @@ test("client dashboard exposes Cardoria navigation and account data sections",()
   assert.match(clientAuth,/\/api\/marketplace\/v1\/orders/);
   assert.match(clientAuth,/\/api\/live\/my-shipments/);
 });
-test("boutique keeps cart and reuses the connected client profile",()=>{
-  assert.match(boutique,/cardoria_boutique_cart/);
-  assert.match(boutique,/\/api\/auth\/me/);
-  assert.match(boutique,/headers\.Authorization\s*=\s*"Bearer "\s*\+\s*token/);
+test("boutique checkout can send La Poste as the shipping carrier",()=>{
+  assert.match(boutique,/shopCarrier/);
+  assert.match(boutique,/Colissimo domicile/);
+  assert.match(checkout,/selectedCarrier/);
+  assert.match(checkout,/La Poste/);
+  assert.match(auth,/shippingLabelAvailable/);
+  assert.match(clientOrders,/\/api\/laposte\/my-labels/);
+  assert.match(adminOrders,/\/api\/laposte\/labels\//);
 });
 
 // Human-authored dashboard CI retrigger after frontend runtime sync; no behavior change.

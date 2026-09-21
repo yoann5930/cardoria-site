@@ -11,6 +11,7 @@ import { getPayPalMarketplaceConfig } from "../lib/marketplace/paypal.js";
 import { refundPayPalOrder, paypalWebhookConfigured } from "../lib/marketplace/paypal-events.js";
 import { processPriceAlerts } from "../lib/marketplace/social.js";
 import { listAllListingsAdmin } from "../lib/marketplace/v1/listings.js";
+import { isColissimoConfigured, colissimoLabelPurchasesEnabled } from "../lib/colissimo.js";
 import { getMarketplaceStats } from "../lib/marketplace/v1/index.js";
 import { listDisputes, resolveDispute } from "../lib/marketplace/v1/disputes.js";
 import { exportAccountingCsv, getInvoiceHtmlByOrder } from "../lib/marketplace/v1/invoices.js";
@@ -61,7 +62,7 @@ router.put("/sellers/:id/verified", WRITE_ADMIN, (req, res) => {
 router.post("/alerts/process", WRITE_ADMIN, async (req, res) => res.json({ ok: true, ...(await processPriceAlerts()) }));
 router.get("/config", (req, res) => {
   const paypal = getPayPalMarketplaceConfig();
-  res.json({ ok: true, boutique: { provider: "sumup", configured: isSumUpConfigured() }, live: { admin: "sumup", seller: "paypal" }, marketplace: { provider: "paypal", configured: paypal.configured, webhookConfigured: paypalWebhookConfigured(), environment: paypal.environment, commissionPercent: paypal.commissionPercent, delayedDisbursement: paypal.delayedDisbursement }, carriers: ["mondial_relay", "colissimo", "chronopost"], carrierLabelsReady: false, stats: getMarketplaceStats() });
+  res.json({ ok: true, boutique: { provider: "sumup", configured: isSumUpConfigured() }, live: { admin: "sumup", seller: "paypal" }, marketplace: { provider: "paypal", configured: paypal.configured, webhookConfigured: paypalWebhookConfigured(), environment: paypal.environment, commissionPercent: paypal.commissionPercent, delayedDisbursement: paypal.delayedDisbursement }, carriers: ["mondial_relay", "colissimo", "chronopost"], carrierLabelsReady: isColissimoConfigured() && colissimoLabelPurchasesEnabled(), stats: getMarketplaceStats() });
 });
 router.get("/stats", (req, res) => res.json({ ok: true, stats: getMarketplaceStats() }));
 router.put("/orders/:id/tracking", WRITE_ADMIN, (req, res) => {

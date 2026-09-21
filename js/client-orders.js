@@ -51,19 +51,33 @@ function steps(status){
   if(label==="En préparation")idx=1; else if(label==="Expédiée")idx=2; else if(label==="Livrée")idx=3;
   return '<div class="client-order-progress">'+values.map((s,i)=>'<span class="'+(i<=idx?'active':'')+'">'+s+'</span>').join("")+'</div>';
 }
+function sessionToken(){let token=localStorage.getItem(TOKEN_KEY)||"";if(!token){token=localStorage.getItem(LEGACY_TOKEN_KEY)||"";if(token){localStorage.setItem(TOKEN_KEY,token);localStorage.removeItem(LEGACY_TOKEN_KEY);}}return token;}
+function downloadLabel(orderId,button){
+  const token=sessionToken();
+  if(!token)return;
+  button.disabled=true;
+  fetch(API+"/api/laposte/my-labels/"+encodeURIComponent(orderId),{headers:{Authorization:"Bearer "+token,Accept:"application/pdf"},cache:"no-store"}).then(async res=>{
+    if(!res.ok||!(res.headers.get("content-type")||"").startsWith("application/pdf"))throw new Error("Bordereau La Poste introuvable.");
+    const url=URL.createObjectURL(await res.blob()),a=document.createElement("a");
+    a.href=url;a.download="bordereau-laposte.pdf";document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+  }).catch(()=>{button.textContent="Bordereau indisponible";}).finally(()=>{button.disabled=false;});
+}
 function render(orders){
   message.hidden=true;list.hidden=false;
   if(!orders.length){list.innerHTML='<div class="client-auth-card"><h2>Aucune commande Boutique</h2><p>Les commandes Boutique associées à l’e-mail de ce compte apparaîtront ici.</p><a class="client-auth-primary client-order-link" href="/boutique.html">Voir la boutique</a></div>';return;}
   list.innerHTML=orders.map(o=>{
-    const url=trackingUrl(o.carrier,o.tracking);
+    const url=o.trackingUrl||trackingUrl(o.carrier,o.tracking);
     const items=(o.items||[]).map(i=>'<li><span>'+esc(i.name||i.ref)+'</span><strong>'+Number(i.qty||1)+' × '+euro(i.price)+'</strong></li>').join("");
     const fallback=o.tracking&&!url?'<p class="client-order-wait">Numéro de suivi disponible. Aucun lien officiel n’est associé à ce transporteur : copiez le numéro pour le suivre sur le site du transporteur.</p>':'';
-    const tracking=o.tracking?'<div class="client-order-shipping"><div><small>TRANSPORTEUR</small><strong>'+esc(o.carrier||"Non renseigné")+'</strong></div><div><small>NUMÉRO DE SUIVI</small><strong>'+esc(o.tracking)+'</strong></div>'+(url?'<a class="client-auth-primary client-order-link" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Suivre mon colis →</a>':'')+'</div>'+fallback:'<p class="client-order-wait">Le numéro de suivi apparaîtra ici dès que votre colis sera expédié.</p>';
+    const label=o.shippingLabelAvailable?'<button type="button" class="client-auth-primary client-order-link" data-laposte-label="'+esc(o.id)+'">Télécharger le bordereau</button>':'';
+    const tracking=o.tracking?'<div class="client-order-shipping"><div><small>TRANSPORTEUR</small><strong>'+esc(o.carrier||"Non renseigné")+'</strong></div><div><small>NUMÉRO DE SUIVI</small><strong>'+esc(o.tracking)+'</strong></div>'+(url?'<a class="client-auth-primary client-order-link" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Suivre mon colis →</a>':'')+label+'</div>'+fallback:'<p class="client-order-wait">Le numéro de suivi apparaîtra ici dès que votre colis sera expédié.</p>';
     return '<article class="client-order-card"><div class="client-order-head"><div><small>COMMANDE BOUTIQUE</small><h2>'+esc(o.id)+'</h2><p>'+esc(o.date||"")+' · Paiement : '+esc(paymentLabel(o.paymentStatus))+'</p></div><strong class="client-order-total">'+euro(o.total)+'</strong></div>'+steps(o.status)+'<ul class="client-order-items">'+items+'</ul>'+tracking+'</article>';
   }).join("");
+  list.querySelectorAll("[data-laposte-label]").forEach(btn=>{btn.onclick=()=>downloadLabel(btn.getAttribute("data-laposte-label"),btn);});
 }
 async function load(){
-  let token=localStorage.getItem(TOKEN_KEY)||"";if(!token){token=localStorage.getItem(LEGACY_TOKEN_KEY)||"";if(token){localStorage.setItem(TOKEN_KEY,token);localStorage.removeItem(LEGACY_TOKEN_KEY);}}
+  const token=sessionToken();
   if(!token){message.innerHTML='<h2>Connexion requise</h2><p>Connectez-vous à votre compte client pour consulter uniquement vos commandes Boutique.</p><a class="client-auth-primary client-order-link" href="/client-login.html">Se connecter</a>';return;}
   try{
     const res=await fetch(API+"/api/auth/orders",{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"});

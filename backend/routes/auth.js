@@ -66,6 +66,8 @@ function publicClientOrder(order) {
     shipping: order.shipping || "Standard",
     carrier: order.carrier || "",
     tracking: order.tracking || "",
+    trackingUrl: order.trackingUrl || "",
+    shippingLabelAvailable: Boolean(order.shippingLabelPath || order.colissimoParcelNumber),
     total: Number(order.total || 0)
   };
 }

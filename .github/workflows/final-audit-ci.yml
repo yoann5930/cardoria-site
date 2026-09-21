@@ -46,12 +46,15 @@ jobs:
           node --check backend/lib/boutique/checkout.js
           node --check backend/lib/live/checkout.js
           node --check backend/lib/marketplace/paypal.js
+          node --check backend/lib/colissimo.js
+          node --check backend/lib/laposte-order-labels.js
+          node --check backend/routes/laposte.js
           node --check js/boutique.js
           node --check js/admin/admin-orders.js
           node --check js/client-auth.js
           node --check js/client-password-reset.js
       - name: Core regression tests
-        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs
+        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs backend/tests/colissimo-direct.test.mjs tests/ovh-colissimo-bridge.test.mjs
       - name: Architecture guards
         run: |
           grep -q 'boutique: "sumup"' backend/lib/payments/routing.js
@@ -96,7 +99,9 @@ jobs:
           if grep -q '"sumup":"retired"' /tmp/matrix.json; then echo "SumUp must not be announced retired"; exit 1; fi
           curl -fsS http://127.0.0.1:10000/api/payments/status > /tmp/payments.json
           grep -q '"provider":"sumup"' /tmp/payments.json
-          grep -q '"webhookMode":"api-verification"' /tmp/payments.json
+          curl -fsS http://127.0.0.1:10000/api/laposte/status > /tmp/laposte.json
+          grep -q '"provider":"colissimo"' /tmp/laposte.json
+          grep -q '"labelPurchasesEnabled":false' /tmp/laposte.json
           for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/system/backups; do
             code=$(curl -sS -o /tmp/anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
             test "$code" = "401"

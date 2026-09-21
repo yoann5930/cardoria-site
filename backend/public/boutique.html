@@ -11,7 +11,7 @@
   <link rel="preload" href="/style.css" as="style">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/css/boutique-v1.css?v=20260907-client-account-1">
-  <link rel="stylesheet" href="/css/boutique-v2.css?v=20260921-quick-search-2">
+  <link rel="stylesheet" href="/css/boutique-v2.css?v=20260921-laposte-1">
   <link rel="stylesheet" href="/css/cardoria-brand-polish.css?v=20260831-1">
   <link rel="stylesheet" href="/css/card-name-contrast.css?v=20260920-2">
   <link rel="stylesheet" href="/css/client-account-button.css?v=20260907-1">
@@ -59,6 +59,11 @@
             <input id="shopPostalCode" placeholder="Code postal" autocomplete="postal-code" required>
             <input id="shopCity" placeholder="Ville" autocomplete="address-level2" required>
             <input id="shopCountry" placeholder="Pays" autocomplete="country-name" value="France" required>
+            <fieldset class="shop-shipping">
+              <legend>Livraison</legend>
+              <label><input type="radio" name="shopCarrier" value="La Poste" checked> La Poste — Colissimo à domicile</label>
+              <label><input type="radio" name="shopCarrier" value="Mondial Relay"> Mondial Relay — Point Relais</label>
+            </fieldset>
           </div>
           <button class="shop-pay" id="shopPayButton" type="button">PAYER</button>
           <p class="shop-pay-note">Paiement sécurisé SumUp. Le stock est revérifié côté serveur juste avant la création du paiement.</p><p id="shopPayMsg"></p>
@@ -72,6 +77,6 @@
   <footer class="shop-footer"><div class="shop-shell shop-footer-grid"><div class="shop-footer-brand"><img src="/assets/logo/cardoria-premium.png" alt="CardoriaShop" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'"><strong>CARDORIA</strong><p>Le Royaume des Collectionneurs.</p></div><div><h3>Boutique</h3><a href="/boutique.html">Gammes</a><a href="/boutique.html?gamme=pokemon">Pokémon</a><a href="/marketplace.html">Marketplace</a></div><div><h3>Services</h3><a href="/estimation.html">Estimation</a><a href="/scanner.html">Scanner</a></div><div><h3>CardoriaShop</h3><a href="/">Accueil</a><a href="/client-login.html">Mon compte</a><a href="/contact.html">Contact</a><a href="/admin-login.html">Admin</a></div></div><div class="shop-shell shop-footer-bottom"><span>© CardoriaShop</span><span>Trading Cards • Collectibles • Premium</span></div></footer>
 
   <script src="/js/attribution.js"></script>
-  <script src="/js/boutique.js?v=20260921-quick-search-2"></script>
+  <script src="/js/boutique.js?v=20260921-laposte-1"></script>
 </body>
 </html>

@@ -102,6 +102,10 @@ body.shop-v1 #cart li{padding:11px 2px;border-bottom:1px solid rgba(255,255,255,
 .shop-customer{gap:8px}
 .shop-customer input{min-height:44px;padding:0 12px;border-color:rgba(255,255,255,.07);border-radius:4px;background:#050505;color:#eee7dc;font-size:12px}
 .shop-customer input::placeholder{color:#9d968c;opacity:1}
+.shop-shipping{margin:4px 0 2px;padding:10px 12px;border:1px solid rgba(201,165,68,.22);border-radius:6px;display:grid;gap:8px}
+.shop-shipping legend{padding:0 6px;color:#d8c071;font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.shop-shipping label{display:flex;gap:8px;align-items:flex-start;color:#eee7dc;font-size:12px;line-height:1.35}
+.shop-shipping input{width:auto;min-height:0;margin-top:2px}
 .shop-pay{min-height:44px;margin-top:10px;border:1px solid rgba(201,165,68,.5);border-radius:4px;background:var(--shop-gold);font-size:10px;font-weight:700;letter-spacing:.055em;text-transform:uppercase}
 .shop-pay-note{color:#9a9288;font-size:9px;line-height:1.6}
 

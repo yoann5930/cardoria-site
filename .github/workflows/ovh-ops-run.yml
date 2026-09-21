@@ -37,6 +37,8 @@ jobs:
           MR_API_V2_LOGIN: ${{ secrets.OVH_MONDIAL_RELAY_API_V2_LOGIN }}
           MR_API_V2_PASSWORD: ${{ secrets.OVH_MONDIAL_RELAY_API_V2_PASSWORD }}
           MR_API_V2_CUSTOMER_ID: ${{ secrets.OVH_MONDIAL_RELAY_API_V2_CUSTOMER_ID }}
+          COLISSIMO_CONTRACT: ${{ secrets.OVH_COLISSIMO_CONTRACT_NUMBER }}
+          COLISSIMO_PASSWORD: ${{ secrets.OVH_COLISSIMO_PASSWORD }}
           OP: ${{ inputs.action }}
           BRANCH: ${{ inputs.branch }}
         run: |
@@ -49,6 +51,7 @@ jobs:
 
           case "$OP" in
             status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|sumup-configure|mondial-relay-configure) ;;
+            colissimo-configure) ;;
             *) echo "FORBIDDEN action"; exit 1 ;;
           esac
           case "$BRANCH" in
@@ -95,8 +98,13 @@ jobs:
             test -n "${MR_ENSEIGNE:-}"
             test -n "${MR_PRIVATE_KEY:-}"
             printf '%s\n%s\n%s\n%s\n%s\n' "$MR_ENSEIGNE" "$MR_PRIVATE_KEY" "${MR_API_V2_LOGIN:-}" "${MR_API_V2_PASSWORD:-}" "${MR_API_V2_CUSTOMER_ID:-}" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
-            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID
+            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID COLISSIMO_CONTRACT COLISSIMO_PASSWORD
+          elif [ "$OP" = colissimo-configure ]; then
+            test -n "${COLISSIMO_CONTRACT:-}"
+            test -n "${COLISSIMO_PASSWORD:-}"
+            printf '%s\n%s\n' "$COLISSIMO_CONTRACT" "$COLISSIMO_PASSWORD" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
+            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID COLISSIMO_CONTRACT COLISSIMO_PASSWORD
           else
-            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID
+            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID COLISSIMO_CONTRACT COLISSIMO_PASSWORD
             ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
           fi

@@ -456,7 +456,8 @@
           ...customer,
           items,
           provider:"sumup",
-          shipping: "Standard",
+          carrier: document.querySelector('input[name="shopCarrier"]:checked')?.value || "La Poste",
+          shipping: (document.querySelector('input[name="shopCarrier"]:checked')?.value || "La Poste") === "La Poste" ? "Colissimo domicile" : "Standard",
           successUrl: location.origin + "/boutique.html?gamme=pokemon",
           ...attribution
         })

@@ -53,6 +53,7 @@
           '<button type="button" class="btn btn-primary" data-save="'+esc(o.id)+'">Enregistrer</button> ' +
           (o.sumupCheckoutId?'<button type="button" class="btn btn-secondary" data-sync="'+esc(o.id)+'">Synchroniser SumUp</button> ':'') +
           (canRefund?'<button type="button" class="btn btn-secondary" data-refund="'+esc(o.id)+'">Rembourser SumUp</button> ':'') +
+          (o.shippingLabelPath||o.colissimoParcelNumber?'<button type="button" class="btn btn-secondary" data-label="'+esc(o.id)+'">Bordereau La Poste</button> ':'') +
           '<button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="bon">Bon commande</button> <button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="facture">Facture</button>' +
         '</div><p class="small" data-status-message></p></article>';
     }).join("") || '<div class="admin-panel">Aucune commande.</div>';
@@ -77,6 +78,21 @@
     A.qs("#orderCards").querySelectorAll("button[data-sync]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.sync,c=card(id),m=c?.querySelector("[data-status-message]"); btn.disabled=true; if(m)m.textContent="Synchronisation SumUp..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/sync-sumup",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Synchronisation impossible");return reload(id,"SumUp synchronisé : "+(d.status||"OK"));}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
     A.qs("#orderCards").querySelectorAll("button[data-refund]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.refund,c=card(id),m=c?.querySelector("[data-status-message]"); if(!confirm("Confirmer le remboursement intégral SumUp de cette commande ?"))return; btn.disabled=true; if(m)m.textContent="Remboursement SumUp..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/refund",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Remboursement impossible");return reload(id,d.status==="refunded"?"Remboursement confirmé. Stock libéré.":"Remboursement demandé. Synchronise SumUp pour confirmer.");}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
     A.qs("#orderCards").querySelectorAll("button[data-doc]").forEach(function (btn) { btn.onclick=function(){window.open("document-commande.html?id="+encodeURIComponent(btn.dataset.doc)+"&type="+encodeURIComponent(btn.dataset.type),"_blank");}; });
+    A.qs("#orderCards").querySelectorAll("button[data-label]").forEach(function (btn) {
+      btn.onclick = function () {
+        var id = btn.dataset.label, c = card(id), m = c && c.querySelector("[data-status-message]");
+        var token = sessionStorage.getItem("cardoria_session_token") || "";
+        btn.disabled = true;
+        if (m) m.textContent = "Téléchargement du bordereau La Poste...";
+        fetch((A.BACKEND || "") + "/api/laposte/labels/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token, Accept: "application/pdf" }, cache: "no-store" }).then(async function (response) {
+          if (!response.ok || !(response.headers.get("content-type") || "").startsWith("application/pdf")) throw new Error("Bordereau La Poste indisponible.");
+          var url = URL.createObjectURL(await response.blob()), link = document.createElement("a");
+          link.href = url; link.download = "bordereau-laposte.pdf"; document.body.appendChild(link); link.click(); link.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+          if (m) m.textContent = "Bordereau téléchargé.";
+        }).catch(function (e) { if (m) m.textContent = e.message; }).finally(function () { btn.disabled = false; });
+      };
+    });
   }
 
   A.renderShell("orders","Commandes Boutique","Cycle complet : paiement SumUp, préparation, transport, livraison et remboursement",

@@ -28,6 +28,7 @@ jobs:
       ADMIN_REQUIRE_2FA: 'false'
       SENDCLOUD_LIVE_LABELS_ENABLED: 'false'
       MONDIAL_RELAY_LIVE_LABELS_ENABLED: 'false'
+      COLISSIMO_LABELS_ENABLED: 'false'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -49,11 +50,14 @@ jobs:
           node --check backend/routes/sendcloud.js
           node --check backend/routes/mondial-relay.js
           node --check backend/lib/mondial-relay.js
+          node --check backend/lib/colissimo.js
+          node --check backend/lib/laposte-order-labels.js
+          node --check backend/routes/laposte.js
           node --check backend/lib/sendcloud-webhook-security.js
           node --check backend/lib/sendcloud-tracking.js
           node --check js/live-energy-spots.js
       - name: Queue and signed webhook tests (no carrier purchases)
-        run: node --test --test-concurrency=1 backend/tests/live-checkout-queue.test.mjs backend/tests/sendcloud-webhook-security.test.mjs backend/tests/mondial-relay-direct.test.mjs
+        run: node --test --test-concurrency=1 backend/tests/live-checkout-queue.test.mjs backend/tests/sendcloud-webhook-security.test.mjs backend/tests/mondial-relay-direct.test.mjs backend/tests/colissimo-direct.test.mjs
       - name: Buyer identity and stale or pending checkout tests (no real payments)
         run: node --test backend/tests/live-buyer-checkout.test.mjs
       - name: Cumulative 10 EUR postage and all giveaway awards

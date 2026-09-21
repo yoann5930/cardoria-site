@@ -1,6 +1,8 @@
 /** Expedition Marketplace Cardoria. */
 import { getOrder, updateOrderStatus } from "./orders.js";
 import { logAudit } from "../audit.js";
+import { attachColissimoLabelAfterPayment, isLaPosteCarrier } from "../laposte-order-labels.js";
+import { colissimoLabelPurchasesEnabled, isColissimoConfigured } from "../colissimo.js";
 
 const CARRIERS = {
   mondial_relay: { name: "Mondial Relay", baseCost: 4.95, days: "3-5 jours" },
@@ -27,8 +29,16 @@ export async function generateShippingLabel(orderId, carrierId) {
   const carrier = CARRIERS[id];
   if (!carrier) throw Object.assign(new Error("Transporteur invalide"), { status: 400 });
 
-  // Aucun faux bordereau n'est autorise en production. Tant que les SDK officiels
-  // ne sont pas branches, le vendeur saisit le suivi reel dans son espace vendeur.
+  if (isLaPosteCarrier(id)) {
+    if (!isColissimoConfigured()) throw Object.assign(new Error("Colissimo n'est pas configuré côté serveur."), { status: 503, code: "COLISSIMO_NOT_CONFIGURED" });
+    if (!colissimoLabelPurchasesEnabled()) throw Object.assign(new Error("Création réelle d'étiquettes Colissimo désactivée."), { status: 503, code: "COLISSIMO_LABELS_NOT_ACTIVATED" });
+    const result = await attachColissimoLabelAfterPayment({ source: "marketplace", orderId });
+    if (!result?.ok && !result?.skipped) throw Object.assign(new Error(result?.error || "Étiquette Colissimo indisponible."), { status: 502, code: result?.code || "COLISSIMO_LABEL_FAILED" });
+    const updated = getOrder(orderId);
+    logAudit({ type: "marketplace", action: "colissimo_label_generated", user: "system", detail: orderId });
+    return { tracking: updated?.shippingTracking || result?.tracking || "", labelPath: updated?.shippingLabelUrl || "", carrier: carrier.name, demo: false };
+  }
+
   if (process.env.NODE_ENV === "production") {
     throw Object.assign(new Error(`Etiquette ${carrier.name} indisponible: integration transporteur officielle requise.`), { status: 501 });
   }

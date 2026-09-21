@@ -25,7 +25,7 @@ function fingerprint({ email, items, total }) {
   return crypto.createHash("sha256").update(`${email}|${normalized}|${money(total)}`).digest("hex");
 }
 
-export async function createLiveBoutiqueCheckout({ customerName, customerEmail, customerPhone, address, postalCode, city, country, items, shipping, successUrl, trafficSource, visitorId, accountUserId = "", requestedProvider, requestedAmount }) {
+export async function createLiveBoutiqueCheckout({ customerName, customerEmail, customerPhone, address, postalCode, city, country, items, shipping, carrier, successUrl, trafficSource, visitorId, accountUserId = "", requestedProvider, requestedAmount }) {
   assertSaleProvider({ channel: "boutique", requestedProvider });
   const name = clean(customerName, 120), email = validateEmail(customerEmail), phone = clean(customerPhone, 40);
   const street = clean(address, 300), zip = clean(postalCode, 20), locality = clean(city, 120), countryName = clean(country, 80) || "France";
@@ -33,13 +33,15 @@ export async function createLiveBoutiqueCheckout({ customerName, customerEmail, 
   if (!phone) throw Object.assign(new Error("Téléphone obligatoire pour la livraison."), { status: 400 });
   if (!street || !zip || !locality) throw Object.assign(new Error("Adresse, code postal et ville obligatoires pour la livraison."), { status: 400 });
   const verifiedItems = validateItems(items), shippingCost = 0;
+  const selectedCarrier = ["La Poste", "Mondial Relay", "Relais Colis"].includes(clean(carrier, 40)) ? clean(carrier, 40) : "La Poste";
+  const shippingLabel = selectedCarrier === "La Poste" ? "Colissimo domicile" : (clean(shipping, 120) || "Standard");
   const total = assertServerAmount(money(verifiedItems.reduce((s, i) => s + i.qty * i.price, 0) + shippingCost), requestedAmount);
   const key = fingerprint({ email, items: verifiedItems, total });
   const orders = readJson("orders", []);
   const existing = orders.find((o) => o.idempotencyKey === key && o.paymentStatus === "pending" && Date.now() - Date.parse(o.createdAt || 0) < 30 * 60 * 1000);
   if (existing?.sumupCheckoutId) return { order: existing, checkoutId: existing.sumupCheckoutId, providerOrderId: existing.sumupCheckoutId, url: existing.paymentUrl || "", paymentId: existing.paymentId || "", status: "pending" };
   const orderId = "CMD-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomInt(1000, 10000), now = new Date().toISOString();
-  const order = { id: orderId, idempotencyKey: key, userId: clean(accountUserId, 120), date: now.slice(0,10), createdAt: now, updatedAt: now, client: name, email, phone, address: [street, `${zip} ${locality}`, countryName].join("\n"), shippingAddress: { address: street, postalCode: zip, city: locality, country: countryName }, items: verifiedItems, payment: "En attente SumUp", paymentStatus: "pending", status: "En attente SumUp", shipping: clean(shipping,120) || "Standard", shippingCost, total, paymentProvider: "sumup", sumupCheckoutId: "", trafficSource: trafficSource === "witnot" ? "witnot" : "", visitorId: clean(visitorId,200) };
+  const order = { id: orderId, idempotencyKey: key, userId: clean(accountUserId, 120), date: now.slice(0,10), createdAt: now, updatedAt: now, client: name, email, phone, address: [street, `${zip} ${locality}`, countryName].join("\n"), shippingAddress: { address: street, postalCode: zip, city: locality, country: countryName }, items: verifiedItems, payment: "En attente SumUp", paymentStatus: "pending", status: "En attente SumUp", shipping: shippingLabel, carrier: selectedCarrier, shippingCost, total, paymentProvider: "sumup", sumupCheckoutId: "", trafficSource: trafficSource === "witnot" ? "witnot" : "", visitorId: clean(visitorId,200) };
   orders.unshift(order); writeJson("orders", orders);
   const base = String(process.env.SITE_URL || process.env.FRONTEND_URL || "").replace(/\/$/, ""), target = successUrl || process.env.BOUTIQUE_SUCCESS_URL || (base ? `${base}/boutique.html?gamme=pokemon` : "/boutique.html?gamme=pokemon");
   const redirect = target + (target.includes("?") ? "&" : "?") + "paid=1&order=" + encodeURIComponent(orderId);

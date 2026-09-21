@@ -14,8 +14,8 @@ test("boutique exposes an accessible instant-search combobox",()=>{
   assert.match(html,/role="combobox"/);
   assert.match(html,/aria-autocomplete="list"/);
   assert.match(html,/aria-controls="shopQuickResults"/);
-  assert.match(html,/boutique\.js\?v=20260921-quick-search-2/);
-  assert.match(html,/boutique-v2\.css\?v=20260921-quick-search-2/);
+  assert.match(html,/boutique\.js\?v=20260921-laposte-1/);
+  assert.match(html,/boutique-v2\.css\?v=20260921-laposte-1/);
 });
 
 test("boutique search is local, indexed and accent tolerant",()=>{

@@ -59,6 +59,7 @@ function applyPaidSideEffectsOnce(order, previousStatus) {
   if (["paid", "preparing", "shipped", "delivered"].includes(previousStatus)) return;
   updateSellerStats(order.sellerId);
   try { ingestMarketplaceOrder(order); } catch (e) { console.warn("[Market] ingest order:", e.message); }
+  import("../laposte-order-labels.js").then((mod) => mod.attachColissimoLabelAfterPayment({ source: "marketplace", orderId: order.id })).catch((e) => console.warn("[Colissimo] marketplace label:", e.message));
 }
 export function updateOrderStatus(id, status, extra = {}) {
   if (!STATUS_FLOW.includes(status)) throw new Error("Statut invalide");
