@@ -41,6 +41,12 @@ case "$cmd" in
   smtp-configure)
     exec sudo -n /usr/local/bin/cardoria-ops smtp-configure
     ;;
+  smtp-domain-configure)
+    exec sudo -n /usr/local/bin/cardoria-ops smtp-domain-configure
+    ;;
+  mail-dns-check)
+    exec sudo -n /usr/local/bin/cardoria-ops mail-dns-check
+    ;;
   sumup-configure)
     exec sudo -n /usr/local/bin/cardoria-sumup-configure
     ;;
