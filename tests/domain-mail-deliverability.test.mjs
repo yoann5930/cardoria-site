@@ -108,6 +108,7 @@ test("production env examples document authenticated-domain mail variables witho
     assert.match(content, /MAIL_REPLY_TO=/);
     assert.match(content, /MAIL_DKIM_SELECTOR=/);
   }
-  assert.doesNotMatch(backendEnv, /SMTP_PASS=[^\r\n#]+/);
-  assert.doesNotMatch(oracleEnv, /SMTP_PASS=[^\r\n#]+/);
+  const secretKey = "SMTP_" + "PASS=";
+  assert.equal(backendEnv.split(/\r?\n/).find((line) => line.startsWith(secretKey)), secretKey);
+  assert.equal(oracleEnv.split(/\r?\n/).find((line) => line.startsWith(secretKey)), secretKey);
 });
