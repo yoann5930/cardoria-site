@@ -351,7 +351,7 @@ function allocationStats(productId, orders) {
       continue;
     }
 
-    const legacyPaidStatus = ["À préparer", "En préparation", "Expédiée", "Livrée"].includes(orderStatus);
+    const legacyPaidStatus = ["À préparer", "En préparation", "Prête à expédier", "Expédiée", "Livrée"].includes(orderStatus);
     if (paymentStatus === "paid" || legacyPaidStatus) {
       stats.soldStock += qty;
       continue;

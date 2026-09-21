@@ -24,6 +24,15 @@ const WRITE_ADMIN = requireAuth({ roles: ["super_admin", "admin", "employee"], a
 const FINANCE_ADMIN = requireAuth({ roles: ["super_admin", "admin"], action: "finance" });
 const BOUTIQUE_STATUSES = ["À préparer", "En préparation", "Prête à expédier", "Expédiée", "Livrée", "Annulée"];
 const BOUTIQUE_CARRIERS = ["Colissimo (La Poste)", "La Poste", "Mondial Relay", "Relais Colis"];
+const colissimoLabelLocks = new Map();
+
+function withColissimoLabelLock(orderId, work) {
+  const key = String(orderId || "");
+  const previous = colissimoLabelLocks.get(key) || Promise.resolve();
+  const run = previous.catch(() => {}).then(work);
+  colissimoLabelLocks.set(key, run.catch(() => {}));
+  return run;
+}
 
 function clean(value, max = 500) {
   return String(value == null ? "" : value).trim().slice(0, max);
@@ -306,6 +315,20 @@ router.post("/boutique-orders/:id/emails/tracking", WRITE_ADMIN, async (req, res
 });
 
 router.post("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, async (req, res) => {
+  try {
+    await withColissimoLabelLock(req.params.id, () => createBoutiqueColissimoLabel(req, res));
+  } catch (error) {
+    if (res.headersSent) return;
+    const status = Number(error?.status);
+    res.status(Number.isInteger(status) && status >= 400 && status <= 599 ? status : 502).json({
+      ok: false,
+      code: error?.code || "COLISSIMO_LABEL_FAILED",
+      error: error?.message || "Création de l'étiquette Colissimo impossible."
+    });
+  }
+});
+
+async function createBoutiqueColissimoLabel(req, res) {
   const orders = readJson("orders", []);
   const index = orders.findIndex((order) => String(order.id) === String(req.params.id));
   if (index < 0) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
@@ -351,12 +374,21 @@ router.post("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, async (req, res
   const weightGrams = weight.grams;
 
   const requestedAt = new Date().toISOString();
+  const claimId = crypto.randomUUID();
   current.shippingWeightGrams = weightGrams;
   current.weightSource = weight.source;
-  current.colissimoLabelAttempt = { status: "creation_pending", claimId: crypto.randomUUID(), requestedAt, weightGrams };
+  current.colissimoLabelAttempt = { status: "creation_pending", claimId, requestedAt, weightGrams };
   current.updatedAt = requestedAt;
   orders[index] = current;
   writeJson("orders", orders);
+
+  const claimed = readJson("orders", []).find((order) => String(order.id) === String(req.params.id));
+  if (claimed?.colissimoParcelNumber) {
+    return res.status(409).json({ ok: false, code: "COLISSIMO_LABEL_ALREADY_CREATED", error: "Une étiquette Colissimo existe déjà pour cette commande.", parcelNumber: claimed.colissimoParcelNumber });
+  }
+  if (claimed?.colissimoLabelAttempt?.claimId !== claimId) {
+    return res.status(409).json({ ok: false, code: "COLISSIMO_LABEL_IN_PROGRESS", error: "Une création d’étiquette Colissimo est déjà en cours pour cette commande." });
+  }
 
   try {
     const created = await createColissimoLabel({ order: current, weightGrams });
@@ -402,7 +434,7 @@ router.post("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, async (req, res
     const status = Number(error?.status);
     res.status(Number.isInteger(status) && status >= 400 && status <= 599 ? status : 502).json({ ok: false, code: error?.code || "COLISSIMO_LABEL_FAILED", error: error?.message || "Création de l'étiquette Colissimo impossible." });
   }
-});
+}
 
 router.get("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, async (req, res) => {
   const order = findBoutiqueOrder(req.params.id);

@@ -114,5 +114,6 @@ test("checkout, admin and client surfaces persist Point Relais and gated Colissi
   assert.match(client, /Commande expédiée/);
   assert.match(client, /POINT RELAIS MONDIAL RELAY/);
   assert.match(routes, /COLISSIMO_LABEL_IN_PROGRESS/);
+  assert.match(routes, /withColissimoLabelLock/);
   assert.doesNotMatch(routes, /COLISSIMO_LIVE_LABELS_ENABLED=true/);
 });

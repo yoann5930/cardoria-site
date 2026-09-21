@@ -126,6 +126,8 @@ test("Boutique admin route protects duplicate labels and reconciliation ambiguit
   const routes = fs.readFileSync("backend/routes/payments-admin.js", "utf8");
   assert.match(routes, /boutique-orders\/:id\/colissimo-label/);
   assert.match(routes, /COLISSIMO_LABEL_ALREADY_CREATED/);
+  assert.match(routes, /COLISSIMO_LABEL_IN_PROGRESS/);
+  assert.match(routes, /withColissimoLabelLock/);
   assert.match(routes, /COLISSIMO_RECONCILIATION_REQUIRED/);
   assert.match(routes, /paymentStatus !== "paid"/);
   assert.match(routes, /shippingWeightGrams/);
