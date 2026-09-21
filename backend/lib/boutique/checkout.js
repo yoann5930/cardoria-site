@@ -5,6 +5,13 @@ import { assertSaleProvider, assertServerAmount } from "../payments/routing.js";
 import { listBoutiqueProducts } from "./catalog.js";
 import { withBoutiqueOrderLock } from "./order-lock.js";
 import { resolveBoutiqueOrderWeight, resolveBoutiqueShippingSelection } from "./shipping.js";
+import {
+  checkoutCreationIsFresh,
+  checkoutRequestFingerprint,
+  findRecentPendingCheckout,
+  normalizeCheckoutRequestItems,
+  withCheckoutRequestLock
+} from "./checkout-idempotency.js";
 
 const money = (v) => Math.round((Number(v) || 0) * 100) / 100;
 const clean = (v, max = 500) => String(v == null ? "" : v).trim().slice(0, max);
@@ -16,20 +23,9 @@ function validateEmail(value) {
 }
 
 export function validateBoutiqueItems(rawItems) {
-  if (!Array.isArray(rawItems) || !rawItems.length) throw Object.assign(new Error("Panier vide"), { status: 400 });
+  const requestedItems = normalizeCheckoutRequestItems(rawItems);
   const catalog = new Map(listBoutiqueProducts({ includeDisabled: false }).map((p) => [String(p.id), p]));
-  const combined = new Map();
-  for (const raw of rawItems) {
-    const ref = clean(raw?.ref || raw?.id, 240);
-    if (!ref) throw Object.assign(new Error("Référence produit invalide."), { status: 400, code: "PRODUCT_ID_INVALID" });
-    const qty = Math.trunc(Number(raw?.qty));
-    if (!Number.isFinite(qty) || qty < 1) {
-      throw Object.assign(new Error("Quantité invalide."), { status: 400, code: "QTY_INVALID" });
-    }
-    if (qty > 20) throw Object.assign(new Error("Quantité trop élevée."), { status: 400, code: "QTY_INVALID" });
-    combined.set(ref, (combined.get(ref) || 0) + qty);
-  }
-  return Array.from(combined.entries()).map(([ref, qty]) => {
+  return requestedItems.map(({ ref, qty }) => {
     const p = catalog.get(ref);
     if (!p || p.boutiqueEnabled === false) {
       throw Object.assign(new Error(`Produit indisponible: ${ref}`), { status: 400, code: "PRODUCT_UNAVAILABLE" });
@@ -62,34 +58,54 @@ function fingerprint({ email, items, total, shippingMethod, pickupId }) {
   return crypto.createHash("sha256").update(`${email}|${normalized}|${money(total)}|${shippingMethod || ""}|${pickupId || ""}`).digest("hex");
 }
 
-function reserveUnlocked({ customerName, customerEmail, customerPhone, address, postalCode, city, country, items, shipping, shippingMethod, pickupPoint, trafficSource, visitorId, accountUserId = "", requestedProvider, requestedAmount, requestedShippingCost }) {
-  assertSaleProvider({ channel: "boutique", requestedProvider });
-  if (requestedShippingCost != null && requestedShippingCost !== "" && money(requestedShippingCost) !== 0) {
-    throw Object.assign(new Error("Les frais de port envoyés par le client ne correspondent pas au tarif serveur."), { status: 403, code: "SHIPPING_FORGED" });
-  }
-  const name = clean(customerName, 120), email = validateEmail(customerEmail), phone = clean(customerPhone, 40);
-  const street = clean(address, 300), zip = clean(postalCode, 20), locality = clean(city, 120), countryName = clean(country, 80) || "France";
-  if (!name) throw Object.assign(new Error("Nom du client obligatoire."), { status: 400 });
-  if (!phone) throw Object.assign(new Error("Téléphone obligatoire pour la livraison."), { status: 400 });
-  const selection = resolveBoutiqueShippingSelection({ shippingMethod, shipping, pickupPoint });
-  if (selection.code !== "mondial_relay" && (!street || !zip || !locality)) {
-    throw Object.assign(new Error("Adresse, code postal et ville obligatoires pour la livraison Colissimo."), { status: 400 });
-  }
-  if (selection.code === "mondial_relay" && !selection.pickupPoint) {
-    throw Object.assign(new Error("Point Relais Mondial Relay obligatoire."), { status: 400 });
-  }
-  const verifiedItems = validateBoutiqueItems(items);
-  const shippingCost = 0;
-  const total = assertServerAmount(money(verifiedItems.reduce((s, i) => s + i.qty * i.price, 0) + shippingCost), requestedAmount);
-  const key = fingerprint({ email, items: verifiedItems, total, shippingMethod: selection.code, pickupId: selection.pickupPoint?.id || "" });
+function successRedirect(orderId, successUrl) {
+  const base = String(process.env.SITE_URL || process.env.FRONTEND_URL || "").replace(/\/$/, "");
+  const target = successUrl || process.env.BOUTIQUE_SUCCESS_URL || (base ? `${base}/boutique.html?gamme=pokemon` : "/boutique.html?gamme=pokemon");
+  return target + (target.includes("?") ? "&" : "?") + "paid=1&order=" + encodeURIComponent(orderId);
+}
+
+function existingCheckoutResponse(order) {
+  return {
+    order,
+    checkoutId: order.sumupCheckoutId,
+    providerOrderId: order.sumupCheckoutId,
+    url: order.paymentUrl || "",
+    paymentId: order.paymentId || "",
+    status: "pending"
+  };
+}
+
+function persistCreatingOrder(payload) {
+  const {
+    name, email, phone, street, zip, locality, countryName, selection, verifiedItems,
+    shippingCost, total, key, requestKey, accountUserId, trafficSource, visitorId
+  } = payload;
   const orders = readJson("orders", []);
-  const existing = orders.find((o) => o.idempotencyKey === key && o.paymentStatus === "pending" && Date.now() - Date.parse(o.createdAt || 0) < 30 * 60 * 1000);
-  if (existing?.sumupCheckoutId) {
-    return { reused: true, order: existing, selection };
+  const existing = findRecentPendingCheckout(orders, requestKey);
+  if (existing?.sumupCheckoutId) return { reused: true, order: existing, selection };
+  if (existing) {
+    if (checkoutCreationIsFresh(existing)) {
+      throw Object.assign(new Error("Création du paiement déjà en cours. Réessaie dans quelques secondes."), {
+        status: 409,
+        code: "BOUTIQUE_CHECKOUT_IN_PROGRESS",
+        orderId: existing.id
+      });
+    }
+    const index = orders.findIndex((order) => String(order.id) === String(existing.id));
+    if (index >= 0) {
+      const now = new Date().toISOString();
+      orders[index].checkoutCreationStatus = "reconciliation_required";
+      orders[index].checkoutReconciliationRequiredAt = now;
+      orders[index].updatedAt = now;
+      writeJson("orders", orders);
+    }
+    throw Object.assign(new Error("Une commande identique existe déjà sans confirmation de création du paiement. Vérification nécessaire avant de réessayer."), {
+      status: 409,
+      code: "BOUTIQUE_CHECKOUT_RECONCILIATION_REQUIRED",
+      orderId: existing.id
+    });
   }
-  if (existing && !existing.sumupCheckoutId) {
-    return { reused: true, order: existing, selection, needsPaymentSession: true };
-  }
+
   const orderId = "CMD-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomInt(1000, 10000);
   const now = new Date().toISOString();
   const homeAddress = selection.code === "mondial_relay"
@@ -107,6 +123,9 @@ function reserveUnlocked({ customerName, customerEmail, customerPhone, address, 
   const order = {
     id: orderId,
     idempotencyKey: key,
+    checkoutRequestKey: requestKey,
+    checkoutCreationStatus: "creating",
+    checkoutCreationStartedAt: now,
     userId: clean(accountUserId, 120),
     date: now.slice(0, 10),
     createdAt: now,
@@ -138,69 +157,98 @@ function reserveUnlocked({ customerName, customerEmail, customerPhone, address, 
   return { reused: false, order, selection };
 }
 
-export function reserveBoutiqueCheckout(payload) {
-  return withBoutiqueOrderLock(() => reserveUnlocked(payload));
-}
-
-function attachPaymentSession(orderId, session, pickupPoint) {
-  return withBoutiqueOrderLock(() => {
-    const updated = readJson("orders", []);
-    const idx = updated.findIndex((o) => o.id === orderId);
-    if (idx < 0) return null;
-    updated[idx].sumupCheckoutId = session.checkoutId;
-    updated[idx].paymentProviderOrderId = session.checkoutId;
-    updated[idx].paymentUrl = session.url;
-    updated[idx].paymentId = session.paymentId;
-    updated[idx].updatedAt = new Date().toISOString();
-    if (updated[idx].pickupPoint && pickupPoint) updated[idx].pickupPoint = pickupPoint;
-    writeJson("orders", updated);
-    return updated[idx];
-  });
-}
-
-function markCheckoutFailed(orderId, error) {
-  return withBoutiqueOrderLock(() => {
-    const updated = readJson("orders", []);
-    const idx = updated.findIndex((o) => o.id === orderId);
-    if (idx < 0) return;
-    updated[idx].paymentStatus = "failed";
-    updated[idx].status = "Paiement échoué";
-    updated[idx].shipmentStatus = "annulée";
-    updated[idx].paymentError = clean(error?.message || "Paiement SumUp indisponible", 500);
-    updated[idx].updatedAt = new Date().toISOString();
-    writeJson("orders", updated);
-  });
-}
-
-export async function createLiveBoutiqueCheckout(payload, { createPaymentSession = createSumUpCheckout } = {}) {
-  const reserved = await reserveBoutiqueCheckout(payload);
-  if (reserved.reused && reserved.order?.sumupCheckoutId) {
-    return {
-      order: reserved.order,
-      checkoutId: reserved.order.sumupCheckoutId,
-      providerOrderId: reserved.order.sumupCheckoutId,
-      url: reserved.order.paymentUrl || "",
-      paymentId: reserved.order.paymentId || "",
-      status: "pending"
-    };
-  }
-  const order = reserved.order;
-  const base = String(process.env.SITE_URL || process.env.FRONTEND_URL || "").replace(/\/$/, "");
-  const target = payload.successUrl || process.env.BOUTIQUE_SUCCESS_URL || (base ? `${base}/boutique.html?gamme=pokemon` : "/boutique.html?gamme=pokemon");
-  const redirect = target + (target.includes("?") ? "&" : "?") + "paid=1&order=" + encodeURIComponent(order.id);
+async function attachSumUpCheckout(order, successUrl, createPaymentSession, pickupPoint) {
+  const redirect = successRedirect(order.id, successUrl);
   try {
     const session = await createPaymentSession({
       orderId: order.id,
       amount: order.total,
-      description: `Boutique CardoriaShop — ${order.items.length} article(s)`,
+      description: `Boutique CardoriaShop — ${(order.items || []).length} article(s)`,
       customerEmail: order.email,
       redirectUrl: redirect,
       source: "boutique"
     });
-    const saved = await attachPaymentSession(order.id, session, reserved.selection?.pickupPoint);
-    return { order: saved || { ...order, sumupCheckoutId: session.checkoutId, pickupPoint: reserved.selection?.pickupPoint }, ...session };
+    return withBoutiqueOrderLock(() => {
+      const updated = readJson("orders", []);
+      const idx = updated.findIndex((row) => row.id === order.id);
+      if (idx < 0) throw Object.assign(new Error("Commande Boutique introuvable après création du paiement."), { status: 500, code: "BOUTIQUE_ORDER_LOST" });
+      const now = new Date().toISOString();
+      updated[idx].sumupCheckoutId = session.checkoutId;
+      updated[idx].paymentProviderOrderId = session.checkoutId;
+      updated[idx].paymentUrl = session.url;
+      updated[idx].paymentId = session.paymentId;
+      updated[idx].checkoutCreationStatus = "created";
+      updated[idx].checkoutCreationCompletedAt = now;
+      updated[idx].updatedAt = now;
+      if (updated[idx].pickupPoint && pickupPoint) updated[idx].pickupPoint = pickupPoint;
+      writeJson("orders", updated);
+      return { order: updated[idx], ...session };
+    });
   } catch (error) {
-    await markCheckoutFailed(order.id, error);
+    await withBoutiqueOrderLock(() => {
+      const updated = readJson("orders", []);
+      const idx = updated.findIndex((row) => row.id === order.id);
+      if (idx < 0) return;
+      const now = new Date().toISOString();
+      updated[idx].paymentStatus = "failed";
+      updated[idx].status = "Paiement échoué";
+      updated[idx].shipmentStatus = "annulée";
+      updated[idx].checkoutCreationStatus = "failed";
+      updated[idx].checkoutCreationFailedAt = now;
+      updated[idx].paymentError = clean(error?.message || "Paiement SumUp indisponible", 500);
+      updated[idx].updatedAt = now;
+      writeJson("orders", updated);
+    });
     throw error;
   }
+}
+
+export async function createLiveBoutiqueCheckout(payload, { createPaymentSession = createSumUpCheckout } = {}) {
+  const {
+    customerName, customerEmail, customerPhone, address, postalCode, city, country, items, shipping, shippingMethod,
+    pickupPoint, successUrl, trafficSource, visitorId, accountUserId = "", requestedProvider, requestedAmount, requestedShippingCost
+  } = payload || {};
+  assertSaleProvider({ channel: "boutique", requestedProvider });
+  if (requestedShippingCost != null && requestedShippingCost !== "" && money(requestedShippingCost) !== 0) {
+    throw Object.assign(new Error("Les frais de port envoyés par le client ne correspondent pas au tarif serveur."), { status: 403, code: "SHIPPING_FORGED" });
+  }
+  const name = clean(customerName, 120);
+  const email = validateEmail(customerEmail);
+  const phone = clean(customerPhone, 40);
+  const street = clean(address, 300);
+  const zip = clean(postalCode, 20);
+  const locality = clean(city, 120);
+  const countryName = clean(country, 80) || "France";
+  if (!name) throw Object.assign(new Error("Nom du client obligatoire."), { status: 400 });
+  if (!phone) throw Object.assign(new Error("Téléphone obligatoire pour la livraison."), { status: 400 });
+  const selection = resolveBoutiqueShippingSelection({ shippingMethod, shipping, pickupPoint });
+  if (selection.code !== "mondial_relay" && (!street || !zip || !locality)) {
+    throw Object.assign(new Error("Adresse, code postal et ville obligatoires pour la livraison Colissimo."), { status: 400 });
+  }
+  if (selection.code === "mondial_relay" && !selection.pickupPoint) {
+    throw Object.assign(new Error("Point Relais Mondial Relay obligatoire."), { status: 400 });
+  }
+
+  const requestedItems = normalizeCheckoutRequestItems(items);
+  const requestKey = checkoutRequestFingerprint({
+    email,
+    items: requestedItems,
+    shippingMethod: selection.code,
+    pickupId: selection.pickupPoint?.id || ""
+  });
+
+  return withCheckoutRequestLock(requestKey, async () => {
+    const reserved = await withBoutiqueOrderLock(() => {
+      const verifiedItems = validateBoutiqueItems(requestedItems);
+      const shippingCost = 0;
+      const total = assertServerAmount(money(verifiedItems.reduce((s, i) => s + i.qty * i.price, 0) + shippingCost), requestedAmount);
+      const key = fingerprint({ email, items: verifiedItems, total, shippingMethod: selection.code, pickupId: selection.pickupPoint?.id || "" });
+      return persistCreatingOrder({
+        name, email, phone, street, zip, locality, countryName, selection, verifiedItems,
+        shippingCost, total, key, requestKey, accountUserId, trafficSource, visitorId
+      });
+    });
+    if (reserved.reused && reserved.order?.sumupCheckoutId) return existingCheckoutResponse(reserved.order);
+    return attachSumUpCheckout(reserved.order, successUrl, createPaymentSession, reserved.selection?.pickupPoint);
+  });
 }
