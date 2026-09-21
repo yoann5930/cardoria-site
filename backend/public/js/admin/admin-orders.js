@@ -102,7 +102,7 @@
       var d=await A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id),{method:"PUT",body:JSON.stringify(data)});
       if(!d.ok)throw new Error(d.error||"Mise à jour impossible");
       var savedTracking=String(d.order?.tracking||data.tracking||"").trim();
-      var msg=savedTracking?"Commande expédiée · suivi "+savedTracking+".":"Commande mise à jour.";
+      var msg=data.status==="Expédiée"?(savedTracking?"Commande expédiée · suivi "+savedTracking+".":"Commande expédiée."):"Commande mise à jour.";
       if(d.emailNotification){
         msg+=d.emailNotification.sent?" Mail de suivi envoyé.":" Mail de suivi non envoyé"+(d.emailNotification.error?": "+d.emailNotification.error:"");
       }
