@@ -64,7 +64,7 @@ function emailShell(title, intro, body, footer) {
 
 export function buildBoutiquePurchaseEmail(order) {
   const id = clean(order?.id, 80);
-  const client = clean(order?.client, 120) || "Bonjour";
+  const client = clean(order?.client, 120) || "client";
   const ordersUrl = SITE_URL() + "/client-orders.html";
   const text = [
     "Cardoria — Confirmation de commande",
