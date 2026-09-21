@@ -54,7 +54,7 @@
         '<div class="admin-form-grid" style="margin-top:14px">' +
           '<label>Statut<select data-field="status">'+options(STATUSES,o.status)+'</select></label>' +
           '<label>Transporteur<select data-field="carrier">'+options(legacyCarrier,o.carrier||"","Choisir")+'</select></label>' +
-          '<label>Numéro de suivi<input data-field="tracking" value="'+esc(o.tracking||"")+'" placeholder="Suivi colis"></label>' +
+          '<label>Numéro de suivi<input data-field="tracking" value="'+esc(o.tracking||o.colissimoParcelNumber||"")+'" placeholder="Rempli automatiquement pour Colissimo"></label>' +
           '<label>Poids Colissimo (g)<input data-field="shippingWeightGrams" type="number" min="1" max="30000" step="1" value="'+esc(o.shippingWeightGrams||"")+'" placeholder="Ex. 250"></label>' +
           '<label>Téléphone<input data-field="phone" value="'+esc(o.phone||"")+'"></label>' +
           '<label class="admin-form-wide">Adresse de livraison<textarea data-field="address" rows="3">'+esc(o.address||"")+'</textarea></label>' +
@@ -74,6 +74,45 @@
 
   function card(id) { return A.qs('[data-order-card="'+CSS.escape(String(id))+'"]'); }
   function payload(c) { function v(n){ return c.querySelector('[data-field="'+n+'"]')?.value || ""; } return { status:v("status"), carrier:v("carrier"), tracking:v("tracking"), phone:v("phone"), address:v("address"), internalNote:v("internalNote"), shipping:"Standard" }; }
+
+  async function saveOrder(id, btn) {
+    var c=card(id),m=c?.querySelector("[data-status-message]");
+    if(!c)return;
+    var data=payload(c);
+    btn.disabled=true;
+    try {
+      if(data.status==="Expédiée" && data.carrier==="Colissimo (La Poste)" && !String(data.tracking||"").trim()) {
+        if(!(colissimo.configured && colissimo.senderConfigured && colissimo.labelPurchasesEnabled)) {
+          throw new Error("Colissimo n’est pas encore prêt pour créer une étiquette réelle.");
+        }
+        var weight=Number(c.querySelector('[data-field="shippingWeightGrams"]')?.value||0);
+        if(!Number.isFinite(weight)||weight<1||weight>30000) throw new Error("Saisissez le poids réel du colis entre 1 g et 30 000 g.");
+        if(m)m.textContent="Création de l’étiquette Colissimo...";
+        var label=await A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/colissimo-label",{method:"POST",body:JSON.stringify({weightGrams:Math.trunc(weight)})});
+        if(!label.ok)throw new Error(label.error||"Création Colissimo impossible");
+        data.tracking=String(label.trackingNumber||label.parcelNumber||"").trim();
+        if(!data.tracking)throw new Error("Colissimo n’a pas retourné de numéro de suivi.");
+        var trackingInput=c.querySelector('[data-field="tracking"]');
+        if(trackingInput)trackingInput.value=data.tracking;
+        if(m)m.textContent="Étiquette créée · suivi "+data.tracking+" · enregistrement de l’expédition...";
+      } else if(m) {
+        m.textContent="Enregistrement...";
+      }
+
+      var d=await A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id),{method:"PUT",body:JSON.stringify(data)});
+      if(!d.ok)throw new Error(d.error||"Mise à jour impossible");
+      var savedTracking=String(d.order?.tracking||data.tracking||"").trim();
+      var msg=savedTracking?"Commande expédiée · suivi "+savedTracking+".":"Commande mise à jour.";
+      if(d.emailNotification){
+        msg+=d.emailNotification.sent?" Mail de suivi envoyé.":" Mail de suivi non envoyé"+(d.emailNotification.error?": "+d.emailNotification.error:"");
+      }
+      return reload(id,msg);
+    } catch(e) {
+      if(m)m.textContent=e.message;
+    } finally {
+      btn.disabled=false;
+    }
+  }
 
   function downloadAdminPdf(path, filename) {
     var token = sessionStorage.getItem("cardoria_session_token") || "";
@@ -99,7 +138,7 @@
   }
 
   function bind() {
-    A.qs("#orderCards").querySelectorAll("button[data-save]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.save,c=card(id),m=c?.querySelector("[data-status-message]"); btn.disabled=true; if(m)m.textContent="Enregistrement..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id),{method:"PUT",body:JSON.stringify(payload(c))}).then(function(d){if(!d.ok)throw new Error(d.error||"Mise à jour impossible");var msg="Commande mise à jour.";if(d.emailNotification){msg=d.emailNotification.sent?"Commande mise à jour. Mail de suivi envoyé.":"Commande mise à jour. Mail de suivi non envoyé"+(d.emailNotification.error?": "+d.emailNotification.error:"");}return reload(id,msg);}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
+    A.qs("#orderCards").querySelectorAll("button[data-save]").forEach(function (btn) { btn.onclick = function () { return saveOrder(btn.dataset.save,btn); }; });
     A.qs("#orderCards").querySelectorAll("button[data-sync]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.sync,c=card(id),m=c?.querySelector("[data-status-message]"); btn.disabled=true; if(m)m.textContent="Synchronisation SumUp..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/sync-sumup",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Synchronisation impossible");return reload(id,"SumUp synchronisé : "+(d.status||"OK"));}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
     A.qs("#orderCards").querySelectorAll("button[data-refund]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.refund,c=card(id),m=c?.querySelector("[data-status-message]"); if(!confirm("Confirmer le remboursement intégral SumUp de cette commande ?"))return; btn.disabled=true; if(m)m.textContent="Remboursement SumUp..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/refund",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Remboursement impossible");return reload(id,d.status==="refunded"?"Remboursement confirmé. Stock libéré.":"Remboursement demandé. Synchronise SumUp pour confirmer.");}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
     A.qs("#orderCards").querySelectorAll("button[data-mail-purchase]").forEach(function (btn) { btn.onclick = function () {
