@@ -75,7 +75,10 @@ function render(orders){
   list.innerHTML=orders.map(o=>{
     const shipped=o.status==="Expédiée"||o.statusLabel==="Commande expédiée";
     const url=trackingUrl(o.carrier,o.tracking,o.trackingUrl);
-    const items=(o.items||[]).map(i=>'<li><span>'+esc(i.name||i.ref)+'</span><strong>'+Number(i.qty||1)+' × '+euro(i.price)+'</strong></li>').join("");
+    const items=(o.items||[]).map(i=>{
+      const meta=[i.extension,i.number?"#"+i.number:"",i.condition].filter(Boolean).join(" · ");
+      return '<li><span>'+esc(i.name||i.ref)+(meta?'<br><small>'+esc(meta)+'</small>':'')+'</span><strong>'+Number(i.qty||1)+' × '+euro(i.price)+'</strong></li>';
+    }).join("");
     const fallback=o.tracking&&!url?'<p class="client-order-wait">Numéro de suivi disponible. Aucun lien officiel n’est associé à ce transporteur : copiez le numéro pour le suivre sur le site du transporteur.</p>':'';
     const method=o.shippingMethod==="mondial_relay"||String(o.shipping||"").toLowerCase().includes("mondial")?"Mondial Relay — Point Relais":(o.shipping||o.carrier||"Livraison");
     const tracking=o.tracking?'<div class="client-order-shipping"><div><small>TRANSPORTEUR</small><strong>'+esc(o.carrier||"Non renseigné")+'</strong></div><div><small>NUMÉRO DE SUIVI</small><strong>'+esc(o.tracking)+'</strong></div>'+(url?'<a class="client-auth-primary client-order-link" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Suivre mon colis →</a>':'')+'</div>'+fallback:'<p class="client-order-wait">Le numéro de suivi apparaîtra ici dès que votre colis sera expédié.</p>';

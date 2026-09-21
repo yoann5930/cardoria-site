@@ -5,7 +5,8 @@ import { logAudit } from "../lib/audit.js";
 import { listPayments, getPayment, PAYMENT_STATUSES } from "../lib/payments/ledger.js";
 import { isSumUpConfigured, syncPaymentFromCheckout } from "../lib/payments/sumup.js";
 import { refundSumUpTransaction } from "../lib/payments/sumup-refund.js";
-import { listBoutiqueInventory } from "../lib/boutique/stock.js";
+import { boutiqueStockImpact, listBoutiqueInventory, LOW_STOCK_THRESHOLD } from "../lib/boutique/stock.js";
+import { withBoutiqueOrderLock } from "../lib/boutique/order-lock.js";
 import { getOrder as getMarketplaceOrder } from "../lib/marketplace/orders.js";
 import { readJson, writeJson } from "../lib/storage.js";
 import { createColissimoLabel, downloadColissimoLabel, getColissimoStatus } from "../lib/colissimo.js";
@@ -43,7 +44,9 @@ function money(value) {
 }
 
 function findBoutiqueOrder(id) {
-  return readJson("orders", []).find((order) => String(order.id) === String(id)) || null;
+  const order = readJson("orders", []).find((row) => String(row.id) === String(id)) || null;
+  if (!order) return null;
+  return { ...order, stockImpact: boutiqueStockImpact(order) };
 }
 
 function paymentOrder(payment) {
@@ -187,7 +190,10 @@ router.get("/boutique-orders", (req, res) => {
     colissimo,
     colissimoMessage: colissimoAdminMessage(colissimo),
     email: getBoutiqueEmailConfiguration(),
-    orders: readJson("orders", [])
+    orders: readJson("orders", []).map((order) => ({
+      ...order,
+      stockImpact: boutiqueStockImpact(order)
+    }))
   });
 });
 
@@ -206,69 +212,78 @@ router.get("/boutique-inventory", (req, res) => {
     acc.soldStock += Number(item.soldStock || 0);
     acc.refundHoldStock += Number(item.refundHoldStock || 0);
     acc.oversoldStock += Number(item.oversoldStock || 0);
+    if (item.alertBucket === "out") acc.outOfStock += 1;
+    if (item.alertBucket === "low") acc.lowStock += 1;
     return acc;
-  }, { baseStock: 0, availableStock: 0, pendingStock: 0, soldStock: 0, refundHoldStock: 0, oversoldStock: 0 });
-  res.json({ ok: true, inventory, totals });
+  }, { baseStock: 0, availableStock: 0, pendingStock: 0, soldStock: 0, refundHoldStock: 0, oversoldStock: 0, outOfStock: 0, lowStock: 0 });
+  res.json({ ok: true, inventory, totals, lowStockThreshold: LOW_STOCK_THRESHOLD });
 });
 
 router.put("/boutique-orders/:id", WRITE_ADMIN, async (req, res) => {
-  const orders = readJson("orders", []);
-  const index = orders.findIndex((order) => String(order.id) === String(req.params.id));
-  if (index < 0) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  const updated = await withBoutiqueOrderLock(() => {
+    const orders = readJson("orders", []);
+    const index = orders.findIndex((order) => String(order.id) === String(req.params.id));
+    if (index < 0) return { missing: true };
 
-  const current = orders[index];
-  const body = req.body || {};
-  const nextStatus = clean(body.status, 80) || current.status;
-  const nextCarrier = clean(body.carrier, 120);
+    const current = orders[index];
+    const body = req.body || {};
+    const nextStatus = clean(body.status, 80) || current.status;
+    const nextCarrier = clean(body.carrier, 120);
 
-  if (!BOUTIQUE_STATUSES.includes(nextStatus) && nextStatus !== current.status) {
-    return res.status(400).json({ ok: false, error: "Statut de commande non autorisé." });
-  }
-  if (!canProcessPaidOrder(current, nextStatus)) {
-    return res.status(409).json({ ok: false, error: "Le paiement SumUp doit être confirmé avant de préparer ou expédier la commande." });
-  }
-  if (nextCarrier && !BOUTIQUE_CARRIERS.includes(nextCarrier) && nextCarrier !== clean(current.carrier, 120)) {
-    return res.status(400).json({ ok: false, error: "Transporteur non autorisé. Choisissez Colissimo (La Poste), La Poste, Mondial Relay ou Relais Colis." });
-  }
-  if (nextStatus === "Expédiée" && (!nextCarrier || !clean(body.tracking, 180))) {
-    return res.status(400).json({ ok: false, error: "Transporteur et numéro de suivi obligatoires pour expédier la commande." });
-  }
+    if (!BOUTIQUE_STATUSES.includes(nextStatus) && nextStatus !== current.status) {
+      return { error: "Statut de commande non autorisé.", status: 400 };
+    }
+    if (!canProcessPaidOrder(current, nextStatus)) {
+      return { error: "Le paiement SumUp doit être confirmé avant de préparer ou expédier la commande.", status: 409 };
+    }
+    if (nextCarrier && !BOUTIQUE_CARRIERS.includes(nextCarrier) && nextCarrier !== clean(current.carrier, 120)) {
+      return { error: "Transporteur non autorisé. Choisissez Colissimo (La Poste), La Poste, Mondial Relay ou Relais Colis.", status: 400 };
+    }
+    if (nextStatus === "Expédiée" && (!nextCarrier || !clean(body.tracking, 180))) {
+      return { error: "Transporteur et numéro de suivi obligatoires pour expédier la commande.", status: 400 };
+    }
 
-  const now = new Date().toISOString();
-  const previousStatus = current.status;
-  current.status = nextStatus;
-  current.carrier = nextCarrier;
-  current.tracking = clean(body.tracking, 180);
-  current.address = clean(body.address, 600);
-  current.phone = clean(body.phone, 40) || current.phone || "";
-  current.internalNote = clean(body.internalNote, 2000);
-  current.updatedAt = now;
+    const now = new Date().toISOString();
+    const previousStatus = current.status;
+    current.status = nextStatus;
+    current.carrier = nextCarrier;
+    current.tracking = clean(body.tracking, 180);
+    current.address = clean(body.address, 600);
+    current.phone = clean(body.phone, 40) || current.phone || "";
+    current.internalNote = clean(body.internalNote, 2000);
+    current.updatedAt = now;
 
-  const nextShipping = clean(body.shipping, 120);
-  if (nextShipping) current.shipping = nextShipping;
-  else current.shipping = current.shipping || "Standard";
-  const nextMethod = clean(body.shippingMethod, 80);
-  if (nextMethod) current.shippingMethod = nextMethod;
-  const nextWeight = parseWeightGrams(body.shippingWeightGrams);
-  if (nextWeight) {
-    current.shippingWeightGrams = nextWeight;
-    current.weightSource = "admin";
-  }
-  if (current.pickupPoint && !current.pickupPoint.id) current.pickupPoint = null;
+    const nextShipping = clean(body.shipping, 120);
+    if (nextShipping) current.shipping = nextShipping;
+    else current.shipping = current.shipping || "Standard";
+    const nextMethod = clean(body.shippingMethod, 80);
+    if (nextMethod) current.shippingMethod = nextMethod;
+    const nextWeight = parseWeightGrams(body.shippingWeightGrams);
+    if (nextWeight) {
+      current.shippingWeightGrams = nextWeight;
+      current.weightSource = "admin";
+    }
+    if (current.pickupPoint && !current.pickupPoint.id) current.pickupPoint = null;
 
-  if (previousStatus !== nextStatus) {
-    current.statusChangedAt = now;
-    if (nextStatus === "En préparation" && !current.preparingAt) current.preparingAt = now;
-    if (nextStatus === "Prête à expédier" && !current.readyToShipAt) current.readyToShipAt = now;
-    if (nextStatus === "Expédiée" && !current.shippedAt) current.shippedAt = now;
-    if (nextStatus === "Livrée" && !current.deliveredAt) current.deliveredAt = now;
-    if (nextStatus === "Annulée" && !current.cancelledAt) current.cancelledAt = now;
-  }
-  current.shipmentStatus = shipmentStatusOf(current);
+    if (previousStatus !== nextStatus) {
+      current.statusChangedAt = now;
+      if (nextStatus === "En préparation" && !current.preparingAt) current.preparingAt = now;
+      if (nextStatus === "Prête à expédier" && !current.readyToShipAt) current.readyToShipAt = now;
+      if (nextStatus === "Expédiée" && !current.shippedAt) current.shippedAt = now;
+      if (nextStatus === "Livrée" && !current.deliveredAt) current.deliveredAt = now;
+      if (nextStatus === "Annulée" && !current.cancelledAt) current.cancelledAt = now;
+    }
+    if (nextStatus === "Annulée" && current.paymentStatus === "pending") current.paymentStatus = "cancelled";
+    current.shipmentStatus = shipmentStatusOf(current);
 
-  current.paymentReviewRequired = nextStatus === "Annulée" && current.paymentStatus === "paid";
-  orders[index] = current;
-  writeJson("orders", orders);
+    current.paymentReviewRequired = nextStatus === "Annulée" && current.paymentStatus === "paid";
+    orders[index] = current;
+    writeJson("orders", orders);
+    return { previousStatus, current };
+  });
+  if (updated?.missing) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  if (updated?.error) return res.status(updated.status || 400).json({ ok: false, error: updated.error });
+  const { previousStatus, current } = updated;
 
   logAudit({ type: "boutique_order", action: "update", user: req.authUser?.email || "admin", detail: `${current.id} — ${previousStatus || "—"} -> ${current.status}` });
 
@@ -463,13 +478,15 @@ router.post("/boutique-orders/:id/sync-sumup", WRITE_ADMIN, async (req, res) => 
     const result = await syncPaymentFromCheckout(order.sumupCheckoutId);
     const refreshed = findBoutiqueOrder(order.id);
     if (refreshed && refreshed.paymentStatus === "refunded" && refreshed.paymentReviewRequired) {
-      const orders = readJson("orders", []);
-      const index = orders.findIndex((item) => String(item.id) === String(refreshed.id));
-      if (index >= 0) {
-        orders[index].paymentReviewRequired = false;
-        orders[index].updatedAt = new Date().toISOString();
-        writeJson("orders", orders);
-      }
+      await withBoutiqueOrderLock(() => {
+        const orders = readJson("orders", []);
+        const index = orders.findIndex((item) => String(item.id) === String(refreshed.id));
+        if (index >= 0) {
+          orders[index].paymentReviewRequired = false;
+          orders[index].updatedAt = new Date().toISOString();
+          writeJson("orders", orders);
+        }
+      });
     }
     logAudit({ type: "boutique_order", action: "sumup_sync", user: req.authUser?.email || "admin", detail: `${order.id} — ${result.status}` });
     res.json({ ok: true, status: result.status, payment: result.payment, order: findBoutiqueOrder(order.id) });
@@ -492,15 +509,17 @@ router.post("/boutique-orders/:id/refund", FINANCE_ADMIN, async (req, res) => {
 
     await refundSumUpTransaction(order.sumupTransactionId, { orderId: order.id, user: req.authUser?.email || "admin" });
 
-    const orders = readJson("orders", []);
-    const index = orders.findIndex((item) => String(item.id) === String(order.id));
-    if (index >= 0) {
-      orders[index].status = "Annulée";
-      orders[index].paymentReviewRequired = true;
-      orders[index].refundRequestedAt = new Date().toISOString();
-      orders[index].updatedAt = new Date().toISOString();
-      writeJson("orders", orders);
-    }
+    await withBoutiqueOrderLock(() => {
+      const orders = readJson("orders", []);
+      const index = orders.findIndex((item) => String(item.id) === String(order.id));
+      if (index >= 0) {
+        orders[index].status = "Annulée";
+        orders[index].paymentReviewRequired = true;
+        orders[index].refundRequestedAt = new Date().toISOString();
+        orders[index].updatedAt = new Date().toISOString();
+        writeJson("orders", orders);
+      }
+    });
 
     let sync = null;
     try { sync = await syncPaymentFromCheckout(order.sumupCheckoutId); } catch {}

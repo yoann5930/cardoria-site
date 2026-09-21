@@ -33,7 +33,8 @@ router.post("/boutique/checkout", async (req, res) => {
       customerName: body.customerName || account?.name || "",
       accountUserId: account?.id || "",
       requestedProvider: body.provider,
-      requestedAmount: body.amount ?? body.total
+      requestedAmount: body.amount ?? body.total,
+      requestedShippingCost: body.shippingCost ?? body.shipping_cost
     });
     res.json({ ok: true, provider: "sumup", orderId: result.order.id, checkoutId: result.checkoutId, providerOrderId: result.checkoutId, url: result.url, paymentId: result.paymentId });
   } catch (e) {

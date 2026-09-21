@@ -236,7 +236,11 @@ export function publicClientOrder(order) {
       ref: item.ref,
       name: item.name,
       qty: Number(item.qty || 1),
-      price: Number(item.price || 0)
+      price: Number(item.price || 0),
+      condition: clean(item.condition, 80),
+      extension: clean(item.extension, 80),
+      number: clean(item.number, 40),
+      image: clean(item.image, 500)
     })) : [],
     paymentStatus: order.paymentStatus || "pending",
     status: order.status || "À préparer",
