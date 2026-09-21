@@ -88,10 +88,12 @@ jobs:
           node --check ../js/admin/admin-catalog-sealed-shortcuts.js
           node --check ../js/admin/admin-sealed-references.js
           node --check ../js/admin/admin-orders.js
+          bash -n ../oracle/cardoria-ops.sh
+          bash -n ../oracle/cardoria-ops-ssh-wrapper.sh
 
       - name: Lot market and catalog regression tests
         working-directory: .
-        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs tests/pokemon-multisource-catalog.test.mjs tests/pokemon-showcase.test.mjs tests/boutique-quick-search.test.mjs tests/order-document-live-data.test.mjs tests/auto-colissimo-save.test.mjs tests/global-card-price-floor.test.mjs backend/tests/colissimo-direct.test.mjs backend/tests/boutique-customer-emails.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs
+        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs tests/pokemon-multisource-catalog.test.mjs tests/pokemon-showcase.test.mjs tests/boutique-quick-search.test.mjs tests/order-document-live-data.test.mjs tests/auto-colissimo-save.test.mjs tests/global-card-price-floor.test.mjs backend/tests/colissimo-direct.test.mjs backend/tests/boutique-customer-emails.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs tests/ovh-smtp-bridge.test.mjs tests/domain-mail-deliverability.test.mjs
 
       - name: Reject client-side admin bypass
         working-directory: .
@@ -118,7 +120,7 @@ jobs:
             exit 1
           fi
           if ! grep -q 'requireTLS: !secure && port === 587' backend/lib/email.js; then
-            echo "Gmail STARTTLS on port 587 is missing"
+            echo "SMTP STARTTLS on port 587 is missing"
             exit 1
           fi
 
