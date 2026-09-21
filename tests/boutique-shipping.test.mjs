@@ -116,4 +116,6 @@ test("checkout, admin and client surfaces persist Point Relais and gated Colissi
   assert.match(routes, /COLISSIMO_LABEL_IN_PROGRESS/);
   assert.match(routes, /withColissimoLabelLock/);
   assert.doesNotMatch(routes, /COLISSIMO_LIVE_LABELS_ENABLED=true/);
+  const sumup = fs.readFileSync("backend/lib/payments/sumup.js", "utf8");
+  assert.match(sumup, /o\.shipmentStatus=shipmentStatusOf\(o\)/);
 });
