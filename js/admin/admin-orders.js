@@ -5,6 +5,7 @@
 
   var orders = [];
   var filter = "all";
+  var colissimo = { configured:false, senderConfigured:false, labelPurchasesEnabled:false, productCode:"DOM" };
   var CARRIERS = ["La Poste", "Mondial Relay", "Relais Colis"];
   var STATUSES = ["À préparer", "En préparation", "Expédiée", "Livrée", "Annulée"];
 
@@ -35,6 +36,9 @@
 
     A.qs("#orderCards").innerHTML = list.map(function (o) {
       var canRefund = o.paymentStatus === "paid" && !!(o.sumupCheckoutId || o.sumupTransactionId);
+      var colissimoReady = !!(colissimo.configured && colissimo.senderConfigured && colissimo.labelPurchasesEnabled);
+      var colissimoAttempt = o.colissimoLabelAttempt && o.colissimoLabelAttempt.status || "";
+      var colissimoBlocked = colissimoAttempt === "reconciliation_required";
       var review = o.paymentReviewRequired ? '<div class="admin-panel" style="margin:10px 0;border-color:#b44"><strong style="color:#ff8f8f">Remboursement SumUp à confirmer</strong><br><small>Le stock reste bloqué jusqu’à confirmation du remboursement.</small></div>' : "";
       var items = (o.items || []).map(function (i) { return '<tr><td>'+esc(i.name||i.ref)+'</td><td>'+Number(i.qty||1)+'</td><td>'+euro(i.price)+'</td><td>'+euro(Number(i.qty||1)*Number(i.price||0))+'</td></tr>'; }).join("") || '<tr><td colspan="4">Aucun article</td></tr>';
       var legacyCarrier = o.carrier && CARRIERS.indexOf(o.carrier) < 0 ? [o.carrier].concat(CARRIERS) : CARRIERS;
@@ -46,6 +50,7 @@
           '<label>Statut<select data-field="status">'+options(STATUSES,o.status)+'</select></label>' +
           '<label>Transporteur<select data-field="carrier">'+options(legacyCarrier,o.carrier||"","Choisir")+'</select></label>' +
           '<label>Numéro de suivi<input data-field="tracking" value="'+esc(o.tracking||"")+'" placeholder="Suivi colis"></label>' +
+          '<label>Poids Colissimo (g)<input data-field="shippingWeightGrams" type="number" min="1" max="30000" step="1" value="'+esc(o.shippingWeightGrams||"")+'" placeholder="Ex. 250"></label>' +
           '<label>Téléphone<input data-field="phone" value="'+esc(o.phone||"")+'"></label>' +
           '<label class="admin-form-wide">Adresse de livraison<textarea data-field="address" rows="3">'+esc(o.address||"")+'</textarea></label>' +
           '<label class="admin-form-wide">Note interne<textarea data-field="internalNote" rows="3">'+esc(o.internalNote||"")+'</textarea></label>' +
@@ -53,8 +58,9 @@
           '<button type="button" class="btn btn-primary" data-save="'+esc(o.id)+'">Enregistrer</button> ' +
           (o.sumupCheckoutId?'<button type="button" class="btn btn-secondary" data-sync="'+esc(o.id)+'">Synchroniser SumUp</button> ':'') +
           (canRefund?'<button type="button" class="btn btn-secondary" data-refund="'+esc(o.id)+'">Rembourser SumUp</button> ':'') +
+          (o.colissimoParcelNumber?'<button type="button" class="btn btn-secondary" data-colissimo-download="'+esc(o.id)+'">Télécharger étiquette Colissimo</button> ':(o.paymentStatus==="paid"?'<button type="button" class="btn btn-secondary" data-colissimo-create="'+esc(o.id)+'" '+((!colissimoReady||colissimoBlocked)?"disabled":"")+'>Créer étiquette Colissimo</button> ':"")) +
           '<button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="bon">Bon commande</button> <button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="facture">Facture</button>' +
-        '</div><p class="small" data-status-message></p></article>';
+        '</div>'+(colissimoBlocked?'<p class="small" style="color:#ffb36b">Colissimo : rapprochement requis dans la Cbox avant tout nouvel essai.</p>':(!colissimoReady&&o.paymentStatus==="paid"&&!o.colissimoParcelNumber?'<p class="small">Colissimo : clé API / adresse expéditeur / activation réelle à terminer.</p>':""))+'<p class="small" data-status-message></p></article>';
     }).join("") || '<div class="admin-panel">Aucune commande.</div>';
     bind();
   }
@@ -62,11 +68,23 @@
   function card(id) { return A.qs('[data-order-card="'+CSS.escape(String(id))+'"]'); }
   function payload(c) { function v(n){ return c.querySelector('[data-field="'+n+'"]')?.value || ""; } return { status:v("status"), carrier:v("carrier"), tracking:v("tracking"), phone:v("phone"), address:v("address"), internalNote:v("internalNote"), shipping:"Standard" }; }
 
+  function downloadAdminPdf(path, filename) {
+    var token = sessionStorage.getItem("cardoria_session_token") || "";
+    if (!token) return Promise.reject(new Error("Session administrateur requise."));
+    return fetch(A.BACKEND + path, { headers:{ Authorization:"Bearer " + token }, cache:"no-store" }).then(async function(r){
+      if (!r.ok) { var d=await r.json().catch(function(){return {};}); throw new Error(d.error || "Téléchargement impossible."); }
+      return r.blob();
+    }).then(function(blob){
+      var url=URL.createObjectURL(blob), a=document.createElement("a"); a.href=url; a.download=filename||"etiquette-colissimo.pdf"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(url);},1000);
+    });
+  }
+
   function reload(id, message) {
     return A.adminFetch("/api/admin/payments/boutique-orders", { cache:"no-store" }).then(function (d) {
       if (!d.ok) throw new Error(d.error || "Chargement impossible");
       orders = d.orders || [];
       if (Array.isArray(d.carriers) && d.carriers.length) CARRIERS = d.carriers;
+      if (d.colissimo) colissimo = d.colissimo;
       render();
       var c = id && card(id), box = c && c.querySelector("[data-status-message]"); if (box) box.textContent = message || "Mis à jour.";
     });
@@ -76,6 +94,20 @@
     A.qs("#orderCards").querySelectorAll("button[data-save]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.save,c=card(id),m=c?.querySelector("[data-status-message]"); btn.disabled=true; if(m)m.textContent="Enregistrement..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id),{method:"PUT",body:JSON.stringify(payload(c))}).then(function(d){if(!d.ok)throw new Error(d.error||"Mise à jour impossible");return reload(id,"Commande mise à jour.");}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
     A.qs("#orderCards").querySelectorAll("button[data-sync]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.sync,c=card(id),m=c?.querySelector("[data-status-message]"); btn.disabled=true; if(m)m.textContent="Synchronisation SumUp..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/sync-sumup",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Synchronisation impossible");return reload(id,"SumUp synchronisé : "+(d.status||"OK"));}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
     A.qs("#orderCards").querySelectorAll("button[data-refund]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.refund,c=card(id),m=c?.querySelector("[data-status-message]"); if(!confirm("Confirmer le remboursement intégral SumUp de cette commande ?"))return; btn.disabled=true; if(m)m.textContent="Remboursement SumUp..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/refund",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Remboursement impossible");return reload(id,d.status==="refunded"?"Remboursement confirmé. Stock libéré.":"Remboursement demandé. Synchronise SumUp pour confirmer.");}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
+    A.qs("#orderCards").querySelectorAll("button[data-colissimo-create]").forEach(function (btn) { btn.onclick = function () {
+      var id=btn.dataset.colissimoCreate,c=card(id),m=c?.querySelector("[data-status-message]"),weight=Number(c?.querySelector('[data-field="shippingWeightGrams"]')?.value||0);
+      if(!Number.isFinite(weight)||weight<1||weight>30000){if(m)m.textContent="Saisissez le poids réel du colis entre 1 g et 30 000 g.";return;}
+      if(!confirm("Créer une étiquette Colissimo réelle pour cette commande ?"))return;
+      btn.disabled=true;if(m)m.textContent="Création Colissimo...";
+      A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/colissimo-label",{method:"POST",body:JSON.stringify({weightGrams:Math.trunc(weight)})})
+        .then(function(d){if(!d.ok)throw new Error(d.error||"Création Colissimo impossible");return reload(id,"Étiquette Colissimo créée : "+(d.parcelNumber||"OK"));})
+        .catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;});
+    }; });
+    A.qs("#orderCards").querySelectorAll("button[data-colissimo-download]").forEach(function (btn) { btn.onclick = function () {
+      var id=btn.dataset.colissimoDownload,c=card(id),m=c?.querySelector("[data-status-message]");btn.disabled=true;if(m)m.textContent="Téléchargement Colissimo...";
+      downloadAdminPdf("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/colissimo-label","colissimo-"+id+".pdf")
+        .then(function(){if(m)m.textContent="Étiquette téléchargée.";}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;});
+    }; });
     A.qs("#orderCards").querySelectorAll("button[data-doc]").forEach(function (btn) { btn.onclick=function(){window.open("document-commande.html?id="+encodeURIComponent(btn.dataset.doc)+"&type="+encodeURIComponent(btn.dataset.type),"_blank");}; });
   }
 
