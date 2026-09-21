@@ -18,6 +18,7 @@ git reset --hard "origin/$BRANCH"
 # executable before exposing it through the forced SSH wrapper/sudoers.
 sudo install -m 0755 -o root -g root "$APP_DIR/oracle/sumup-configure.sh" /usr/local/bin/cardoria-sumup-configure
 sudo install -m 0755 -o root -g root "$APP_DIR/oracle/mondial-relay-configure.sh" /usr/local/bin/cardoria-mondial-relay-configure
+sudo install -m 0755 -o root -g root "$APP_DIR/oracle/colissimo-configure.sh" /usr/local/bin/cardoria-colissimo-configure
 
 cd backend
 npm install --omit=dev

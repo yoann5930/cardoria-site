@@ -25,7 +25,7 @@ on:
           - mail-dns-check
           - sumup-configure
           - mondial-relay-configure
-          - mondial-relay-configure
+          - colissimo-configure
       branch:
         description: Production deploy branch
         required: false

@@ -28,6 +28,7 @@ jobs:
       ADMIN_REQUIRE_2FA: 'false'
       SENDCLOUD_LIVE_LABELS_ENABLED: 'false'
       MONDIAL_RELAY_LIVE_LABELS_ENABLED: 'false'
+      COLISSIMO_LIVE_LABELS_ENABLED: 'false'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -48,6 +49,8 @@ jobs:
           node --check backend/lib/live/shipments.js
           node --check backend/routes/sendcloud.js
           node --check backend/routes/mondial-relay.js
+          node --check backend/lib/colissimo.js
+          node --check backend/routes/colissimo.js
           node --check backend/lib/mondial-relay.js
           node --check backend/lib/sendcloud-webhook-security.js
           node --check backend/lib/sendcloud-tracking.js

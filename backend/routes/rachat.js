@@ -74,6 +74,7 @@ router.post("/propositions", async (req, res) => {
     });
 
     await sendEmail({
+      kind: "rachat_proposal_admin",
       subject: `[Cardoria] Proposition de vente — ${proposal.cardName}`,
       text: [
         "Nouvelle proposition de vente Cardoria",

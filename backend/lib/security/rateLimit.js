@@ -45,6 +45,12 @@ export const authRateLimit = rateLimit({
   keyFn: (req) => `auth:${req.ip || "unknown"}`
 });
 
+export const passwordResetRateLimit = rateLimit({
+  windowMs: 15 * 60_000,
+  max: Number(process.env.RATE_LIMIT_PASSWORD_RESET || 8),
+  keyFn: (req) => `auth-reset:${req.ip || "unknown"}`
+});
+
 export const aiRateLimit = rateLimit({
   windowMs: 60_000,
   max: Number(process.env.RATE_LIMIT_AI || 8),

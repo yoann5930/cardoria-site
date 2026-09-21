@@ -5,7 +5,7 @@ import crypto from "crypto";
 import { getDb } from "../engine/database.js";
 import { hashToken, makeId, ADMIN_ROLES } from "./migrate.js";
 import { getUserByEmail, getUserById } from "./users.js";
-import { sendEmail } from "../email.js";
+import { publicSiteOrigin, sendEmail } from "../email.js";
 
 const MAGIC_LINK_MINUTES = Math.max(5, Math.min(60, Number(process.env.MAGIC_LINK_MINUTES || 15)));
 
@@ -33,25 +33,17 @@ export async function requestMagicLogin(email) {
   });
   tx();
 
-  const siteUrl = String(process.env.SITE_URL || "https://www.cardoriashop.fr").replace(/\/$/, "");
-  const link = `${siteUrl}/admin-email-login.html?token=${encodeURIComponent(token)}`;
+  const link = `${publicSiteOrigin()}/admin-email-login.html?token=${encodeURIComponent(token)}`;
 
   let sent = false;
   try {
     sent = await sendEmail({
+      kind: "magic_login",
       to: user.email,
-      subject: "Cardoria - Connexion administrateur",
-      text: [
-        "Bonjour,",
-        "",
-        "Voici votre lien de connexion securise au back-office Cardoria :",
-        link,
-        "",
-        `Ce lien est valable ${MAGIC_LINK_MINUTES} minutes et ne peut etre utilise qu'une fois.`,
-        "Si vous n'etes pas a l'origine de cette demande, ignorez cet e-mail.",
-        "",
-        "Cardoria"
-      ].join("\n")
+      subject: "Connexion administrateur Cardoria",
+      text: `Bonjour,\n\nVoici votre lien de connexion sécurisé au back-office Cardoria.\nIl est valable ${MAGIC_LINK_MINUTES} minutes et ne peut être utilisé qu'une fois.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`,
+      actionUrl: link,
+      actionLabel: "Ouvrir le back-office"
     });
   } catch {
     sent = false;
@@ -59,7 +51,7 @@ export async function requestMagicLogin(email) {
 
   if (!sent) {
     db.prepare("DELETE FROM auth_magic_tokens WHERE token_hash = ?").run(tokenHash);
-    throw Object.assign(new Error("Le service d'envoi d'e-mail Cardoria n'est pas configure."), { status: 503 });
+    return { ok: true, message: "Si cette adresse est autorisee, un lien de connexion a ete envoye." };
   }
 
   return { ok: true, message: "Lien de connexion envoye. Consultez votre boite e-mail." };

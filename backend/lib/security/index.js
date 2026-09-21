@@ -55,11 +55,14 @@ export function applySecurityMiddleware(app) {
     next();
   });
 
-  const allowedOrigins = (process.env.CORS_ORIGINS || process.env.SITE_URL || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const allowedOrigins = [...new Set([
+    "https://www.cardoriashop.fr",
+    "https://cardoriashop.fr",
+    ...((process.env.CORS_ORIGINS || process.env.SITE_URL || "").split(",").map((s) => s.trim()).filter(Boolean))
+  ])];
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (origin && allowedOrigins.includes(origin)) res.setHeader("Access-Control-Allow-Origin", origin);
-    else if (!origin && allowedOrigins[0]) res.setHeader("Access-Control-Allow-Origin", allowedOrigins[0]);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-cardoria-admin-code, x-csrf-token, x-session-token, x-live-admin-grant");
@@ -74,7 +77,7 @@ export function applySecurityMiddleware(app) {
 
   app.use((req, res, next) => {
     if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
-      const skipSanitize = req.path.includes("/estimation") || req.path.includes("/ai/analyze") || req.path.includes("/ai/analyses");
+      const skipSanitize = req.path.includes("/estimation") || req.path.includes("/ai/analyze") || req.path.includes("/ai/analyses") || req.path.includes("/auth/login") || req.path.includes("/auth/register") || req.path.includes("/password/confirm");
       if (!skipSanitize) req.body = sanitizeObject(req.body);
     }
     next();

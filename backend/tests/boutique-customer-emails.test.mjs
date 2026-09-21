@@ -30,7 +30,7 @@ test("purchase confirmation contains the real order, items and total", () => {
   assert.match(message.subject, /CMD-20260921-3918/);
   assert.match(message.text, /Carte Pokémon Test/);
   assert.match(message.text, /2,50 €/);
-  assert.match(message.text, /client-orders\.html/);
+  assert.match(message.text, /https:\/\/www\.cardoriashop\.fr\/client-orders\.html/);
   assert.match(message.html, /Commande confirmée/);
 });
 

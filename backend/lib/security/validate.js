@@ -51,6 +51,13 @@ export function validateBody(schema, body = {}) {
       continue;
     }
 
+    if (rules.secret === true) {
+      val = String(val).slice(0, rules.maxLength || 128);
+      if (rules.minLength && val.length < rules.minLength) errors.push(`${key} trop court`);
+      else data[key] = val;
+      continue;
+    }
+
     val = sanitizeString(val, { maxLength: rules.maxLength || 500, allowNewlines: rules.allowNewlines !== false });
     if (rules.minLength && val.length < rules.minLength) errors.push(`${key} trop court`);
     else data[key] = val;
@@ -62,7 +69,7 @@ export function validateBody(schema, body = {}) {
 export const SCHEMAS = {
   login: {
     email: { type: "email", required: true },
-    password: { type: "string", required: true, minLength: 8, maxLength: 128, allowNewlines: false }
+    password: { type: "string", required: true, minLength: 8, maxLength: 128, allowNewlines: false, secret: true }
   },
   legacyAdminLogin: {
     code: { type: "string", required: true, minLength: 4, maxLength: 64, allowNewlines: false }
@@ -71,8 +78,8 @@ export const SCHEMAS = {
     email: { type: "email", required: true }
   },
   passwordResetConfirm: {
-    token: { type: "string", required: true, minLength: 20, maxLength: 128, allowNewlines: false },
-    password: { type: "string", required: true, minLength: 10, maxLength: 128, allowNewlines: false }
+    token: { type: "string", required: true, minLength: 20, maxLength: 128, allowNewlines: false, secret: true },
+    password: { type: "string", required: true, minLength: 10, maxLength: 128, allowNewlines: false, secret: true }
   },
   gdprExport: {
     email: { type: "email", required: true }

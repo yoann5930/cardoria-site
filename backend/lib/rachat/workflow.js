@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { readJson, writeJson } from "../storage.js";
-import { sendEmail } from "../email.js";
+import { publicSiteOrigin, sendEmail } from "../email.js";
 import { logAudit } from "../audit.js";
 
 export const RACHAT_STATUSES = [
@@ -181,7 +181,7 @@ export function startRachatReview(id, { user = "admin", note = "" } = {}) {
 }
 
 function publicBaseUrl() {
-  return clean(process.env.SITE_URL || process.env.FRONTEND_URL || "https://www.cardoriashop.fr", 500).replace(/\/$/, "");
+  return publicSiteOrigin();
 }
 
 export async function sendRachatOffer(id, { amount, note = "", expiresDays = DECISION_TTL_DAYS, user = "admin" } = {}) {
@@ -197,6 +197,7 @@ export async function sendRachatOffer(id, { amount, note = "", expiresDays = DEC
   const offerUrl = `${publicBaseUrl()}/rachat-suivi.html?id=${encodeURIComponent(proposal.id)}&token=${encodeURIComponent(token)}`;
   const sentAt = nowIso();
   const emailSent = await sendEmail({
+    kind: "rachat_offer",
     to: proposal.customerEmail,
     subject: `[Cardoria] Offre de rachat — ${proposal.cardName}`,
     text: [
@@ -206,11 +207,15 @@ export async function sendRachatOffer(id, { amount, note = "", expiresDays = DEC
       proposal.condition ? `État indiqué : ${proposal.condition}` : "",
       note ? `Message Cardoria : ${clean(note, 1200)}` : "",
       "",
-      `Répondez à l’offre ici : ${offerUrl}`,
-      `Offre valable jusqu’au ${new Date(expiresAt).toLocaleDateString("fr-FR")}.`,
-      "",
-      `Référence : ${proposal.id}`
-    ].filter(Boolean).join("\n")
+      `Offre valable jusqu’au ${new Date(expiresAt).toLocaleDateString("fr-FR")}.`
+    ].filter(Boolean).join("\n"),
+    actionUrl: offerUrl,
+    actionLabel: "Répondre à l’offre",
+    details: [
+      { label: "Référence", value: proposal.id },
+      { label: "Carte", value: proposal.cardName },
+      { label: "Offre", value: `${offerAmount.toFixed(2).replace(".", ",")} €` }
+    ]
   });
 
   proposal.status = "Offre envoyée";
@@ -371,18 +376,20 @@ export async function markRachatPaid(id, { amount, method = "", reference = "", 
   logAudit({ type: "rachat", action: "paid_and_converted", user, detail: `${proposal.id} -> ${purchase.id} — ${paidAmount} EUR` });
 
   const emailed = await sendEmail({
+    kind: "rachat_paid",
     to: proposal.customerEmail,
     subject: `[Cardoria] Rachat finalisé — ${proposal.cardName}`,
     text: [
       `Bonjour${proposal.customerName ? ` ${proposal.customerName}` : ""},`,
       "",
       `Le rachat de votre carte ${proposal.cardName} est finalisé.`,
-      `Montant enregistré : ${paidAmount.toFixed(2).replace(".", ",")} €`,
-      `Référence Cardoria : ${proposal.id}`,
-      paymentReference ? `Référence paiement : ${paymentReference}` : "",
-      "",
       "Merci pour votre confiance."
-    ].filter(Boolean).join("\n")
+    ].filter(Boolean).join("\n"),
+    details: [
+      { label: "Référence", value: proposal.id },
+      { label: "Montant", value: `${paidAmount.toFixed(2).replace(".", ",")} €` },
+      ...(paymentReference ? [{ label: "Référence paiement", value: paymentReference }] : [])
+    ]
   });
   return { proposal, purchase, emailSent: emailed };
 }

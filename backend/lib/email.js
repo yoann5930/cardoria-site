@@ -1,8 +1,10 @@
 import fs from "node:fs";
 import nodemailer from "nodemailer";
+import { renderCardoriaEmail } from "./email-templates.js";
 
 export const ALERT_EMAIL = process.env.MAIL_TO || "Cardoria59330@gmail.com";
 export const CONFIDENCE_THRESHOLD = Number(process.env.CONFIDENCE_THRESHOLD || 95);
+export const PUBLIC_SITE_ORIGIN = "https://www.cardoriashop.fr";
 
 function envTrim(name) {
   return String(process.env[name] || "").trim();
@@ -45,6 +47,39 @@ export function getEmailPublicStatus() {
   };
 }
 
+export function publicSiteOrigin() {
+  const candidates = [envTrim("PUBLIC_SITE_URL"), envTrim("SITE_URL"), envTrim("FRONTEND_URL"), PUBLIC_SITE_ORIGIN];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    try {
+      const url = new URL(raw);
+      const host = url.hostname.toLowerCase();
+      if (url.protocol !== "https:") continue;
+      if (host === "localhost" || host === "127.0.0.1") continue;
+      if (host.endsWith(".onrender.com") || host.endsWith(".vercel.app") || host === "cardoria.vercel.app") continue;
+      if (host === "cardoriashop.fr" || host === "www.cardoriashop.fr") return PUBLIC_SITE_ORIGIN;
+    } catch {
+      continue;
+    }
+  }
+  return PUBLIC_SITE_ORIGIN;
+}
+
+function redactSecret(detail) {
+  let out = String(detail || "erreur SMTP");
+  const pass = envTrim("SMTP_PASS");
+  if (pass) out = out.split(pass).join("[redacted]");
+  return out.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "[redacted-email]");
+}
+
+function logEmail(kind, result, extra = "") {
+  const provider = envTrim("SMTP_HOST") || "smtp.unconfigured";
+  const suffix = extra ? ` ${extra}` : "";
+  const line = `[email] kind=${kind || "transactional"} provider=${provider} result=${result}${suffix}`;
+  if (result === "sent" || result === "queued-test") console.log(line);
+  else console.warn(line);
+}
+
 function createSmtpTransport() {
   const port = Number(process.env.SMTP_PORT || 587);
   const secure = String(process.env.SMTP_SECURE || "").toLowerCase() === "true" || port === 465;
@@ -53,6 +88,10 @@ function createSmtpTransport() {
     port,
     secure,
     requireTLS: !secure && port === 587,
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 12000,
+    tls: { minVersion: "TLSv1.2" },
     auth: {
       user: envTrim("SMTP_USER"),
       pass: envTrim("SMTP_PASS")
@@ -67,10 +106,27 @@ function writeTestOutbox(message) {
   return true;
 }
 
-export async function sendEmail({ subject, text, html, attachments, to }) {
-  if (writeTestOutbox({ to: to || ALERT_EMAIL, subject, text, html })) return true;
+export async function sendEmail({ subject, text, html, attachments, to, kind, actionUrl, actionLabel, details, preheader } = {}) {
+  let payloadText = text;
+  let payloadHtml = html;
+  if (!payloadHtml) {
+    const rendered = renderCardoriaEmail({
+      preheader: preheader || subject,
+      title: subject,
+      bodyText: text,
+      actionUrl,
+      actionLabel,
+      details
+    });
+    payloadText = rendered.text;
+    payloadHtml = rendered.html;
+  }
+  if (writeTestOutbox({ kind: kind || "transactional", to: to || ALERT_EMAIL, subject, text: payloadText, html: payloadHtml, actionUrl: actionUrl || "" })) {
+    logEmail(kind, "queued-test");
+    return true;
+  }
   if (!isSmtpConfigured()) {
-    console.warn("SMTP non configuré — e-mail non envoyé :", subject, `(${smtpMissingReason()})`);
+    logEmail(kind, "skipped", smtpMissingReason());
     return false;
   }
   try {
@@ -82,18 +138,22 @@ export async function sendEmail({ subject, text, html, attachments, to }) {
       replyTo: status.replyTo || undefined,
       to: to || ALERT_EMAIL,
       subject,
-      text,
-      html,
+      text: payloadText,
+      html: payloadHtml,
       attachments
     });
+    logEmail(kind, "sent");
     return true;
   } catch (error) {
-    const pass = envTrim("SMTP_PASS");
-    let detail = String(error?.code || error?.message || "erreur SMTP");
-    if (pass) detail = detail.split(pass).join("[redacted]");
-    console.warn("SMTP envoi impossible — e-mail non envoyé :", subject, detail);
+    logEmail(kind, "fail", redactSecret(error?.code || error?.message));
     return false;
   }
+}
+
+export function notifySafely(promise, kind) {
+  Promise.resolve(promise).catch((error) => {
+    logEmail(kind, "fail", redactSecret(error?.message));
+  });
 }
 
 export function buildAttachments(imagesBase64) {
