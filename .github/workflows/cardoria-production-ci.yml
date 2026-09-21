@@ -49,6 +49,7 @@ jobs:
           node --check backend/lib/live/camera-media.js
           node --check backend/lib/security/index.js
           node --check js/boutique.js
+          node --check js/admin/admin-stock.js
           node --check js/admin/admin-orders.js
           node --check js/admin/admin-payments.js
       - name: Payment matrix and idempotence tests
