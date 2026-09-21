@@ -9,8 +9,9 @@ import { generateTotpSecret, verifyTotp, getTotpUri } from "../lib/auth/totp.js"
 import { create2faChallenge, get2faChallenge, record2faFailure, consume2faChallenge, revokeUser2faChallenges } from "../lib/auth/2faChallenge.js";
 import { requestPasswordReset, confirmPasswordReset } from "../lib/auth/passwordReset.js";
 import { requestMagicLogin, consumeMagicLogin } from "../lib/auth/magicLink.js";
+import { notifySafely, publicSiteOrigin, sendEmail } from "../lib/email.js";
 import { validateBody, SCHEMAS } from "../lib/security/validate.js";
-import { authRateLimit } from "../lib/security/rateLimit.js";
+import { authRateLimit, passwordResetRateLimit } from "../lib/security/rateLimit.js";
 import { generateCsrfToken } from "../lib/security/csrf.js";
 import { logAudit } from "../lib/audit.js";
 import { readJson } from "../lib/storage.js";
@@ -120,6 +121,14 @@ router.post("/register", authRateLimit, (req, res) => {
     const user = createUser({ email, password, role: "client", name });
     const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"], ttlHours: CLIENT_SESSION_HOURS });
     logAudit({ type: "auth", action: "client_register", user: email, detail: "marketplace" });
+    notifySafely(sendEmail({
+      kind: "welcome",
+      to: email,
+      subject: "Bienvenue chez Cardoria",
+      text: `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte client Cardoria est créé.\nRetrouvez vos commandes, votre suivi colis et vos informations depuis votre espace.`,
+      actionUrl: `${publicSiteOrigin()}/client-login.html`,
+      actionLabel: "Accéder à mon espace"
+    }), "welcome");
     res.status(201).json({ ok: true, token: session.token, expiresAt: session.expiresAt, user: publicUser(user) });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.message });
@@ -265,7 +274,7 @@ router.get("/orders", (req, res) => {
   res.json({ ok: true, orders });
 });
 
-router.post("/password/request", authRateLimit, async (req, res) => {
+router.post("/password/request", passwordResetRateLimit, async (req, res) => {
   const v = validateBody(SCHEMAS.passwordResetRequest, req.body);
   if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
   try { res.json(await requestPasswordReset(v.data.email)); }

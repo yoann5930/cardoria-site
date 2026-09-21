@@ -16,6 +16,7 @@ router.get("/test", async (req, res) => {
   }
 
   const sent = await sendEmail({
+    kind: "admin_test",
     to: ALERT_EMAIL,
     subject: "Cardoria - Test e-mail administrateur",
     text: "Test de configuration e-mail Cardoria."

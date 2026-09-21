@@ -3,7 +3,7 @@
  */
 import { getDb } from "../engine/database.js";
 import { getListing } from "./listings.js";
-import { sendEmail } from "../email.js";
+import { publicSiteOrigin, sendEmail } from "../email.js";
 
 export function addFavorite(userId, listingId) {
   if (!getListing(listingId)) throw new Error("Annonce introuvable");
@@ -95,9 +95,12 @@ export async function processPriceAlerts() {
     }
     if (currentPrice != null && currentPrice <= alert.target_price) {
       await sendEmail({
+        kind: "marketplace_price_alert",
         to: alert.user_email,
         subject: `[Cardoria] Alerte prix — ${title || "Carte souhaitée"}`,
-        text: `Bonne nouvelle ! Le prix est descendu à ${currentPrice.toFixed(2)} € (seuil : ${alert.target_price} €).\n\nConsultez la marketplace Cardoria.`
+        text: `Bonne nouvelle ! Le prix est descendu à ${currentPrice.toFixed(2)} € (seuil : ${alert.target_price} €).`,
+        actionUrl: `${publicSiteOrigin()}/marketplace.html`,
+        actionLabel: "Voir la marketplace"
       }).catch(() => {});
       db.prepare("UPDATE mk_price_alerts SET last_notified_at = ? WHERE id = ?").run(new Date().toISOString(), alert.id);
       notified++;

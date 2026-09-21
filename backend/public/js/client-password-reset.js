@@ -17,14 +17,31 @@
     message.className = "client-auth-message" + (type ? " is-" + type : "");
   }
 
+  function networkError(error) {
+    if (error && error.name === "AbortError") {
+      return "Le serveur met trop de temps à répondre. Réessayez.";
+    }
+    return "Connexion au serveur Cardoria impossible. Rechargez la page puis réessayez.";
+  }
+
   async function postJson(path, body) {
-    var response = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      cache: "no-store",
-      body: JSON.stringify(body)
-    });
+    var controller = new AbortController();
+    var timeout = window.setTimeout(function () { controller.abort(); }, 20000);
+    var response;
+    try {
+      response = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        cache: "no-store",
+        signal: controller.signal,
+        body: JSON.stringify(body)
+      });
+    } catch (error) {
+      throw new Error(networkError(error));
+    } finally {
+      window.clearTimeout(timeout);
+    }
     var data = {};
     try { data = await response.json(); } catch {}
     if (!response.ok || data.ok === false) throw new Error(data.error || "Opération impossible.");

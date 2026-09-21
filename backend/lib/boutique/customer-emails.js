@@ -1,7 +1,7 @@
-import { isSmtpConfigured, sendEmail, smtpMissingReason } from "../email.js";
+import { isSmtpConfigured, publicSiteOrigin, sendEmail, smtpMissingReason } from "../email.js";
 import { readJson, writeJson } from "../storage.js";
 
-const SITE_URL = () => String(process.env.SITE_URL || process.env.FRONTEND_URL || "https://www.cardoriashop.fr").replace(/\/$/, "");
+const SITE_URL = () => publicSiteOrigin();
 const clean = (value, max = 500) => String(value == null ? "" : value).trim().slice(0, max);
 const money = (value) => Number(value || 0).toFixed(2).replace(".", ",") + " €";
 const nowIso = () => new Date().toISOString();
@@ -135,13 +135,13 @@ export function buildBoutiqueTrackingEmail(order) {
 export async function deliverBoutiquePurchaseEmail(order) {
   const message = buildBoutiquePurchaseEmail(order);
   if (!message.to) return false;
-  return sendEmail(message);
+  return sendEmail({ ...message, kind: "boutique_purchase" });
 }
 
 export async function deliverBoutiqueTrackingEmail(order) {
   const message = buildBoutiqueTrackingEmail(order);
   if (!message.to || !clean(order?.tracking, 180)) return false;
-  return sendEmail(message);
+  return sendEmail({ ...message, kind: "boutique_tracking" });
 }
 
 function emailStateKey(kind) {
