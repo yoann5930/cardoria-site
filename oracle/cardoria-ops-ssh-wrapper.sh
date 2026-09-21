@@ -53,6 +53,9 @@ case "$cmd" in
   mondial-relay-configure)
     exec sudo -n /usr/local/bin/cardoria-mondial-relay-configure
     ;;
+  colissimo-configure)
+    exec sudo -n /usr/local/bin/cardoria-colissimo-configure
+    ;;
   deploy)
     exec sudo -n /usr/local/bin/cardoria-ops deploy
     ;;

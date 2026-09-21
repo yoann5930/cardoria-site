@@ -15,6 +15,7 @@ github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops smtp-domain-configur
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops mail-dns-check
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-sumup-configure
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-mondial-relay-configure
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-colissimo-configure
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops deploy
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops deploy main
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops deploy migration/oracle-free-20260902

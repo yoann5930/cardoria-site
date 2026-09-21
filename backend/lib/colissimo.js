@@ -39,7 +39,9 @@ function labelFormat() {
 }
 
 function normalizeCountry(value) {
-  const code = clean(value || "FR", 2).toUpperCase();
+  const raw = clean(value || "FR", 40).toUpperCase();
+  if (raw === "FRANCE" || raw === "FR") return "FR";
+  const code = raw.slice(0, 2);
   if (!/^[A-Z]{2}$/.test(code)) throw failure("COLISSIMO_INPUT_INVALID", "Code pays Colissimo invalide.", 400);
   return code;
 }
@@ -83,13 +85,23 @@ function senderAddress() {
 function recipientAddress(order = {}) {
   const shipping = order.shippingAddress || {};
   const name = clean(order.client || shipping.recipientName || shipping.name, 35);
-  const line2 = clean(shipping.address || shipping.addressLine1, 35);
+  let line2 = clean(shipping.address || shipping.addressLine1, 35);
   const line3 = clean(shipping.addressLine2, 35);
-  const zipCode = clean(shipping.postalCode || shipping.zipCode, 10);
-  const city = clean(shipping.city, 35);
+  let zipCode = clean(shipping.postalCode || shipping.zipCode, 10);
+  let city = clean(shipping.city, 35);
   const countryCode = normalizeCountry(shipping.countryCode || shipping.country || "FR");
   const phoneNumber = normalizePhone(order.phone || shipping.phone);
   const email = clean(order.email || shipping.email, 80);
+  if ((!line2 || !zipCode || !city) && order.address) {
+    const lines = String(order.address).split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+    if (!line2 && lines[0]) line2 = clean(lines[0], 35);
+    const zipCity = lines[1] || "";
+    const zipMatch = zipCity.match(/^(\d{5})\s+(.+)$/);
+    if (zipMatch) {
+      if (!zipCode) zipCode = clean(zipMatch[1], 10);
+      if (!city) city = clean(zipMatch[2], 35);
+    }
+  }
   if (countryCode !== "FR") {
     throw failure("COLISSIMO_FRANCE_ONLY", "L'intégration Boutique Colissimo est actuellement limitée aux adresses en France.", 400);
   }

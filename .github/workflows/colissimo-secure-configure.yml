@@ -1,0 +1,24 @@
+name: Colissimo Secure Configure
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: colissimo-secure-configure
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'colissimo-configure:')
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: colissimo-configure
+      branch: main
+    secrets: inherit

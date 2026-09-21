@@ -66,9 +66,28 @@ test("Colissimo DOM request uses server order address and kilograms", () => {
   assert.equal(request.letter.addressee.line2, "12 rue de Paris");
   assert.equal(request.letter.addressee.zipCode, "75001");
   assert.equal(request.letter.addressee.city, "Paris");
+  assert.equal(request.letter.addressee.countryCode, "FR");
   assert.equal(request.outputFormat.outputPrintingType, "PDF_10x15_300dpi");
   assert.equal("contractNumber" in request, false);
   assert.equal("password" in request, false);
+});
+
+test("Colissimo can rebuild a France address from the Boutique textarea fallback", () => {
+  const request = buildColissimoLabelRequest({
+    order: {
+      id: "CMD-20260921-9999",
+      client: "Client Fallback",
+      email: "fallback@example.test",
+      phone: "0612345678",
+      address: "8 rue des Fleurs\n59330 Hautmont\nFrance"
+    },
+    weightGrams: 120,
+    depositDate: "2026-09-21"
+  });
+  assert.equal(request.letter.addressee.line2, "8 rue des Fleurs");
+  assert.equal(request.letter.addressee.zipCode, "59330");
+  assert.equal(request.letter.addressee.city, "Hautmont");
+  assert.equal(request.letter.addressee.countryCode, "FR");
 });
 
 test("Colissimo multipart parser extracts jsonInfos and PDF label", () => {
