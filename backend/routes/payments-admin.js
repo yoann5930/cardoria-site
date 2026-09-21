@@ -9,6 +9,7 @@ import { listBoutiqueInventory } from "../lib/boutique/stock.js";
 import { getOrder as getMarketplaceOrder } from "../lib/marketplace/orders.js";
 import { readJson, writeJson } from "../lib/storage.js";
 import { createColissimoLabel, downloadColissimoLabel, getColissimoStatus } from "../lib/colissimo.js";
+import { getBoutiqueEmailConfiguration, sendBoutiquePurchaseEmail, sendBoutiqueTrackingEmail } from "../lib/boutique/customer-emails.js";
 
 const router = Router();
 const WRITE_ADMIN = requireAuth({ roles: ["super_admin", "admin", "employee"], action: "write" });
@@ -161,7 +162,7 @@ router.post("/:id/refund", FINANCE_ADMIN, async (req, res) => {
 });
 
 router.get("/boutique-orders", (req, res) => {
-  res.json({ ok: true, carriers: BOUTIQUE_CARRIERS, colissimo: getColissimoStatus(), orders: readJson("orders", []) });
+  res.json({ ok: true, carriers: BOUTIQUE_CARRIERS, colissimo: getColissimoStatus(), email: getBoutiqueEmailConfiguration(), orders: readJson("orders", []) });
 });
 
 router.get("/boutique-orders/:id", (req, res) => {
@@ -184,7 +185,7 @@ router.get("/boutique-inventory", (req, res) => {
   res.json({ ok: true, inventory, totals });
 });
 
-router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
+router.put("/boutique-orders/:id", WRITE_ADMIN, async (req, res) => {
   const orders = readJson("orders", []);
   const index = orders.findIndex((order) => String(order.id) === String(req.params.id));
   if (index < 0) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
@@ -231,7 +232,47 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
   writeJson("orders", orders);
 
   logAudit({ type: "boutique_order", action: "update", user: req.authUser?.email || "admin", detail: `${current.id} — ${previousStatus || "—"} -> ${current.status}` });
-  res.json({ ok: true, order: current });
+
+  let emailNotification = null;
+  if (current.status === "Expédiée" && current.carrier && current.tracking) {
+    try {
+      emailNotification = await sendBoutiqueTrackingEmail(current.id);
+    } catch (error) {
+      emailNotification = { ok: false, sent: false, error: clean(error?.message || "Envoi e-mail de suivi impossible.", 240) };
+    }
+  }
+
+  res.json({ ok: true, order: findBoutiqueOrder(current.id) || current, emailNotification });
+});
+
+router.post("/boutique-orders/:id/emails/purchase", WRITE_ADMIN, async (req, res) => {
+  const order = findBoutiqueOrder(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  if (order.paymentStatus !== "paid") return res.status(409).json({ ok: false, error: "Le paiement doit être confirmé avant l'envoi du mail d'achat." });
+  try {
+    const result = await sendBoutiquePurchaseEmail(order.id, { force: true });
+    if (!result.sent) return res.status(result.reason === "smtp_not_configured" ? 503 : 502).json({ ok: false, ...result });
+    logAudit({ type: "boutique_order", action: "purchase_email_resent", user: req.authUser?.email || "admin", detail: order.id });
+    res.json({ ok: true, sent: true, order: result.order });
+  } catch (error) {
+    res.status(502).json({ ok: false, sent: false, error: clean(error?.message || "Envoi du mail d'achat impossible.", 240) });
+  }
+});
+
+router.post("/boutique-orders/:id/emails/tracking", WRITE_ADMIN, async (req, res) => {
+  const order = findBoutiqueOrder(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  if (order.status !== "Expédiée" || !order.carrier || !order.tracking) {
+    return res.status(409).json({ ok: false, error: "La commande doit être expédiée avec transporteur et numéro de suivi." });
+  }
+  try {
+    const result = await sendBoutiqueTrackingEmail(order.id, { force: true });
+    if (!result.sent) return res.status(result.reason === "smtp_not_configured" ? 503 : 502).json({ ok: false, ...result });
+    logAudit({ type: "boutique_order", action: "tracking_email_resent", user: req.authUser?.email || "admin", detail: order.id });
+    res.json({ ok: true, sent: true, order: result.order });
+  } catch (error) {
+    res.status(502).json({ ok: false, sent: false, error: clean(error?.message || "Envoi du mail de suivi impossible.", 240) });
+  }
 });
 
 router.post("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, async (req, res) => {
