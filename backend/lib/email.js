@@ -8,7 +8,7 @@ function envTrim(name) {
   return String(process.env[name] || "").trim();
 }
 
-/** SMTP Gmail utilisable : hôte + compte + mot de passe d'application. Ne lit jamais le secret pour le journaliser. */
+/** SMTP utilisable : hôte + compte + mot de passe. Ne lit jamais le secret pour le journaliser. */
 export function isSmtpConfigured() {
   return Boolean(envTrim("SMTP_HOST") && envTrim("SMTP_USER") && envTrim("SMTP_PASS"));
 }
@@ -18,6 +18,31 @@ export function smtpMissingReason() {
   if (!envTrim("SMTP_USER")) return "SMTP_USER manquant";
   if (!envTrim("SMTP_PASS")) return "SMTP_PASS manquant";
   return "";
+}
+
+function mailbox(value) {
+  const email = String(value || "").trim();
+  return /^\S+@\S+\.\S+$/.test(email) ? email : "";
+}
+
+export function getEmailPublicStatus() {
+  const smtpUser = mailbox(envTrim("SMTP_USER"));
+  const from = mailbox(envTrim("MAIL_FROM")) || smtpUser;
+  const replyTo = mailbox(envTrim("MAIL_REPLY_TO")) || from;
+  const host = envTrim("SMTP_HOST");
+  return {
+    configured: isSmtpConfigured(),
+    host,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || "").toLowerCase() === "true" || Number(process.env.SMTP_PORT || 587) === 465,
+    smtpUser,
+    from,
+    fromName: envTrim("MAIL_FROM_NAME") || "Cardoria",
+    replyTo,
+    fromDomain: from.includes("@") ? from.split("@").pop().toLowerCase() : "",
+    dkimSelector: envTrim("MAIL_DKIM_SELECTOR"),
+    missingReason: smtpMissingReason()
+  };
 }
 
 function createSmtpTransport() {
@@ -50,8 +75,11 @@ export async function sendEmail({ subject, text, html, attachments, to }) {
   }
   try {
     const transporter = createSmtpTransport();
+    const status = getEmailPublicStatus();
+    const fromAddress = status.from || envTrim("SMTP_USER");
     await transporter.sendMail({
-      from: envTrim("MAIL_FROM") || envTrim("SMTP_USER"),
+      from: status.fromName ? { name: status.fromName, address: fromAddress } : fromAddress,
+      replyTo: status.replyTo || undefined,
       to: to || ALERT_EMAIL,
       subject,
       text,
