@@ -73,6 +73,7 @@ jobs:
           node --check lib/engine/tcgdex-sync.js
           node --check lib/colissimo.js
           node --check lib/boutique/shipping.js
+          node --check lib/boutique/stock.js
           node --check lib/boutique/order-lock.js
           node --check lib/boutique/checkout.js
           node --check lib/boutique/customer-emails.js
@@ -93,6 +94,7 @@ jobs:
           node --check ../js/admin/admin-catalog-sealed-shortcuts.js
           node --check ../js/admin/admin-sealed-references.js
           node --check ../js/admin/admin-orders.js
+          node --check ../js/admin/admin-stock.js
           bash -n ../oracle/cardoria-ops.sh
           bash -n ../oracle/cardoria-ops-ssh-wrapper.sh
           bash -n ../oracle/colissimo-configure.sh

@@ -260,13 +260,15 @@
       const meta = [product.extension, product.number ? "#" + product.number : "", product.rarity].filter(Boolean).join(" · ");
       const stock = Math.max(0, Number(product.stock || 0));
       const canBuy = !!product.purchasable && stock > 0 && Number(product.price || 0) > 0;
+      const availability = product.availability || (stock <= 0 ? "out" : stock <= Number(product.lowStockThreshold || 2) ? "low" : "available");
+      const stockLabel = product.availabilityLabel || (availability === "out" ? "Rupture de stock" : availability === "low" ? ("Plus que " + stock + " en stock") : "En stock");
       return '<article class="product" data-product-id="' + esc(product.id) + '" data-preview-product="' + esc(product.id) + '">' +
         '<div class="product-img pokemon-product-visual" data-preview-product="' + esc(product.id) + '" role="button" tabindex="0">' +
           '<img src="' + esc(image) + '" alt="' + esc(product.name || "Produit Pokémon") + '" loading="lazy" onerror="this.onerror=null;this.src=\'' + POKEMON_LOGO + '\'">' +
         '</div>' +
         '<h3 class="product-name">' + esc(product.name) + '</h3>' +
         (meta ? '<p class="product-meta">' + esc(meta) + '</p>' : '') +
-        '<div class="product-stock-row"><span>État : ' + esc(product.condition || "Non renseigné") + '</span><span>' + (stock > 0 ? "En stock : " + stock : "Rupture de stock") + '</span></div>' +
+        '<div class="product-stock-row"><span class="product-condition">État : ' + esc(product.condition || "Non renseigné") + '</span><span class="product-stock is-' + esc(availability) + '">' + esc(stockLabel) + '</span></div>' +
         '<div class="price">' + (Number(product.price || 0) > 0 ? euro(product.price) : "Prix à définir") + '</div>' +
         '<button class="primary" type="button" data-add-product="' + esc(product.id) + '" ' + (canBuy ? "" : "disabled") + '>' + (canBuy ? "Ajouter au panier" : "Indisponible") + '</button>' +
       '</article>';
@@ -362,7 +364,9 @@
       }
       const available = Math.max(0, Number(product.stock || 0));
       const qty = Math.min(previousQty, available);
-      if (qty < previousQty) notices.push("Quantité disponible mise à jour : " + qty);
+      if (qty < previousQty) {
+        notices.push("La quantité disponible pour " + (product.name || item.name || "cet article") + " est maintenant de " + qty + ".");
+      }
       next.push({ ...product, qty });
     });
     cart = next;

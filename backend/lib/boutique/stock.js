@@ -6,7 +6,10 @@ const DEFAULT_PURCHASES = [];
 const DEFAULT_ORDERS = [];
 export const PENDING_RESERVATION_MS = 30 * 60 * 1000;
 export const LOW_STOCK_THRESHOLD = 2;
+export const MAX_STOCK_BASE = 100000;
 export const STOCK_PREFS_TAG = "[STOCK_PREFS]";
+const STOCK_PREFS_LINE = /\[STOCK_PREFS\]\s*(\{[^\n\r]*\})/;
+const STOCK_PREF_KEY = /^[\w.:-]{1,240}$/;
 
 export function boutiqueStockImpact(order) {
   const payment = String(order?.paymentStatus || "").toLowerCase();
@@ -15,13 +18,21 @@ export function boutiqueStockImpact(order) {
   if (["failed", "cancelled", "canceled"].includes(payment) || status === "Paiement échoué") {
     return { code: "released", label: "Non décrémenté" };
   }
-  if (status === "Annulée" && payment === "paid") return { code: "hold", label: "Stock bloqué (remboursement à confirmer)" };
+  if (status === "Annulée" && payment === "paid") return { code: "hold", label: "Stock bloqué — remboursement en attente" };
   if (status === "Annulée") return { code: "released", label: "Non décrémenté (annulée)" };
   if (payment === "paid") return { code: "decremented", label: "Décrémenté" };
   if (payment === "pending" || status === "En attente SumUp") {
     return { code: "reserved", label: "Réservé (paiement en attente, 30 min)" };
   }
   return { code: "none", label: "Non décrémenté" };
+}
+
+export function boutiqueAvailability(item) {
+  const stock = Math.max(0, Number(item?.stock || 0));
+  const oversold = Number(item?.oversoldStock || 0) > 0;
+  if (oversold || stock <= 0) return { code: "out", label: "Rupture de stock" };
+  if (stock <= LOW_STOCK_THRESHOLD) return { code: "low", label: "Plus que " + stock + " en stock" };
+  return { code: "available", label: "En stock" };
 }
 
 export function stockAlertBucket(item) {
@@ -75,8 +86,12 @@ function conditionLabel(value, packaging) {
   return labels[normalizeCondition(value)] || "Non renseigné";
 }
 
+function invalidStockPrefs(message) {
+  return Object.assign(new Error(message), { status: 400, code: "STOCK_PREFS_INVALID" });
+}
+
 function parseStockPrefs(notes) {
-  const match = String(notes || "").match(/\[STOCK_PREFS\]\s*(\{[^\n\r]*\})/);
+  const match = String(notes || "").match(STOCK_PREFS_LINE);
   if (!match) return {};
   try {
     const parsed = JSON.parse(match[1]);
@@ -84,6 +99,86 @@ function parseStockPrefs(notes) {
   } catch {
     return {};
   }
+}
+
+function parseStockPrefsStrict(notes) {
+  const raw = String(notes || "");
+  if (!raw.includes(STOCK_PREFS_TAG)) throw invalidStockPrefs("Préférences de stock manquantes.");
+  const match = raw.match(STOCK_PREFS_LINE);
+  if (!match) throw invalidStockPrefs("Préférences de stock illisibles.");
+  try {
+    const parsed = JSON.parse(match[1]);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("object");
+    return parsed;
+  } catch {
+    throw invalidStockPrefs("Préférences de stock JSON invalides.");
+  }
+}
+
+export function sanitizeStockPreference(pref) {
+  if (!pref || typeof pref !== "object" || Array.isArray(pref)) {
+    throw invalidStockPrefs("Préférence de stock invalide.");
+  }
+  const rawCondition = String(pref.condition == null ? "" : pref.condition).trim();
+  const condition = normalizeCondition(pref.condition);
+  if (rawCondition && !condition) throw invalidStockPrefs("État de carte invalide.");
+  if (pref.boutique !== undefined && pref.boutique !== true && pref.boutique !== false) {
+    throw invalidStockPrefs("Activation Boutique invalide.");
+  }
+  let boutiquePrice = null;
+  if (pref.boutiquePrice !== undefined && pref.boutiquePrice !== null && pref.boutiquePrice !== "") {
+    const rawPrice = Number(String(pref.boutiquePrice).replace(",", "."));
+    if (!Number.isFinite(rawPrice) || rawPrice <= 0) throw invalidStockPrefs("Prix Boutique invalide.");
+    boutiquePrice = money(rawPrice);
+  }
+  let stockBase = null;
+  if (pref.stockBase !== undefined && pref.stockBase !== null && pref.stockBase !== "") {
+    if (typeof pref.stockBase !== "number" && typeof pref.stockBase !== "string") {
+      throw invalidStockPrefs("Quantité de stock invalide.");
+    }
+    if (typeof pref.stockBase === "string" && !/^\d+$/.test(pref.stockBase.trim())) {
+      throw invalidStockPrefs("Quantité de stock invalide.");
+    }
+    const rawStock = Number(pref.stockBase);
+    if (!Number.isInteger(rawStock) || rawStock < 0 || rawStock > MAX_STOCK_BASE) {
+      throw invalidStockPrefs("Quantité de stock invalide.");
+    }
+    stockBase = rawStock;
+  }
+  let shippingWeightGrams = null;
+  if (pref.shippingWeightGrams !== undefined && pref.shippingWeightGrams !== null && pref.shippingWeightGrams !== "") {
+    if (typeof pref.shippingWeightGrams === "string" && !/^\d+$/.test(String(pref.shippingWeightGrams).trim())) {
+      throw invalidStockPrefs("Poids d'expédition invalide.");
+    }
+    const rawWeight = Number(pref.shippingWeightGrams);
+    if (!Number.isInteger(rawWeight) || rawWeight < 1 || rawWeight > 30000) {
+      throw invalidStockPrefs("Poids d'expédition invalide.");
+    }
+    shippingWeightGrams = rawWeight;
+  }
+  if (pref.removed !== undefined && pref.removed !== true && pref.removed !== false) {
+    throw invalidStockPrefs("Statut de retrait invalide.");
+  }
+  return {
+    condition,
+    boutique: pref.boutique === undefined ? true : pref.boutique === true,
+    boutiquePrice,
+    stockBase,
+    shippingWeightGrams,
+    removed: pref.removed === true
+  };
+}
+
+export function applyStockPrefsToNotes(existingNotes, incomingNotes) {
+  const parsed = parseStockPrefsStrict(incomingNotes);
+  const sanitized = {};
+  for (const [key, pref] of Object.entries(parsed)) {
+    if (!STOCK_PREF_KEY.test(String(key || ""))) throw invalidStockPrefs("Référence de stock invalide.");
+    sanitized[key] = sanitizeStockPreference(pref);
+  }
+  const base = String(existingNotes || "").replace(/\n?\[STOCK_PREFS\]\s*\{[^\n\r]*\}/g, "").replace(/\s+$/, "");
+  const line = STOCK_PREFS_TAG + " " + JSON.stringify(sanitized);
+  return base ? base + "\n" + line : line;
 }
 
 function readLinePreference(purchase, key) {
@@ -408,6 +503,7 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
   const catalogLinked = !isCardPackaging(line.packaging) || Boolean(line.cardId);
   const identityReady = !isCardPackaging(line.packaging) || (Boolean(line.cardId) && Boolean(line.name) && Boolean(line.image));
   const priceReady = Number(price || 0) > 0;
+  const availability = boutiqueAvailability({ stock, oversoldStock });
   const publicProduct = {
     id: line.key,
     cardId: line.cardId,
@@ -432,6 +528,9 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     identityReady,
     priceReady,
     purchasable: boutiqueEnabled && identityReady && priceReady && stock > 0 && oversoldStock === 0,
+    availability: availability.code,
+    availabilityLabel: availability.label,
+    lowStockThreshold: LOW_STOCK_THRESHOLD,
     shippingWeightGrams: Number.isFinite(Number(line.shippingWeightGrams)) && Number(line.shippingWeightGrams) >= 1
       ? Math.trunc(Number(line.shippingWeightGrams))
       : null
@@ -481,4 +580,39 @@ export function listBoutiqueInventory({ includeDisabled = true } = {}) {
 
 export function getBoutiqueProduct(productId) {
   return listBoutiqueProducts({ includeDisabled: false }).find((product) => String(product.id) === String(productId)) || null;
+}
+
+export function summarizeBoutiqueInventory(inventory) {
+  const totals = (inventory || []).reduce((acc, item) => {
+    const enabled = item.boutiqueEnabled !== false && item.stockRemoved !== true;
+    acc.baseStock += Number(item.baseStock || 0);
+    acc.availableStock += Number(item.stock || 0);
+    acc.pendingStock += Number(item.pendingStock || 0);
+    acc.soldStock += Number(item.soldStock || 0);
+    acc.refundHoldStock += Number(item.refundHoldStock || 0);
+    acc.oversoldStock += Number(item.oversoldStock || 0);
+    acc.stockValue = Math.round((acc.stockValue + Number(item.stock || 0) * Number(item.averagePurchaseCost || 0)) * 100) / 100;
+    if (enabled && Number(item.stock || 0) > 0 && Number(item.oversoldStock || 0) === 0) acc.availableProducts += 1;
+    if (item.alertBucket === "low") acc.lowStockProducts += 1;
+    if (item.alertBucket === "out") acc.outOfStockProducts += 1;
+    if (Number(item.oversoldStock || 0) > 0) acc.oversoldProducts += 1;
+    if (item.stockRemoved || item.boutiqueEnabled === false) acc.removedProducts += 1;
+    return acc;
+  }, {
+    baseStock: 0,
+    availableStock: 0,
+    pendingStock: 0,
+    soldStock: 0,
+    refundHoldStock: 0,
+    oversoldStock: 0,
+    stockValue: 0,
+    availableProducts: 0,
+    lowStockProducts: 0,
+    outOfStockProducts: 0,
+    oversoldProducts: 0,
+    removedProducts: 0
+  });
+  totals.lowStock = totals.lowStockProducts;
+  totals.outOfStock = totals.outOfStockProducts;
+  return totals;
 }

@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { isSumUpConfigured, syncPaymentFromCheckout, handleSumUpWebhook } from "../lib/payments/sumup.js";
 import { listBoutiqueProducts } from "../lib/boutique/catalog.js";
+import { LOW_STOCK_THRESHOLD } from "../lib/boutique/stock.js";
 import { createLiveBoutiqueCheckout } from "../lib/boutique/checkout.js";
 import { assertSaleProvider } from "../lib/payments/routing.js";
 import { validateSession } from "../lib/auth/session.js";
@@ -16,7 +17,11 @@ router.get("/status", (req, res) => {
 
 router.get("/boutique/products", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  res.json({ ok: true, products: listBoutiqueProducts({ includeDisabled: false }) });
+  res.json({
+    ok: true,
+    products: listBoutiqueProducts({ includeDisabled: false }),
+    lowStockThreshold: LOW_STOCK_THRESHOLD
+  });
 });
 
 router.post("/boutique/checkout", async (req, res) => {

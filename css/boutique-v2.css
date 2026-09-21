@@ -84,7 +84,9 @@ body.shop-v1 .product-condition{color:#aaa095}
 body.shop-v1 .product-stock{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-weight:700;letter-spacing:.02em}
 body.shop-v1 .product-stock::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px rgba(255,255,255,.025)}
 body.shop-v1 .product-stock.is-available{color:#8fd19a}
-body.shop-v1 .product-stock.is-empty{color:#df8a8a}
+body.shop-v1 .product-stock.is-low{color:#f0cc61}
+body.shop-v1 .product-stock.is-empty,
+body.shop-v1 .product-stock.is-out{color:#df8a8a}
 body.shop-v1 .product .price{margin:17px 0 15px;color:#f0cc61;font-size:23px;font-weight:600;letter-spacing:.01em}
 body.shop-v1 .product .primary{min-height:42px;border:1px solid rgba(201,165,68,.48);border-radius:4px;background:transparent;color:#f0d16f;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 body.shop-v1 .product .primary:hover:not(:disabled){transform:none;background:var(--shop-gold);color:#0b0802;box-shadow:none}
