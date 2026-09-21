@@ -8,12 +8,13 @@ import { refundSumUpTransaction } from "../lib/payments/sumup-refund.js";
 import { listBoutiqueInventory } from "../lib/boutique/stock.js";
 import { getOrder as getMarketplaceOrder } from "../lib/marketplace/orders.js";
 import { readJson, writeJson } from "../lib/storage.js";
+import { createColissimoLabel, downloadColissimoLabel, getColissimoStatus } from "../lib/colissimo.js";
 
 const router = Router();
 const WRITE_ADMIN = requireAuth({ roles: ["super_admin", "admin", "employee"], action: "write" });
 const FINANCE_ADMIN = requireAuth({ roles: ["super_admin", "admin"], action: "finance" });
 const BOUTIQUE_STATUSES = ["À préparer", "En préparation", "Expédiée", "Livrée", "Annulée"];
-const BOUTIQUE_CARRIERS = ["La Poste", "Mondial Relay", "Relais Colis"];
+const BOUTIQUE_CARRIERS = ["Colissimo (La Poste)", "La Poste", "Mondial Relay", "Relais Colis"];
 
 function clean(value, max = 500) {
   return String(value == null ? "" : value).trim().slice(0, max);
@@ -160,7 +161,7 @@ router.post("/:id/refund", FINANCE_ADMIN, async (req, res) => {
 });
 
 router.get("/boutique-orders", (req, res) => {
-  res.json({ ok: true, carriers: BOUTIQUE_CARRIERS, orders: readJson("orders", []) });
+  res.json({ ok: true, carriers: BOUTIQUE_CARRIERS, colissimo: getColissimoStatus(), orders: readJson("orders", []) });
 });
 
 router.get("/boutique-orders/:id", (req, res) => {
@@ -200,7 +201,7 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
     return res.status(409).json({ ok: false, error: "Le paiement SumUp doit être confirmé avant de préparer ou expédier la commande." });
   }
   if (nextCarrier && !BOUTIQUE_CARRIERS.includes(nextCarrier) && nextCarrier !== clean(current.carrier, 120)) {
-    return res.status(400).json({ ok: false, error: "Transporteur non autorisé. Choisissez La Poste, Mondial Relay ou Relais Colis." });
+    return res.status(400).json({ ok: false, error: "Transporteur non autorisé. Choisissez Colissimo (La Poste), La Poste, Mondial Relay ou Relais Colis." });
   }
   if (nextStatus === "Expédiée" && (!nextCarrier || !clean(body.tracking, 180))) {
     return res.status(400).json({ ok: false, error: "Transporteur et numéro de suivi obligatoires pour expédier la commande." });
@@ -231,6 +232,92 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, (req, res) => {
 
   logAudit({ type: "boutique_order", action: "update", user: req.authUser?.email || "admin", detail: `${current.id} — ${previousStatus || "—"} -> ${current.status}` });
   res.json({ ok: true, order: current });
+});
+
+router.post("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, async (req, res) => {
+  const orders = readJson("orders", []);
+  const index = orders.findIndex((order) => String(order.id) === String(req.params.id));
+  if (index < 0) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  const current = orders[index];
+  if (current.paymentStatus !== "paid") return res.status(409).json({ ok: false, error: "Le paiement SumUp doit être confirmé avant de créer une étiquette Colissimo." });
+  if (current.status === "Annulée") return res.status(409).json({ ok: false, error: "Une commande annulée ne peut pas être expédiée." });
+  if (current.colissimoParcelNumber) {
+    return res.status(409).json({ ok: false, code: "COLISSIMO_LABEL_ALREADY_CREATED", error: "Une étiquette Colissimo existe déjà pour cette commande.", parcelNumber: current.colissimoParcelNumber });
+  }
+  if (current.colissimoLabelAttempt?.status === "reconciliation_required") {
+    return res.status(409).json({ ok: false, code: "COLISSIMO_RECONCILIATION_REQUIRED", error: "Une tentative Colissimo doit être rapprochée dans la Cbox avant tout nouvel essai." });
+  }
+  const weightGrams = Math.trunc(Number(req.body?.weightGrams));
+  if (!Number.isFinite(weightGrams) || weightGrams < 1 || weightGrams > 30000) {
+    return res.status(400).json({ ok: false, error: "Poids Colissimo requis entre 1 g et 30 kg." });
+  }
+
+  const requestedAt = new Date().toISOString();
+  current.shippingWeightGrams = weightGrams;
+  current.colissimoLabelAttempt = { status: "creation_pending", requestedAt, weightGrams };
+  current.updatedAt = requestedAt;
+  orders[index] = current;
+  writeJson("orders", orders);
+
+  try {
+    const created = await createColissimoLabel({ order: current, weightGrams });
+    const refreshed = readJson("orders", []);
+    const refreshedIndex = refreshed.findIndex((order) => String(order.id) === String(req.params.id));
+    if (refreshedIndex < 0) throw Object.assign(new Error("Commande Boutique introuvable après création Colissimo."), { status: 500 });
+    const order = refreshed[refreshedIndex];
+    const now = new Date().toISOString();
+    order.carrier = "Colissimo (La Poste)";
+    order.tracking = created.trackingNumber;
+    order.colissimoParcelNumber = created.parcelNumber;
+    order.colissimoProductCode = created.productCode;
+    order.colissimoLabelFormat = created.labelFormat;
+    order.colissimoPdfUrl = created.pdfUrl || "";
+    order.colissimoLabelCreatedAt = now;
+    order.colissimoLabelAttempt = { status: "created", requestedAt, completedAt: now, weightGrams };
+    order.updatedAt = now;
+    refreshed[refreshedIndex] = order;
+    writeJson("orders", refreshed);
+    logAudit({ type: "shipping", action: "colissimo_label_created", user: req.authUser?.email || "admin", detail: order.id + " — " + created.parcelNumber });
+    res.status(201).json({ ok: true, provider: created.provider, parcelNumber: created.parcelNumber, trackingNumber: created.trackingNumber, trackingUrl: created.trackingUrl, labelPath: "/api/admin/payments/boutique-orders/" + encodeURIComponent(order.id) + "/colissimo-label", order });
+  } catch (error) {
+    const refreshed = readJson("orders", []);
+    const refreshedIndex = refreshed.findIndex((order) => String(order.id) === String(req.params.id));
+    if (refreshedIndex >= 0) {
+      const order = refreshed[refreshedIndex];
+      const now = new Date().toISOString();
+      const reconciliation = error?.code === "COLISSIMO_RECONCILIATION_REQUIRED";
+      order.colissimoLabelAttempt = {
+        status: reconciliation ? "reconciliation_required" : "failed",
+        requestedAt,
+        failedAt: now,
+        weightGrams,
+        code: clean(error?.code, 80)
+      };
+      order.updatedAt = now;
+      refreshed[refreshedIndex] = order;
+      writeJson("orders", refreshed);
+    }
+    const status = Number(error?.status);
+    res.status(Number.isInteger(status) && status >= 400 && status <= 599 ? status : 502).json({ ok: false, code: error?.code || "COLISSIMO_LABEL_FAILED", error: error?.message || "Création de l'étiquette Colissimo impossible." });
+  }
+});
+
+router.get("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, async (req, res) => {
+  const order = findBoutiqueOrder(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  if (!order.colissimoParcelNumber) return res.status(404).json({ ok: false, error: "Aucune étiquette Colissimo pour cette commande." });
+  try {
+    const bytes = await downloadColissimoLabel(order.colissimoParcelNumber, order.colissimoPdfUrl || "");
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'attachment; filename="colissimo-' + String(order.colissimoParcelNumber).replace(/[^A-Za-z0-9_-]/g, "") + '.pdf"');
+    res.setHeader("Content-Length", String(bytes.length));
+    res.send(bytes);
+  } catch (error) {
+    const status = Number(error?.status);
+    res.status(Number.isInteger(status) && status >= 400 && status <= 599 ? status : 502).json({ ok: false, code: error?.code || "COLISSIMO_LABEL_UNAVAILABLE", error: error?.message || "Téléchargement de l'étiquette Colissimo impossible." });
+  }
 });
 
 router.post("/boutique-orders/:id/sync-sumup", WRITE_ADMIN, async (req, res) => {
