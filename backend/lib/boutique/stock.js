@@ -5,7 +5,34 @@ import { floorCardPrice } from "../pricing/card-price-floor.js";
 const DEFAULT_PURCHASES = [];
 const DEFAULT_ORDERS = [];
 export const PENDING_RESERVATION_MS = 30 * 60 * 1000;
+export const LOW_STOCK_THRESHOLD = 2;
 export const STOCK_PREFS_TAG = "[STOCK_PREFS]";
+
+export function boutiqueStockImpact(order) {
+  const payment = String(order?.paymentStatus || "").toLowerCase();
+  const status = String(order?.status || "");
+  if (payment === "refunded" || status === "Remboursée") return { code: "released", label: "Stock remis (remboursé)" };
+  if (["failed", "cancelled", "canceled"].includes(payment) || status === "Paiement échoué") {
+    return { code: "released", label: "Non décrémenté" };
+  }
+  if (status === "Annulée" && payment === "paid") return { code: "hold", label: "Stock bloqué (remboursement à confirmer)" };
+  if (status === "Annulée") return { code: "released", label: "Non décrémenté (annulée)" };
+  if (payment === "paid") return { code: "decremented", label: "Décrémenté" };
+  if (payment === "pending" || status === "En attente SumUp") {
+    return { code: "reserved", label: "Réservé (paiement en attente, 30 min)" };
+  }
+  return { code: "none", label: "Non décrémenté" };
+}
+
+export function stockAlertBucket(item) {
+  const stock = Math.max(0, Number(item?.stock || 0));
+  const enabled = item?.boutiqueEnabled !== false && item?.stockRemoved !== true;
+  if (!enabled) return "";
+  if (Number(item?.oversoldStock || 0) > 0) return "oversold";
+  if (stock <= 0) return "out";
+  if (stock <= LOW_STOCK_THRESHOLD) return "low";
+  return "";
+}
 
 function money(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
@@ -428,7 +455,9 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     purchaseIds: line.purchaseIds.slice(),
     boutiquePrice: line.boutiquePrice == null ? null : (isCardPackaging(line.packaging) ? floorCardPrice(line.boutiquePrice) : money(line.boutiquePrice)),
     latestPurchaseAt: line.latestPurchaseAt,
-    inventoryStatus: line.stockRemoved ? "removed" : !identityReady ? "catalog_link_required" : !priceReady ? "catalog_price_required" : oversoldStock > 0 ? "oversold" : stock <= 0 ? "out_of_stock" : allocation.pendingStock > 0 ? "reserved" : "available"
+    inventoryStatus: line.stockRemoved ? "removed" : !identityReady ? "catalog_link_required" : !priceReady ? "catalog_price_required" : oversoldStock > 0 ? "oversold" : stock <= 0 ? "out_of_stock" : allocation.pendingStock > 0 ? "reserved" : stock <= LOW_STOCK_THRESHOLD ? "low_stock" : "available",
+    alertBucket: stockAlertBucket({ stock, boutiqueEnabled, stockRemoved: line.stockRemoved, oversoldStock }),
+    lowStockThreshold: LOW_STOCK_THRESHOLD
   };
 }
 

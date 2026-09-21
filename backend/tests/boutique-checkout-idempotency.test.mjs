@@ -122,7 +122,7 @@ function runWorker(moduleUrl, lockRoot, stateFile) {
   });
 }
 
-test("inter-process lock serializes the shared order creation critical section", async () => {
+test("inter-process lock serializes the shared order creation critical section", { skip: process.platform === "win32" ? "Windows file URL join duplicates the drive letter" : false }, async () => {
   const lockRoot = tempLockRoot();
   const stateFile = path.join(lockRoot, "state.json");
   fs.writeFileSync(stateFile, JSON.stringify({ created: 0, orderId: "" }), "utf8");

@@ -115,7 +115,7 @@
       var clientBox = section("Client",
         '<p><strong>'+esc(o.client||"Client")+'</strong><br>'+esc(o.email||"")+(o.phone?'<br>'+esc(o.phone):"")+'</p>');
       var paymentBox = section("Paiement",
-        '<p><span class="admin-badge '+paymentClass(o)+'">'+esc(paymentLabel(o))+'</span><br><small>Montant : '+euro(total(o))+'</small></p>');
+        '<p><span class="admin-badge '+paymentClass(o)+'">'+esc(paymentLabel(o))+'</span><br><small>Montant : '+euro(total(o))+'</small><br><small>Stock : '+esc((o.stockImpact && o.stockImpact.label) || "—")+'</small></p>');
       var itemsBox = section("Articles",
         '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Article</th><th>Qté</th><th>PU</th><th>Total</th></tr></thead><tbody>'+items+'</tbody></table></div>');
       var deliveryBox = section("Livraison",
@@ -125,7 +125,7 @@
           : '<p><small>Adresse</small><br>'+esc(o.address||"—")+'</p>'));
       var expeditionBox = section("Expédition",
         '<div class="admin-form-grid">'+
-          '<label>Statut de préparation<select data-field="status">'+options(STATUSES,o.status)+'</select></label>'+
+          '<label>Statut de préparation<select data-field="status">'+options(STATUSES.indexOf(o.status)<0 && o.status ? [o.status].concat(STATUSES) : STATUSES,o.status)+'</select></label>'+
           '<label>Transporteur<select data-field="carrier">'+options(legacyCarrier,o.carrier||"","Choisir")+'</select></label>'+
           '<label>Numéro de suivi<input data-field="tracking" value="'+esc(tracking)+'" placeholder="Rempli automatiquement pour Colissimo"></label>'+
           '<label>Poids du colis (g)<input data-field="shippingWeightGrams" type="number" min="1" max="30000" step="1" value="'+esc(o.shippingWeightGrams||(weight.known?weight.grams:""))+'" placeholder="'+(weight.known?"Calculé : "+weight.grams:"Ex. 250")+'"></label>'+

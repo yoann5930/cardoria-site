@@ -14,6 +14,7 @@
   let searchFrame = 0;
   let lastPreviewTrigger = null;
   let selectedRelay = null;
+  let cartNotices = [];
 
   const qs = (id) => document.getElementById(id);
   const euro = (value) => Number(value || 0).toFixed(2).replace(".", ",") + " €";
@@ -346,13 +347,27 @@
       } catch {}
     }
 
-    cart = cart.map((item) => {
-      const product = products.find((candidate) => String(candidate.id) === String(item.id));
-      if (!product || !product.purchasable || Number(product.stock || 0) <= 0) return null;
-      return { ...product, qty: Math.min(Number(item.qty || 1), Number(product.stock || 0)) };
-    }).filter(Boolean);
+    cartNotices = syncCartQuantities();
+  }
 
+  function syncCartQuantities() {
+    const notices = [];
+    const next = [];
+    cart.forEach((item) => {
+      const product = products.find((candidate) => String(candidate.id) === String(item.id));
+      const previousQty = Math.max(1, Number(item.qty || 1));
+      if (!product || !product.purchasable || Number(product.stock || 0) <= 0) {
+        notices.push((item.name || "Article") + " n’est plus disponible.");
+        return;
+      }
+      const available = Math.max(0, Number(product.stock || 0));
+      const qty = Math.min(previousQty, available);
+      if (qty < previousQty) notices.push("Quantité disponible mise à jour : " + qty);
+      next.push({ ...product, qty });
+    });
+    cart = next;
     saveCart();
+    return notices;
   }
 
   function ensurePreviewModal() {
@@ -408,9 +423,10 @@
     const container = qs("cart");
     const total = qs("cartTotal");
     if (!container || !total) return;
-    container.innerHTML = cart.length
+    const notices = (cartNotices || []).map((text) => '<li class="shop-cart-notice">' + esc(text) + "</li>").join("");
+    container.innerHTML = notices + (cart.length
       ? cart.map((item) => '<li>' + item.qty + " × " + esc(item.name) + " — " + euro(item.qty * item.price) + '</li>').join("")
-      : "<li>Panier vide</li>";
+      : "<li>Panier vide</li>");
     total.textContent = euro(cart.reduce((sum, item) => sum + item.qty * item.price, 0));
   }
 
@@ -558,6 +574,7 @@
           ...customer,
           items,
           provider:"sumup",
+          shippingCost: 0,
           shippingMethod: customer.shippingMethod,
           pickupPoint: customer.pickupPoint || null,
           shipping: customer.shipping,

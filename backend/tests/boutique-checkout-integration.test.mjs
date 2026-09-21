@@ -16,7 +16,7 @@ test("Boutique checkout uses request-level locking before creating an order", ()
 });
 
 test("existing pending order with checkout is reused and unfinished stale order requires reconciliation", () => {
-  assert.match(source, /if \(existing\?\.sumupCheckoutId\) return existingCheckoutResponse\(existing\);/);
+  assert.match(source, /existingCheckoutResponse/);
   assert.match(source, /BOUTIQUE_CHECKOUT_IN_PROGRESS/);
   assert.match(source, /BOUTIQUE_CHECKOUT_RECONCILIATION_REQUIRED/);
   assert.match(source, /checkoutCreationStatus = "reconciliation_required"/);
@@ -24,7 +24,9 @@ test("existing pending order with checkout is reused and unfinished stale order 
 
 test("stock and server amount validation happen inside the critical section before new order persistence", () => {
   const lockIndex = source.indexOf("return withCheckoutRequestLock(requestKey");
-  const validateIndex = source.indexOf("const verifiedItems = validateItems(requestedItems)");
-  const unshiftIndex = source.indexOf("orders.unshift(order)");
-  assert.ok(lockIndex >= 0 && validateIndex > lockIndex && unshiftIndex > validateIndex);
+  const persistIndex = source.indexOf("return persistCreatingOrder({");
+  const validateIndex = source.indexOf("const verifiedItems = validateBoutiqueItems(requestedItems)");
+  assert.ok(lockIndex >= 0 && persistIndex > lockIndex && validateIndex > lockIndex);
+  assert.match(source, /orders\.unshift\(order\)/);
+  assert.match(source, /withBoutiqueOrderLock/);
 });

@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { DATA_DIR } from "../storage.js";
+import { getDataDir } from "../storage.js";
 
 export const PENDING_CHECKOUT_REUSE_MS = 30 * 60 * 1000;
 export const CHECKOUT_CREATION_STALE_MS = 2 * 60 * 1000;
@@ -18,8 +18,12 @@ export function normalizeCheckoutRequestItems(rawItems) {
   const combined = new Map();
   for (const raw of rawItems) {
     const ref = clean(raw?.ref || raw?.id, 240);
-    if (!ref) throw Object.assign(new Error("Référence produit manquante."), { status: 400 });
-    const qty = Math.max(1, Math.min(20, Math.trunc(Number(raw?.qty) || 1)));
+    if (!ref) throw Object.assign(new Error("Référence produit invalide."), { status: 400, code: "PRODUCT_ID_INVALID" });
+    const qty = Math.trunc(Number(raw?.qty));
+    if (!Number.isFinite(qty) || qty < 1) {
+      throw Object.assign(new Error("Quantité invalide."), { status: 400, code: "QTY_INVALID" });
+    }
+    if (qty > 20) throw Object.assign(new Error("Quantité trop élevée."), { status: 400, code: "QTY_INVALID" });
     combined.set(ref, (combined.get(ref) || 0) + qty);
   }
   return Array.from(combined.entries())
@@ -65,7 +69,7 @@ function lockFilePath(requestKey, lockRoot) {
 }
 
 async function withInterProcessLock(requestKey, work, {
-  lockRoot = path.join(DATA_DIR, "locks", "boutique-checkout"),
+  lockRoot = path.join(getDataDir(), "locks", "boutique-checkout"),
   waitMs = CHECKOUT_LOCK_WAIT_MS,
   staleMs = CHECKOUT_CREATION_STALE_MS
 } = {}) {

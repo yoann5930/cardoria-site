@@ -1,6 +1,11 @@
 import fs from "fs";
 import path from "path";
 
+export function getDataDir() {
+  const override = String(process.env.CARDORIA_DATA_DIR || "").trim();
+  return override ? path.resolve(override) : path.join(process.cwd(), "data");
+}
+
 export const DATA_DIR = path.join(process.cwd(), "data");
 
 const FILES = {
@@ -24,14 +29,15 @@ const FILES = {
 };
 
 function ensureDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  const backupDir = path.join(DATA_DIR, "backups");
+  const dir = getDataDir();
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const backupDir = path.join(dir, "backups");
   if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
 }
 
 export function readJson(key, fallback) {
   ensureDir();
-  const file = path.join(DATA_DIR, FILES[key] || key);
+  const file = path.join(getDataDir(), FILES[key] || key);
   if (!fs.existsSync(file)) {
     fs.writeFileSync(file, JSON.stringify(fallback, null, 2), "utf8");
     return fallback;
@@ -47,7 +53,7 @@ export function readJson(key, fallback) {
 
 export function writeJson(key, data) {
   ensureDir();
-  const file = path.join(DATA_DIR, FILES[key] || key);
+  const file = path.join(getDataDir(), FILES[key] || key);
   const tmp = file + ".tmp";
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf8");
   fs.renameSync(tmp, file);

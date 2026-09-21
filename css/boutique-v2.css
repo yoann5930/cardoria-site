@@ -97,6 +97,7 @@ body.shop-v1 .product .primary:hover:not(:disabled){transform:none;background:va
 body.shop-v1 #cart{gap:0;margin:16px 0}
 body.shop-v1 #cart li{padding:11px 2px;border-bottom:1px solid rgba(255,255,255,.04);border-radius:0;background:transparent;color:#c0b8ad;font-size:11px}
 .shop-cart-total{border-top-color:rgba(255,255,255,.05)}
+.shop-cart-notice{color:#ffb36b;font-size:13px;line-height:1.35}
 .shop-cart-total span{font-size:10px;font-weight:400;letter-spacing:.15em}
 .shop-cart-total strong{color:#f0cc61;font-size:22px;font-weight:500}
 .shop-customer{gap:8px}

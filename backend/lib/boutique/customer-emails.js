@@ -2,6 +2,7 @@ import { isSmtpConfigured, publicSiteOrigin, sendEmail, smtpMissingReason } from
 import { renderCardoriaEmail } from "../email-templates.js";
 import { readJson, writeJson } from "../storage.js";
 import { boutiqueTrackingUrl, firstNameFromClient, formatPickupSummary, publicClientOrder } from "./shipping.js";
+import { withBoutiqueOrderLock } from "./order-lock.js";
 
 const SITE_URL = () => publicSiteOrigin();
 const clean = (value, max = 500) => String(value == null ? "" : value).trim().slice(0, max);
@@ -104,79 +105,83 @@ function fingerprint(kind, order) {
 }
 
 function claim(orderId, kind, force = false) {
-  const orders = readJson("orders", []);
-  const index = orders.findIndex((order) => String(order.id) === String(orderId));
-  if (index < 0) return { ok: false, reason: "order_not_found", order: null };
-  const order = orders[index];
-  if (kind === "purchase" && order.paymentStatus !== "paid") return { ok: false, reason: "payment_not_paid", order };
-  if (kind === "tracking" && (order.status !== "Expédiée" || !clean(order.tracking, 180) || !clean(order.carrier, 120))) {
-    return { ok: false, reason: "tracking_not_ready", order };
-  }
+  return withBoutiqueOrderLock(() => {
+    const orders = readJson("orders", []);
+    const index = orders.findIndex((order) => String(order.id) === String(orderId));
+    if (index < 0) return { ok: false, reason: "order_not_found", order: null };
+    const order = orders[index];
+    if (kind === "purchase" && order.paymentStatus !== "paid") return { ok: false, reason: "payment_not_paid", order };
+    if (kind === "tracking" && (order.status !== "Expédiée" || !clean(order.tracking, 180) || !clean(order.carrier, 120))) {
+      return { ok: false, reason: "tracking_not_ready", order };
+    }
 
-  const key = emailStateKey(kind);
-  const state = order[key] || {};
-  const currentFingerprint = fingerprint(kind, order);
-  if (!force && state.status === "sent" && state.fingerprint === currentFingerprint) {
-    return { ok: false, reason: "already_sent", order };
-  }
-  if (!force && state.status === "sending" && state.fingerprint === currentFingerprint) {
-    const age = Date.now() - Date.parse(state.lastAttemptAt || 0);
-    if (Number.isFinite(age) && age >= 0 && age < 5 * 60 * 1000) return { ok: false, reason: "already_sending", order };
-  }
+    const key = emailStateKey(kind);
+    const state = order[key] || {};
+    const currentFingerprint = fingerprint(kind, order);
+    if (!force && state.status === "sent" && state.fingerprint === currentFingerprint) {
+      return { ok: false, reason: "already_sent", order };
+    }
+    if (!force && state.status === "sending" && state.fingerprint === currentFingerprint) {
+      const age = Date.now() - Date.parse(state.lastAttemptAt || 0);
+      if (Number.isFinite(age) && age >= 0 && age < 5 * 60 * 1000) return { ok: false, reason: "already_sending", order };
+    }
 
-  const now = nowIso();
-  order[key] = {
-    ...state,
-    status: "sending",
-    fingerprint: currentFingerprint,
-    attempts: Number(state.attempts || 0) + 1,
-    lastAttemptAt: now,
-    error: ""
-  };
-  order.updatedAt = now;
-  orders[index] = order;
-  writeJson("orders", orders);
-  return { ok: true, reason: "", order: { ...order } };
+    const now = nowIso();
+    order[key] = {
+      ...state,
+      status: "sending",
+      fingerprint: currentFingerprint,
+      attempts: Number(state.attempts || 0) + 1,
+      lastAttemptAt: now,
+      error: ""
+    };
+    order.updatedAt = now;
+    orders[index] = order;
+    writeJson("orders", orders);
+    return { ok: true, reason: "", order: { ...order } };
+  });
 }
 
 function finalize(orderId, kind, fingerprintValue, sent, error = "") {
-  const orders = readJson("orders", []);
-  const index = orders.findIndex((order) => String(order.id) === String(orderId));
-  if (index < 0) return null;
-  const order = orders[index];
-  const key = emailStateKey(kind);
-  const state = order[key] || {};
-  if (state.fingerprint !== fingerprintValue) return order;
-  const now = nowIso();
-  order[key] = {
-    ...state,
-    status: sent ? "sent" : "failed",
-    sentAt: sent ? now : (state.sentAt || ""),
-    failedAt: sent ? "" : now,
-    error: sent ? "" : clean(error || "Envoi e-mail impossible.", 240)
-  };
-  order.updatedAt = now;
-  orders[index] = order;
-  writeJson("orders", orders);
-  return order;
+  return withBoutiqueOrderLock(() => {
+    const orders = readJson("orders", []);
+    const index = orders.findIndex((order) => String(order.id) === String(orderId));
+    if (index < 0) return null;
+    const order = orders[index];
+    const key = emailStateKey(kind);
+    const state = order[key] || {};
+    if (state.fingerprint !== fingerprintValue) return order;
+    const now = nowIso();
+    order[key] = {
+      ...state,
+      status: sent ? "sent" : "failed",
+      sentAt: sent ? now : (state.sentAt || ""),
+      failedAt: sent ? "" : now,
+      error: sent ? "" : clean(error || "Envoi e-mail impossible.", 240)
+    };
+    order.updatedAt = now;
+    orders[index] = order;
+    writeJson("orders", orders);
+    return order;
+  });
 }
 
 async function notify(orderId, kind, { force = false } = {}) {
-  const claimed = claim(orderId, kind, force);
+  const claimed = await claim(orderId, kind, force);
   if (!claimed.ok) return { ok: true, sent: false, skipped: true, reason: claimed.reason, order: claimed.order };
   const order = claimed.order;
   const currentFingerprint = fingerprint(kind, order);
 
   if (!isSmtpConfigured()) {
     const reason = smtpMissingReason() || "SMTP non configuré.";
-    const updated = finalize(orderId, kind, currentFingerprint, false, reason);
+    const updated = await finalize(orderId, kind, currentFingerprint, false, reason);
     return { ok: false, sent: false, skipped: false, reason: "smtp_not_configured", error: reason, order: updated };
   }
 
   const sent = kind === "tracking"
     ? await deliverBoutiqueTrackingEmail(order)
     : await deliverBoutiquePurchaseEmail(order);
-  const updated = finalize(orderId, kind, currentFingerprint, sent, sent ? "" : "SMTP configuré mais envoi refusé ou indisponible.");
+  const updated = await finalize(orderId, kind, currentFingerprint, sent, sent ? "" : "SMTP configuré mais envoi refusé ou indisponible.");
   return { ok: sent, sent, skipped: false, reason: sent ? "" : "send_failed", error: sent ? "" : "Envoi e-mail impossible.", order: updated };
 }
 

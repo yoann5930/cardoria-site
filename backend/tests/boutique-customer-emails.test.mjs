@@ -78,9 +78,10 @@ test("customer email state prevents duplicate automatic notifications", () => {
 
 test("paid SumUp Boutique confirmation triggers purchase email without blocking payment", () => {
   const source = fs.readFileSync("backend/lib/payments/sumup.js", "utf8");
-  assert.match(source, /status==="paid".*sendBoutiquePurchaseEmail\(orderId\)/s);
-  assert.match(source, /try\{customerEmail=await sendBoutiquePurchaseEmail\(orderId\);\}catch/);
-  assert.match(source, /return\{checkout,status,transactionId,payment:/);
+  assert.match(source, /status === "paid"/);
+  assert.match(source, /sendBoutiquePurchaseEmail\(orderId\)/);
+  assert.match(source, /try \{ customerEmail = await sendBoutiquePurchaseEmail\(orderId\); \} catch/);
+  assert.match(source, /return \{ checkout, status, transactionId, payment:/);
 });
 
 test("shipping update triggers tracking email and exposes manual retry endpoints", () => {
