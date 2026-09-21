@@ -48,7 +48,13 @@
   function setClientLinks(loggedIn, account) {
     document.querySelectorAll("[data-home-client-link]").forEach(function (link) {
       link.href = "/client-login.html";
-      link.textContent = loggedIn ? "Mon compte" : "Connexion";
+      var label = loggedIn ? "Mon compte" : "Connexion";
+      var nested = link.querySelector("span:last-child");
+      if (nested && link.classList.contains("shop-client-account")) {
+        nested.textContent = loggedIn ? (account && account.name ? String(account.name) : "Mon compte") : "Connexion client";
+      } else {
+        link.textContent = label;
+      }
       link.setAttribute("aria-label", loggedIn
         ? "Ouvrir mon espace client Cardoria"
         : "Se connecter à son espace client Cardoria");

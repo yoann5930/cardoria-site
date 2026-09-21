@@ -63,10 +63,11 @@ function readLinePreference(purchase, key) {
   const prefs = parseStockPrefs(purchase?.notes);
   const pref = prefs[key];
   if (!pref || typeof pref !== "object" || Array.isArray(pref)) {
-    return { condition: "", boutiqueEnabled: true, boutiquePrice: null, stockBase: null, removed: false, explicit: false };
+    return { condition: "", boutiqueEnabled: true, boutiquePrice: null, stockBase: null, shippingWeightGrams: null, removed: false, explicit: false };
   }
   const rawPrice = Number(pref.boutiquePrice);
   const rawStockBase = Number(pref.stockBase);
+  const rawWeight = Math.trunc(Number(pref.shippingWeightGrams));
   return {
     condition: normalizeCondition(pref.condition),
     boutiqueEnabled: pref.boutique === undefined ? true : pref.boutique === true,
@@ -74,6 +75,7 @@ function readLinePreference(purchase, key) {
     stockBase: pref.stockBase === null || pref.stockBase === undefined || pref.stockBase === "" || !Number.isFinite(rawStockBase)
       ? null
       : Math.max(0, Math.trunc(rawStockBase)),
+    shippingWeightGrams: Number.isFinite(rawWeight) && rawWeight >= 1 && rawWeight <= 30000 ? rawWeight : null,
     removed: pref.removed === true,
     explicit: true
   };
@@ -171,7 +173,7 @@ function addLine(map, item) {
   const qty = normalizeStockQuantity(item.stock, 1);
   if (qty <= 0) return;
   const unitCost = Math.max(0, Number(item.unitCost) || 0);
-  const pref = item.preference || { condition: "", boutiqueEnabled: true, boutiquePrice: null, stockBase: null, removed: false, explicit: false };
+  const pref = item.preference || { condition: "", boutiqueEnabled: true, boutiquePrice: null, stockBase: null, shippingWeightGrams: null, removed: false, explicit: false };
   const catalogPrice = catalogReferencePrice(item.card);
   if (!map[item.key]) {
     map[item.key] = {
@@ -186,6 +188,7 @@ function addLine(map, item) {
       condition: pref.condition || normalizeCondition(item.condition),
       boutiqueEnabled: pref.boutiqueEnabled !== false,
       boutiquePrice: pref.boutiquePrice,
+      shippingWeightGrams: pref.shippingWeightGrams || null,
       stockBaseOverride: pref.stockBase,
       stockRemoved: pref.removed === true,
       preferenceApplied: pref.explicit === true,
@@ -210,10 +213,12 @@ function addLine(map, item) {
     current.condition = pref.condition || current.condition;
     current.boutiqueEnabled = pref.boutiqueEnabled !== false;
     current.boutiquePrice = pref.boutiquePrice;
+    if (pref.shippingWeightGrams) current.shippingWeightGrams = pref.shippingWeightGrams;
     current.preferenceApplied = true;
   }
   if (pref.explicit && pref.stockBase !== null && pref.stockBase !== undefined) current.stockBaseOverride = pref.stockBase;
   if (pref.explicit) current.stockRemoved = pref.removed === true;
+  if (pref.explicit && pref.shippingWeightGrams) current.shippingWeightGrams = pref.shippingWeightGrams;
   if (!current.image) current.image = item.card?.imageThumb || item.card?.imageHd || item.image || "";
   if (!current.catalogPrice && catalogPrice.price) {
     current.catalogPrice = catalogPrice.price;
@@ -399,7 +404,10 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     catalogLinked,
     identityReady,
     priceReady,
-    purchasable: boutiqueEnabled && identityReady && priceReady && stock > 0 && oversoldStock === 0
+    purchasable: boutiqueEnabled && identityReady && priceReady && stock > 0 && oversoldStock === 0,
+    shippingWeightGrams: Number.isFinite(Number(line.shippingWeightGrams)) && Number(line.shippingWeightGrams) >= 1
+      ? Math.trunc(Number(line.shippingWeightGrams))
+      : null
   };
 
   if (!includeAdminDetails) return publicProduct;

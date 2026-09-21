@@ -10,11 +10,19 @@ import { getOrder as getMarketplaceOrder } from "../lib/marketplace/orders.js";
 import { readJson, writeJson } from "../lib/storage.js";
 import { createColissimoLabel, downloadColissimoLabel, getColissimoStatus } from "../lib/colissimo.js";
 import { getBoutiqueEmailConfiguration, sendBoutiquePurchaseEmail, sendBoutiqueTrackingEmail } from "../lib/boutique/customer-emails.js";
+import {
+  colissimoAdminMessage,
+  colissimoLabelBlock,
+  parseWeightGrams,
+  resolveBoutiqueOrderWeight,
+  shipmentStatusOf
+} from "../lib/boutique/shipping.js";
+import crypto from "crypto";
 
 const router = Router();
 const WRITE_ADMIN = requireAuth({ roles: ["super_admin", "admin", "employee"], action: "write" });
 const FINANCE_ADMIN = requireAuth({ roles: ["super_admin", "admin"], action: "finance" });
-const BOUTIQUE_STATUSES = ["À préparer", "En préparation", "Expédiée", "Livrée", "Annulée"];
+const BOUTIQUE_STATUSES = ["À préparer", "En préparation", "Prête à expédier", "Expédiée", "Livrée", "Annulée"];
 const BOUTIQUE_CARRIERS = ["Colissimo (La Poste)", "La Poste", "Mondial Relay", "Relais Colis"];
 
 function clean(value, max = 500) {
@@ -50,7 +58,7 @@ function paymentReconciliation(payment) {
 }
 
 function canProcessPaidOrder(order, nextStatus) {
-  if (!["À préparer", "En préparation", "Expédiée", "Livrée"].includes(nextStatus)) return true;
+  if (!["À préparer", "En préparation", "Prête à expédier", "Expédiée", "Livrée"].includes(nextStatus)) return true;
   return order.paymentStatus === "paid";
 }
 
@@ -162,7 +170,16 @@ router.post("/:id/refund", FINANCE_ADMIN, async (req, res) => {
 });
 
 router.get("/boutique-orders", (req, res) => {
-  res.json({ ok: true, carriers: BOUTIQUE_CARRIERS, colissimo: getColissimoStatus(), email: getBoutiqueEmailConfiguration(), orders: readJson("orders", []) });
+  const colissimo = getColissimoStatus();
+  res.json({
+    ok: true,
+    carriers: BOUTIQUE_CARRIERS,
+    statuses: BOUTIQUE_STATUSES,
+    colissimo,
+    colissimoMessage: colissimoAdminMessage(colissimo),
+    email: getBoutiqueEmailConfiguration(),
+    orders: readJson("orders", [])
+  });
 });
 
 router.get("/boutique-orders/:id", (req, res) => {
@@ -211,7 +228,6 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, async (req, res) => {
   const now = new Date().toISOString();
   const previousStatus = current.status;
   current.status = nextStatus;
-  current.shipping = clean(body.shipping, 120) || current.shipping || "Standard";
   current.carrier = nextCarrier;
   current.tracking = clean(body.tracking, 180);
   current.address = clean(body.address, 600);
@@ -219,13 +235,27 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, async (req, res) => {
   current.internalNote = clean(body.internalNote, 2000);
   current.updatedAt = now;
 
+  const nextShipping = clean(body.shipping, 120);
+  if (nextShipping) current.shipping = nextShipping;
+  else current.shipping = current.shipping || "Standard";
+  const nextMethod = clean(body.shippingMethod, 80);
+  if (nextMethod) current.shippingMethod = nextMethod;
+  const nextWeight = parseWeightGrams(body.shippingWeightGrams);
+  if (nextWeight) {
+    current.shippingWeightGrams = nextWeight;
+    current.weightSource = "admin";
+  }
+  if (current.pickupPoint && !current.pickupPoint.id) current.pickupPoint = null;
+
   if (previousStatus !== nextStatus) {
     current.statusChangedAt = now;
     if (nextStatus === "En préparation" && !current.preparingAt) current.preparingAt = now;
+    if (nextStatus === "Prête à expédier" && !current.readyToShipAt) current.readyToShipAt = now;
     if (nextStatus === "Expédiée" && !current.shippedAt) current.shippedAt = now;
     if (nextStatus === "Livrée" && !current.deliveredAt) current.deliveredAt = now;
     if (nextStatus === "Annulée" && !current.cancelledAt) current.cancelledAt = now;
   }
+  current.shipmentStatus = shipmentStatusOf(current);
 
   current.paymentReviewRequired = nextStatus === "Annulée" && current.paymentStatus === "paid";
   orders[index] = current;
@@ -281,21 +311,49 @@ router.post("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, async (req, res
   if (index < 0) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
   const current = orders[index];
   if (current.paymentStatus !== "paid") return res.status(409).json({ ok: false, error: "Le paiement SumUp doit être confirmé avant de créer une étiquette Colissimo." });
-  if (current.status === "Annulée") return res.status(409).json({ ok: false, error: "Une commande annulée ne peut pas être expédiée." });
   if (current.colissimoParcelNumber) {
     return res.status(409).json({ ok: false, code: "COLISSIMO_LABEL_ALREADY_CREATED", error: "Une étiquette Colissimo existe déjà pour cette commande.", parcelNumber: current.colissimoParcelNumber });
   }
-  if (current.colissimoLabelAttempt?.status === "reconciliation_required") {
-    return res.status(409).json({ ok: false, code: "COLISSIMO_RECONCILIATION_REQUIRED", error: "Une tentative Colissimo doit être rapprochée dans la Cbox avant tout nouvel essai." });
+  if (current.colissimoLabelAttempt?.status === "creation_pending") {
+    const pendingBlock = colissimoLabelBlock(current);
+    if (pendingBlock?.code === "COLISSIMO_LABEL_IN_PROGRESS") {
+      return res.status(409).json({ ok: false, code: "COLISSIMO_LABEL_IN_PROGRESS", error: pendingBlock.error });
+    }
   }
-  const weightGrams = Math.trunc(Number(req.body?.weightGrams));
-  if (!Number.isFinite(weightGrams) || weightGrams < 1 || weightGrams > 30000) {
+  const hasBodyWeight = req.body?.weightGrams != null && req.body?.weightGrams !== "";
+  const overrideWeight = hasBodyWeight ? parseWeightGrams(req.body.weightGrams) : null;
+  if (hasBodyWeight && !overrideWeight) {
     return res.status(400).json({ ok: false, error: "Poids Colissimo requis entre 1 g et 30 kg." });
   }
+  const preview = overrideWeight
+    ? { ...current, shippingWeightGrams: overrideWeight, weightSource: "admin" }
+    : current;
+  const block = colissimoLabelBlock(preview);
+  if (block) {
+    if (block.stalePending) {
+      const nowLock = new Date().toISOString();
+      current.colissimoLabelAttempt = {
+        status: "reconciliation_required",
+        requestedAt: current.colissimoLabelAttempt?.requestedAt || nowLock,
+        failedAt: nowLock,
+        code: "COLISSIMO_RECONCILIATION_REQUIRED"
+      };
+      current.updatedAt = nowLock;
+      orders[index] = current;
+      writeJson("orders", orders);
+    }
+    return res.status(block.status).json({ ok: false, code: block.code, error: block.error, parcelNumber: block.parcelNumber });
+  }
+  const weight = resolveBoutiqueOrderWeight(preview, overrideWeight);
+  if (!weight.known) {
+    return res.status(400).json({ ok: false, code: "COLISSIMO_WEIGHT_REQUIRED", error: "Poids du colis requis. Une étiquette ne peut pas être créée tant que le poids est inconnu." });
+  }
+  const weightGrams = weight.grams;
 
   const requestedAt = new Date().toISOString();
   current.shippingWeightGrams = weightGrams;
-  current.colissimoLabelAttempt = { status: "creation_pending", requestedAt, weightGrams };
+  current.weightSource = weight.source;
+  current.colissimoLabelAttempt = { status: "creation_pending", claimId: crypto.randomUUID(), requestedAt, weightGrams };
   current.updatedAt = requestedAt;
   orders[index] = current;
   writeJson("orders", orders);
@@ -308,7 +366,10 @@ router.post("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, async (req, res
     const order = refreshed[refreshedIndex];
     const now = new Date().toISOString();
     order.carrier = "Colissimo (La Poste)";
+    order.shippingMethod = order.shippingMethod || "colissimo_home";
+    order.shipping = order.shipping && order.shipping !== "Standard" ? order.shipping : "Colissimo domicile";
     order.tracking = created.trackingNumber;
+    order.trackingUrl = created.trackingUrl || "";
     order.colissimoParcelNumber = created.parcelNumber;
     order.colissimoProductCode = created.productCode;
     order.colissimoLabelFormat = created.labelFormat;

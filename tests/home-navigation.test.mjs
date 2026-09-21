@@ -70,7 +70,7 @@ test("runtime mirror contains same homepage navigation after sync",()=>{
 
 test("homepage client entry follows the authenticated session without forcing logout",()=>{
   assert.equal((html.match(/data-home-client-link/g)||[]).length,2);
-  assert.match(html,/home-client-session\.js\?v=20260921-account-1/);
+  assert.match(html,/home-client-session\.js\?v=20260921-shipping-1/);
   assert.match(sessionJs,/cardoria_session_token/);
   assert.match(sessionJs,/cardoria_client_session/);
   assert.match(sessionJs,/cardoria_account/);

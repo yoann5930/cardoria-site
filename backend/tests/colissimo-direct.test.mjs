@@ -135,7 +135,7 @@ test("Boutique admin route protects duplicate labels and reconciliation ambiguit
 test("admin order UI exposes Colissimo weight, create and download controls", () => {
   const source = fs.readFileSync("js/admin/admin-orders.js", "utf8");
   const runtime = fs.readFileSync("backend/public/js/admin/admin-orders.js", "utf8");
-  assert.match(source, /Poids Colissimo \(g\)/);
+  assert.match(source, /Poids du colis \(g\)/);
   assert.match(source, /data-colissimo-create/);
   assert.match(source, /data-colissimo-download/);
   assert.match(source, /rapprochement requis dans la Cbox/i);

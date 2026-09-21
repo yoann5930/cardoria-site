@@ -6,7 +6,9 @@ const message=document.getElementById("clientOrdersMessage");
 const list=document.getElementById("clientOrdersList");
 function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function euro(v){return Number(v||0).toFixed(2).replace(".",",")+" €";}
-function trackingUrl(carrier,tracking){
+function trackingUrl(carrier,tracking,provided){
+  const given=String(provided||"").trim();
+  if(/^https:\/\//i.test(given)) return given;
   const t=String(tracking||"").trim(); if(!t)return "";
   const c=String(carrier||"").toLowerCase();
   if(c.includes("autre"))return "";
@@ -37,6 +39,7 @@ function trackingUrl(carrier,tracking){
 }
 function statusLabel(status){
   if(status==="À préparer")return "Commande confirmée";
+  if(status==="Expédiée")return "Commande expédiée";
   return status||"Commande confirmée";
 }
 function paymentLabel(status){
@@ -45,21 +48,44 @@ function paymentLabel(status){
 function steps(status){
   const label=statusLabel(status);
   if(label==="En attente SumUp")return '<div class="client-order-progress is-pending"><span class="active">Paiement en attente</span></div>';
-  if(label==="Annulée"||label==="Paiement échoué")return '<div class="client-order-progress is-cancelled"><span class="active">'+esc(label)+'</span></div>';
-  const values=["Commande confirmée","En préparation","Expédiée","Livrée"];
+  if(label==="Annulée"||label==="Paiement échoué"||label==="Remboursée")return '<div class="client-order-progress is-cancelled"><span class="active">'+esc(label)+'</span></div>';
+  const values=["Commande confirmée","En préparation","Prête à expédier","Expédiée","Livrée"];
   let idx=0;
-  if(label==="En préparation")idx=1; else if(label==="Expédiée")idx=2; else if(label==="Livrée")idx=3;
-  return '<div class="client-order-progress">'+values.map((s,i)=>'<span class="'+(i<=idx?'active':'')+'">'+s+'</span>').join("")+'</div>';
+  if(label==="En préparation")idx=1;
+  else if(label==="Prête à expédier")idx=2;
+  else if(label==="Expédiée"||label==="Commande expédiée")idx=3;
+  else if(label==="Livrée")idx=4;
+  return '<div class="client-order-progress is-five">'+values.map((s,i)=>'<span class="'+(i<=idx?'active':'')+'">'+s+'</span>').join("")+'</div>';
+}
+function deliveryHtml(o){
+  const d=o.delivery||{};
+  if(d.pickupPoint){
+    const p=d.pickupPoint;
+    return '<div class="client-order-delivery"><small>POINT RELAIS MONDIAL RELAY</small><strong>'+esc(p.name||"Point Relais")+'</strong><p>'+esc([p.address, [p.postalCode,p.city].filter(Boolean).join(" ")].filter(Boolean).join(" · "))+(p.id?' · n° '+esc(p.id):"")+'</p></div>';
+  }
+  if(d.address){
+    const a=d.address;
+    return '<div class="client-order-delivery"><small>ADRESSE DE LIVRAISON</small><p>'+esc([a.street,[a.postalCode,a.city].filter(Boolean).join(" "),a.country].filter(Boolean).join(" · "))+'</p></div>';
+  }
+  return "";
 }
 function render(orders){
   message.hidden=true;list.hidden=false;
   if(!orders.length){list.innerHTML='<div class="client-auth-card"><h2>Aucune commande Boutique</h2><p>Les commandes Boutique associées à l’e-mail de ce compte apparaîtront ici.</p><a class="client-auth-primary client-order-link" href="/boutique.html">Voir la boutique</a></div>';return;}
   list.innerHTML=orders.map(o=>{
-    const url=trackingUrl(o.carrier,o.tracking);
+    const shipped=o.status==="Expédiée"||o.statusLabel==="Commande expédiée";
+    const url=trackingUrl(o.carrier,o.tracking,o.trackingUrl);
     const items=(o.items||[]).map(i=>'<li><span>'+esc(i.name||i.ref)+'</span><strong>'+Number(i.qty||1)+' × '+euro(i.price)+'</strong></li>').join("");
     const fallback=o.tracking&&!url?'<p class="client-order-wait">Numéro de suivi disponible. Aucun lien officiel n’est associé à ce transporteur : copiez le numéro pour le suivre sur le site du transporteur.</p>':'';
+    const method=o.shippingMethod==="mondial_relay"||String(o.shipping||"").toLowerCase().includes("mondial")?"Mondial Relay — Point Relais":(o.shipping||o.carrier||"Livraison");
     const tracking=o.tracking?'<div class="client-order-shipping"><div><small>TRANSPORTEUR</small><strong>'+esc(o.carrier||"Non renseigné")+'</strong></div><div><small>NUMÉRO DE SUIVI</small><strong>'+esc(o.tracking)+'</strong></div>'+(url?'<a class="client-auth-primary client-order-link" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Suivre mon colis →</a>':'')+'</div>'+fallback:'<p class="client-order-wait">Le numéro de suivi apparaîtra ici dès que votre colis sera expédié.</p>';
-    return '<article class="client-order-card"><div class="client-order-head"><div><small>COMMANDE BOUTIQUE</small><h2>'+esc(o.id)+'</h2><p>'+esc(o.date||"")+' · Paiement : '+esc(paymentLabel(o.paymentStatus))+'</p></div><strong class="client-order-total">'+euro(o.total)+'</strong></div>'+steps(o.status)+'<ul class="client-order-items">'+items+'</ul>'+tracking+'</article>';
+    return '<article class="client-order-card'+(shipped?' is-shipped':'')+'">'+
+      (shipped?'<p class="client-order-shipped-banner">Commande expédiée</p>':'')+
+      '<div class="client-order-head"><div><small>COMMANDE BOUTIQUE</small><h2>'+esc(o.id)+'</h2><p>'+esc(o.date||"")+' · Paiement : '+esc(paymentLabel(o.paymentStatus))+' · Préparation : '+esc(statusLabel(o.status||o.statusLabel))+'</p></div><strong class="client-order-total">'+euro(o.total)+'</strong></div>'+
+      steps(o.status)+
+      '<p class="client-order-method"><small>MODE DE LIVRAISON</small><strong>'+esc(method)+'</strong></p>'+
+      deliveryHtml(o)+
+      '<ul class="client-order-items">'+items+'</ul>'+tracking+'</article>';
   }).join("");
 }
 async function load(){
