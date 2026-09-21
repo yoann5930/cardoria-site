@@ -30,6 +30,15 @@ jobs:
           OVH_VPS_SSH_KEY: ${{ secrets.OVH_VPS_SSH_KEY }}
           OVH_VPS_HOST_FINGERPRINT: ${{ secrets.OVH_VPS_HOST_FINGERPRINT }}
           SMTP_PASS: ${{ secrets.OVH_SMTP_PASS }}
+          DOMAIN_SMTP_HOST: ${{ secrets.OVH_CARDORIA_SMTP_HOST }}
+          DOMAIN_SMTP_PORT: ${{ secrets.OVH_CARDORIA_SMTP_PORT }}
+          DOMAIN_SMTP_SECURE: ${{ secrets.OVH_CARDORIA_SMTP_SECURE }}
+          DOMAIN_SMTP_USER: ${{ secrets.OVH_CARDORIA_SMTP_USER }}
+          DOMAIN_SMTP_PASS: ${{ secrets.OVH_CARDORIA_SMTP_PASS }}
+          DOMAIN_MAIL_FROM: ${{ secrets.OVH_CARDORIA_MAIL_FROM }}
+          DOMAIN_MAIL_FROM_NAME: ${{ secrets.OVH_CARDORIA_MAIL_FROM_NAME }}
+          DOMAIN_MAIL_REPLY_TO: ${{ secrets.OVH_CARDORIA_MAIL_REPLY_TO }}
+          DOMAIN_DKIM_SELECTOR: ${{ secrets.OVH_CARDORIA_DKIM_SELECTOR }}
           SUMUP_API_KEY: ${{ secrets.OVH_SUMUP_API_KEY }}
           SUMUP_MERCHANT_CODE: ${{ secrets.OVH_SUMUP_MERCHANT_CODE }}
           MR_ENSEIGNE: ${{ secrets.OVH_MONDIAL_RELAY_ENSEIGNE }}
@@ -48,7 +57,7 @@ jobs:
           test -n "${OVH_VPS_HOST_FINGERPRINT:-}"
 
           case "$OP" in
-            status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|sumup-configure|mondial-relay-configure) ;;
+            status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|sumup-configure|mondial-relay-configure) ;;
             *) echo "FORBIDDEN action"; exit 1 ;;
           esac
           case "$BRANCH" in
@@ -85,12 +94,24 @@ jobs:
           if [ "$OP" = smtp-configure ]; then
             test -n "${SMTP_PASS:-}"
             printf '%s' "$SMTP_PASS" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
-            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE
+            unset SMTP_PASS DOMAIN_SMTP_HOST DOMAIN_SMTP_PORT DOMAIN_SMTP_SECURE DOMAIN_SMTP_USER DOMAIN_SMTP_PASS DOMAIN_MAIL_FROM DOMAIN_MAIL_FROM_NAME DOMAIN_MAIL_REPLY_TO DOMAIN_DKIM_SELECTOR SUMUP_API_KEY SUMUP_MERCHANT_CODE
+          elif [ "$OP" = smtp-domain-configure ]; then
+            test -n "${DOMAIN_SMTP_HOST:-}"
+            test -n "${DOMAIN_SMTP_PORT:-}"
+            test -n "${DOMAIN_SMTP_SECURE:-}"
+            test -n "${DOMAIN_SMTP_USER:-}"
+            test -n "${DOMAIN_SMTP_PASS:-}"
+            test -n "${DOMAIN_MAIL_FROM:-}"
+            printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
+              "$DOMAIN_SMTP_HOST" "$DOMAIN_SMTP_PORT" "$DOMAIN_SMTP_SECURE" "$DOMAIN_SMTP_USER" "$DOMAIN_SMTP_PASS" \
+              "$DOMAIN_MAIL_FROM" "${DOMAIN_MAIL_FROM_NAME:-Cardoria}" "${DOMAIN_MAIL_REPLY_TO:-$DOMAIN_MAIL_FROM}" "${DOMAIN_DKIM_SELECTOR:-}" \
+              | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
+            unset SMTP_PASS DOMAIN_SMTP_HOST DOMAIN_SMTP_PORT DOMAIN_SMTP_SECURE DOMAIN_SMTP_USER DOMAIN_SMTP_PASS DOMAIN_MAIL_FROM DOMAIN_MAIL_FROM_NAME DOMAIN_MAIL_REPLY_TO DOMAIN_DKIM_SELECTOR SUMUP_API_KEY SUMUP_MERCHANT_CODE
           elif [ "$OP" = sumup-configure ]; then
             test -n "${SUMUP_API_KEY:-}"
             test -n "${SUMUP_MERCHANT_CODE:-}"
             printf '%s\n%s\n' "$SUMUP_API_KEY" "$SUMUP_MERCHANT_CODE" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
-            unset SMTP_PASS SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID
+            unset SMTP_PASS DOMAIN_SMTP_HOST DOMAIN_SMTP_PORT DOMAIN_SMTP_SECURE DOMAIN_SMTP_USER DOMAIN_SMTP_PASS DOMAIN_MAIL_FROM DOMAIN_MAIL_FROM_NAME DOMAIN_MAIL_REPLY_TO DOMAIN_DKIM_SELECTOR SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID
           elif [ "$OP" = mondial-relay-configure ]; then
             test -n "${MR_ENSEIGNE:-}"
             test -n "${MR_PRIVATE_KEY:-}"
