@@ -1,6 +1,9 @@
 /**
  * Serialize Boutique order mutations in this Node process.
- * Multi-worker deployments still need a single writer or a database lock.
+ * Production OVH runs a single systemd unit (`npm start` → one Node process),
+ * so this queue is the live protection against last-unit oversell.
+ * Multi-worker deployments sharing orders.json would still need a single writer
+ * or a database lock; this Map/Promise does not coordinate other processes.
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 

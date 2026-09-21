@@ -5,7 +5,7 @@ import { logAudit } from "../lib/audit.js";
 import { listPayments, getPayment, PAYMENT_STATUSES } from "../lib/payments/ledger.js";
 import { isSumUpConfigured, syncPaymentFromCheckout } from "../lib/payments/sumup.js";
 import { refundSumUpTransaction } from "../lib/payments/sumup-refund.js";
-import { boutiqueStockImpact, listBoutiqueInventory, LOW_STOCK_THRESHOLD } from "../lib/boutique/stock.js";
+import { boutiqueStockImpact, listBoutiqueInventory, summarizeBoutiqueInventory, LOW_STOCK_THRESHOLD, MAX_STOCK_BASE } from "../lib/boutique/stock.js";
 import { withBoutiqueOrderLock } from "../lib/boutique/order-lock.js";
 import { getOrder as getMarketplaceOrder } from "../lib/marketplace/orders.js";
 import { readJson, writeJson } from "../lib/storage.js";
@@ -205,18 +205,14 @@ router.get("/boutique-orders/:id", (req, res) => {
 
 router.get("/boutique-inventory", (req, res) => {
   const inventory = listBoutiqueInventory({ includeDisabled: true });
-  const totals = inventory.reduce((acc, item) => {
-    acc.baseStock += Number(item.baseStock || 0);
-    acc.availableStock += Number(item.stock || 0);
-    acc.pendingStock += Number(item.pendingStock || 0);
-    acc.soldStock += Number(item.soldStock || 0);
-    acc.refundHoldStock += Number(item.refundHoldStock || 0);
-    acc.oversoldStock += Number(item.oversoldStock || 0);
-    if (item.alertBucket === "out") acc.outOfStock += 1;
-    if (item.alertBucket === "low") acc.lowStock += 1;
-    return acc;
-  }, { baseStock: 0, availableStock: 0, pendingStock: 0, soldStock: 0, refundHoldStock: 0, oversoldStock: 0, outOfStock: 0, lowStock: 0 });
-  res.json({ ok: true, inventory, totals, lowStockThreshold: LOW_STOCK_THRESHOLD });
+  const totals = summarizeBoutiqueInventory(inventory);
+  res.json({
+    ok: true,
+    inventory,
+    totals,
+    lowStockThreshold: LOW_STOCK_THRESHOLD,
+    maxStockBase: MAX_STOCK_BASE
+  });
 });
 
 router.put("/boutique-orders/:id", WRITE_ADMIN, async (req, res) => {

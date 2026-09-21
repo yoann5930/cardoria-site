@@ -9,15 +9,18 @@
   var saveQueue = Promise.resolve();
   var conditions = ["", "M", "NM", "EX", "GD", "LP", "PL", "PO"];
   var stockFilter = "all";
+  var stockQuery = "";
   var lastInventory = [];
   var lastTotals = {};
+  var lowStockThreshold = 2;
+  var maxStockBase = 100000;
 
   function esc(v) { return String(v == null ? "" : v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#039;"); }
   function euro(v) { return Number(v || 0).toFixed(2).replace(".", ",") + " €"; }
   function price(v) { var n = Number(String(v == null ? "" : v).replace(",", ".")); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; }
   function normalizeCondition(v) { var u = String(v || "").trim().toUpperCase(); return conditions.indexOf(u) >= 0 ? u : ""; }
-  function nonNegativeInt(v) { var n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null; }
-  function positiveWeight(v) { if (v == null || v === "") return null; var n = Number(v); return Number.isFinite(n) && n >= 1 && n <= 30000 ? Math.trunc(n) : null; }
+  function nonNegativeInt(v) { if (typeof v === "string" && !/^\d+$/.test(String(v).trim())) return null; var n = Number(v); return Number.isInteger(n) && n >= 0 ? n : null; }
+  function positiveWeight(v) { if (v == null || v === "") return null; if (typeof v === "string" && !/^\d+$/.test(String(v).trim())) return null; var n = Number(v); return Number.isInteger(n) && n >= 1 && n <= 30000 ? n : null; }
 
   function parsePrefs(notes) {
     var m = String(notes || "").match(/\[STOCK_PREFS\]\s*(\{[^\n\r]*\})/);
@@ -51,10 +54,10 @@
     if (item.inventoryStatus === "catalog_link_required") return '<span class="admin-badge admin-badge--warn">Lien catalogue requis</span>';
     if (item.inventoryStatus === "catalog_price_required") return '<span class="admin-badge admin-badge--warn">Prix catalogue indisponible</span>';
     if (Number(item.oversoldStock || 0) > 0) return '<span class="admin-badge admin-badge--danger">SURVENTE</span>';
-    if (item.inventoryStatus === "low_stock" || (Number(item.stock || 0) > 0 && Number(item.stock || 0) <= 2)) return '<span class="admin-badge admin-badge--warn">Bientôt en rupture</span>';
-    if (Number(item.refundHoldStock || 0) > 0) return '<span class="admin-badge admin-badge--warn">Remboursement</span>';
+    if (Number(item.refundHoldStock || 0) > 0) return '<span class="admin-badge admin-badge--warn">Stock bloqué — remboursement en attente</span>';
     if (Number(item.pendingStock || 0) > 0) return '<span class="admin-badge admin-badge--gold">Réservé</span>';
-    if (Number(item.stock || 0) <= 0) return '<span class="admin-badge">Épuisé</span>';
+    if (item.inventoryStatus === "low_stock" || (Number(item.stock || 0) > 0 && Number(item.stock || 0) <= lowStockThreshold)) return '<span class="admin-badge admin-badge--warn">Stock faible</span>';
+    if (Number(item.stock || 0) <= 0) return '<span class="admin-badge admin-badge--danger">Épuisé</span>';
     return '<span class="admin-badge admin-badge--ok">Disponible</span>';
   }
 
@@ -82,7 +85,7 @@
       if (msg) msg.textContent = "Enregistré";
       await load();
     } catch (e) {
-      if (msg) msg.textContent = "Erreur d'enregistrement";
+      if (msg) msg.textContent = e && e.message ? e.message : "Erreur d'enregistrement";
       console.error("[stock] preference save failed", e);
     }
   }
@@ -102,8 +105,14 @@
     await queuePreferenceSave(item, { condition: condition, boutique: boutique, boutiquePrice: boutiquePrice, shippingWeightGrams: shippingWeightGrams }, "Enregistrement...");
   }
 
-  async function changeQuantity(item) {
+  function desiredBaseFromAvailable(item, desiredAvailable) {
     var committed = Number(item.committedStock || 0);
+    var newBase = committed + desiredAvailable;
+    if (newBase > maxStockBase) return null;
+    return newBase;
+  }
+
+  async function changeQuantity(item) {
     var currentAvailable = Number(item.stock || 0);
     var raw = window.prompt("Nouvelle quantité disponible pour « " + item.name + " » :", String(currentAvailable));
     if (raw === null) return;
@@ -112,7 +121,11 @@
       window.alert("Quantité invalide. Saisissez un nombre entier supérieur ou égal à 0.");
       return;
     }
-    var newBase = committed + desiredAvailable;
+    var newBase = desiredBaseFromAvailable(item, desiredAvailable);
+    if (newBase === null) {
+      window.alert("Quantité trop élevée. Maximum autorisé : " + maxStockBase + ".");
+      return;
+    }
     await queuePreferenceSave(item, { stockBase: newBase, removed: false }, "Mise à jour du stock...");
   }
 
@@ -131,12 +144,38 @@
       window.alert("Quantité invalide. Saisissez un nombre entier supérieur ou égal à 0.");
       return;
     }
-    var newBase = Number(item.committedStock || 0) + desiredAvailable;
+    var newBase = desiredBaseFromAvailable(item, desiredAvailable);
+    if (newBase === null) {
+      window.alert("Quantité trop élevée. Maximum autorisé : " + maxStockBase + ".");
+      return;
+    }
     await queuePreferenceSave(item, { stockBase: newBase, removed: false, boutique: true }, "Remise en stock...");
   }
 
-  function alertBucket(item) {
-    return item.alertBucket || (Number(item.oversoldStock || 0) > 0 ? "oversold" : Number(item.stock || 0) <= 0 ? "out" : Number(item.stock || 0) <= 2 ? "low" : "");
+  function matchesFilter(item) {
+    if (stockFilter === "available") return Number(item.stock || 0) > 0 && Number(item.oversoldStock || 0) === 0 && item.boutiqueEnabled !== false && !item.stockRemoved;
+    if (stockFilter === "low") return item.alertBucket === "low" || item.inventoryStatus === "low_stock";
+    if (stockFilter === "out") return item.alertBucket === "out" || item.inventoryStatus === "out_of_stock";
+    if (stockFilter === "reserved") return Number(item.pendingStock || 0) > 0;
+    if (stockFilter === "oversold") return Number(item.oversoldStock || 0) > 0;
+    if (stockFilter === "removed") return item.stockRemoved === true || item.boutiqueEnabled === false;
+    return true;
+  }
+
+  function matchesSearch(item) {
+    var q = String(stockQuery || "").trim().toLowerCase();
+    if (!q) return true;
+    var hay = [item.name, item.key, item.cardId, item.extension, item.number, item.number ? "#" + item.number : ""].join(" ").toLowerCase();
+    return hay.indexOf(q) >= 0;
+  }
+
+  function stockBreakdown(item) {
+    var lack = Number(item.oversoldStock || 0);
+    return "Base " + Number(item.effectiveBaseStock || item.baseStock || 0) +
+      " · réservé " + Number(item.pendingStock || 0) +
+      " · vendu " + Number(item.soldStock || 0) +
+      " · remboursement " + Number(item.refundHoldStock || 0) +
+      (lack ? " · manque " + lack : "");
   }
 
   function render(inventory, totals) {
@@ -144,29 +183,25 @@
     lastTotals = totals || {};
     inventoryByKey = Object.create(null);
     lastInventory.forEach(function (i) { inventoryByKey[i.key] = i; });
-    var visible = lastInventory.filter(function (i) {
-      if (i.boutiqueEnabled === false || i.stockRemoved) return stockFilter === "all";
-      if (stockFilter === "out") return alertBucket(i) === "out" || alertBucket(i) === "oversold";
-      if (stockFilter === "low") return alertBucket(i) === "low";
-      return true;
-    });
+    var visible = lastInventory.filter(function (i) { return matchesFilter(i) && matchesSearch(i); });
     A.qs("#stockUnits").textContent = String(totals.availableStock || 0);
-    A.qs("#stockValue").textContent = euro(inventory.reduce(function (s, i) { return s + Number(i.stock || 0) * Number(i.averagePurchaseCost || 0); }, 0));
-    A.qs("#stockLinked").textContent = String(inventory.filter(function (i) { return !!i.cardId; }).length) + " / " + inventory.length;
-    A.qs("#stockBoutique").textContent = String(inventory.filter(function (i) { return i.boutiqueEnabled && !i.stockRemoved; }).length) + " / " + inventory.length;
-    if (A.qs("#stockOut")) A.qs("#stockOut").textContent = String(totals.outOfStock || inventory.filter(function (i) { return alertBucket(i) === "out"; }).length);
-    if (A.qs("#stockLow")) A.qs("#stockLow").textContent = String(totals.lowStock || inventory.filter(function (i) { return alertBucket(i) === "low"; }).length);
+    A.qs("#stockAvailableProducts").textContent = String(totals.availableProducts || 0);
+    A.qs("#stockLow").textContent = String(totals.lowStockProducts || totals.lowStock || 0);
+    A.qs("#stockOut").textContent = String(totals.outOfStockProducts || totals.outOfStock || 0);
+    A.qs("#stockOversold").textContent = String(totals.oversoldProducts || 0);
+    A.qs("#stockValue").textContent = euro(totals.stockValue != null ? totals.stockValue : inventory.reduce(function (s, i) { return s + Number(i.stock || 0) * Number(i.averagePurchaseCost || 0); }, 0));
+    if (A.qs("#stockLowThresholdLabel")) A.qs("#stockLowThresholdLabel").textContent = String(lowStockThreshold);
 
     var summary = A.qs("#stockSummary");
-    if (summary) summary.innerHTML = "Acheté : <strong>" + Number(totals.baseStock || 0) + "</strong> · Disponible : <strong>" + Number(totals.availableStock || 0) + "</strong> · Réservé paiement : <strong>" + Number(totals.pendingStock || 0) + "</strong> · Vendu/payé : <strong>" + Number(totals.soldStock || 0) + "</strong> · En remboursement : <strong>" + Number(totals.refundHoldStock || 0) + "</strong>" + (Number(totals.oversoldStock || 0) ? " · <strong style='color:#ff8f8f'>Survente : " + Number(totals.oversoldStock) + "</strong>" : "") + " · Rupture : <strong>" + Number(totals.outOfStock || 0) + "</strong> · Bientôt en rupture : <strong>" + Number(totals.lowStock || 0) + "</strong>";
+    if (summary) summary.innerHTML = "Acheté : <strong>" + Number(totals.baseStock || 0) + "</strong> · Disponible : <strong>" + Number(totals.availableStock || 0) + "</strong> · Réservé paiement : <strong>" + Number(totals.pendingStock || 0) + "</strong> · Vendu/payé : <strong>" + Number(totals.soldStock || 0) + "</strong> · En remboursement : <strong>" + Number(totals.refundHoldStock || 0) + "</strong>" + (Number(totals.oversoldStock || 0) ? " · <strong style='color:#ff8f8f'>Survente : " + Number(totals.oversoldStock) + "</strong>" : "") + " · Rupture : <strong>" + Number(totals.outOfStockProducts || totals.outOfStock || 0) + "</strong> · Stock faible : <strong>" + Number(totals.lowStockProducts || totals.lowStock || 0) + "</strong>";
 
     A.qs("#stockRows").innerHTML = visible.map(function (i) {
       var actions = i.stockRemoved
         ? '<button type="button" class="admin-btn admin-btn--small" data-restore-stock>Remettre</button>'
         : '<button type="button" class="admin-btn admin-btn--small" data-edit-stock>Modifier</button> <button type="button" class="admin-btn admin-btn--small admin-btn--danger" data-remove-stock>Supprimer</button>';
       var lastChange = i.latestPurchaseAt ? '<br><small>Dernier achat : ' + esc(i.latestPurchaseAt) + '</small>' : '';
-      return '<tr data-stock-row="'+esc(i.key)+'"><td><small>'+esc(i.cardId || i.key)+'</small></td><td><strong>'+esc(i.name)+'</strong><br><small>'+esc([i.extension,i.number?"#"+i.number:""].filter(Boolean).join(" · "))+'</small></td><td>'+esc(i.categoryLabel || i.packaging)+'</td><td><select data-condition '+((i.packaging!=="carte_unite"&&i.packaging!=="lot_cartes")?'disabled':'')+'>'+conditionOptions(i)+'</select></td><td>'+euro(i.averagePurchaseCost)+'</td><td><input data-price type="number" min="'+((i.packaging==="carte_unite"||i.packaging==="lot_cartes")?"1":"0.01")+'" step="0.01" value="'+(i.boutiquePrice ? Number(i.boutiquePrice).toFixed(2) : '')+'" placeholder="'+(i.catalogPrice ? Number(i.catalogPrice).toFixed(2) : 'Prix requis')+'"><br><small>'+(i.boutiquePrice?'Prix Admin':i.catalogPrice?'Auto Cardoria '+euro(i.catalogPrice):'Prix catalogue indisponible')+'</small></td><td><input data-weight type="number" min="1" max="30000" step="1" value="'+(i.shippingWeightGrams ? String(i.shippingWeightGrams) : '')+'" placeholder="g"><br><small>Poids colis</small></td><td><strong>'+Number(i.stock||0)+'</strong> dispo<br><small>'+Number(i.pendingStock||0)+' réservé · '+Number(i.soldStock||0)+' vendu'+(Number(i.refundHoldStock||0)?' · '+Number(i.refundHoldStock)+' remboursement':'')+'</small><br>'+statusLabel(i)+lastChange+'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+actions+'</div></td><td><select data-boutique '+(i.stockRemoved?'disabled':'')+'><option value="yes"'+(i.boutiqueEnabled?' selected':'')+'>Oui</option><option value="no"'+(!i.boutiqueEnabled?' selected':'')+'>Non</option></select></td><td>Achats payés<br><small data-save-status></small></td></tr>';
-    }).join("") || '<tr><td colspan="10">'+(stockFilter==="all"?"Aucun stock Boutique.": "Aucun produit dans ce filtre.")+'</td></tr>';
+      return '<tr data-stock-row="'+esc(i.key)+'"><td><small>'+esc(i.cardId || i.key)+'</small></td><td><strong>'+esc(i.name)+'</strong><br><small>'+esc([i.extension,i.number?"#"+i.number:""].filter(Boolean).join(" · "))+'</small></td><td>'+esc(i.categoryLabel || i.packaging)+'</td><td><select data-condition '+((i.packaging!=="carte_unite"&&i.packaging!=="lot_cartes")?'disabled':'')+'>'+conditionOptions(i)+'</select></td><td>'+euro(i.averagePurchaseCost)+'</td><td><input data-price type="number" min="'+((i.packaging==="carte_unite"||i.packaging==="lot_cartes")?"1":"0.01")+'" step="0.01" value="'+(i.boutiquePrice ? Number(i.boutiquePrice).toFixed(2) : '')+'" placeholder="'+(i.catalogPrice ? Number(i.catalogPrice).toFixed(2) : 'Prix requis')+'"><br><small>'+(i.boutiquePrice?'Prix Admin':i.catalogPrice?'Auto Cardoria '+euro(i.catalogPrice):'Prix catalogue indisponible')+'</small></td><td><input data-weight type="number" min="1" max="30000" step="1" value="'+(i.shippingWeightGrams ? String(i.shippingWeightGrams) : '')+'" placeholder="g"><br><small>Poids colis</small></td><td><strong>'+Number(i.stock||0)+'</strong> dispo<br><small>'+esc(stockBreakdown(i))+'</small><br>'+statusLabel(i)+lastChange+'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+actions+'</div></td><td><select data-boutique '+(i.stockRemoved?'disabled':'')+'><option value="yes"'+(i.boutiqueEnabled?' selected':'')+'>Oui</option><option value="no"'+(!i.boutiqueEnabled?' selected':'')+'>Non</option></select></td><td>Achats payés<br><small data-save-status></small></td></tr>';
+    }).join("") || '<tr><td colspan="10">'+(stockFilter==="all" && !stockQuery ? "Aucun stock Boutique." : "Aucun produit dans ce filtre.")+'</td></tr>';
 
     A.qs("#stockRows").querySelectorAll("tr[data-stock-row]").forEach(function (row) {
       var item = inventoryByKey[row.getAttribute("data-stock-row")];
@@ -185,6 +220,8 @@
     var p = results[0], inv = results[1];
     if (!p || !p.ok) throw new Error(p && p.error || "Achats indisponibles");
     if (!inv || !inv.ok) throw new Error(inv && inv.error || "Stock Boutique indisponible");
+    if (Number.isFinite(Number(inv.lowStockThreshold))) lowStockThreshold = Number(inv.lowStockThreshold);
+    if (Number.isFinite(Number(inv.maxStockBase))) maxStockBase = Number(inv.maxStockBase);
 
     var missingPriceIds = Array.from(new Set((inv.inventory || []).filter(function (item) {
       return item.cardId && !item.boutiquePrice && Number(item.catalogPrice || 0) <= 0;
@@ -211,14 +248,37 @@
   }
 
   A.renderShell("stock", "Stock Boutique", "Source unique : achats Pokémon payés moins réservations, ventes et remboursements",
-    '<div class="admin-kpi-grid" style="margin-bottom:16px"><div class="admin-kpi"><label>Stock disponible</label><strong id="stockUnits">0</strong></div><div class="admin-kpi"><label>Valeur achat disponible</label><strong id="stockValue">0,00 €</strong></div><div class="admin-kpi"><label>Rupture</label><strong id="stockOut">0</strong></div><div class="admin-kpi"><label>Bientôt en rupture</label><strong id="stockLow">0</strong></div><div class="admin-kpi"><label>Lié catalogue</label><strong id="stockLinked">0 / 0</strong></div><div class="admin-kpi"><label>Dans Boutique</label><strong id="stockBoutique">0 / 0</strong></div></div>' +
-    '<div class="admin-panel"><p id="stockSummary" class="small">Chargement...</p><div class="admin-filters" style="margin:12px 0"><button type="button" class="btn btn-secondary" data-stock-filter="all">Tous</button><button type="button" class="btn btn-secondary" data-stock-filter="out">Produits en rupture</button><button type="button" class="btn btn-secondary" data-stock-filter="low">Bientôt en rupture</button></div><p class="small">Les cartes liées au catalogue récupèrent automatiquement leur tarif de référence Cardoria. Vous pouvez toujours saisir un prix Admin pour le remplacer. Vous pouvez aussi modifier la quantité disponible, l’état, le poids d’expédition et la présence en Boutique. Le retrait conserve toujours l’historique d’achat, les ventes et la comptabilité. Le poids n’est jamais inventé : s’il manque, une étiquette ne pourra pas être créée. Seuil bientôt en rupture : 2 unités.</p><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Réf.</th><th>Nom</th><th>Catégorie</th><th>État</th><th>Prix achat moy.</th><th>Prix Boutique</th><th>Poids (g)</th><th>Stock réel / actions</th><th>Boutique</th><th>Source</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
+    '<div class="admin-kpi-grid" style="margin-bottom:16px">' +
+      '<div class="admin-kpi"><label>Total unités disponibles</label><strong id="stockUnits">0</strong></div>' +
+      '<div class="admin-kpi"><label>Produits disponibles</label><strong id="stockAvailableProducts">0</strong></div>' +
+      '<div class="admin-kpi"><label>Produits stock faible</label><strong id="stockLow">0</strong></div>' +
+      '<div class="admin-kpi"><label>Produits en rupture</label><strong id="stockOut">0</strong></div>' +
+      '<div class="admin-kpi"><label>Produits en survente</label><strong id="stockOversold">0</strong></div>' +
+      '<div class="admin-kpi"><label>Valeur du stock</label><strong id="stockValue">0,00 €</strong></div>' +
+    '</div>' +
+    '<div class="admin-panel"><p id="stockSummary" class="small">Chargement...</p>' +
+    '<div class="admin-filters" style="margin:12px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
+      '<button type="button" class="btn btn-secondary" data-stock-filter="all">Tous</button>' +
+      '<button type="button" class="btn btn-secondary" data-stock-filter="available">Disponible</button>' +
+      '<button type="button" class="btn btn-secondary" data-stock-filter="low">Stock faible</button>' +
+      '<button type="button" class="btn btn-secondary" data-stock-filter="out">Rupture</button>' +
+      '<button type="button" class="btn btn-secondary" data-stock-filter="reserved">Réservé</button>' +
+      '<button type="button" class="btn btn-secondary" data-stock-filter="oversold">Survente</button>' +
+      '<button type="button" class="btn btn-secondary" data-stock-filter="removed">Retiré de la Boutique</button>' +
+      '<input id="stockSearch" type="search" placeholder="Nom, référence, extension, numéro" style="min-width:220px;flex:1">' +
+    '</div>' +
+    '<p class="small">Les cartes liées au catalogue récupèrent automatiquement leur tarif de référence Cardoria. Vous pouvez toujours saisir un prix Admin pour le remplacer. Modifier la quantité change le stock de base pour obtenir la disponibilité voulue, sans écraser les ventes déjà commises. Le retrait conserve l’historique d’achat, les ventes et la comptabilité. Le poids n’est jamais inventé : s’il manque, une étiquette ne pourra pas être créée. Seuil stock faible : <span id="stockLowThresholdLabel">2</span> unités.</p>' +
+    '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Réf.</th><th>Nom</th><th>Catégorie</th><th>État</th><th>Prix achat moy.</th><th>Prix Boutique</th><th>Poids (g)</th><th>Stock réel / actions</th><th>Boutique</th><th>Source</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
 
   document.querySelectorAll("[data-stock-filter]").forEach(function (button) {
     button.addEventListener("click", function () {
       stockFilter = button.getAttribute("data-stock-filter") || "all";
       render(lastInventory, lastTotals);
     });
+  });
+  A.qs("#stockSearch")?.addEventListener("input", function (event) {
+    stockQuery = event.target.value || "";
+    render(lastInventory, lastTotals);
   });
 
   load().catch(function (e) { A.qs("#stockRows").innerHTML = '<tr><td colspan="10">Chargement du stock impossible.</td></tr>'; console.error("[stock] load failed", e); });
