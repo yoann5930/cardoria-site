@@ -37,10 +37,15 @@ test("client dashboard exposes Cardoria navigation and account data sections",()
 test("boutique checkout can send La Poste as the shipping carrier",()=>{
   assert.match(boutique,/shopCarrier/);
   assert.match(boutique,/Colissimo domicile/);
+  assert.match(boutique,/SHIPPING_RATES/);
+  assert.match(boutique,/4\.95/);
+  assert.match(checkout,/resolveBoutiqueShipping/);
   assert.match(checkout,/selectedCarrier/);
   assert.match(checkout,/La Poste/);
   assert.match(auth,/shippingLabelAvailable/);
+  assert.match(auth,/shippingCost/);
   assert.match(clientOrders,/\/api\/laposte\/my-labels/);
+  assert.match(clientOrders,/FRAIS DE PORT/);
   assert.match(adminOrders,/\/api\/laposte\/labels\//);
 });
 

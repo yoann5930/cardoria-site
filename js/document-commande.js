@@ -57,6 +57,8 @@
     const tracking = order.tracking ? esc(order.tracking) : "Suivi à renseigner";
     const clientAddress = lines(order.address || "");
     const title = type === "facture" ? "FACTURE" : "BON DE COMMANDE";
+    const shippingCost = Number(order.shippingCost || 0);
+    const shippingRow = '<tr><td></td><td>Frais de port — ' + esc(shippingLabel(order)) + '</td><td>1</td><td>' + euro(shippingCost) + '</td><td>' + euro(shippingCost) + '</td></tr>';
 
     page.innerHTML =
       '<section class="panel">' +
@@ -69,7 +71,7 @@
           '<div><h3>Client</h3><p>' + esc(order.client || "") + '<br>' + esc(order.email || "") + (clientAddress ? '<br>' + clientAddress : '') + '</p></div>' +
           '<div><h3>Livraison</h3><p>' + esc(shippingLabel(order)) + '<br>' + tracking + '</p></div>' +
         '</div>' +
-        '<div class="table-wrap"><table><thead><tr><th>Réf.</th><th>Désignation</th><th>Qté</th><th>Prix</th><th>Total</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        '<div class="table-wrap"><table><thead><tr><th>Réf.</th><th>Désignation</th><th>Qté</th><th>Prix</th><th>Total</th></tr></thead><tbody>' + rows + shippingRow + '</tbody></table></div>' +
         '<h2>Total : ' + euro(orderTotal(order)) + '</h2>' +
         '<button class="primary no-print" type="button" onclick="window.print()">Imprimer / PDF</button>' +
       '</section>';

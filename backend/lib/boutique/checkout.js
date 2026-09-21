@@ -3,6 +3,7 @@ import { readJson, writeJson } from "../storage.js";
 import { createSumUpCheckout } from "../payments/sumup.js";
 import { assertSaleProvider, assertServerAmount } from "../payments/routing.js";
 import { listBoutiqueProducts } from "./catalog.js";
+import { resolveBoutiqueShipping } from "./shipping.js";
 
 const money = (v) => Math.round((Number(v) || 0) * 100) / 100;
 const clean = (v, max = 500) => String(v == null ? "" : v).trim().slice(0, max);
@@ -20,9 +21,9 @@ function validateItems(rawItems) {
     return { ref: p.id, name: p.name, qty, price: money(p.price), category: p.category || "pokemon" };
   });
 }
-function fingerprint({ email, items, total }) {
+function fingerprint({ email, items, total, carrier }) {
   const normalized = items.map((i) => `${i.ref}:${i.qty}`).sort().join("|");
-  return crypto.createHash("sha256").update(`${email}|${normalized}|${money(total)}`).digest("hex");
+  return crypto.createHash("sha256").update(`${email}|${normalized}|${carrier}|${money(total)}`).digest("hex");
 }
 
 export async function createLiveBoutiqueCheckout({ customerName, customerEmail, customerPhone, address, postalCode, city, country, items, shipping, carrier, successUrl, trafficSource, visitorId, accountUserId = "", requestedProvider, requestedAmount }) {
@@ -32,11 +33,13 @@ export async function createLiveBoutiqueCheckout({ customerName, customerEmail, 
   if (!name) throw Object.assign(new Error("Nom du client obligatoire."), { status: 400 });
   if (!phone) throw Object.assign(new Error("Téléphone obligatoire pour la livraison."), { status: 400 });
   if (!street || !zip || !locality) throw Object.assign(new Error("Adresse, code postal et ville obligatoires pour la livraison."), { status: 400 });
-  const verifiedItems = validateItems(items), shippingCost = 0;
-  const selectedCarrier = ["La Poste", "Mondial Relay", "Relais Colis"].includes(clean(carrier, 40)) ? clean(carrier, 40) : "La Poste";
-  const shippingLabel = selectedCarrier === "La Poste" ? "Colissimo domicile" : (clean(shipping, 120) || "Standard");
+  const verifiedItems = validateItems(items);
+  const shippingOption = resolveBoutiqueShipping(carrier || "La Poste");
+  const selectedCarrier = shippingOption.id;
+  const shippingLabel = shippingOption.method;
+  const shippingCost = money(shippingOption.cost);
   const total = assertServerAmount(money(verifiedItems.reduce((s, i) => s + i.qty * i.price, 0) + shippingCost), requestedAmount);
-  const key = fingerprint({ email, items: verifiedItems, total });
+  const key = fingerprint({ email, items: verifiedItems, total, carrier: selectedCarrier });
   const orders = readJson("orders", []);
   const existing = orders.find((o) => o.idempotencyKey === key && o.paymentStatus === "pending" && Date.now() - Date.parse(o.createdAt || 0) < 30 * 60 * 1000);
   if (existing?.sumupCheckoutId) return { order: existing, checkoutId: existing.sumupCheckoutId, providerOrderId: existing.sumupCheckoutId, url: existing.paymentUrl || "", paymentId: existing.paymentId || "", status: "pending" };

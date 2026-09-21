@@ -77,6 +77,7 @@ jobs:
           node --check lib/colissimo.js
           node --check lib/laposte-order-labels.js
           node --check routes/laposte.js
+          node --check lib/boutique/shipping.js
           node --check ../script.js
           node --check ../js/boutique.js
           node --check ../js/document-commande.js
@@ -90,7 +91,7 @@ jobs:
 
       - name: Lot market and catalog regression tests
         working-directory: .
-        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs tests/pokemon-multisource-catalog.test.mjs tests/pokemon-showcase.test.mjs tests/boutique-quick-search.test.mjs tests/order-document-live-data.test.mjs tests/global-card-price-floor.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs backend/tests/colissimo-direct.test.mjs tests/ovh-colissimo-bridge.test.mjs
+        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs tests/pokemon-multisource-catalog.test.mjs tests/pokemon-showcase.test.mjs tests/boutique-quick-search.test.mjs tests/order-document-live-data.test.mjs tests/global-card-price-floor.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs backend/tests/colissimo-direct.test.mjs tests/ovh-colissimo-bridge.test.mjs backend/tests/boutique-shipping.test.mjs
 
       - name: Reject client-side admin bypass
         working-directory: .

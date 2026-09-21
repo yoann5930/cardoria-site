@@ -403,6 +403,28 @@
     renderCart();
   }
 
+  const SHIPPING_RATES = {
+    "La Poste": { shipping: "Colissimo domicile", cost: 6.5 },
+    "Mondial Relay": { shipping: "Point Relais", cost: 4.95 }
+  };
+
+  function selectedShipping() {
+    const select = qs("shopCarrier");
+    const option = select?.selectedOptions?.[0];
+    const carrier = option?.value || "La Poste";
+    const fallback = SHIPPING_RATES[carrier] || SHIPPING_RATES["La Poste"];
+    const cost = Number(option?.dataset?.cost);
+    return {
+      carrier,
+      shipping: option?.dataset?.shipping || fallback.shipping,
+      cost: Number.isFinite(cost) && cost >= 0 ? cost : fallback.cost
+    };
+  }
+
+  function cartSubtotal() {
+    return cart.reduce((sum, item) => sum + item.qty * item.price, 0);
+  }
+
   function renderCart() {
     const container = qs("cart");
     const total = qs("cartTotal");
@@ -410,7 +432,12 @@
     container.innerHTML = cart.length
       ? cart.map((item) => '<li>' + item.qty + " × " + esc(item.name) + " — " + euro(item.qty * item.price) + '</li>').join("")
       : "<li>Panier vide</li>";
-    total.textContent = euro(cart.reduce((sum, item) => sum + item.qty * item.price, 0));
+    const shipping = selectedShipping();
+    const subtotal = cartSubtotal();
+    const shippingCost = cart.length ? shipping.cost : 0;
+    if (qs("cartSubtotal")) qs("cartSubtotal").textContent = euro(subtotal);
+    if (qs("cartShipping")) qs("cartShipping").textContent = euro(shippingCost);
+    total.textContent = euro(subtotal + shippingCost);
   }
 
   function customerPayload() {
@@ -448,6 +475,7 @@
       const token = getToken();
       const headers = { "Content-Type": "application/json" };
       if (token) headers.Authorization = "Bearer " + token;
+      const shipping = selectedShipping();
 
       const response = await fetch(BACKEND_URL + "/api/payments/boutique/checkout", {
         method: "POST",
@@ -456,8 +484,8 @@
           ...customer,
           items,
           provider:"sumup",
-          carrier: document.querySelector('input[name="shopCarrier"]:checked')?.value || "La Poste",
-          shipping: (document.querySelector('input[name="shopCarrier"]:checked')?.value || "La Poste") === "La Poste" ? "Colissimo domicile" : "Standard",
+          carrier: shipping.carrier,
+          shipping: shipping.shipping,
           successUrl: location.origin + "/boutique.html?gamme=pokemon",
           ...attribution
         })
@@ -616,6 +644,7 @@
   function init() {
     qs("shopMenuButton")?.addEventListener("click", toggleMenu);
     qs("shopPayButton")?.addEventListener("click", checkoutBoutique);
+    qs("shopCarrier")?.addEventListener("change", renderCart);
     qs("products")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-add-product]");
       if (button) {

@@ -9,7 +9,7 @@ const runtimeJs = fs.readFileSync("backend/public/js/document-commande.js", "utf
 const adminRoutes = fs.readFileSync("backend/routes/payments-admin.js", "utf8");
 
 test("order document uses the dedicated live-order client", () => {
-  assert.match(html, /\/js\/document-commande\.js\?v=20260921-live-order-1/);
+  assert.match(html, /\/js\/document-commande\.js\?v=20260921-shipping-1/);
   assert.doesNotMatch(html, /script\.js\?v=6/);
   assert.equal(runtimeHtml, html);
   assert.equal(runtimeJs, js);

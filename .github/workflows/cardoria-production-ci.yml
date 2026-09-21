@@ -42,6 +42,7 @@ jobs:
           node --check backend/lib/payments/sumup.js
           node --check backend/lib/payments/sumup-refund.js
           node --check backend/lib/boutique/checkout.js
+          node --check backend/lib/boutique/shipping.js
           node --check backend/lib/live/checkout.js
           node --check backend/lib/live/sessions.js
           node --check backend/lib/live/camera-media.js
@@ -59,6 +60,7 @@ jobs:
           grep -q 'live_admin: "sumup"' backend/lib/payments/routing.js
           grep -q 'live_seller: "paypal"' backend/lib/payments/routing.js
           grep -q 'marketplace: "paypal"' backend/lib/payments/routing.js
+          grep -q 'resolveBoutiqueShipping' backend/lib/boutique/checkout.js
           grep -q 'createSumUpCheckout' backend/lib/boutique/checkout.js
           grep -q 'idempotencyKey' backend/lib/boutique/checkout.js
           grep -q 'createSumUpCheckout' backend/lib/live/checkout.js

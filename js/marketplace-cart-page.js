@@ -4,19 +4,50 @@
   var root = document.getElementById("cartRoot");
   var userId = M.getUserId();
   var paymentConfig = null;
+  var shippingOptions = [];
+  var selectedCarrier = "mondial_relay";
+  var lastCart = null;
 
   function apiV1(path, opts) { return M.api(path, opts); }
   function authBox() {
     return "<div class='panel' style='margin:18px 0'><h3>Connexion requise pour payer</h3><p>Le panier reste disponible sans compte. Le paiement exige une session Cardoria sécurisée.</p><div class='mk-form-grid'><input id='authEmail' type='email' placeholder='Email' autocomplete='email'><input id='authPassword' type='password' placeholder='Mot de passe' autocomplete='current-password'><input id='authName' placeholder='Nom (inscription uniquement)' autocomplete='name'><div><button class='mk-btn mk-btn-primary' id='loginBtn' type='button'>Se connecter</button> <button class='mk-btn mk-btn-secondary' id='registerBtn' type='button'>Créer un compte</button></div></div></div>";
   }
 
+  function activeShippingOptions() {
+    return shippingOptions.length ? shippingOptions : [
+      { id: "mondial_relay", name: "Mondial Relay", price: 4.95, estimatedDays: "3-5 jours" },
+      { id: "colissimo", name: "Colissimo", price: 6.5, estimatedDays: "2-3 jours" },
+      { id: "chronopost", name: "Chronopost", price: 9.9, estimatedDays: "24-48h" }
+    ];
+  }
+
+  function shippingQuote(cart, carrierId) {
+    var option = activeShippingOptions().find(function (item) { return item.id === carrierId; }) || activeShippingOptions()[0];
+    var base = Number(option && option.price || 0);
+    var qty = (cart.items || []).reduce(function (sum, item) { return sum + Number(item.qty || 1); }, 0);
+    var weightKg = Math.max(0.05, qty * 0.05);
+    var extra = weightKg > 0.1 ? Math.ceil((weightKg - 0.1) / 0.1) * 0.5 : 0;
+    return Math.round((base + extra) * 100) / 100;
+  }
+
+  function carrierOptionsHtml() {
+    return activeShippingOptions().map(function (option) {
+      var selected = option.id === selectedCarrier ? " selected" : "";
+      var days = option.estimatedDays ? " · " + option.estimatedDays : "";
+      return "<option value='" + M.esc(option.id) + "'" + selected + ">" + M.esc(option.name) + " — " + M.euro(option.price) + days + "</option>";
+    }).join("");
+  }
+
   function render(cart) {
+    lastCart = cart;
     if (!cart.items.length) { root.innerHTML = "<p>Votre panier est vide. <a href='marketplace.html'>Parcourir la marketplace</a></p>"; return; }
     var account = M.getAccount();
     var commissionInfo = paymentConfig && paymentConfig.commissionConfigured ? "Commission Cardoria : " + Number(paymentConfig.commissionPercent).toLocaleString("fr-FR") + " %." : "Commission Cardoria non configurée : paiement bloqué.";
+    var shippingCost = shippingQuote(cart, selectedCarrier);
+    var grandTotal = Math.round((Number(cart.subtotal || 0) + shippingCost) * 100) / 100;
     root.innerHTML = cart.items.map(function (it) {
       return "<div class='mk-cart-row' style='display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(212,175,55,.2)'><div><strong>" + M.esc(it.title) + "</strong><br><span style='color:#baaf97'>" + M.euro(it.unitPrice) + " × " + Number(it.qty) + "</span></div><div><input type='number' min='1' value='" + Number(it.qty) + "' data-id='" + M.esc(it.listingId) + "' style='width:60px'> <button type='button' data-del='" + M.esc(it.listingId) + "'>Retirer</button></div></div>";
-    }).join("") + "<p style='margin-top:16px;font-size:20px;color:#ffe18a'>Sous-total : <strong>" + M.euro(cart.subtotal) + "</strong></p><div class='mk-payment-provider'><strong>Paiement Marketplace sécurisé par PayPal</strong><p>Le prix des cartes et les frais de livraison sont recalculés côté serveur.</p><small>" + commissionInfo + "</small></div>" + (account ? "<p>Connecté : <strong>" + M.esc(account.email) + "</strong></p>" : authBox()) + "<div class='mk-form-grid' style='margin-top:16px'><input id='buyName' placeholder='Nom' autocomplete='name' value='" + M.esc(account && account.name || "") + "'><input id='buyAddress' placeholder='Adresse livraison' autocomplete='street-address'><select id='buyCarrier'><option value='mondial_relay'>Mondial Relay</option><option value='colissimo'>Colissimo</option><option value='chronopost'>Chronopost</option></select><button class='mk-btn mk-btn-primary' type='button' id='checkoutBtn'>Payer avec PayPal</button></div>";
+    }).join("") + "<p style='margin-top:16px;font-size:20px;color:#ffe18a'>Sous-total : <strong>" + M.euro(cart.subtotal) + "</strong></p><p>Frais de port : <strong id='mkShippingCost'>" + M.euro(shippingCost) + "</strong></p><p style='font-size:20px;color:#ffe18a'>Total : <strong id='mkGrandTotal'>" + M.euro(grandTotal) + "</strong></p><div class='mk-payment-provider'><strong>Paiement Marketplace sécurisé par PayPal</strong><p>Le prix des cartes et les frais de livraison sont recalculés côté serveur.</p><small>" + commissionInfo + "</small></div>" + (account ? "<p>Connecté : <strong>" + M.esc(account.email) + "</strong></p>" : authBox()) + "<div class='mk-form-grid' style='margin-top:16px'><input id='buyName' placeholder='Nom' autocomplete='name' value='" + M.esc(account && account.name || "") + "'><input id='buyAddress' placeholder='Adresse livraison' autocomplete='street-address'><label for='buyCarrier'>Mode d'envoi</label><select id='buyCarrier'>" + carrierOptionsHtml() + "</select><button class='mk-btn mk-btn-primary' type='button' id='checkoutBtn'>Payer avec PayPal</button></div>";
 
     root.querySelectorAll("input[type=number]").forEach(function (inp) { inp.onchange = function () { apiV1("/v1/cart/qty", { method: "PUT", body: JSON.stringify({ userId: userId, listingId: inp.dataset.id, qty: Number(inp.value) }) }).then(load); }; });
     root.querySelectorAll("button[data-del]").forEach(function (btn) { btn.onclick = function () { apiV1("/v1/cart/item", { method: "DELETE", body: JSON.stringify({ userId: userId, listingId: btn.dataset.del }) }).then(load); }; });
@@ -24,6 +55,17 @@
     var registerBtn = document.getElementById("registerBtn");
     if (loginBtn) loginBtn.onclick = function () { M.login(document.getElementById("authEmail").value.trim(), document.getElementById("authPassword").value).then(load).catch(function (e) { alert(e.message); }); };
     if (registerBtn) registerBtn.onclick = function () { M.register(document.getElementById("authEmail").value.trim(), document.getElementById("authPassword").value, document.getElementById("authName").value.trim()).then(load).catch(function (e) { alert(e.message); }); };
+    var carrierSelect = document.getElementById("buyCarrier");
+    if (carrierSelect) carrierSelect.onchange = function () {
+      selectedCarrier = carrierSelect.value;
+      if (!lastCart) return;
+      var shippingCost = shippingQuote(lastCart, selectedCarrier);
+      var grandTotal = Math.round((Number(lastCart.subtotal || 0) + shippingCost) * 100) / 100;
+      var shipEl = document.getElementById("mkShippingCost");
+      var totalEl = document.getElementById("mkGrandTotal");
+      if (shipEl) shipEl.textContent = M.euro(shippingCost);
+      if (totalEl) totalEl.textContent = M.euro(grandTotal);
+    };
     document.getElementById("checkoutBtn").onclick = checkout;
   }
 
@@ -41,6 +83,16 @@
       .catch(function (e) { button.disabled = false; button.textContent = "Payer avec PayPal"; alert(e.message); });
   }
 
-  function load() { Promise.all([apiV1("/v1/cart/" + encodeURIComponent(userId)), apiV1("/v1/paypal/config")]).then(function (r) { paymentConfig = r[1]; render(r[0].cart); }).catch(function (e) { root.innerHTML = "<div class='panel'>" + M.esc(e.message) + "</div>"; }); }
+  function load() {
+    Promise.all([
+      apiV1("/v1/cart/" + encodeURIComponent(userId)),
+      apiV1("/v1/paypal/config"),
+      M.api("/shipping/options").catch(function () { return { options: [] }; })
+    ]).then(function (r) {
+      paymentConfig = r[1];
+      if (Array.isArray(r[2] && r[2].options) && r[2].options.length) shippingOptions = r[2].options;
+      render(r[0].cart);
+    }).catch(function (e) { root.innerHTML = "<div class='panel'>" + M.esc(e.message) + "</div>"; });
+  }
   load();
 })();

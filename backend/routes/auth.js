@@ -67,6 +67,7 @@ function publicClientOrder(order) {
     carrier: order.carrier || "",
     tracking: order.tracking || "",
     trackingUrl: order.trackingUrl || "",
+    shippingCost: Number(order.shippingCost || 0),
     shippingLabelAvailable: Boolean(order.shippingLabelPath || order.colissimoParcelNumber),
     total: Number(order.total || 0)
   };

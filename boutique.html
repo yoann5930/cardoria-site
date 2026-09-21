@@ -11,7 +11,7 @@
   <link rel="preload" href="/style.css" as="style">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/css/boutique-v1.css?v=20260907-client-account-1">
-  <link rel="stylesheet" href="/css/boutique-v2.css?v=20260921-laposte-1">
+  <link rel="stylesheet" href="/css/boutique-v2.css?v=20260921-shipping-1">
   <link rel="stylesheet" href="/css/cardoria-brand-polish.css?v=20260831-1">
   <link rel="stylesheet" href="/css/card-name-contrast.css?v=20260920-2">
   <link rel="stylesheet" href="/css/client-account-button.css?v=20260907-1">
@@ -50,7 +50,11 @@
         <div class="shop-catalog"><div class="shop-catalog-head"><div><p class="shop-kicker">Pokémon</p><h2>Produits disponibles</h2></div><p class="shop-catalog-note">Disponibilité synchronisée avec le stock CardoriaShop.</p></div><div class="products" id="products" aria-live="polite"></div></div>
         <aside class="shop-cart" aria-label="Panier CardoriaShop">
           <div class="shop-cart-head"><h2>Votre panier</h2><span>▣</span></div><ul id="cart"></ul>
-          <div class="shop-cart-total"><span>Total</span><strong id="cartTotal">0,00 €</strong></div>
+          <div class="shop-cart-breakdown">
+            <div class="shop-cart-total"><span>Sous-total</span><strong id="cartSubtotal">0,00 €</strong></div>
+            <div class="shop-cart-total"><span>Frais de port</span><strong id="cartShipping">6,50 €</strong></div>
+            <div class="shop-cart-total shop-cart-total-final"><span>Total</span><strong id="cartTotal">6,50 €</strong></div>
+          </div>
           <div class="shop-customer">
             <input id="shopName" placeholder="Nom et prénom" autocomplete="name" required>
             <input id="shopEmail" placeholder="Email" type="email" autocomplete="email" required>
@@ -60,9 +64,13 @@
             <input id="shopCity" placeholder="Ville" autocomplete="address-level2" required>
             <input id="shopCountry" placeholder="Pays" autocomplete="country-name" value="France" required>
             <fieldset class="shop-shipping">
-              <legend>Livraison</legend>
-              <label><input type="radio" name="shopCarrier" value="La Poste" checked> La Poste — Colissimo à domicile</label>
-              <label><input type="radio" name="shopCarrier" value="Mondial Relay"> Mondial Relay — Point Relais</label>
+              <legend>Mode d'envoi</legend>
+              <label for="shopCarrier">Choisir le transporteur</label>
+              <select id="shopCarrier" name="shopCarrier" required>
+                <option value="La Poste" data-cost="6.5" data-shipping="Colissimo domicile" selected>La Poste — Colissimo à domicile — 6,50 €</option>
+                <option value="Mondial Relay" data-cost="4.95" data-shipping="Point Relais">Mondial Relay — Point Relais — 4,95 €</option>
+              </select>
+              <p class="shop-shipping-note">Les frais de port sont ajoutés au total selon le mode choisi, puis recalculés côté serveur au paiement.</p>
             </fieldset>
           </div>
           <button class="shop-pay" id="shopPayButton" type="button">PAYER</button>
@@ -77,6 +85,6 @@
   <footer class="shop-footer"><div class="shop-shell shop-footer-grid"><div class="shop-footer-brand"><img src="/assets/logo/cardoria-premium.png" alt="CardoriaShop" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'"><strong>CARDORIA</strong><p>Le Royaume des Collectionneurs.</p></div><div><h3>Boutique</h3><a href="/boutique.html">Gammes</a><a href="/boutique.html?gamme=pokemon">Pokémon</a><a href="/marketplace.html">Marketplace</a></div><div><h3>Services</h3><a href="/estimation.html">Estimation</a><a href="/scanner.html">Scanner</a></div><div><h3>CardoriaShop</h3><a href="/">Accueil</a><a href="/client-login.html">Mon compte</a><a href="/contact.html">Contact</a><a href="/admin-login.html">Admin</a></div></div><div class="shop-shell shop-footer-bottom"><span>© CardoriaShop</span><span>Trading Cards • Collectibles • Premium</span></div></footer>
 
   <script src="/js/attribution.js"></script>
-  <script src="/js/boutique.js?v=20260921-laposte-1"></script>
+  <script src="/js/boutique.js?v=20260921-shipping-1"></script>
 </body>
 </html>
