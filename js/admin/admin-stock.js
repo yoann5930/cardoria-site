@@ -14,6 +14,7 @@
   function price(v) { var n = Number(String(v == null ? "" : v).replace(",", ".")); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; }
   function normalizeCondition(v) { var u = String(v || "").trim().toUpperCase(); return conditions.indexOf(u) >= 0 ? u : ""; }
   function nonNegativeInt(v) { var n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null; }
+  function positiveWeight(v) { if (v == null || v === "") return null; var n = Number(v); return Number.isFinite(n) && n >= 1 && n <= 30000 ? Math.trunc(n) : null; }
 
   function parsePrefs(notes) {
     var m = String(notes || "").match(/\[STOCK_PREFS\]\s*(\{[^\n\r]*\})/);
@@ -28,6 +29,7 @@
       boutique: pref.boutique !== undefined ? pref.boutique !== false : previous.boutique !== false,
       boutiquePrice: pref.boutiquePrice !== undefined ? price(pref.boutiquePrice) : price(previous.boutiquePrice),
       stockBase: pref.stockBase !== undefined ? nonNegativeInt(pref.stockBase) : nonNegativeInt(previous.stockBase),
+      shippingWeightGrams: pref.shippingWeightGrams !== undefined ? positiveWeight(pref.shippingWeightGrams) : positiveWeight(previous.shippingWeightGrams),
       removed: pref.removed !== undefined ? pref.removed === true : previous.removed === true
     };
     var base = current.replace(/\n?\[STOCK_PREFS\]\s*\{[^\n\r]*\}/g, "").replace(/\s+$/, "");
@@ -87,12 +89,13 @@
     var condition = row.querySelector("[data-condition]")?.value || "";
     var boutique = row.querySelector("[data-boutique]")?.value !== "no";
     var boutiquePrice = row.querySelector("[data-price]")?.value || "";
+    var shippingWeightGrams = row.querySelector("[data-weight]")?.value || "";
     if ((item.packaging === "carte_unite" || item.packaging === "lot_cartes") && boutiquePrice !== "" && Number(boutiquePrice) > 0 && Number(boutiquePrice) < 1) {
       boutiquePrice = "1.00";
       var priceInput = row.querySelector("[data-price]");
       if (priceInput) priceInput.value = boutiquePrice;
     }
-    await queuePreferenceSave(item, { condition: condition, boutique: boutique, boutiquePrice: boutiquePrice }, "Enregistrement...");
+    await queuePreferenceSave(item, { condition: condition, boutique: boutique, boutiquePrice: boutiquePrice, shippingWeightGrams: shippingWeightGrams }, "Enregistrement...");
   }
 
   async function changeQuantity(item) {
@@ -143,12 +146,12 @@
       var actions = i.stockRemoved
         ? '<button type="button" class="admin-btn admin-btn--small" data-restore-stock>Remettre</button>'
         : '<button type="button" class="admin-btn admin-btn--small" data-edit-stock>Modifier</button> <button type="button" class="admin-btn admin-btn--small admin-btn--danger" data-remove-stock>Supprimer</button>';
-      return '<tr data-stock-row="'+esc(i.key)+'"><td><small>'+esc(i.cardId || i.key)+'</small></td><td><strong>'+esc(i.name)+'</strong><br><small>'+esc([i.extension,i.number?"#"+i.number:""].filter(Boolean).join(" · "))+'</small></td><td>'+esc(i.categoryLabel || i.packaging)+'</td><td><select data-condition '+((i.packaging!=="carte_unite"&&i.packaging!=="lot_cartes")?'disabled':'')+'>'+conditionOptions(i)+'</select></td><td>'+euro(i.averagePurchaseCost)+'</td><td><input data-price type="number" min="'+((i.packaging==="carte_unite"||i.packaging==="lot_cartes")?"1":"0.01")+'" step="0.01" value="'+(i.boutiquePrice ? Number(i.boutiquePrice).toFixed(2) : '')+'" placeholder="'+(i.catalogPrice ? Number(i.catalogPrice).toFixed(2) : 'Prix requis')+'"><br><small>'+(i.boutiquePrice?'Prix Admin':i.catalogPrice?'Auto Cardoria '+euro(i.catalogPrice):'Prix catalogue indisponible')+'</small></td><td><strong>'+Number(i.stock||0)+'</strong> dispo<br><small>'+Number(i.pendingStock||0)+' réservé · '+Number(i.soldStock||0)+' vendu'+(Number(i.refundHoldStock||0)?' · '+Number(i.refundHoldStock)+' remboursement':'')+'</small><br>'+statusLabel(i)+'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+actions+'</div></td><td><select data-boutique '+(i.stockRemoved?'disabled':'')+'><option value="yes"'+(i.boutiqueEnabled?' selected':'')+'>Oui</option><option value="no"'+(!i.boutiqueEnabled?' selected':'')+'>Non</option></select></td><td>Achats payés<br><small data-save-status></small></td></tr>';
-    }).join("") || '<tr><td colspan="9">Aucun stock Boutique.</td></tr>';
+      return '<tr data-stock-row="'+esc(i.key)+'"><td><small>'+esc(i.cardId || i.key)+'</small></td><td><strong>'+esc(i.name)+'</strong><br><small>'+esc([i.extension,i.number?"#"+i.number:""].filter(Boolean).join(" · "))+'</small></td><td>'+esc(i.categoryLabel || i.packaging)+'</td><td><select data-condition '+((i.packaging!=="carte_unite"&&i.packaging!=="lot_cartes")?'disabled':'')+'>'+conditionOptions(i)+'</select></td><td>'+euro(i.averagePurchaseCost)+'</td><td><input data-price type="number" min="'+((i.packaging==="carte_unite"||i.packaging==="lot_cartes")?"1":"0.01")+'" step="0.01" value="'+(i.boutiquePrice ? Number(i.boutiquePrice).toFixed(2) : '')+'" placeholder="'+(i.catalogPrice ? Number(i.catalogPrice).toFixed(2) : 'Prix requis')+'"><br><small>'+(i.boutiquePrice?'Prix Admin':i.catalogPrice?'Auto Cardoria '+euro(i.catalogPrice):'Prix catalogue indisponible')+'</small></td><td><input data-weight type="number" min="1" max="30000" step="1" value="'+(i.shippingWeightGrams ? String(i.shippingWeightGrams) : '')+'" placeholder="g"><br><small>Poids colis</small></td><td><strong>'+Number(i.stock||0)+'</strong> dispo<br><small>'+Number(i.pendingStock||0)+' réservé · '+Number(i.soldStock||0)+' vendu'+(Number(i.refundHoldStock||0)?' · '+Number(i.refundHoldStock)+' remboursement':'')+'</small><br>'+statusLabel(i)+'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+actions+'</div></td><td><select data-boutique '+(i.stockRemoved?'disabled':'')+'><option value="yes"'+(i.boutiqueEnabled?' selected':'')+'>Oui</option><option value="no"'+(!i.boutiqueEnabled?' selected':'')+'>Non</option></select></td><td>Achats payés<br><small data-save-status></small></td></tr>';
+    }).join("") || '<tr><td colspan="10">Aucun stock Boutique.</td></tr>';
 
     A.qs("#stockRows").querySelectorAll("tr[data-stock-row]").forEach(function (row) {
       var item = inventoryByKey[row.getAttribute("data-stock-row")];
-      row.querySelectorAll("select[data-condition],select[data-boutique],input[data-price]").forEach(function (control) { control.addEventListener("change", function () { savePreference(item); }); });
+      row.querySelectorAll("select[data-condition],select[data-boutique],input[data-price],input[data-weight]").forEach(function (control) { control.addEventListener("change", function () { savePreference(item); }); });
       row.querySelector("[data-edit-stock]")?.addEventListener("click", function () { changeQuantity(item); });
       row.querySelector("[data-remove-stock]")?.addEventListener("click", function () { removeFromStock(item); });
       row.querySelector("[data-restore-stock]")?.addEventListener("click", function () { restoreToStock(item); });
@@ -190,7 +193,7 @@
 
   A.renderShell("stock", "Stock Boutique", "Source unique : achats Pokémon payés moins réservations, ventes et remboursements",
     '<div class="admin-kpi-grid" style="margin-bottom:16px"><div class="admin-kpi"><label>Stock disponible</label><strong id="stockUnits">0</strong></div><div class="admin-kpi"><label>Valeur achat disponible</label><strong id="stockValue">0,00 €</strong></div><div class="admin-kpi"><label>Lié catalogue</label><strong id="stockLinked">0 / 0</strong></div><div class="admin-kpi"><label>Dans Boutique</label><strong id="stockBoutique">0 / 0</strong></div></div>' +
-    '<div class="admin-panel"><p id="stockSummary" class="small">Chargement...</p><p class="small">Les cartes liées au catalogue récupèrent automatiquement leur tarif de référence Cardoria. Vous pouvez toujours saisir un prix Admin pour le remplacer. Vous pouvez aussi modifier la quantité disponible, l’état et la présence en Boutique. Le retrait conserve toujours l’historique d’achat, les ventes et la comptabilité.</p><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Réf.</th><th>Nom</th><th>Catégorie</th><th>État</th><th>Prix achat moy.</th><th>Prix Boutique</th><th>Stock réel / actions</th><th>Boutique</th><th>Source</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
+    '<div class="admin-panel"><p id="stockSummary" class="small">Chargement...</p><p class="small">Les cartes liées au catalogue récupèrent automatiquement leur tarif de référence Cardoria. Vous pouvez toujours saisir un prix Admin pour le remplacer. Vous pouvez aussi modifier la quantité disponible, l’état, le poids d’expédition et la présence en Boutique. Le retrait conserve toujours l’historique d’achat, les ventes et la comptabilité. Le poids n’est jamais inventé : s’il manque, une étiquette ne pourra pas être créée.</p><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Réf.</th><th>Nom</th><th>Catégorie</th><th>État</th><th>Prix achat moy.</th><th>Prix Boutique</th><th>Poids (g)</th><th>Stock réel / actions</th><th>Boutique</th><th>Source</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
 
-  load().catch(function (e) { A.qs("#stockRows").innerHTML = '<tr><td colspan="9">Chargement du stock impossible.</td></tr>'; console.error("[stock] load failed", e); });
+  load().catch(function (e) { A.qs("#stockRows").innerHTML = '<tr><td colspan="10">Chargement du stock impossible.</td></tr>'; console.error("[stock] load failed", e); });
 })();

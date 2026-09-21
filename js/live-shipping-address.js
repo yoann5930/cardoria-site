@@ -1,8 +1,17 @@
 (function(){
   "use strict";
-  var TOKEN_KEY="cardoria_client_session";
+  var TOKEN_KEY="cardoria_session_token";
+  var LEGACY_TOKEN_KEY="cardoria_client_session";
   function clean(v){return String(v==null?"":v).trim();}
-  function token(){try{return localStorage.getItem(TOKEN_KEY)||"";}catch(e){return"";}}
+  function token(){
+    try{
+      var t=localStorage.getItem(TOKEN_KEY)||"";
+      if(t)return t;
+      t=localStorage.getItem(LEGACY_TOKEN_KEY)||"";
+      if(t){localStorage.setItem(TOKEN_KEY,t);localStorage.removeItem(LEGACY_TOKEN_KEY);return t;}
+    }catch(e){}
+    return"";
+  }
   function headers(){var h={Accept:"application/json","Content-Type":"application/json"},t=token();if(t)h.Authorization="Bearer "+t;return h;}
   async function api(path,options){
     options=options||{};

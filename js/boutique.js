@@ -13,6 +13,7 @@
   let activeSuggestion = -1;
   let searchFrame = 0;
   let lastPreviewTrigger = null;
+  let selectedRelay = null;
 
   const qs = (id) => document.getElementById(id);
   const euro = (value) => Number(value || 0).toFixed(2).replace(".", ",") + " €";
@@ -413,6 +414,94 @@
     total.textContent = euro(cart.reduce((sum, item) => sum + item.qty * item.price, 0));
   }
 
+  function shippingMethod() {
+    return document.querySelector('input[name="shopShippingMethod"]:checked')?.value || "colissimo_home";
+  }
+
+  function renderRelaySummary() {
+    const box = qs("shopRelayBox");
+    const summary = qs("shopRelaySummary");
+    const relay = shippingMethod() === "mondial_relay";
+    if (box) box.hidden = !relay;
+    if (!summary) return;
+    if (!selectedRelay) {
+      summary.textContent = "Aucun Point Relais sélectionné.";
+      return;
+    }
+    summary.textContent = [selectedRelay.name, selectedRelay.id ? "n° " + selectedRelay.id : "", selectedRelay.address, selectedRelay.postalCode, selectedRelay.city].filter(Boolean).join(" — ");
+  }
+
+  function closeRelayModal() {
+    const modal = qs("shopRelayModal");
+    if (modal) modal.hidden = true;
+  }
+
+  function pickRelay(point) {
+    selectedRelay = {
+      id: String(point.id),
+      carrierServicePointId: point.carrierServicePointId || String(point.id),
+      name: point.name || "",
+      address: [point.street, point.houseNumber].filter(Boolean).join(" ") || point.address || "",
+      postalCode: point.postalCode || "",
+      city: point.city || "",
+      countryCode: point.countryCode || "FR",
+      carrierCode: "mondial_relay"
+    };
+    renderRelaySummary();
+    closeRelayModal();
+  }
+
+  async function chooseRelay() {
+    const message = qs("shopPayMsg");
+    const postalCode = qs("shopPostalCode")?.value?.trim() || "";
+    const city = qs("shopCity")?.value?.trim() || "";
+    if (!postalCode && !city) {
+      if (message) message.textContent = "Renseignez le code postal ou la ville pour trouver un Point Relais.";
+      return;
+    }
+    try {
+      if (message) message.textContent = "Recherche des Points Relais Mondial Relay...";
+      const response = await fetch(BACKEND_URL + "/api/mondial-relay/service-points?" + new URLSearchParams({
+        postalCode,
+        city,
+        countryCode: "FR",
+        limit: "10",
+        radius: "15000"
+      }), { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) throw new Error(data.error || "Recherche Point Relais indisponible.");
+      const points = Array.isArray(data.points) ? data.points : [];
+      if (!points.length) throw new Error("Aucun Point Relais Mondial Relay trouvé près de cette adresse.");
+      const list = qs("shopRelayModalList");
+      const status = qs("shopRelayModalStatus");
+      const modal = qs("shopRelayModal");
+      if (!list || !modal) throw new Error("Fenêtre Point Relais indisponible.");
+      list.replaceChildren();
+      if (status) status.textContent = points.length + " Point Relais trouvé" + (points.length > 1 ? "s" : "") + ".";
+      points.forEach((point) => {
+        const card = document.createElement("article");
+        card.className = "shop-relay-choice";
+        const title = document.createElement("strong");
+        title.textContent = point.name || "Point Relais";
+        const address = document.createElement("p");
+        address.textContent = [point.street, point.houseNumber].filter(Boolean).join(" ");
+        const cityLine = document.createElement("p");
+        cityLine.textContent = [point.postalCode, point.city, point.id ? "n° " + point.id : ""].filter(Boolean).join(" ");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "shop-pay";
+        button.textContent = "Choisir ce Point Relais";
+        button.addEventListener("click", () => pickRelay(point));
+        card.append(title, address, cityLine, button);
+        list.appendChild(card);
+      });
+      modal.hidden = false;
+      if (message) message.textContent = "";
+    } catch (error) {
+      if (message) message.textContent = error.message;
+    }
+  }
+
   function customerPayload() {
     const payload = {
       customerName: qs("shopName")?.value?.trim() || "",
@@ -421,12 +510,25 @@
       address: qs("shopAddress")?.value?.trim() || "",
       postalCode: qs("shopPostalCode")?.value?.trim() || "",
       city: qs("shopCity")?.value?.trim() || "",
-      country: qs("shopCountry")?.value?.trim() || "France"
+      country: qs("shopCountry")?.value?.trim() || "France",
+      shippingMethod: shippingMethod()
     };
-    if (!payload.customerName || !payload.customerEmail || !payload.customerPhone || !payload.address || !payload.postalCode || !payload.city) {
-      throw new Error("Nom, email, téléphone et adresse complète sont obligatoires.");
+    if (!payload.customerName || !payload.customerEmail || !payload.customerPhone) {
+      throw new Error("Nom, email et téléphone sont obligatoires.");
     }
     if (!/^\S+@\S+\.\S+$/.test(payload.customerEmail)) throw new Error("Adresse email invalide.");
+    if (payload.shippingMethod === "mondial_relay") {
+      if (!selectedRelay || !selectedRelay.id) throw new Error("Choisissez un Point Relais Mondial Relay.");
+      payload.pickupPoint = selectedRelay;
+      payload.shipping = "Mondial Relay Point Relais";
+      if (!payload.postalCode) payload.postalCode = selectedRelay.postalCode;
+      if (!payload.city) payload.city = selectedRelay.city;
+    } else {
+      if (!payload.address || !payload.postalCode || !payload.city) {
+        throw new Error("Nom, email, téléphone et adresse complète sont obligatoires.");
+      }
+      payload.shipping = "Colissimo domicile";
+    }
     return payload;
   }
 
@@ -456,7 +558,9 @@
           ...customer,
           items,
           provider:"sumup",
-          shipping: "Standard",
+          shippingMethod: customer.shippingMethod,
+          pickupPoint: customer.pickupPoint || null,
+          shipping: customer.shipping,
           successUrl: location.origin + "/boutique.html?gamme=pokemon",
           ...attribution
         })
@@ -539,6 +643,21 @@
         if (qs(id) && value) qs(id).value = value;
       }
 
+      if (user.relay && user.relay.id) {
+        selectedRelay = {
+          id: String(user.relay.id),
+          carrierServicePointId: user.relay.carrierServicePointId || String(user.relay.id),
+          name: user.relay.name || "",
+          address: user.relay.address || "",
+          postalCode: user.relay.postalCode || "",
+          city: user.relay.city || "",
+          countryCode: user.relay.countryCode || "FR",
+          carrierCode: "mondial_relay"
+        };
+        const relayRadio = document.querySelector('input[name="shopShippingMethod"][value="mondial_relay"]');
+        if (user.shippingPreference === "mondial_relay" && relayRadio) relayRadio.checked = true;
+        renderRelaySummary();
+      }
       const account = document.querySelector(".shop-client-account");
       if (account) {
         account.setAttribute("aria-label", "Ouvrir mon espace client");
@@ -615,6 +734,15 @@
   function init() {
     qs("shopMenuButton")?.addEventListener("click", toggleMenu);
     qs("shopPayButton")?.addEventListener("click", checkoutBoutique);
+    qs("shopChooseRelay")?.addEventListener("click", chooseRelay);
+    qs("shopRelayModalClose")?.addEventListener("click", closeRelayModal);
+    qs("shopRelayModal")?.addEventListener("click", (event) => {
+      if (event.target === qs("shopRelayModal")) closeRelayModal();
+    });
+    document.querySelectorAll('input[name="shopShippingMethod"]').forEach((input) => {
+      input.addEventListener("change", renderRelaySummary);
+    });
+    renderRelaySummary();
     qs("products")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-add-product]");
       if (button) {

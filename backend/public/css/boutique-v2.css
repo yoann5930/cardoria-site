@@ -102,6 +102,21 @@ body.shop-v1 #cart li{padding:11px 2px;border-bottom:1px solid rgba(255,255,255,
 .shop-customer{gap:8px}
 .shop-customer input{min-height:44px;padding:0 12px;border-color:rgba(255,255,255,.07);border-radius:4px;background:#050505;color:#eee7dc;font-size:12px}
 .shop-customer input::placeholder{color:#9d968c;opacity:1}
+.shop-shipping{display:grid;gap:8px;margin-top:6px;padding:12px;border:1px solid rgba(201,165,68,.16);border-radius:6px;background:#050505}
+.shop-shipping-label{margin:0;color:#c9a544;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.shop-ship-option{display:flex;gap:8px;align-items:flex-start;color:#eee7dc;font-size:12px;line-height:1.4}
+.shop-relay-box{display:grid;gap:8px}
+.shop-relay-box[hidden]{display:none!important}
+.shop-relay-box p{margin:0;color:#d9d2c7;font-size:12px;line-height:1.45}
+.shop-relay-btn{min-height:40px;border:1px solid rgba(201,165,68,.4);border-radius:4px;background:transparent;color:#f1d77a;font-size:11px;font-weight:700;cursor:pointer}
+.shop-relay-modal{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(3,3,3,.78)}
+.shop-relay-modal[hidden]{display:none!important}
+.shop-relay-dialog{width:min(640px,100%);max-height:min(84vh,740px);overflow:auto;padding:22px;border:1px solid rgba(201,165,68,.28);border-radius:16px;background:#090909}
+.shop-relay-dialog h2{margin:6px 0 10px;color:#f1d77a;font-family:Georgia,"Times New Roman",serif;font-size:26px;font-weight:400}
+.shop-relay-list{display:grid;gap:10px;margin:14px 0}
+.shop-relay-choice{display:grid;gap:6px;padding:14px;border:1px solid rgba(201,165,68,.16);border-radius:10px;background:#050505}
+.shop-relay-choice strong{color:#fff1c7}
+.shop-relay-choice p{margin:0;color:#c6bfb4;font-size:12px}
 .shop-pay{min-height:44px;margin-top:10px;border:1px solid rgba(201,165,68,.5);border-radius:4px;background:var(--shop-gold);font-size:10px;font-weight:700;letter-spacing:.055em;text-transform:uppercase}
 .shop-pay-note{color:#9a9288;font-size:9px;line-height:1.6}
 

@@ -16,6 +16,7 @@ import { generateCsrfToken } from "../lib/security/csrf.js";
 import { logAudit } from "../lib/audit.js";
 import { readJson } from "../lib/storage.js";
 import { resolveFrenchPostalCity } from "../lib/france-communes.js";
+import { publicClientOrder as formatPublicClientOrder } from "../lib/boutique/shipping.js";
 
 const router = Router();
 const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;
@@ -44,31 +45,8 @@ function publicUser(user) {
   };
 }
 
-function clientOrderStatus(status) {
-  const value = String(status || "À préparer");
-  if (value === "À préparer") return "Commande confirmée";
-  return value;
-}
-
 function publicClientOrder(order) {
-  return {
-    id: order.id,
-    date: order.date,
-    createdAt: order.createdAt,
-    updatedAt: order.updatedAt,
-    items: Array.isArray(order.items) ? order.items.map((item) => ({
-      ref: item.ref,
-      name: item.name,
-      qty: Number(item.qty || 1),
-      price: Number(item.price || 0)
-    })) : [],
-    paymentStatus: order.paymentStatus || "pending",
-    status: clientOrderStatus(order.status),
-    shipping: order.shipping || "Standard",
-    carrier: order.carrier || "",
-    tracking: order.tracking || "",
-    total: Number(order.total || 0)
-  };
+  return formatPublicClientOrder(order);
 }
 
 function rejectTemporaryCodeLogin(res) {
