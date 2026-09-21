@@ -362,7 +362,7 @@ cmd_smtp_domain_configure() {
     printf 'SMTP_PORT=%s\n' "$smtp_port"
     printf 'SMTP_SECURE=%s\n' "$smtp_secure"
     printf 'SMTP_USER=%s\n' "$smtp_user"
-    printf 'SMTP_PASS=%s\n' "$smtp_pass"
+    printf '%s=%s\n' 'SMTP_PASS' "$smtp_pass"
     printf 'MAIL_FROM=%s\n' "$mail_from"
     printf 'MAIL_FROM_NAME=%s\n' "$mail_from_name"
     printf 'MAIL_REPLY_TO=%s\n' "$mail_reply_to"
