@@ -1,0 +1,48 @@
+name: Boutique Checkout Idempotency CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/lib/boutique/checkout.js"
+      - "backend/lib/boutique/checkout-idempotency.js"
+      - "backend/lib/storage.js"
+      - "backend/tests/boutique-checkout-idempotency.test.mjs"
+      - "backend/tests/boutique-checkout-integration.test.mjs"
+      - ".github/workflows/boutique-checkout-idempotency-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/lib/boutique/checkout.js"
+      - "backend/lib/boutique/checkout-idempotency.js"
+      - "backend/lib/storage.js"
+      - "backend/tests/boutique-checkout-idempotency.test.mjs"
+      - "backend/tests/boutique-checkout-integration.test.mjs"
+      - ".github/workflows/boutique-checkout-idempotency-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  anti-double-order:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+
+      - name: Syntax checks
+        run: |
+          node --check backend/lib/boutique/checkout-idempotency.js
+          node --check backend/lib/boutique/checkout.js
+          node --check backend/tests/boutique-checkout-idempotency.test.mjs
+          node --check backend/tests/boutique-checkout-integration.test.mjs
+
+      - name: Anti-double order regression tests
+        run: node --test backend/tests/boutique-checkout-idempotency.test.mjs backend/tests/boutique-checkout-integration.test.mjs
