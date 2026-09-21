@@ -6,6 +6,7 @@
   var orders = [];
   var filter = "all";
   var colissimo = { configured:false, senderConfigured:false, labelPurchasesEnabled:false, productCode:"DOM" };
+  var emailConfig = { configured:false, missingReason:"" };
   var CARRIERS = ["La Poste", "Mondial Relay", "Relais Colis"];
   var STATUSES = ["À préparer", "En préparation", "Expédiée", "Livrée", "Annulée"];
 
@@ -15,6 +16,8 @@
   function paymentLabel(o) { return ({paid:"Payé",pending:"En attente",failed:"Échoué",refunded:"Remboursé"})[o.paymentStatus] || o.payment || "—"; }
   function paymentClass(o) { return o.paymentStatus === "paid" ? "admin-badge--ok" : (o.paymentStatus === "failed" || o.paymentStatus === "refunded") ? "admin-badge--danger" : "admin-badge--gold"; }
   function options(values, current, emptyLabel) { var out = emptyLabel ? '<option value="">'+esc(emptyLabel)+'</option>' : ""; return out + values.map(function (v) { return '<option value="'+esc(v)+'"'+(v===current?' selected':'')+'>'+esc(v)+'</option>'; }).join(""); }
+  function emailLabel(state) { if(!state)return "Non envoyé"; if(state.status==="sent")return "Envoyé"; if(state.status==="failed")return "Échec"; if(state.status==="sending")return "En cours"; return "Non envoyé"; }
+  function emailColor(state) { return state?.status==="sent"?"#7fd59b":state?.status==="failed"?"#ff8f8f":"#baaf97"; }
 
   function statusSteps(current) {
     if (current === "Annulée") return '<span class="active">Annulée</span>';
@@ -39,12 +42,14 @@
       var colissimoReady = !!(colissimo.configured && colissimo.senderConfigured && colissimo.labelPurchasesEnabled);
       var colissimoAttempt = o.colissimoLabelAttempt && o.colissimoLabelAttempt.status || "";
       var colissimoBlocked = colissimoAttempt === "reconciliation_required";
+      var purchaseMail = o.purchaseEmail || null, trackingMail = o.trackingEmail || null;
       var review = o.paymentReviewRequired ? '<div class="admin-panel" style="margin:10px 0;border-color:#b44"><strong style="color:#ff8f8f">Remboursement SumUp à confirmer</strong><br><small>Le stock reste bloqué jusqu’à confirmation du remboursement.</small></div>' : "";
+      var mailPanel = '<div class="admin-panel" style="margin:10px 0"><strong>E-mails client</strong><br><small>Confirmation achat : <span style="color:'+emailColor(purchaseMail)+'">'+esc(emailLabel(purchaseMail))+'</span>'+(purchaseMail?.sentAt?' · '+esc(new Date(purchaseMail.sentAt).toLocaleString("fr-FR")):'')+'</small><br><small>Suivi expédition : <span style="color:'+emailColor(trackingMail)+'">'+esc(emailLabel(trackingMail))+'</span>'+(trackingMail?.sentAt?' · '+esc(new Date(trackingMail.sentAt).toLocaleString("fr-FR")):'')+'</small>'+(emailConfig.configured?'':'<br><small style="color:#ffb36b">SMTP : '+esc(emailConfig.missingReason||"non configuré")+'</small>')+'</div>';
       var items = (o.items || []).map(function (i) { return '<tr><td>'+esc(i.name||i.ref)+'</td><td>'+Number(i.qty||1)+'</td><td>'+euro(i.price)+'</td><td>'+euro(Number(i.qty||1)*Number(i.price||0))+'</td></tr>'; }).join("") || '<tr><td colspan="4">Aucun article</td></tr>';
       var legacyCarrier = o.carrier && CARRIERS.indexOf(o.carrier) < 0 ? [o.carrier].concat(CARRIERS) : CARRIERS;
       return '<article class="request-card" data-order-card="'+esc(o.id)+'" style="margin-bottom:18px">' +
         '<div class="request-head"><div><h3>'+esc(o.id)+'</h3><p>'+esc(o.date||"")+' • '+esc(o.client||"Client")+'<br>'+esc(o.email||"")+(o.phone?'<br>'+esc(o.phone):'')+'</p><small style="color:#baaf97">Checkout SumUp : '+esc(o.sumupCheckoutId||"—")+'</small></div><div style="text-align:right"><strong>'+euro(total(o))+'</strong><br><span class="admin-badge '+paymentClass(o)+'">'+esc(paymentLabel(o))+'</span></div></div>' +
-        '<div class="progress">'+statusSteps(o.status)+'</div>'+review+
+        '<div class="progress">'+statusSteps(o.status)+'</div>'+review+mailPanel+
         '<details open><summary style="cursor:pointer;color:#ffe18a;margin-bottom:10px">Articles</summary><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Article</th><th>Qté</th><th>PU</th><th>Total</th></tr></thead><tbody>'+items+'</tbody></table></div></details>' +
         '<div class="admin-form-grid" style="margin-top:14px">' +
           '<label>Statut<select data-field="status">'+options(STATUSES,o.status)+'</select></label>' +
@@ -58,6 +63,8 @@
           '<button type="button" class="btn btn-primary" data-save="'+esc(o.id)+'">Enregistrer</button> ' +
           (o.sumupCheckoutId?'<button type="button" class="btn btn-secondary" data-sync="'+esc(o.id)+'">Synchroniser SumUp</button> ':'') +
           (canRefund?'<button type="button" class="btn btn-secondary" data-refund="'+esc(o.id)+'">Rembourser SumUp</button> ':'') +
+          (o.paymentStatus==="paid"?'<button type="button" class="btn btn-secondary" data-mail-purchase="'+esc(o.id)+'">Renvoyer mail achat</button> ':'') +
+          (o.status==="Expédiée"&&o.carrier&&o.tracking?'<button type="button" class="btn btn-secondary" data-mail-tracking="'+esc(o.id)+'">Renvoyer mail suivi</button> ':'') +
           (o.colissimoParcelNumber?'<button type="button" class="btn btn-secondary" data-colissimo-download="'+esc(o.id)+'">Télécharger étiquette Colissimo</button> ':(o.paymentStatus==="paid"?'<button type="button" class="btn btn-secondary" data-colissimo-create="'+esc(o.id)+'" '+((!colissimoReady||colissimoBlocked)?"disabled":"")+'>Créer étiquette Colissimo</button> ':"")) +
           '<button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="bon">Bon commande</button> <button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="facture">Facture</button>' +
         '</div>'+(colissimoBlocked?'<p class="small" style="color:#ffb36b">Colissimo : rapprochement requis dans la Cbox avant tout nouvel essai.</p>':(!colissimoReady&&o.paymentStatus==="paid"&&!o.colissimoParcelNumber?'<p class="small">Colissimo : clé API / adresse expéditeur / activation réelle à terminer.</p>':""))+'<p class="small" data-status-message></p></article>';
@@ -85,6 +92,7 @@
       orders = d.orders || [];
       if (Array.isArray(d.carriers) && d.carriers.length) CARRIERS = d.carriers;
       if (d.colissimo) colissimo = d.colissimo;
+      if (d.email) emailConfig = d.email;
       render();
       var c = id && card(id), box = c && c.querySelector("[data-status-message]"); if (box) box.textContent = message || "Mis à jour.";
     });
@@ -94,6 +102,18 @@
     A.qs("#orderCards").querySelectorAll("button[data-save]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.save,c=card(id),m=c?.querySelector("[data-status-message]"); btn.disabled=true; if(m)m.textContent="Enregistrement..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id),{method:"PUT",body:JSON.stringify(payload(c))}).then(function(d){if(!d.ok)throw new Error(d.error||"Mise à jour impossible");return reload(id,"Commande mise à jour.");}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
     A.qs("#orderCards").querySelectorAll("button[data-sync]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.sync,c=card(id),m=c?.querySelector("[data-status-message]"); btn.disabled=true; if(m)m.textContent="Synchronisation SumUp..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/sync-sumup",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Synchronisation impossible");return reload(id,"SumUp synchronisé : "+(d.status||"OK"));}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
     A.qs("#orderCards").querySelectorAll("button[data-refund]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.refund,c=card(id),m=c?.querySelector("[data-status-message]"); if(!confirm("Confirmer le remboursement intégral SumUp de cette commande ?"))return; btn.disabled=true; if(m)m.textContent="Remboursement SumUp..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/refund",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Remboursement impossible");return reload(id,d.status==="refunded"?"Remboursement confirmé. Stock libéré.":"Remboursement demandé. Synchronise SumUp pour confirmer.");}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
+    A.qs("#orderCards").querySelectorAll("button[data-mail-purchase]").forEach(function (btn) { btn.onclick = function () {
+      var id=btn.dataset.mailPurchase,c=card(id),m=c?.querySelector("[data-status-message]");btn.disabled=true;if(m)m.textContent="Envoi du mail d’achat...";
+      A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/emails/purchase",{method:"POST",body:"{}"})
+        .then(function(d){if(!d.ok)throw new Error(d.error||"Envoi impossible");return reload(id,"Mail d’achat envoyé.");})
+        .catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;});
+    }; });
+    A.qs("#orderCards").querySelectorAll("button[data-mail-tracking]").forEach(function (btn) { btn.onclick = function () {
+      var id=btn.dataset.mailTracking,c=card(id),m=c?.querySelector("[data-status-message]");btn.disabled=true;if(m)m.textContent="Envoi du mail de suivi...";
+      A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/emails/tracking",{method:"POST",body:"{}"})
+        .then(function(d){if(!d.ok)throw new Error(d.error||"Envoi impossible");return reload(id,"Mail de suivi envoyé.");})
+        .catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;});
+    }; });
     A.qs("#orderCards").querySelectorAll("button[data-colissimo-create]").forEach(function (btn) { btn.onclick = function () {
       var id=btn.dataset.colissimoCreate,c=card(id),m=c?.querySelector("[data-status-message]"),weight=Number(c?.querySelector('[data-field="shippingWeightGrams"]')?.value||0);
       if(!Number.isFinite(weight)||weight<1||weight>30000){if(m)m.textContent="Saisissez le poids réel du colis entre 1 g et 30 000 g.";return;}
