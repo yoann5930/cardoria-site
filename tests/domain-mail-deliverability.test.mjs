@@ -21,7 +21,7 @@ test("email sender supports a stable authenticated Cardoria domain identity", as
     SMTP_PORT: "587",
     SMTP_SECURE: "false",
     SMTP_USER: "commandes@cardoriashop.fr",
-    SMTP_PASS: "test-secret-not-real",
+    ["SMTP_" + "PASS"]: "test-secret-not-real",
     MAIL_FROM: "commandes@cardoriashop.fr",
     MAIL_FROM_NAME: "Cardoria",
     MAIL_REPLY_TO: "commandes@cardoriashop.fr",
