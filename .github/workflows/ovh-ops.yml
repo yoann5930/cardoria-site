@@ -21,6 +21,8 @@ on:
           - dns-check
           - https-enable
           - smtp-configure
+          - smtp-domain-configure
+          - mail-dns-check
           - sumup-configure
           - mondial-relay-configure
           - mondial-relay-configure
