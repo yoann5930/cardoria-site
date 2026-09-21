@@ -1,9 +1,14 @@
 import { Router } from "express";
 import { requireAdmin } from "../lib/auth.js";
-import { ALERT_EMAIL, isSmtpConfigured, smtpMissingReason, sendEmail } from "../lib/email.js";
+import { ALERT_EMAIL, getEmailPublicStatus, isSmtpConfigured, smtpMissingReason, sendEmail } from "../lib/email.js";
 
 const router = Router();
 router.use(requireAdmin);
+
+router.get("/status", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ok: true, ...getEmailPublicStatus() });
+});
 
 router.get("/test", async (req, res) => {
   if (!isSmtpConfigured()) {
