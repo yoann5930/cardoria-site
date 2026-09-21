@@ -163,6 +163,12 @@ router.get("/boutique-orders", (req, res) => {
   res.json({ ok: true, carriers: BOUTIQUE_CARRIERS, orders: readJson("orders", []) });
 });
 
+router.get("/boutique-orders/:id", (req, res) => {
+  const order = findBoutiqueOrder(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  res.json({ ok: true, order });
+});
+
 router.get("/boutique-inventory", (req, res) => {
   const inventory = listBoutiqueInventory({ includeDisabled: true });
   const totals = inventory.reduce((acc, item) => {
