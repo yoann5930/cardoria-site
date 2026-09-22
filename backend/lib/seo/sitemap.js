@@ -189,6 +189,7 @@ export function generateRobotsTxt(siteUrl = SITE) {
     "Disallow: /reset-password.html",
     "Disallow: /favoris.html",
     "Disallow: /souhaits.html",
+    "Disallow: /panier-marketplace.html",
     "Disallow: /document-commande.html",
     "",
     "Sitemap: " + base + "/sitemap.xml"
