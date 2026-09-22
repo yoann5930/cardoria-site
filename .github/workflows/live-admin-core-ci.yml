@@ -12,6 +12,9 @@ on:
       - "backend/scripts/live-admin-core-e2e.mjs"
       - "js/admin/admin-live.js"
       - "backend/public/js/admin/admin-live.js"
+      - "admin-live.html"
+      - "backend/public/admin-live.html"
+      - "oracle/healthcheck.sh"
       - ".github/workflows/live-admin-core-ci.yml"
   push:
     branches: [main]
@@ -24,6 +27,9 @@ on:
       - "backend/scripts/live-admin-core-e2e.mjs"
       - "js/admin/admin-live.js"
       - "backend/public/js/admin/admin-live.js"
+      - "admin-live.html"
+      - "backend/public/admin-live.html"
+      - "oracle/healthcheck.sh"
       - ".github/workflows/live-admin-core-ci.yml"
 
 jobs:
@@ -51,11 +57,16 @@ jobs:
           node --check backend/routes/live-admin-studio.js
           node --check backend/lib/live/checkout.js
           node --check backend/scripts/live-admin-core-e2e.mjs
+          node --check js/admin/admin-live.js
       - name: Live Admin payment guards
         run: |
           grep -q 'live.status!=="live"' backend/lib/live/checkout.js
           grep -q 'channel:"live"' backend/lib/live/checkout.js
           grep -q 'ownerRole:s.ownerRole' backend/lib/live/sessions.js
+          grep -q 'Ouvrir le Live public' js/admin/admin-live.js
+          grep -q 'window.open(liveUrl, "_blank", "noopener")' js/admin/admin-live.js
+          ! grep -q 'window.open("about:blank", "_blank")' js/admin/admin-live.js
+          grep -q 'admin-live.js?v=20260922-public-open-v2' admin-live.html
       - name: Start clean backend
         run: |
           rm -rf backend/data

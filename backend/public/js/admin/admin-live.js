@@ -166,7 +166,7 @@
     A.qs("#liveBody").innerHTML = listedSessions.map(function (s) {
       var products = (s.products || []).map(function (p) { return esc(p.name) + " · " + esc(p.mode) + (p.mode === "giveaway" ? " gratuit" : " · " + A.euro(p.price)); }).join("<br>") || "Aucune vente configurée";
       var selected = s.id === selectedLiveId ? " btn-primary" : "";
-      return "<tr><td>" + esc(s.title) + "</td><td>" + esc(s.status) + "</td><td><strong>" + (s.ownerRole === "seller" ? "PayPal" : "SumUp") + "</strong></td><td>" + products + "</td><td class='admin-live-actions'><button class='btn" + selected + "' data-select='" + esc(s.id) + "'>Sélectionner</button> <button class='btn btn-secondary' data-enter-live='" + esc(s.id) + "'>Voir comme spectateur</button> <button class='btn' data-cancel='" + esc(s.id) + "'>Annuler</button></td></tr>";
+      return "<tr><td>" + esc(s.title) + "</td><td>" + esc(s.status) + "</td><td><strong>" + (s.ownerRole === "seller" ? "PayPal" : "SumUp") + "</strong></td><td>" + products + "</td><td class='admin-live-actions'><button class='btn" + selected + "' data-select='" + esc(s.id) + "'>Sélectionner</button> <button class='btn btn-secondary' data-enter-live='" + esc(s.id) + "'>Ouvrir le Live public</button> <button class='btn' data-cancel='" + esc(s.id) + "'>Annuler</button></td></tr>";
     }).join("") || "<tr><td colspan='5'>Aucun Live</td></tr>";
     if (!selectedLiveId && listedSessions[0]) selectedLiveId = listedSessions[0].id;
     setSelectedLive(selectedLiveId);
@@ -177,18 +177,7 @@
       b.onclick = function () { setSelectedLive(b.dataset.select); renderSessions(listedSessions); };
     });
     A.qs("#liveBody").querySelectorAll("[data-enter-live]").forEach(function (btn) {
-      btn.onclick = function () {
-        var liveWindow = window.open("about:blank", "_blank");
-        A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(btn.dataset.enterLive) + "/enter", { method: "POST", body: "{}" }).then(function (d) {
-          var liveUrl = (d.access && d.access.url) || ("/live.html?session=" + encodeURIComponent(btn.dataset.enterLive));
-          if (d.access && d.access.grantToken) liveUrl += "#cardoriaAdminGrant=" + encodeURIComponent(d.access.grantToken);
-          if (liveWindow) liveWindow.location.href = liveUrl;
-          else location.assign(liveUrl);
-        }).catch(function (e) {
-          if (liveWindow) liveWindow.close();
-          alert(e.message);
-        });
-      };
+      btn.onclick = function () { openSpectator(btn.dataset.enterLive); };
     });
     A.qs("#liveBody").querySelectorAll("[data-cancel]").forEach(function (b) {
       b.onclick = function () {
@@ -199,16 +188,11 @@
   }
   function openSpectator(id) {
     if (!id) return alert("Sélectionnez un Live.");
-    var liveWindow = window.open("about:blank", "_blank");
-    A.adminFetch("/api/admin/live/sessions/" + encodeURIComponent(id) + "/enter", { method: "POST", body: "{}" }).then(function (d) {
-      var liveUrl = (d.access && d.access.url) || ("/live.html?session=" + encodeURIComponent(id));
-      if (d.access && d.access.grantToken) liveUrl += "#cardoriaAdminGrant=" + encodeURIComponent(d.access.grantToken);
-      if (liveWindow) liveWindow.location.href = liveUrl;
-      else location.assign(liveUrl);
-    }).catch(function (e) {
-      if (liveWindow) liveWindow.close();
-      alert(e.message);
-    });
+    var session = listedSessions.find(function (item) { return item.id === String(id); });
+    if (!session || session.status !== "live") return alert("Démarrez le Live avant d’ouvrir la vue publique.");
+    var liveUrl = "/live.html?session=" + encodeURIComponent(id);
+    var liveWindow = window.open(liveUrl, "_blank", "noopener");
+    if (!liveWindow) location.assign(liveUrl);
   }
   function cameraChoice(sourceId) {
     var assigned = media().assignDistinctCameras ? media().assignDistinctCameras({
