@@ -12,7 +12,13 @@ on:
       - "backend/scripts/live-public-e2e.mjs"
       - "backend/tests/live-scheduling.test.mjs"
       - "js/cardoria-live-viewer.js"
+      - "js/cardoria-live-actions.js"
+      - "js/client-auth.js"
+      - "client-login.html"
       - "backend/public/js/cardoria-live-viewer.js"
+      - "backend/public/js/cardoria-live-actions.js"
+      - "backend/public/js/client-auth.js"
+      - "backend/public/client-login.html"
       - "live.html"
       - "backend/public/live.html"
       - ".github/workflows/live-public-ci.yml"
@@ -27,7 +33,13 @@ on:
       - "backend/scripts/live-public-e2e.mjs"
       - "backend/tests/live-scheduling.test.mjs"
       - "js/cardoria-live-viewer.js"
+      - "js/cardoria-live-actions.js"
+      - "js/client-auth.js"
+      - "client-login.html"
       - "backend/public/js/cardoria-live-viewer.js"
+      - "backend/public/js/cardoria-live-actions.js"
+      - "backend/public/js/client-auth.js"
+      - "backend/public/client-login.html"
       - "live.html"
       - "backend/public/live.html"
       - ".github/workflows/live-public-ci.yml"
@@ -75,6 +87,9 @@ jobs:
           grep -q 'CLIENT_LOGIN_REQUIRED' backend/routes/live-actions.js
           grep -q 'cardoria_account' js/cardoria-live-actions.js
           ! grep -q 'id="claName"' js/cardoria-live-actions.js
+          grep -q 'cardoria-live-actions.js?v=20260922-chat-account-v3' live.html
+          grep -q 'client-auth.js?v=20260922-live-chat-auth-v2' client-login.html
+          grep -q 'ALWAYS_REVALIDATE_PUBLIC_PATHS' backend/server.js
       - name: Start clean backend
         working-directory: backend
         run: |
@@ -91,6 +106,14 @@ jobs:
             sleep 1
           done
           test "$ready" = "true"
+      - name: Live public cache freshness
+        run: |
+          set -euo pipefail
+          curl -sSI http://127.0.0.1:10000/live.html | tr -d "\r" | grep -qi '^cache-control: .*no-store'
+          curl -sSI http://127.0.0.1:10000/js/cardoria-live-actions.js | tr -d "\r" | grep -qi '^cache-control: .*no-store'
+          curl -fsS http://127.0.0.1:10000/live.html | grep -q 'cardoria-live-actions.js?v=20260922-chat-account-v3'
+          curl -fsS http://127.0.0.1:10000/js/cardoria-live-actions.js | grep -q 'live-chat-dock'
+          ! curl -fsS http://127.0.0.1:10000/js/cardoria-live-actions.js | grep -q 'id="claName"'
       - name: Live public visibility privacy and viewer E2E
         working-directory: backend
         run: node scripts/live-public-e2e.mjs
