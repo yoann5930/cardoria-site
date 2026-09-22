@@ -53,6 +53,8 @@ const draftRealtime = await json(`/api/live/webrtc/status/${encodeURIComponent(l
 assert(draftRealtime.response.status === 404, "Draft realtime status is publicly accessible");
 const draftState = await json(`/api/live/actions/${encodeURIComponent(liveId)}/state`);
 assert(draftState.response.status === 404, "Draft live action state is publicly accessible");
+const draftChat = await json(`/api/live/actions/${encodeURIComponent(liveId)}/chat`);
+assert(draftChat.response.status === 404, "Draft live chat is publicly accessible");
 const draftViewer = await json("/api/live/webrtc/viewer/start", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -113,7 +115,15 @@ const noCameraViewer = await json("/api/live/webrtc/viewer/start", {
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ liveSessionId: liveId })
 });
-assert(noCameraViewer.response.status === 404 && noCameraViewer.body.code === "LIVE_STREAM_NOT_PUBLISHED", "Viewer start without a published camera is not rejected correctly");
+assert(noCameraViewer.response.status === 200 && noCameraViewer.body.waiting === true, "Viewer start without a published camera must stay open in waiting mode");
+assert((noCameraViewer.body.sources || []).length === 0, "Waiting viewer should have no camera sources");
+assert(noCameraViewer.body.viewerId, "Waiting viewer did not receive a viewerId");
+const waitingBeat = await json("/api/live/webrtc/viewer/heartbeat", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ viewerId: noCameraViewer.body.viewerId })
+});
+assert(waitingBeat.response.status === 200 && waitingBeat.body.active === true && waitingBeat.body.waiting === true, "Waiting viewer heartbeat must stay active without a camera");
 const anonymousAdminAccess = await json(`/api/live/sessions/${encodeURIComponent(liveId)}/admin-access`);
 assert(anonymousAdminAccess.response.status === 401, "Anonymous viewer obtained admin live access");
 const stopped = await auth(token, `/api/live/seller/sessions/${encodeURIComponent(liveId)}/stop`, { method: "POST", body: "{}" });

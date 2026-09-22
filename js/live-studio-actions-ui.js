@@ -94,7 +94,7 @@
     document.getElementById("lasSheetGo").onclick = onGo;
     document.getElementById("lasSheetCancel").onclick = function () { sheet.hidden = true; };
   }
-  function renderActivity(state, checkouts) {
+  function renderActivity(state, checkouts, session) {
     var viewers = document.getElementById("liveStudioViewers");
     var chat = document.getElementById("liveStudioChat");
     var last = document.getElementById("liveStudioLastSale");
@@ -111,10 +111,15 @@
       })[0];
       last.textContent = paid ? (esc(paid.productName || "Lot") + " · " + euro(paid.amount)) : "—";
     }
-    if (viewers && selected) {
-      fetch("/api/live/webrtc/status/" + encodeURIComponent(selected), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (d) {
+    if (viewers && selected && session && session.status === "live") {
+      fetch("/api/live/webrtc/status/" + encodeURIComponent(selected), { cache: "no-store" }).then(function (r) {
+        if (!r.ok) throw new Error("offline");
+        return r.json();
+      }).then(function (d) {
         viewers.textContent = String(Number(d.viewers || 0));
       }).catch(function () {});
+    } else if (viewers) {
+      viewers.textContent = "0";
     }
   }
   function loadEditor() {
@@ -172,7 +177,7 @@
       ].join("");
       bindEditor(session, products, state, current, startPrice, duration);
       showState(state);
-      renderActivity(state, checkouts);
+      renderActivity(state, checkouts, session);
       if (state.giveaway && state.giveaway.status === "ready_to_draw" && !state.giveaway.winner && autoDrawId !== state.giveaway.id) {
         autoDrawId = state.giveaway.id;
         postAction("giveaway/draw", {});

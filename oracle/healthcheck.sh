@@ -47,7 +47,7 @@ check_plans() {
 check_live_public_chat() {
   local headers
   check /live.html 200
-  grep -Fq 'cardoria-live-actions.js?v=20260922-chat-account-v3' "$OUT"
+  grep -Fq 'cardoria-live-actions.js?v=20260923-live-public-journey' "$OUT"
 
   headers=$(curl -sSI "$BASE/live.html" | tr -d '\r')
   printf '%s\n' "$headers" | grep -qi '^Cache-Control: .*no-store'
@@ -59,16 +59,28 @@ check_live_public_chat() {
     exit 1
   fi
 
+  check /js/cardoria-live-viewer.js 200
+  headers=$(curl -sSI "$BASE/js/cardoria-live-viewer.js" | tr -d '\r')
+  printf '%s\n' "$headers" | grep -qi '^Cache-Control: .*no-store'
+  if grep -Fq 'Aucune caméra disponible.' "$OUT"; then
+    echo "FAIL public viewer still fatals when no camera is published"
+    exit 1
+  fi
+
   check /client-login.html 200
-  grep -Fq 'client-auth.js?v=20260922-live-chat-auth-v2' "$OUT"
+  grep -Fq 'client-auth.js?v=20260923-live-public-journey' "$OUT"
 
   check /admin-live.html 200
-  grep -Fq 'admin-live.js?v=20260922-public-open-v2' "$OUT"
+  grep -Fq 'admin-live.js?v=20260923-live-public-journey' "$OUT"
   check /js/admin/admin-live.js 200
   grep -Fq 'Ouvrir le Live public' "$OUT"
   grep -Fq 'window.open(liveUrl, "_blank", "noopener")' "$OUT"
   if grep -Fq 'window.open("about:blank", "_blank")' "$OUT"; then
     echo "FAIL legacy async public Live opener is still served"
+    exit 1
+  fi
+  if grep -Fq 'Voir comme spectateur' "$OUT"; then
+    echo "FAIL legacy spectator button label is still served"
     exit 1
   fi
 

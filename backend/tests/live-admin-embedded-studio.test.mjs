@@ -32,8 +32,9 @@ test("Camera publisher accepts secure admin grant",()=>{
   assert.match(realtimeRoute,/cardoria-live-grant/);
 });
 
-test("Live page loads embedded studio and keeps payment providers untouched",()=>{
-  assert.match(livePage,/cardoria-live-admin-studio\.js/);
+test("Live page is a public spectator page and does not load embedded admin studio",()=>{
+  assert.doesNotMatch(livePage,/cardoria-live-admin-studio\.js/);
+  assert.match(livePage,/Live en cours — en attente de diffusion/);
   assert.doesNotMatch(studio,/revolut|onrender\.com/i);
   assert.doesNotMatch(studioRoute,/paypal|sumup|commission/i);
 });

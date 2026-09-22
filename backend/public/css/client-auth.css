@@ -16,4 +16,9 @@
 .client-relay-choice p{margin:0;color:#d9d2c7;font-size:13px;line-height:1.45}
 .client-relay-choice small{color:#bba96d;font-size:11px;letter-spacing:.04em}
 .client-relay-choice .client-auth-primary{margin-top:8px;width:100%}
+html.client-auth-embed body.client-auth-page{min-height:100%;background:#030303}
+html.client-auth-embed .client-auth-header,html.client-auth-embed .client-auth-intro,html.client-auth-embed .client-auth-benefits{display:none}
+html.client-auth-embed .client-auth-main{padding:18px 16px 24px}
+html.client-auth-embed .client-auth-shell{grid-template-columns:1fr;gap:0;width:100%}
+html.client-auth-embed .client-dashboard-hero,html.client-auth-embed .client-dashboard-stats,html.client-auth-embed .client-dashboard-grid,html.client-auth-embed .client-dashboard-footer{display:none}
 @media(max-width:760px){.client-relay-dialog{padding:16px}.client-relay-dialog-head h2{font-size:24px}}

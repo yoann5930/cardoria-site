@@ -10,6 +10,7 @@ const pairs = [
   "client-login.html", "css/live-studio-clean.css", "js/client-auth.js",
   "js/cardoria-live-actions.js", "js/cardoria-live-viewer.js", "js/live-energy-spots.js",
   "js/live-shipping-address.js", "js/live-studio-actions-ui.js", "js/live-studio-sales-controls.js",
+  "js/admin/admin-live.js", "live.html", "admin-live.html",
   "js/marketplace-seller-dashboard.js", "js/carte.js", "js/seo.js"
 ];
 

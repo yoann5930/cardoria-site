@@ -224,6 +224,15 @@
     qs("clientStatProfileText").textContent = user.profileReady ? (user.relayReady ? "Adresse + relais prêts" : "Adresse enregistrée") : "À compléter";
   }
 
+  function isEmbed() {
+    return new URLSearchParams(location.search).get("embed") === "1";
+  }
+
+  function notifyEmbedParent() {
+    if (!isEmbed() || window.parent === window) return;
+    try { window.parent.postMessage({ type: "cardoria-client-auth", ok: true }, location.origin); } catch {}
+  }
+
   function showAccount(user) {
     currentUser = user;
     setAccount(user);
@@ -231,7 +240,8 @@
     qs("clientAccountName").textContent = user.name || "Client";
     qs("clientAccountEmail").textContent = user.email || "";
     fillProfile(user);
-    loadDashboardData();
+    notifyEmbedParent();
+    if (!isEmbed()) loadDashboardData();
   }
 
   function showLoggedOut() {
@@ -519,6 +529,7 @@
     qs("clientRelayModal")?.addEventListener("click", (event) => {
       if (event.target === qs("clientRelayModal")) closeRelayModal();
     });
+    if (isEmbed()) document.documentElement.classList.add("client-auth-embed");
     const mode=new URLSearchParams(location.search).get("mode");
     if(mode==="register")showForm("register");
     else if(mode==="login")showForm("login");

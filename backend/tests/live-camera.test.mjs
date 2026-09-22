@@ -226,7 +226,9 @@ test("webrtc pair/start sans Live → 404 ; publish, stop, reconnexion, spectate
         method: "POST",
         body: { liveSessionId: "LIVE-CAM-ADMIN" }
       });
-      assert.equal(viewerBefore.status, 404);
+      assert.equal(viewerBefore.status, 200);
+      assert.equal(viewerBefore.data.waiting, true);
+      assert.equal((viewerBefore.data.sources || []).length, 0);
 
       const published = await requestJson(base, "/api/live/webrtc/publisher/start", {
         method: "POST",
@@ -250,11 +252,22 @@ test("webrtc pair/start sans Live → 404 ; publish, stop, reconnexion, spectate
       });
       assert.equal(stopped.status, 200);
 
+      const beatAfterStop = await requestJson(base, "/api/live/webrtc/viewer/heartbeat", {
+        method: "POST",
+        body: { viewerId: viewer.data.viewerId }
+      });
+      assert.equal(beatAfterStop.status, 200);
+      assert.equal(beatAfterStop.data.active, true);
+      assert.equal(beatAfterStop.data.waiting, true);
+      assert.deepEqual(beatAfterStop.data.sources || [], []);
+
       const afterStop = await requestJson(base, "/api/live/webrtc/viewer/start", {
         method: "POST",
         body: { liveSessionId: "LIVE-CAM-ADMIN" }
       });
-      assert.equal(afterStop.status, 404);
+      assert.equal(afterStop.status, 200);
+      assert.equal(afterStop.data.waiting, true);
+      assert.equal((afterStop.data.sources || []).length, 0);
 
       const reconnected = await requestJson(base, "/api/live/webrtc/publisher/start", {
         method: "POST",

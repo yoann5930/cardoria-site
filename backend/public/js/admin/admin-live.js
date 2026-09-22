@@ -364,7 +364,7 @@
       '<button class="live-studio-btn live-studio-btn--go" type="button" id="liveGoStart" data-start="">Démarrer le Live</button>',
       '<button class="live-studio-btn live-studio-btn--pause" type="button" id="liveGoPause">Pause</button>',
       '<button class="live-studio-btn live-studio-btn--end" type="button" id="liveGoEnd" data-stop="">Terminer le Live</button>',
-      '<button class="live-studio-btn live-studio-btn--ghost" type="button" id="liveGoWatch" data-enter-live="">Voir comme spectateur</button>',
+      '<button class="live-studio-btn live-studio-btn--ghost" type="button" id="liveGoWatch" data-enter-live="">Ouvrir le Live public</button>',
       '<span class="live-studio-sr">Entrer dans le Live</span>',
       '</div></header>',
       '<div class="live-studio-layout"><section class="live-studio-video"><h2>Vidéo</h2><div class="live-studio-previews">',
