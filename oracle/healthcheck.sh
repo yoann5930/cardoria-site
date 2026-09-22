@@ -44,6 +44,26 @@ check_plans() {
   echo "OK $path canonical Starter/Pro/Elite"
 }
 
+check_live_public_chat() {
+  local headers
+  check /live.html 200
+  grep -Fq 'cardoria-live-actions.js?v=20260922-chat-account-v3' "$OUT"
+
+  headers=$(curl -sSI "$BASE/live.html" | tr -d '\r')
+  printf '%s\n' "$headers" | grep -qi '^Cache-Control: .*no-store'
+
+  check /js/cardoria-live-actions.js 200
+  grep -Fq 'live-chat-dock' "$OUT"
+  if grep -Fq 'id="claName"' "$OUT"; then
+    echo "FAIL legacy Live chat name field is still served"
+    exit 1
+  fi
+
+  check /client-login.html 200
+  grep -Fq 'client-auth.js?v=20260922-live-chat-auth-v2' "$OUT"
+  echo "OK Live public chat cache/account build"
+}
+
 check / 200
 check /boutique.html 200
 check /marketplace.html 200
@@ -52,6 +72,7 @@ check /scanner.html 200
 check /robots.txt 200
 check /sitemap.xml 200
 check /admin-login.html 200
+check_live_public_chat
 check /api/health/ 200
 check /api/health/startup 200
 check /api/payments/boutique/products 200
