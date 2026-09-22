@@ -23,8 +23,12 @@ Disallow: /admin-stock.html
 Disallow: /admin-estimations.html
 Disallow: /admin-analytics.html
 Disallow: /mes-commandes.html
+Disallow: /client-orders.html
+Disallow: /client-login.html
+Disallow: /reset-password.html
 Disallow: /favoris.html
 Disallow: /souhaits.html
+Disallow: /panier-marketplace.html
 Disallow: /document-commande.html
 
 Sitemap: https://www.cardoriashop.fr/sitemap.xml
