@@ -519,6 +519,9 @@
     qs("clientRelayModal")?.addEventListener("click", (event) => {
       if (event.target === qs("clientRelayModal")) closeRelayModal();
     });
+    const mode=new URLSearchParams(location.search).get("mode");
+    if(mode==="register")showForm("register");
+    else if(mode==="login")showForm("login");
     restore();
   }
   document.addEventListener("DOMContentLoaded", init);
