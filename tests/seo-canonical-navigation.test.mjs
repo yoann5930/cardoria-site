@@ -10,6 +10,11 @@ const scanner = fs.readFileSync("scanner.html", "utf8");
 const wishlist = fs.readFileSync("souhaits.html", "utf8");
 const marketplaceCart = fs.readFileSync("panier-marketplace.html", "utf8");
 const marketplaceRoutes = fs.readFileSync("backend/routes/marketplace-v1.js", "utf8");
+const marketplaceListings = fs.readFileSync("backend/lib/marketplace/v1/listings.js", "utf8");
+const marketplaceSearch = fs.readFileSync("backend/lib/marketplace/listings.js", "utf8");
+const marketplaceBrowse = fs.readFileSync("js/marketplace-browse.js", "utf8");
+const marketplaceSeller = fs.readFileSync("js/marketplace-seller.js", "utf8");
+const marketplaceListing = fs.readFileSync("js/marketplace-listing.js", "utf8");
 
 test("estimation aliases use HTTP redirects to the canonical URL", () => {
   assert.match(
@@ -59,6 +64,24 @@ test("marketplace sitemap always emits the canonical production host", () => {
   assert.doesNotMatch(marketplaceRoutes, /MARKETPLACE_FRONTEND_URL \|\| process\.env\.FRONTEND_URL/);
 });
 
+test("marketplace listings use crawlable clean canonical URLs with server rendering", () => {
+  assert.match(marketplaceListings, /publicUrl: row\.slug \? `\/annonces\//);
+  assert.match(marketplaceListings, /url: `\/annonces\//);
+  assert.match(marketplaceSearch, /publicUrl: row\.slug \? `\/annonces\//);
+  assert.match(server, /app\.get\("\/annonces\/:slug", sendMarketplaceListingSeoPage\)/);
+  assert.match(server, /res\.redirect\(301, `\/annonces\/\$\{encodeURIComponent\(req\.query\.slug\)\}`\)/);
+  assert.match(server, /"@type": "Product"/);
+  assert.match(server, /"@type": "BreadcrumbList"/);
+  assert.match(marketplaceBrowse, /listing\.publicUrl \|\| M\.listingUrl\(listing\.id\)/);
+  assert.match(marketplaceSeller, /l\.publicUrl \|\| M\.listingUrl\(l\.id\)/);
+  assert.match(marketplaceListing, /location\.pathname\.match\(\/\^\\\/annonces\\\//);
+});
+
+test("homepage links directly to priority Pokemon search-intent pages", () => {
+  assert.match(home, /href="\/pages\/prix-carte-pokemon\/"/);
+  assert.match(home, /href="\/pages\/combien-vaut-ma-carte-pokemon\/"/);
+});
+
 test("runtime mirrors stay identical for SEO-critical files", () => {
   assert.equal(fs.readFileSync("backend/public/index.html", "utf8"), home);
   assert.equal(fs.readFileSync("backend/public/js/layout.js", "utf8"), layout);
@@ -66,5 +89,8 @@ test("runtime mirrors stay identical for SEO-critical files", () => {
   assert.equal(fs.readFileSync("backend/public/scanner.html", "utf8"), scanner);
   assert.equal(fs.readFileSync("backend/public/souhaits.html", "utf8"), wishlist);
   assert.equal(fs.readFileSync("backend/public/panier-marketplace.html", "utf8"), marketplaceCart);
+  assert.equal(fs.readFileSync("backend/public/js/marketplace-browse.js", "utf8"), marketplaceBrowse);
+  assert.equal(fs.readFileSync("backend/public/js/marketplace-seller.js", "utf8"), marketplaceSeller);
+  assert.equal(fs.readFileSync("backend/public/js/marketplace-listing.js", "utf8"), marketplaceListing);
   assert.equal(fs.readFileSync("backend/public/robots.txt", "utf8"), fs.readFileSync("robots.txt", "utf8"));
 });
