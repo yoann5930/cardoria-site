@@ -33,6 +33,8 @@ function rowToListing(row, extras = {}) {
     stock: row.stock,
     photos: parsePhotos(row.photos),
     status: row.status,
+    slug: row.slug || "",
+    publicUrl: row.slug ? `/annonces/${encodeURIComponent(row.slug)}` : `/annonce.html?id=${encodeURIComponent(row.id)}`,
     views: row.views,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
