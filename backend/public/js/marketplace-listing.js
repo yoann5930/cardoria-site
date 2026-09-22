@@ -3,7 +3,8 @@
   var M = window.CardoriaMarketplace;
   var params = new URLSearchParams(location.search);
   var id = params.get("id");
-  var slug = params.get("slug");
+  var pathMatch = location.pathname.match(/^\/annonces\/([^/]+)\/?$/);
+  var slug = pathMatch ? decodeURIComponent(pathMatch[1]) : params.get("slug");
   var root = document.getElementById("listingPage");
 
   function safeUrl(v) { try { var u = new URL(String(v || ""), location.origin); return /^https?:$/.test(u.protocol) ? u.href : ""; } catch (_) { return ""; } }
@@ -28,7 +29,7 @@
     var seo = l.seo || {};
     document.title = seo.title || (l.title + " — " + M.euro(l.price) + " | Marketplace Cardoria");
     setMeta("description", seo.description || (l.title + " en " + l.condition + ". " + M.euro(l.price) + " sur la marketplace Cardoria."));
-    var link = document.querySelector('link[rel="canonical"]') || document.createElement("link"); link.rel = "canonical"; link.href = location.origin + "/" + (l.publicUrl || ("annonce.html?id=" + encodeURIComponent(l.id))); if (!link.parentNode) document.head.appendChild(link);
+    var link = document.querySelector('link[rel="canonical"]') || document.createElement("link"); link.rel = "canonical"; link.href = location.origin + (l.publicUrl || ("/annonce.html?id=" + encodeURIComponent(l.id))); if (!link.parentNode) document.head.appendChild(link);
     var img = safeUrl((l.photos && l.photos[0]) || seo.image); if (img) setMeta("og:image", img, "property");
     var ld = document.createElement("script"); ld.type = "application/ld+json"; ld.textContent = JSON.stringify({ "@context": "https://schema.org", "@type": "Product", name: l.title, description: l.description || l.title, image: img || undefined, offers: { "@type": "Offer", price: l.price, priceCurrency: "EUR", availability: Number(l.stock) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock" } }); document.head.appendChild(ld);
   }
