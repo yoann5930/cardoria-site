@@ -7,6 +7,16 @@ on:
       - backend/lib/seo/**
       - backend/server.js
       - backend/routes/marketplace-v1.js
+      - backend/lib/marketplace/listings.js
+      - backend/lib/marketplace/v1/listings.js
+      - js/marketplace-browse.js
+      - backend/public/js/marketplace-browse.js
+      - js/marketplace-seller.js
+      - backend/public/js/marketplace-seller.js
+      - js/marketplace-listing.js
+      - backend/public/js/marketplace-listing.js
+      - index.html
+      - backend/public/index.html
       - js/seo.js
       - js/carte.js
       - scanner.html
@@ -42,6 +52,11 @@ jobs:
           node --check backend/lib/seo/card-render.js
           node --check backend/server.js
           node --check backend/routes/marketplace-v1.js
+          node --check backend/lib/marketplace/listings.js
+          node --check backend/lib/marketplace/v1/listings.js
+          node --check js/marketplace-browse.js
+          node --check js/marketplace-seller.js
+          node --check js/marketplace-listing.js
           node --check js/seo.js
           node --check js/carte.js
           node --check scripts/audit-public-seo.mjs
