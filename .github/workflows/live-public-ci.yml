@@ -9,6 +9,7 @@ on:
       - "backend/routes/live-actions.js"
       - "backend/lib/live/**"
       - "backend/scripts/live-public-e2e.mjs"
+      - "backend/tests/live-scheduling.test.mjs"
       - "js/cardoria-live-viewer.js"
       - "backend/public/js/cardoria-live-viewer.js"
       - "live.html"
@@ -22,6 +23,7 @@ on:
       - "backend/routes/live-actions.js"
       - "backend/lib/live/**"
       - "backend/scripts/live-public-e2e.mjs"
+      - "backend/tests/live-scheduling.test.mjs"
       - "js/cardoria-live-viewer.js"
       - "backend/public/js/cardoria-live-viewer.js"
       - "live.html"
@@ -85,6 +87,7 @@ jobs:
         run: |
           node --test backend/tests/live-realtime-contract.test.mjs
           node --test backend/tests/live-architecture.test.mjs
+          node --test backend/tests/live-scheduling.test.mjs
       - name: Stop backend
         if: always()
         run: |
