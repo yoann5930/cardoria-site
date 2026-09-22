@@ -41,7 +41,7 @@ function rowToListingV1(row) {
     moderatedBy: row.moderated_by || "",
     moderatedAt: row.moderated_at || "",
     seo: buildListingSeoMeta(row),
-    publicUrl: row.slug ? `annonce.html?slug=${encodeURIComponent(row.slug)}` : `annonce.html?id=${row.id}`,
+    publicUrl: row.slug ? `/annonces/${encodeURIComponent(row.slug)}` : `/annonce.html?id=${encodeURIComponent(row.id)}`,
     statusLabel: statusLabel(row.status)
   };
 }
@@ -217,7 +217,7 @@ export function getListingsSitemapEntries(limit = 5000) {
   `).all(limit).map((r) => ({
     id: r.id,
     slug: r.slug,
-    url: `/annonce.html?slug=${encodeURIComponent(r.slug)}`,
+    url: `/annonces/${encodeURIComponent(r.slug)}`,
     lastmod: r.updated_at?.slice(0, 10),
     title: r.title
   }));

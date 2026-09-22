@@ -28,6 +28,7 @@ import { getCardBySlug, searchCards } from "./lib/engine/cards.js";
 import { getLicense } from "./lib/engine/licenses.js";
 import { syncPokemonCatalog, syncPokemonReferenceCatalog } from "./lib/engine/tcgdex-sync.js";
 import { initMarketplace } from "./lib/marketplace/index.js";
+import { getListingV1, getListingV1BySlug } from "./lib/marketplace/v1/listings.js";
 import { initMarketplacePersistence, marketplacePersistenceMiddleware, enginePersistenceMiddleware, flushMarketplacePersistence, flushEnginePersistence, closeMarketplacePersistence } from "./lib/marketplace/persistence.js";
 import { emptyPublicCatalogOnce } from "./lib/marketplace/empty-catalog.js";
 import { initAi } from "./lib/ai/index.js";
@@ -398,6 +399,84 @@ function sendExtensionSeoPage(req, res, next) {
   }
 }
 
+function buildMarketplaceListingSeoHtml(req, slug) {
+  if (!/^[a-z0-9-]+$/.test(String(slug || ""))) return null;
+  const listing = getListingV1BySlug(slug);
+  if (!listing || listing.status !== "active" || listing.moderationLocked || Number(listing.stock || 0) <= 0) return null;
+
+  const templatePath = path.join(PUBLIC_ROOT, "annonce.html");
+  if (!fs.existsSync(templatePath)) return null;
+  const template = fs.readFileSync(templatePath, "utf8");
+  const siteUrl = absoluteSiteUrl(req);
+  const canonical = `${siteUrl}/annonces/${encodeURIComponent(slug)}`;
+  const price = positivePrice(listing.price);
+  const priceLabel = price == null ? "" : new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(price);
+  const title = listing.seo?.title || `${listing.title}${priceLabel ? " — " + priceLabel : ""} | Cardoria Marketplace`;
+  const description = listing.seo?.description || `${listing.title} en état ${listing.condition || "non précisé"} sur Cardoria Marketplace.`;
+  const image = safeImage(listing.photos?.[0]) || `${siteUrl}/assets/logo/cardoria-premium.png`;
+  const sellerName = listing.seller?.displayName || "Vendeur Cardoria";
+  const availability = Number(listing.stock || 0) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock";
+
+  const product = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: listing.title,
+    description,
+    image: [image],
+    sku: listing.id,
+    category: listing.license || "Trading Card",
+    offers: price == null ? undefined : {
+      "@type": "Offer",
+      url: canonical,
+      priceCurrency: "EUR",
+      price,
+      availability,
+    }
+  };
+  const breadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Accueil", item: `${siteUrl}/` },
+      { "@type": "ListItem", position: 2, name: "Marketplace", item: `${siteUrl}/marketplace.html` },
+      { "@type": "ListItem", position: 3, name: listing.title, item: canonical }
+    ]
+  };
+  const visual = image ? `<img id="mainPhoto" src="${escapeHtml(image)}" alt="${escapeHtml(listing.title)}" width="560" height="560">` : "";
+  const mainHtml = `<main class="container mk-page" id="listingPage">
+    <nav class="engine-breadcrumb" aria-label="Fil d'Ariane"><a href="/">Accueil</a> › <a href="/marketplace.html">Marketplace</a> › ${escapeHtml(listing.title)}</nav>
+    <div class="mk-detail">
+      <div><div class="mk-gallery"><div class="mk-gallery-main">${visual}</div></div></div>
+      <div>
+        <h1>${escapeHtml(listing.title)}</h1>
+        <p style="color:#baaf97">${escapeHtml(listing.description || description)}</p>
+        <p><strong>État :</strong> ${escapeHtml(listing.condition || "—")} · <strong>Licence :</strong> ${escapeHtml(listing.license || "—")} · <strong>Stock :</strong> ${Number(listing.stock || 0)}</p>
+        ${priceLabel ? `<div class="mk-buy-box"><div class="mk-price-big">${escapeHtml(priceLabel)}</div></div>` : ""}
+        <p><strong>Vendeur :</strong> ${escapeHtml(sellerName)}</p>
+        <p><a href="/marketplace.html">Voir les autres annonces Cardoria Marketplace</a></p>
+      </div>
+    </div>
+  </main>`;
+  const head = seoHead({ title, description, canonical, image, type: "product", jsonLd: [product, breadcrumbs] });
+  return injectSeoIntoTemplate(template, {
+    title,
+    description,
+    head,
+    mainHtml,
+    mainPattern: /<main class="container mk-page" id="listingPage">[\s\S]*?<\/main>/i
+  });
+}
+
+function sendMarketplaceListingSeoPage(req, res, next) {
+  try {
+    const html = buildMarketplaceListingSeoHtml(req, req.params.slug);
+    if (!html) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Annonce introuvable | Cardoria</title></head><body><h1>Annonce introuvable</h1><p><a href=\"/marketplace.html\">Retour à la Marketplace</a></p></body></html>");
+    return res.status(200).set("Cache-Control", "public, max-age=180, stale-while-revalidate=900").type("text/html; charset=utf-8").send(html);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 function sendPublicFile(req, res, next) {
   let requestPath;
   try { requestPath = decodeURIComponent(req.path || "/"); } catch { return res.status(400).send("Requete invalide."); }
@@ -421,6 +500,15 @@ app.get(["/boutique", "/boutique/", "/pages/boutique", "/pages/boutique/"], (req
 app.get(["/estimation", "/estimation/", "/pages/estimation", "/pages/estimation/"], (req, res) => res.redirect(308, "/estimation.html"));
 app.get("/index.html", (req, res) => res.redirect(301, "/"));
 app.get("/cartes/:license/:slug", sendCardSeoPage);
+app.get("/annonces/:slug", sendMarketplaceListingSeoPage);
+app.get("/annonce.html", (req, res, next) => {
+  if (req.query.slug) return res.redirect(301, `/annonces/${encodeURIComponent(req.query.slug)}`);
+  if (req.query.id) {
+    const listing = getListingV1(String(req.query.id));
+    if (listing?.slug) return res.redirect(301, `/annonces/${encodeURIComponent(listing.slug)}`);
+  }
+  return next();
+});
 app.get("/carte.html", (req, res, next) => {
   if (!req.query.license || !req.query.slug) return next();
   return res.redirect(301, `/cartes/${encodeURIComponent(req.query.license)}/${encodeURIComponent(req.query.slug)}`);

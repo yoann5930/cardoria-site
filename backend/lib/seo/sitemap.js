@@ -16,9 +16,11 @@ const STATIC_PAGES = [
   { loc: "/boutique.html", priority: "0.9", changefreq: "daily" },
   { loc: "/estimation.html", priority: "0.9", changefreq: "weekly" },
   { loc: "/marketplace.html", priority: "0.9", changefreq: "daily" },
+  { loc: "/scanner.html", priority: "0.85", changefreq: "weekly" },
   { loc: "/tendances.html", priority: "0.8", changefreq: "daily" },
   { loc: "/comparateur.html", priority: "0.75", changefreq: "weekly" },
   { loc: "/accessoires.html", priority: "0.75", changefreq: "weekly" },
+  { loc: "/referencement.html", priority: "0.7", changefreq: "monthly" },
   { loc: "/pages/contact/", priority: "0.7", changefreq: "monthly" },
   { loc: "/pages/faq/", priority: "0.8", changefreq: "monthly" },
   { loc: "/pages/a-propos/", priority: "0.7", changefreq: "monthly" },
@@ -88,6 +90,7 @@ export function getCardSitemapPageCount(pageSize = CARD_SITEMAP_PAGE_SIZE) {
 export function generateSitemapIndexXml(siteUrl = SITE) {
   const base = normalizeBase(siteUrl);
   let maps = sitemapEntry(base, "/api/seo/core.xml");
+  maps += sitemapEntry(base, "/api/marketplace/v1/sitemap.xml");
   const cardPages = getCardSitemapPageCount();
   for (let page = 1; page <= cardPages; page += 1) {
     maps += sitemapEntry(base, `/api/seo/cards-${page}.xml`);
@@ -186,6 +189,7 @@ export function generateRobotsTxt(siteUrl = SITE) {
     "Disallow: /reset-password.html",
     "Disallow: /favoris.html",
     "Disallow: /souhaits.html",
+    "Disallow: /panier-marketplace.html",
     "Disallow: /document-commande.html",
     "",
     "Sitemap: " + base + "/sitemap.xml"
