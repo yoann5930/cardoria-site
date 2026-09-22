@@ -1,3 +1,4 @@
+// Public Live account chat regression coverage.
 const BASE = process.env.TEST_BASE_URL || "http://127.0.0.1:10000";
 const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 const password = "Live-Public-E2E-Password-2026!";
