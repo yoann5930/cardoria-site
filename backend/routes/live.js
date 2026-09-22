@@ -4,6 +4,7 @@ import { logAudit } from "../lib/audit.js";
 import { ADMIN_ROLES } from "../lib/auth.js";
 import { validateSession } from "../lib/auth/session.js";
 import { MarketplaceAuthError, assertSellerSession } from "../lib/marketplace/v1/security.js";
+import { getSeller } from "../lib/marketplace/sellers.js";
 import { PAYMENT_MATRIX } from "../lib/payments/routing.js";
 import { createLiveCheckout, planLiveCheckout } from "../lib/live/checkout.js";
 import { authenticatedCheckoutInput } from "../lib/live/buyer-identity.js";
@@ -12,7 +13,7 @@ import liveRealtimeRoutes from "./live-realtime.js";
 import liveActionRoutes from "./live-actions.js";
 import liveAdminStudioRoutes from "./live-admin-studio.js";
 import { isRealtimePublished } from "../lib/live/realtime-sessions.js";
-import { createLiveSession, getLiveSession, listLiveCheckouts, listLiveSessions, publicLiveSession, resolveAdminLiveAccess, setLiveStatus, updateLiveSession } from "../lib/live/sessions.js";
+import { createLiveSession, getLiveSession, listLiveCheckouts, listLiveSessions, promoteDueScheduledLiveSessions, publicLiveSession, resolveAdminLiveAccess, setLiveStatus, updateLiveSession } from "../lib/live/sessions.js";
 import { archiveLiveSession, getLiveArchive, listLiveArchives } from "../lib/live/archive.js";
 import { createLiveShipmentsForLive, listLiveShipments } from "../lib/live/shipments.js";
 
@@ -61,7 +62,14 @@ function getPublicLiveSession(id) {
 
 router.get("/matrix", (req, res) => res.json({ ok: true, matrix: PAYMENT_MATRIX, retired: ["revolut"] }));
 router.get("/sessions", (req, res) => {
-  res.json({ ok: true, sessions: listLiveSessions({ status: "live" }).map(publicRealtimeSession) });
+  promoteDueScheduledLiveSessions({ canStart: (session) => session.ownerRole !== "seller" || Boolean(getSeller(session.ownerId)?.senderReady) });
+  const requested=String(req.query.status||"live").toLowerCase();
+  const sessions=requested==="all"
+    ? listLiveSessions().filter((session)=>["scheduled","live"].includes(String(session.status||"").toLowerCase()))
+    : requested==="scheduled"
+      ? listLiveSessions({status:"scheduled"})
+      : listLiveSessions({status:"live"});
+  res.json({ ok: true, sessions: sessions.map(publicRealtimeSession) });
 });
 router.get("/sessions/:id", (req, res) => {
   const session = getPublicLiveSession(req.params.id);
