@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
+import * as sitemapUrls from '../backend/lib/seo/sitemap-urls.js';
 
 // Execute the actual production module; only database-backed imports are stubbed.
 // Run with: node --experimental-vm-modules --test tests/seo-sitemap-lastmod.test.mjs
@@ -17,6 +18,7 @@ async function load({ cards = [], posts = [], licenses = [], extensions = [], co
   const imports = {
     './blog.js': { listBlogPosts: () => posts },
     './generator.js': { SITE, listExtensions: () => extensions, listGeneratedPages: () => [] },
+    './sitemap-urls.js': sitemapUrls,
     '../engine/licenses.js': { listLicenses: () => licenses },
     '../engine/cards.js': {
       getCardCount: () => count,
@@ -159,3 +161,49 @@ test('card sitemap exposes only real catalogue images with escaped metadata', as
   assert.match(xml, /<image:title>Pikachu &amp; Friends — Test &lt;Set&gt; — 1\/100<\/image:title>/);
   assert.equal((xml.match(/<image:image>/g) || []).length, 1);
 });
+
+test('known 404 licence and empty extension paths are never emitted', async () => {
+  const { api } = await load({
+    licenses: [{ slug: 'pokemon' }, { slug: 'starwars' }, { slug: 'yugioh' }],
+    extensions: [
+      { url: '/extensions/pokemon/base-set', license: 'pokemon', slug: 'base-set' },
+      { url: '/extensions/pokemon/', license: 'pokemon', slug: '' },
+      { url: '/extensions/pokemon/', license: 'pokemon', slug: '' },
+      { url: '/extensions/pokemon/★', license: 'pokemon', slug: '' }
+    ]
+  });
+  const xml = api.generateCoreSitemapXml();
+  const locs = tags(xml, 'loc');
+  assert.ok(locs.includes(`${SITE}/pages/licences/pokemon/`));
+  assert.ok(locs.includes(`${SITE}/pages/licences/yugioh/`));
+  assert.ok(locs.includes(`${SITE}/boutique.html`));
+  assert.ok(locs.includes(`${SITE}/extensions/pokemon/base-set`));
+  assert.ok(!locs.includes(`${SITE}/pages/licences/starwars/`));
+  assert.ok(!locs.includes(`${SITE}/extensions/pokemon/`));
+  assert.ok(!locs.includes(`${SITE}/extensions/pokemon`));
+  assert.match(xml, /^<\?xml version="1.0" encoding="UTF-8"\?>/);
+  assert.match(xml, /<urlset xmlns="http:\/\/www.sitemaps.org\/schemas\/sitemap\/0.9">/);
+  for (const loc of locs) {
+    assert.match(loc, /^https:\/\/www\.cardoriashop\.fr\//);
+    assert.doesNotMatch(loc, /onrender\.com|vercel\.app|localhost|http:\/\//);
+    const path = new URL(loc).pathname.replace(/\/$/, '');
+    if (path.startsWith('/extensions/')) {
+      assert.equal(path.split('/').filter(Boolean).length, 3, loc);
+    }
+    if (/^\/pages\/licences\/[^/]+$/.test(path)) {
+      assert.ok(sitemapUrls.isIndexableLicenseSitemapSlug(path.split('/')[3]), loc);
+    }
+  }
+});
+
+test('sitemap index stays valid XML on the canonical host', async () => {
+  const { api } = await load({ count: 1 });
+  const xml = api.generateSitemapIndexXml();
+  assert.match(xml, /^<\?xml version="1.0" encoding="UTF-8"\?>/);
+  assert.match(xml, /<sitemapindex xmlns="http:\/\/www.sitemaps.org\/schemas\/sitemap\/0.9">/);
+  const locs = tags(xml, 'loc');
+  assert.ok(locs.includes(`${SITE}/api/seo/core.xml`));
+  assert.ok(locs.includes(`${SITE}/api/seo/cards-1.xml`));
+  for (const loc of locs) assert.match(loc, /^https:\/\/www\.cardoriashop\.fr\//);
+});
+

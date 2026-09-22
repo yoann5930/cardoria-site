@@ -4,6 +4,7 @@
 import { getDb } from "../engine/database.js";
 import { listLicenses } from "../engine/licenses.js";
 import { getSitemapCards, getCardCount } from "../engine/cards.js";
+import { extensionSitemapEntry, slugifyExtensionName } from "./sitemap-urls.js";
 
 const SITE = "https://www.cardoriashop.fr";
 const SITE_NAME = "CardoriaShop";
@@ -51,17 +52,15 @@ export function listExtensions(licenseSlug) {
   const rows = licenseSlug
     ? db.prepare("SELECT DISTINCT extension, license_slug, COUNT(*) AS card_count FROM cards WHERE active = 1 AND license_slug = ? AND extension <> '' GROUP BY extension ORDER BY extension").all(licenseSlug)
     : db.prepare("SELECT DISTINCT extension, license_slug, COUNT(*) AS card_count FROM cards WHERE active = 1 AND extension <> '' GROUP BY extension, license_slug ORDER BY license_slug, extension").all();
-  return rows.map((r) => ({
+  return rows.map((r) => extensionSitemapEntry({
     extension: r.extension,
-    license: r.license_slug,
-    cardCount: r.card_count,
-    slug: slugifyExt(r.extension),
-    url: `/extensions/${encodeURIComponent(r.license_slug)}/${encodeURIComponent(slugifyExt(r.extension))}`
-  }));
+    license_slug: r.license_slug,
+    card_count: r.card_count
+  })).filter(Boolean);
 }
 
 export function slugifyExt(name) {
-  return String(name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return slugifyExtensionName(name);
 }
 
 export function generateLicensePages() {
