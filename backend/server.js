@@ -482,8 +482,10 @@ function sendMarketplaceListingSeoPage(req, res, next) {
 const ALWAYS_REVALIDATE_PUBLIC_PATHS = new Set([
   "/live.html",
   "/client-login.html",
+  "/admin-live.html",
   "/js/cardoria-live-actions.js",
-  "/js/client-auth.js"
+  "/js/client-auth.js",
+  "/js/admin/admin-live.js"
 ]);
 
 function sendPublicFile(req, res, next) {
