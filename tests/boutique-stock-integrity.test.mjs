@@ -14,6 +14,8 @@ const { createLiveBoutiqueCheckout, validateBoutiqueItems } = await import("../b
 const {
   listBoutiqueProducts,
   listBoutiqueInventory,
+  summarizeBoutiqueInventory,
+  shippingWeightStatus,
   boutiqueStockImpact,
   boutiqueAvailability,
   sanitizeStockPreference,
@@ -35,19 +37,19 @@ const pickup = {
   city: "Valenciennes"
 };
 
-function purchaseNotes(price = 10, base = 1, removed = false, boutique = true) {
+function purchaseNotes(price = 10, base = 1, removed = false, boutique = true, shippingWeightGrams = 80) {
   return '[STOCK_PREFS] ' + JSON.stringify({
     [PRODUCT_ID]: {
       boutique,
       boutiquePrice: price,
       stockBase: base,
-      shippingWeightGrams: 80,
+      shippingWeightGrams,
       removed
     }
   });
 }
 
-function seed({ stock = 1, price = 10, removed = false, boutique = true, orders = [] } = {}) {
+function seed({ stock = 1, price = 10, removed = false, boutique = true, weight = 80, orders = [] } = {}) {
   writeJson("purchases", [{
     id: "P-STOCK-1",
     status: "paid",
@@ -58,7 +60,7 @@ function seed({ stock = 1, price = 10, removed = false, boutique = true, orders 
     quantity: Math.max(1, stock),
     amount: price * Math.max(1, stock),
     date: "2026-01-01",
-    notes: purchaseNotes(price, stock, removed, boutique)
+    notes: purchaseNotes(price, stock, removed, boutique, weight)
   }]);
   writeJson("orders", orders);
 }
@@ -405,6 +407,57 @@ test("M. manual STOCK_PREFS reject negative, decimal and non-integer quantities"
   const notes = applyStockPrefsToNotes("[RACHAT] keep-me", purchaseNotes(10, 14));
   assert.match(notes, /\[RACHAT\] keep-me/);
   assert.match(notes, /\[STOCK_PREFS\]/);
+});
+
+test("product shipping weight is explicit, validated and exposed without inventing grams", () => {
+  seed({ stock: 2, weight: 80 });
+  let item = listBoutiqueInventory({ includeDisabled: true }).find((row) => row.id === PRODUCT_ID);
+  assert.equal(item.shippingWeightGrams, 80);
+  assert.equal(item.shippingWeightKnown, true);
+  assert.equal(item.shippingWeightStatus, "known");
+  assert.equal(item.shippingWeightLabel, "80 g");
+  assert.deepEqual(shippingWeightStatus(item), { known: true, grams: 80, code: "known", label: "80 g" });
+
+  seed({ stock: 2, weight: null });
+  item = listBoutiqueInventory({ includeDisabled: true }).find((row) => row.id === PRODUCT_ID);
+  assert.equal(item.shippingWeightGrams, null);
+  assert.equal(item.shippingWeightKnown, false);
+  assert.equal(item.shippingWeightStatus, "missing");
+  assert.equal(item.shippingWeightLabel, "Poids à renseigner");
+  assert.deepEqual(shippingWeightStatus(item), { known: false, grams: null, code: "missing", label: "Poids à renseigner" });
+
+  assert.throws(() => sanitizeStockPreference({ shippingWeightGrams: 0 }), (error) => error.code === "STOCK_PREFS_INVALID");
+  assert.throws(() => sanitizeStockPreference({ shippingWeightGrams: 2.5 }), (error) => error.code === "STOCK_PREFS_INVALID");
+  assert.throws(() => sanitizeStockPreference({ shippingWeightGrams: "abc" }), (error) => error.code === "STOCK_PREFS_INVALID");
+  assert.throws(() => sanitizeStockPreference({ shippingWeightGrams: 30001 }), (error) => error.code === "STOCK_PREFS_INVALID");
+});
+
+test("weight coverage totals count only active Boutique products", () => {
+  const inventory = [
+    { boutiqueEnabled: true, stockRemoved: false, shippingWeightKnown: true, shippingWeightGrams: 80, stock: 2 },
+    { boutiqueEnabled: true, stockRemoved: false, shippingWeightKnown: false, shippingWeightGrams: null, stock: 1 },
+    { boutiqueEnabled: false, stockRemoved: false, shippingWeightKnown: false, shippingWeightGrams: null, stock: 4 },
+    { boutiqueEnabled: true, stockRemoved: true, shippingWeightKnown: false, shippingWeightGrams: null, stock: 3 }
+  ];
+  const totals = summarizeBoutiqueInventory(inventory);
+  assert.equal(totals.activeProductsForWeight, 2);
+  assert.equal(totals.weightedProducts, 1);
+  assert.equal(totals.missingWeightProducts, 1);
+  assert.equal(totals.weightCoveragePercent, 50);
+  assert.equal(summarizeBoutiqueInventory([]).weightCoveragePercent, 100);
+});
+
+test("admin stock exposes weight KPIs, filters and strict client-side validation", () => {
+  const adminStock = fs.readFileSync("js/admin/admin-stock.js", "utf8");
+  const runtimeCopy = fs.readFileSync("backend/public/js/admin/admin-stock.js", "utf8");
+  assert.equal(adminStock, runtimeCopy);
+  assert.match(adminStock, /Poids renseignés/);
+  assert.match(adminStock, /Poids manquants/);
+  assert.match(adminStock, /Couverture poids/);
+  assert.match(adminStock, /data-stock-filter="missing_weight"/);
+  assert.match(adminStock, /data-stock-filter="weighted"/);
+  assert.match(adminStock, /Poids unitaire d’expédition/);
+  assert.match(adminStock, /Poids invalide : entier entre 1 et 30 000 g/);
 });
 
 test("N/O. oversold products are not purchasable and low stock uses the shared threshold", () => {

@@ -45,6 +45,17 @@ export function stockAlertBucket(item) {
   return "";
 }
 
+export function shippingWeightStatus(item) {
+  const grams = Math.trunc(Number(item?.shippingWeightGrams));
+  const known = Number.isFinite(grams) && grams >= 1 && grams <= 30000;
+  return {
+    known,
+    grams: known ? grams : null,
+    code: known ? "known" : "missing",
+    label: known ? grams + " g" : "Poids à renseigner"
+  };
+}
+
 function money(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
@@ -504,6 +515,7 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
   const identityReady = !isCardPackaging(line.packaging) || (Boolean(line.cardId) && Boolean(line.name) && Boolean(line.image));
   const priceReady = Number(price || 0) > 0;
   const availability = boutiqueAvailability({ stock, oversoldStock });
+  const weight = shippingWeightStatus(line);
   const publicProduct = {
     id: line.key,
     cardId: line.cardId,
@@ -531,9 +543,10 @@ function buildInventoryLine(line, orders, includeAdminDetails) {
     availability: availability.code,
     availabilityLabel: availability.label,
     lowStockThreshold: LOW_STOCK_THRESHOLD,
-    shippingWeightGrams: Number.isFinite(Number(line.shippingWeightGrams)) && Number(line.shippingWeightGrams) >= 1
-      ? Math.trunc(Number(line.shippingWeightGrams))
-      : null
+    shippingWeightGrams: weight.grams,
+    shippingWeightKnown: weight.known,
+    shippingWeightStatus: weight.code,
+    shippingWeightLabel: weight.label
   };
 
   if (!includeAdminDetails) return publicProduct;
@@ -597,6 +610,14 @@ export function summarizeBoutiqueInventory(inventory) {
     if (item.alertBucket === "out") acc.outOfStockProducts += 1;
     if (Number(item.oversoldStock || 0) > 0) acc.oversoldProducts += 1;
     if (item.stockRemoved || item.boutiqueEnabled === false) acc.removedProducts += 1;
+    if (enabled) {
+      acc.activeProductsForWeight += 1;
+      if (item.shippingWeightKnown === true || (Number.isInteger(Number(item.shippingWeightGrams)) && Number(item.shippingWeightGrams) >= 1 && Number(item.shippingWeightGrams) <= 30000)) {
+        acc.weightedProducts += 1;
+      } else {
+        acc.missingWeightProducts += 1;
+      }
+    }
     return acc;
   }, {
     baseStock: 0,
@@ -610,9 +631,15 @@ export function summarizeBoutiqueInventory(inventory) {
     lowStockProducts: 0,
     outOfStockProducts: 0,
     oversoldProducts: 0,
-    removedProducts: 0
+    removedProducts: 0,
+    activeProductsForWeight: 0,
+    weightedProducts: 0,
+    missingWeightProducts: 0
   });
   totals.lowStock = totals.lowStockProducts;
   totals.outOfStock = totals.outOfStockProducts;
+  totals.weightCoveragePercent = totals.activeProductsForWeight
+    ? Math.round((totals.weightedProducts / totals.activeProductsForWeight) * 100)
+    : 100;
   return totals;
 }

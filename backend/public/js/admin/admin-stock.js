@@ -97,6 +97,12 @@
     var boutique = row.querySelector("[data-boutique]")?.value !== "no";
     var boutiquePrice = row.querySelector("[data-price]")?.value || "";
     var shippingWeightGrams = row.querySelector("[data-weight]")?.value || "";
+    if (shippingWeightGrams !== "" && positiveWeight(shippingWeightGrams) === null) {
+      var weightMessage = row.querySelector("[data-save-status]");
+      if (weightMessage) weightMessage.textContent = "Poids invalide : entier entre 1 et 30 000 g.";
+      window.alert("Poids invalide. Saisissez un nombre entier entre 1 et 30 000 g, ou laissez vide si le poids est inconnu.");
+      return;
+    }
     if ((item.packaging === "carte_unite" || item.packaging === "lot_cartes") && boutiquePrice !== "" && Number(boutiquePrice) > 0 && Number(boutiquePrice) < 1) {
       boutiquePrice = "1.00";
       var priceInput = row.querySelector("[data-price]");
@@ -159,6 +165,8 @@
     if (stockFilter === "reserved") return Number(item.pendingStock || 0) > 0;
     if (stockFilter === "oversold") return Number(item.oversoldStock || 0) > 0;
     if (stockFilter === "removed") return item.stockRemoved === true || item.boutiqueEnabled === false;
+    if (stockFilter === "missing_weight") return item.boutiqueEnabled !== false && !item.stockRemoved && item.shippingWeightKnown !== true;
+    if (stockFilter === "weighted") return item.boutiqueEnabled !== false && !item.stockRemoved && item.shippingWeightKnown === true;
     return true;
   }
 
@@ -190,17 +198,24 @@
     A.qs("#stockOut").textContent = String(totals.outOfStockProducts || totals.outOfStock || 0);
     A.qs("#stockOversold").textContent = String(totals.oversoldProducts || 0);
     A.qs("#stockValue").textContent = euro(totals.stockValue != null ? totals.stockValue : inventory.reduce(function (s, i) { return s + Number(i.stock || 0) * Number(i.averagePurchaseCost || 0); }, 0));
+    A.qs("#stockWeighted").textContent = String(totals.weightedProducts || 0) + " / " + String(totals.activeProductsForWeight || 0);
+    A.qs("#stockMissingWeight").textContent = String(totals.missingWeightProducts || 0);
+    A.qs("#stockWeightCoverage").textContent = String(totals.weightCoveragePercent == null ? 100 : totals.weightCoveragePercent) + " %";
     if (A.qs("#stockLowThresholdLabel")) A.qs("#stockLowThresholdLabel").textContent = String(lowStockThreshold);
 
     var summary = A.qs("#stockSummary");
-    if (summary) summary.innerHTML = "Acheté : <strong>" + Number(totals.baseStock || 0) + "</strong> · Disponible : <strong>" + Number(totals.availableStock || 0) + "</strong> · Réservé paiement : <strong>" + Number(totals.pendingStock || 0) + "</strong> · Vendu/payé : <strong>" + Number(totals.soldStock || 0) + "</strong> · En remboursement : <strong>" + Number(totals.refundHoldStock || 0) + "</strong>" + (Number(totals.oversoldStock || 0) ? " · <strong style='color:#ff8f8f'>Survente : " + Number(totals.oversoldStock) + "</strong>" : "") + " · Rupture : <strong>" + Number(totals.outOfStockProducts || totals.outOfStock || 0) + "</strong> · Stock faible : <strong>" + Number(totals.lowStockProducts || totals.lowStock || 0) + "</strong>";
+    if (summary) summary.innerHTML = "Acheté : <strong>" + Number(totals.baseStock || 0) + "</strong> · Disponible : <strong>" + Number(totals.availableStock || 0) + "</strong> · Réservé paiement : <strong>" + Number(totals.pendingStock || 0) + "</strong> · Vendu/payé : <strong>" + Number(totals.soldStock || 0) + "</strong> · En remboursement : <strong>" + Number(totals.refundHoldStock || 0) + "</strong>" + (Number(totals.oversoldStock || 0) ? " · <strong style='color:#ff8f8f'>Survente : " + Number(totals.oversoldStock) + "</strong>" : "") + " · Rupture : <strong>" + Number(totals.outOfStockProducts || totals.outOfStock || 0) + "</strong> · Stock faible : <strong>" + Number(totals.lowStockProducts || totals.lowStock || 0) + "</strong> · Poids renseignés : <strong>" + Number(totals.weightedProducts || 0) + "/" + Number(totals.activeProductsForWeight || 0) + "</strong> · Poids manquants : <strong>" + Number(totals.missingWeightProducts || 0) + "</strong> · Couverture poids : <strong>" + Number(totals.weightCoveragePercent == null ? 100 : totals.weightCoveragePercent) + " %</strong>";
 
     A.qs("#stockRows").innerHTML = visible.map(function (i) {
       var actions = i.stockRemoved
         ? '<button type="button" class="admin-btn admin-btn--small" data-restore-stock>Remettre</button>'
         : '<button type="button" class="admin-btn admin-btn--small" data-edit-stock>Modifier</button> <button type="button" class="admin-btn admin-btn--small admin-btn--danger" data-remove-stock>Supprimer</button>';
       var lastChange = i.latestPurchaseAt ? '<br><small>Dernier achat : ' + esc(i.latestPurchaseAt) + '</small>' : '';
-      return '<tr data-stock-row="'+esc(i.key)+'"><td><small>'+esc(i.cardId || i.key)+'</small></td><td><strong>'+esc(i.name)+'</strong><br><small>'+esc([i.extension,i.number?"#"+i.number:""].filter(Boolean).join(" · "))+'</small></td><td>'+esc(i.categoryLabel || i.packaging)+'</td><td><select data-condition '+((i.packaging!=="carte_unite"&&i.packaging!=="lot_cartes")?'disabled':'')+'>'+conditionOptions(i)+'</select></td><td>'+euro(i.averagePurchaseCost)+'</td><td><input data-price type="number" min="'+((i.packaging==="carte_unite"||i.packaging==="lot_cartes")?"1":"0.01")+'" step="0.01" value="'+(i.boutiquePrice ? Number(i.boutiquePrice).toFixed(2) : '')+'" placeholder="'+(i.catalogPrice ? Number(i.catalogPrice).toFixed(2) : 'Prix requis')+'"><br><small>'+(i.boutiquePrice?'Prix Admin':i.catalogPrice?'Auto Cardoria '+euro(i.catalogPrice):'Prix catalogue indisponible')+'</small></td><td><input data-weight type="number" min="1" max="30000" step="1" value="'+(i.shippingWeightGrams ? String(i.shippingWeightGrams) : '')+'" placeholder="g"><br><small>Poids colis</small></td><td><strong>'+Number(i.stock||0)+'</strong> dispo<br><small>'+esc(stockBreakdown(i))+'</small><br>'+statusLabel(i)+lastChange+'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+actions+'</div></td><td><select data-boutique '+(i.stockRemoved?'disabled':'')+'><option value="yes"'+(i.boutiqueEnabled?' selected':'')+'>Oui</option><option value="no"'+(!i.boutiqueEnabled?' selected':'')+'>Non</option></select></td><td>Achats payés<br><small data-save-status></small></td></tr>';
+      var weightKnown = i.shippingWeightKnown === true || positiveWeight(i.shippingWeightGrams) !== null;
+      var weightBadge = weightKnown
+        ? '<span class="admin-badge admin-badge--ok">Poids renseigné</span>'
+        : '<span class="admin-badge admin-badge--warn">Poids à renseigner</span>';
+      return '<tr data-stock-row="'+esc(i.key)+'"><td><small>'+esc(i.cardId || i.key)+'</small></td><td><strong>'+esc(i.name)+'</strong><br><small>'+esc([i.extension,i.number?"#"+i.number:""].filter(Boolean).join(" · "))+'</small></td><td>'+esc(i.categoryLabel || i.packaging)+'</td><td><select data-condition '+((i.packaging!=="carte_unite"&&i.packaging!=="lot_cartes")?'disabled':'')+'>'+conditionOptions(i)+'</select></td><td>'+euro(i.averagePurchaseCost)+'</td><td><input data-price type="number" min="'+((i.packaging==="carte_unite"||i.packaging==="lot_cartes")?"1":"0.01")+'" step="0.01" value="'+(i.boutiquePrice ? Number(i.boutiquePrice).toFixed(2) : '')+'" placeholder="'+(i.catalogPrice ? Number(i.catalogPrice).toFixed(2) : 'Prix requis')+'"><br><small>'+(i.boutiquePrice?'Prix Admin':i.catalogPrice?'Auto Cardoria '+euro(i.catalogPrice):'Prix catalogue indisponible')+'</small></td><td><input data-weight type="number" min="1" max="30000" step="1" value="'+(i.shippingWeightGrams ? String(i.shippingWeightGrams) : '')+'" placeholder="g" aria-label="Poids unitaire d’expédition en grammes"><br><small>Poids unitaire d’expédition</small><br>'+weightBadge+'</td><td><strong>'+Number(i.stock||0)+'</strong> dispo<br><small>'+esc(stockBreakdown(i))+'</small><br>'+statusLabel(i)+lastChange+'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+actions+'</div></td><td><select data-boutique '+(i.stockRemoved?'disabled':'')+'><option value="yes"'+(i.boutiqueEnabled?' selected':'')+'>Oui</option><option value="no"'+(!i.boutiqueEnabled?' selected':'')+'>Non</option></select></td><td>Achats payés<br><small data-save-status></small></td></tr>';
     }).join("") || '<tr><td colspan="10">'+(stockFilter==="all" && !stockQuery ? "Aucun stock Boutique." : "Aucun produit dans ce filtre.")+'</td></tr>';
 
     A.qs("#stockRows").querySelectorAll("tr[data-stock-row]").forEach(function (row) {
@@ -255,6 +270,9 @@
       '<div class="admin-kpi"><label>Produits en rupture</label><strong id="stockOut">0</strong></div>' +
       '<div class="admin-kpi"><label>Produits en survente</label><strong id="stockOversold">0</strong></div>' +
       '<div class="admin-kpi"><label>Valeur du stock</label><strong id="stockValue">0,00 €</strong></div>' +
+      '<div class="admin-kpi"><label>Poids renseignés</label><strong id="stockWeighted">0 / 0</strong></div>' +
+      '<div class="admin-kpi"><label>Poids manquants</label><strong id="stockMissingWeight">0</strong></div>' +
+      '<div class="admin-kpi"><label>Couverture poids</label><strong id="stockWeightCoverage">100 %</strong></div>' +
     '</div>' +
     '<div class="admin-panel"><p id="stockSummary" class="small">Chargement...</p>' +
     '<div class="admin-filters" style="margin:12px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
@@ -265,9 +283,11 @@
       '<button type="button" class="btn btn-secondary" data-stock-filter="reserved">Réservé</button>' +
       '<button type="button" class="btn btn-secondary" data-stock-filter="oversold">Survente</button>' +
       '<button type="button" class="btn btn-secondary" data-stock-filter="removed">Retiré de la Boutique</button>' +
+      '<button type="button" class="btn btn-secondary" data-stock-filter="missing_weight">Poids manquant</button>' +
+      '<button type="button" class="btn btn-secondary" data-stock-filter="weighted">Poids renseigné</button>' +
       '<input id="stockSearch" type="search" placeholder="Nom, référence, extension, numéro" style="min-width:220px;flex:1">' +
     '</div>' +
-    '<p class="small">Les cartes liées au catalogue récupèrent automatiquement leur tarif de référence Cardoria. Vous pouvez toujours saisir un prix Admin pour le remplacer. Modifier la quantité change le stock de base pour obtenir la disponibilité voulue, sans écraser les ventes déjà commises. Le retrait conserve l’historique d’achat, les ventes et la comptabilité. Le poids n’est jamais inventé : s’il manque, une étiquette ne pourra pas être créée. Seuil stock faible : <span id="stockLowThresholdLabel">2</span> unités.</p>' +
+    '<p class="small">Les cartes liées au catalogue récupèrent automatiquement leur tarif de référence Cardoria. Vous pouvez toujours saisir un prix Admin pour le remplacer. Modifier la quantité change le stock de base pour obtenir la disponibilité voulue, sans écraser les ventes déjà commises. Le retrait conserve l’historique d’achat, les ventes et la comptabilité. Le poids correspond au poids unitaire d’expédition du produit en grammes. Il n’est jamais inventé : s’il manque, la commande reste enregistrable mais une étiquette Colissimo ne pourra pas être créée sans poids réel. Seuil stock faible : <span id="stockLowThresholdLabel">2</span> unités.</p>' +
     '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Réf.</th><th>Nom</th><th>Catégorie</th><th>État</th><th>Prix achat moy.</th><th>Prix Boutique</th><th>Poids (g)</th><th>Stock réel / actions</th><th>Boutique</th><th>Source</th></tr></thead><tbody id="stockRows"></tbody></table></div></div>');
 
   document.querySelectorAll("[data-stock-filter]").forEach(function (button) {
