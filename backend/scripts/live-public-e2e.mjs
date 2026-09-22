@@ -91,6 +91,22 @@ assert(realtimeStatus.response.status === 200 && realtimeStatus.body.liveId === 
 const state = await json(`/api/live/actions/${encodeURIComponent(liveId)}/state`);
 assert(state.response.status === 200 && state.body.ok === true, "Active live public action state unavailable");
 
+const anonymousChat = await json(`/api/live/actions/${encodeURIComponent(liveId)}/chat`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "Anonymous", message: "Je ne dois pas pouvoir écrire" })
+});
+assert(anonymousChat.response.status === 401 && anonymousChat.body.code === "CLIENT_LOGIN_REQUIRED", "Anonymous viewer can write in live chat");
+const accountChat = await auth(token, `/api/live/actions/${encodeURIComponent(liveId)}/chat`, {
+  method: "POST",
+  body: JSON.stringify({ name: "Forged nickname", message: "Bonjour depuis mon compte" })
+});
+assert(accountChat.response.status === 200, "Authenticated client cannot write in live chat");
+assert(accountChat.body.message?.name === "Live Public Seller", "Live chat did not reuse account name");
+assert(accountChat.body.message?.name !== "Forged nickname", "Live chat trusts forged browser nickname");
+const publicChat = await json(`/api/live/actions/${encodeURIComponent(liveId)}/chat`);
+assert(publicChat.response.status === 200 && publicChat.body.messages?.some((entry) => entry.message === "Bonjour depuis mon compte" && entry.name === "Live Public Seller"), "Public live chat does not expose authenticated message");
+
 const noCameraViewer = await json("/api/live/webrtc/viewer/start", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
