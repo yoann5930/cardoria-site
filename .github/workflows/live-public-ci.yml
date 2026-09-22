@@ -61,6 +61,8 @@ jobs:
           node --check backend/routes/live-realtime.js
           node --check backend/routes/live-actions.js
           node --check backend/scripts/live-public-e2e.mjs
+          node --check js/cardoria-live-actions.js
+          node --check js/client-auth.js
       - name: Public Live security guards
         run: |
           grep -q 'session?.status === "live"' backend/routes/live.js
@@ -69,6 +71,10 @@ jobs:
           grep -q 'sanitizePublicValue' backend/routes/live.js
           grep -q 'promoteScheduledLives' backend/server.js
           grep -q 'setInterval(promoteScheduledLives' backend/server.js
+          grep -q 'live-chat-dock' live.html
+          grep -q 'CLIENT_LOGIN_REQUIRED' backend/routes/live-actions.js
+          grep -q 'cardoria_account' js/cardoria-live-actions.js
+          ! grep -q 'id="claName"' js/cardoria-live-actions.js
       - name: Start clean backend
         working-directory: backend
         run: |
