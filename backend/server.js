@@ -479,6 +479,13 @@ function sendMarketplaceListingSeoPage(req, res, next) {
   }
 }
 
+const ALWAYS_REVALIDATE_PUBLIC_PATHS = new Set([
+  "/live.html",
+  "/client-login.html",
+  "/js/cardoria-live-actions.js",
+  "/js/client-auth.js"
+]);
+
 function sendPublicFile(req, res, next) {
   let requestPath;
   try { requestPath = decodeURIComponent(req.path || "/"); } catch { return res.status(400).send("Requete invalide."); }
@@ -495,6 +502,11 @@ function sendPublicFile(req, res, next) {
   if (!PUBLIC_EXTENSIONS.has(extension)) return next();
   const absolutePath = path.resolve(PUBLIC_ROOT, relativePath);
   if (absolutePath !== PUBLIC_ROOT && !absolutePath.startsWith(PUBLIC_ROOT + path.sep)) return res.status(403).send("Forbidden");
+  if (ALWAYS_REVALIDATE_PUBLIC_PATHS.has(requestPath)) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
   return res.sendFile(absolutePath, (error) => { if (!error) return; if (error.status === 404) return next(); return next(error); });
 }
 
