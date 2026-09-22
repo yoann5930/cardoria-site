@@ -28,7 +28,7 @@ import { getCardBySlug, searchCards } from "./lib/engine/cards.js";
 import { getLicense } from "./lib/engine/licenses.js";
 import { syncPokemonCatalog, syncPokemonReferenceCatalog } from "./lib/engine/tcgdex-sync.js";
 import { initMarketplace } from "./lib/marketplace/index.js";
-import { getListingV1BySlug } from "./lib/marketplace/v1/listings.js";
+import { getListingV1, getListingV1BySlug } from "./lib/marketplace/v1/listings.js";
 import { initMarketplacePersistence, marketplacePersistenceMiddleware, enginePersistenceMiddleware, flushMarketplacePersistence, flushEnginePersistence, closeMarketplacePersistence } from "./lib/marketplace/persistence.js";
 import { emptyPublicCatalogOnce } from "./lib/marketplace/empty-catalog.js";
 import { initAi } from "./lib/ai/index.js";
@@ -431,7 +431,6 @@ function buildMarketplaceListingSeoHtml(req, slug) {
       priceCurrency: "EUR",
       price,
       availability,
-      seller: { "@type": "Organization", name: sellerName }
     }
   };
   const breadcrumbs = {
@@ -504,6 +503,10 @@ app.get("/cartes/:license/:slug", sendCardSeoPage);
 app.get("/annonces/:slug", sendMarketplaceListingSeoPage);
 app.get("/annonce.html", (req, res, next) => {
   if (req.query.slug) return res.redirect(301, `/annonces/${encodeURIComponent(req.query.slug)}`);
+  if (req.query.id) {
+    const listing = getListingV1(String(req.query.id));
+    if (listing?.slug) return res.redirect(301, `/annonces/${encodeURIComponent(listing.slug)}`);
+  }
   return next();
 });
 app.get("/carte.html", (req, res, next) => {
