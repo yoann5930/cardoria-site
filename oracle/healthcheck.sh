@@ -61,7 +61,18 @@ check_live_public_chat() {
 
   check /client-login.html 200
   grep -Fq 'client-auth.js?v=20260922-live-chat-auth-v2' "$OUT"
-  echo "OK Live public chat cache/account build"
+
+  check /admin-live.html 200
+  grep -Fq 'admin-live.js?v=20260922-public-open-v2' "$OUT"
+  check /js/admin/admin-live.js 200
+  grep -Fq 'Ouvrir le Live public' "$OUT"
+  grep -Fq 'window.open(liveUrl, "_blank", "noopener")' "$OUT"
+  if grep -Fq 'window.open("about:blank", "_blank")' "$OUT"; then
+    echo "FAIL legacy async public Live opener is still served"
+    exit 1
+  fi
+
+  echo "OK Live public chat/cache/open build"
 }
 
 check / 200
