@@ -111,16 +111,20 @@ function makeTestUser(role, suffix) {
   };
 }
 
-test("bouton Admin Live et route enter sont branchés sans bypass URL", () => {
+test("bouton Admin ouvre la vraie vue publique sans grant admin ni popup asynchrone", () => {
   for (const relative of ["js/admin/admin-live.js", "backend/public/js/admin/admin-live.js"]) {
     const source = readRepo(relative);
     assert.match(source, /data-enter-live=/);
-    assert.match(source, /Voir comme spectateur/);
-    assert.match(source, /\/api\/admin\/live\/sessions\/" \+ encodeURIComponent\(btn\.dataset\.enterLive\) \+ "\/enter"/);
-    assert.match(source, /window\.open\("about:blank", "_blank"\)/);
-    assert.match(source, /liveWindow\.location\.href = liveUrl/);
-    assert.match(source, /liveWindow\.close\(\)/);
+    assert.match(source, /Ouvrir le Live public/);
+    assert.match(source, /openSpectator\(btn\.dataset\.enterLive\)/);
+    assert.match(source, /session\.status !== "live"/);
+    assert.match(source, /Démarrez le Live avant d’ouvrir la vue publique/);
+    assert.match(source, /var liveUrl = "\/live\.html\?session=" \+ encodeURIComponent\(id\)/);
+    assert.match(source, /window\.open\(liveUrl, "_blank", "noopener"\)/);
     assert.match(source, /location\.assign\(liveUrl\)/);
+    assert.doesNotMatch(source, /btn\.dataset\.enterLive\) \+ "\/enter"/);
+    assert.doesNotMatch(source, /cardoriaAdminGrant/);
+    assert.doesNotMatch(source, /window\.open\("about:blank", "_blank"\)/);
     assert.doesNotMatch(source, /\?admin=1|\?free=1|\?noFee=1/);
     assert.match(source, /data-start=/);
     assert.match(source, /data-stop=/);
