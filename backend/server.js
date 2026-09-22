@@ -31,6 +31,7 @@ import { initMarketplace } from "./lib/marketplace/index.js";
 import { getListingV1, getListingV1BySlug } from "./lib/marketplace/v1/listings.js";
 import { initMarketplacePersistence, marketplacePersistenceMiddleware, enginePersistenceMiddleware, flushMarketplacePersistence, flushEnginePersistence, closeMarketplacePersistence } from "./lib/marketplace/persistence.js";
 import { emptyPublicCatalogOnce } from "./lib/marketplace/empty-catalog.js";
+import { getSeller } from "./lib/marketplace/sellers.js";
 import { initAi } from "./lib/ai/index.js";
 import { initSeo } from "./lib/seo/index.js";
 import { getLicenseSeoContent, listExtensions } from "./lib/seo/generator.js";
@@ -61,6 +62,7 @@ import { apiRateLimit, aiRateLimit } from "./lib/security/rateLimit.js";
 import { migrateAuth } from "./lib/auth/migrate.js";
 import { scheduleAutoBackup } from "./lib/backup/full.js";
 import { cleanupLegacyLiveTestsOnce } from "./lib/live/cleanup-tests.js";
+import { promoteDueScheduledLiveSessions } from "./lib/live/sessions.js";
 import { initLaunch, connectionJournalMiddleware, maintenanceMiddleware } from "./lib/launch/index.js";
 import systemRoutes from "./routes/system.js";
 import sendcloudRoutes from "./routes/sendcloud.js";
@@ -571,6 +573,23 @@ safeInit("auth-post-restore", migrateAuth);
 authReady = true;
 console.log("[startup] auth-routes: ready after persistence restore");
 
+function promoteScheduledLives() {
+  try {
+    const result = promoteDueScheduledLiveSessions({
+      canStart: (session) => session.ownerRole !== "seller" || Boolean(getSeller(session.ownerId)?.senderReady)
+    });
+    if (result.promoted.length) console.log(`[live-schedule] started: ${result.promoted.join(", ")}`);
+    if (result.blocked.length) console.warn(`[live-schedule] blocked seller profile: ${result.blocked.join(", ")}`);
+    if (result.invalid.length) console.error(`[live-schedule] invalid schedule: ${result.invalid.join(", ")}`);
+  } catch (error) {
+    console.error("[live-schedule] scheduler error", error?.message || String(error));
+  }
+}
+const liveScheduleIntervalMs = Math.max(1000, Number(process.env.LIVE_SCHEDULE_INTERVAL_MS) || 5000);
+promoteScheduledLives();
+const liveScheduleTimer = setInterval(promoteScheduledLives, liveScheduleIntervalMs);
+liveScheduleTimer.unref?.();
+
 const skipCatalogPreload = process.env.NODE_ENV === "test";
 if (skipCatalogPreload) {
   console.log("[startup] catalog-preload: skipped in test");
@@ -676,6 +695,7 @@ function shutdown(signal) {
   console.log(`[process] ${signal} received, closing HTTP server`);
   clearTimeout(firstMarketRefresh);
   clearInterval(marketRefreshTimer);
+  clearInterval(liveScheduleTimer);
   const forceExit = setTimeout(() => process.exit(1), 10000); forceExit.unref();
   server.close(async () => {
     const enginePersisted = await flushEnginePersistence(`shutdown-${signal.toLowerCase()}`);

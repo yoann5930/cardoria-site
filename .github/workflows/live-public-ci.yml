@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - "backend/server.js"
       - "backend/routes/live.js"
       - "backend/routes/live-realtime.js"
       - "backend/routes/live-actions.js"
@@ -18,6 +19,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "backend/server.js"
       - "backend/routes/live.js"
       - "backend/routes/live-realtime.js"
       - "backend/routes/live-actions.js"
@@ -54,6 +56,7 @@ jobs:
         run: npm install --omit=dev
       - name: Live public syntax checks
         run: |
+          node --check backend/server.js
           node --check backend/routes/live.js
           node --check backend/routes/live-realtime.js
           node --check backend/routes/live-actions.js
@@ -64,6 +67,8 @@ jobs:
           grep -q 'live.status!=="live"' backend/routes/live-realtime.js
           grep -q 'assertPublicLive' backend/routes/live-actions.js
           grep -q 'sanitizePublicValue' backend/routes/live.js
+          grep -q 'promoteScheduledLives' backend/server.js
+          grep -q 'setInterval(promoteScheduledLives' backend/server.js
       - name: Start clean backend
         working-directory: backend
         run: |
