@@ -70,6 +70,7 @@ test("marketplace listings use crawlable clean canonical URLs with server render
   assert.match(marketplaceSearch, /publicUrl: row\.slug \? `\/annonces\//);
   assert.match(server, /app\.get\("\/annonces\/:slug", sendMarketplaceListingSeoPage\)/);
   assert.match(server, /res\.redirect\(301, `\/annonces\/\$\{encodeURIComponent\(req\.query\.slug\)\}`\)/);
+  assert.match(server, /const listing = getListingV1\(String\(req\.query\.id\)\)/);
   assert.match(server, /"@type": "Product"/);
   assert.match(server, /"@type": "BreadcrumbList"/);
   assert.match(marketplaceBrowse, /listing\.publicUrl \|\| M\.listingUrl\(listing\.id\)/);
