@@ -20,18 +20,19 @@ async function main() {
     console.log("Sitemap généré depuis l'API backend (" + xml.length + " octets)");
   } catch (e) {
     console.warn("Fallback statique :", e.message);
-    const today = new Date().toISOString().slice(0, 10);
     const paths = [
-      "/", "/boutique.html", "/estimation.html", "/marketplace.html", "/rachat-cartes.html",
-      "/tendances.html", "/contact.html", "/pages/faq/", "/pages/a-propos/", "/pages/contact/",
+      "/", "/pages/prix-carte-pokemon/", "/pages/combien-vaut-ma-carte-pokemon/",
+      "/boutique.html", "/estimation.html", "/marketplace.html", "/scanner.html",
+      "/tendances.html", "/comparateur.html", "/accessoires.html", "/referencement.html",
+      "/pages/faq/", "/pages/a-propos/", "/pages/contact/",
       "/pages/mentions-legales/", "/pages/confidentialite/", "/pages/cgv/", "/pages/blog/",
       "/pages/licences/", "/pages/licences/pokemon/", "/pages/licences/yugioh/",
       "/pages/licences/onepiece/", "/pages/licences/lorcana/", "/pages/licences/magic/",
-      "/pages/licences/dragonball/", "/pages/licences/sports/"
+      "/pages/licences/dragonball/", "/pages/licences/sports/", "/vendre.html"
     ];
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
       paths.map(function (p) {
-        return "  <url><loc>" + SITE + p + "</loc><lastmod>" + today + "</lastmod></url>";
+        return "  <url><loc>" + SITE + p + "</loc></url>";
       }).join("\n") + "\n</urlset>";
   }
   writeFileSync(join(root, "sitemap.xml"), xml, "utf8");
