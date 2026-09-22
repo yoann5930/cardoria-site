@@ -82,7 +82,7 @@ router.get("/v1/sellers/:id/subscription", (req, res) => {
 });
 router.get("/v1/sitemap/listings", (req, res) => res.json({ ok: true, entries: getListingsSitemapEntries(Number(req.query.limit) || 5000) }));
 router.get("/v1/sitemap.xml", (req, res) => {
-  const base = (process.env.MARKETPLACE_FRONTEND_URL || process.env.FRONTEND_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+  const base = "https://www.cardoriashop.fr";
   const entries = getListingsSitemapEntries(Number(req.query.limit) || 5000);
   const urls = entries.map((e) => `  <url><loc>${base}${e.url}</loc>${e.lastmod ? `<lastmod>${e.lastmod}</lastmod>` : ""}<changefreq>daily</changefreq><priority>0.7</priority></url>`).join("\n");
   res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`);
