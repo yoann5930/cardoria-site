@@ -42,8 +42,8 @@ test('index omits fabricated modification dates and keeps every card partition',
   const xml = api.generateSitemapIndexXml();
   assert.deepEqual(tags(xml, 'lastmod'), []);
   assert.deepEqual(tags(xml, 'loc'), [
-    `${SITE}/api/seo/core.xml`, `${SITE}/api/seo/cards-1.xml`,
-    `${SITE}/api/seo/cards-2.xml`, `${SITE}/api/seo/cards-3.xml`
+    `${SITE}/api/seo/core.xml`, `${SITE}/api/marketplace/v1/sitemap.xml`,
+    `${SITE}/api/seo/cards-1.xml`, `${SITE}/api/seo/cards-2.xml`, `${SITE}/api/seo/cards-3.xml`
   ]);
   assert.equal(api.generateSitemapXml(), xml);
 });
@@ -61,6 +61,8 @@ test('static, license and extension pages do not pretend to change every day', a
   // URLs carrying explicit noindex directives must never be advertised as sitemap targets.
   assert.ok(!tags(xml, 'loc').includes(`${SITE}/rachat-cartes.html`));
   assert.ok(!tags(xml, 'loc').includes(`${SITE}/licence.html`));
+  assert.ok(tags(xml, 'loc').includes(`${SITE}/scanner.html`));
+  assert.ok(tags(xml, 'loc').includes(`${SITE}/referencement.html`));
 });
 
 test('blog keeps genuine update and creation dates', async () => {
@@ -113,7 +115,10 @@ test('card pagination and URL escaping are unchanged', async () => {
 
 test('empty catalogue keeps the core sitemap and no phantom card partitions', async () => {
   const { api } = await load();
-  assert.deepEqual(tags(api.generateSitemapIndexXml(), 'loc'), [`${SITE}/api/seo/core.xml`]);
+  assert.deepEqual(tags(api.generateSitemapIndexXml(), 'loc'), [
+    `${SITE}/api/seo/core.xml`,
+    `${SITE}/api/marketplace/v1/sitemap.xml`
+  ]);
 });
 
 test('robots keeps public cards crawlable and advertises the canonical sitemap', async () => {
@@ -121,6 +126,7 @@ test('robots keeps public cards crawlable and advertises the canonical sitemap',
   const robots = api.generateRobotsTxt();
   assert.match(robots, /Allow: \/cartes\//);
   assert.match(robots, /Disallow: \/admin/);
+  assert.match(robots, /Disallow: \/panier-marketplace\.html/);
   assert.ok(robots.endsWith(`Sitemap: ${SITE}/sitemap.xml`));
 });
 
