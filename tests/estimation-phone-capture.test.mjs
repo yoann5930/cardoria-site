@@ -81,3 +81,17 @@ test("mobile capture page opens a direct camera preview with fallback only", () 
   assert.match(script, /videoFrameToDataUrl/);
   assert.match(root, /id="phoneCameraFile"[^>]*capture="environment"/);
 });
+
+
+test("OVH exposes a safe production estimation capture diagnostic", () => {
+  const ops = fs.readFileSync(new URL("../oracle/cardoria-ops.sh", import.meta.url), "utf8");
+  const wrapper = fs.readFileSync(new URL("../oracle/cardoria-ops-ssh-wrapper.sh", import.meta.url), "utf8");
+  const sudoers = fs.readFileSync(new URL("../oracle/sudoers-cardoria-ops", import.meta.url), "utf8");
+  assert.match(ops, /cmd_estimation_capture_check\(\)/);
+  assert.match(ops, /capture_create_http/);
+  assert.match(ops, /capture_upload_http/);
+  assert.match(ops, /capture_fetch_http/);
+  assert.match(ops, /ESTIMATION CAPTURE CHECK OK/);
+  assert.match(wrapper, /cardoria-ops estimation-capture-check/);
+  assert.match(sudoers, /cardoria-ops estimation-capture-check/);
+});

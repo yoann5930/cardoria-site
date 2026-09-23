@@ -50,6 +50,9 @@ case "$cmd" in
   admin-password-reset-request)
     exec sudo -n /usr/local/bin/cardoria-ops admin-password-reset-request
     ;;
+  estimation-capture-check)
+    exec sudo -n /usr/local/bin/cardoria-ops estimation-capture-check
+    ;;
   sumup-configure)
     exec sudo -n /usr/local/bin/cardoria-sumup-configure
     ;;

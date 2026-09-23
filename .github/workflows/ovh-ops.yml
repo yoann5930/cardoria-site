@@ -24,6 +24,7 @@ on:
           - smtp-domain-configure
           - mail-dns-check
           - admin-password-reset-request
+          - estimation-capture-check
           - sumup-configure
           - mondial-relay-configure
           - colissimo-configure
