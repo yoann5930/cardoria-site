@@ -79,12 +79,43 @@
       return "Aucune caméra n'a été détectée sur ce téléphone.";
     }
     if (name === "NotReadableError" || name === "TrackStartError" || name === "AbortError") {
-      return "La caméra est encore utilisée par le lecteur de QR. Patientez une seconde puis réessayez.";
+      return "La caméra est encore utilisée par le lecteur de QR. Fermez le lecteur puis appuyez sur « Activer la caméra ».";
+    }
+    if (name === "TimeoutError") {
+      return "La caméra n'a pas répondu. Appuyez de nouveau sur « Activer la caméra » ou utilisez « Ouvrir l'appareil photo ».";
     }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       return "Ce navigateur ne permet pas l'ouverture directe de la caméra.";
     }
     return "Impossible d'ouvrir la caméra. Appuyez sur « Activer la caméra ».";
+  }
+
+  function requestCameraWithTimeout(constraints, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        var error = new Error("Délai d'ouverture caméra dépassé.");
+        error.name = "TimeoutError";
+        reject(error);
+      }, timeoutMs);
+
+      navigator.mediaDevices.getUserMedia(constraints).then(function (mediaStream) {
+        if (settled) {
+          mediaStream.getTracks().forEach(function (track) { track.stop(); });
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        resolve(mediaStream);
+      }).catch(function (error) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(error);
+      });
+    });
   }
 
   async function getCameraStream() {
@@ -96,10 +127,11 @@
     var lastError = null;
     for (var i = 0; i < constraints.length; i += 1) {
       try {
-        return await navigator.mediaDevices.getUserMedia(constraints[i]);
+        return await requestCameraWithTimeout(constraints[i], 10000);
       } catch (error) {
         lastError = error;
-        if (String(error && error.name || "") === "NotAllowedError") break;
+        var name = String(error && error.name || "");
+        if (name === "NotAllowedError" || name === "SecurityError" || name === "TimeoutError") break;
       }
     }
     throw lastError || new Error("Caméra indisponible");
@@ -117,7 +149,7 @@
     var video = qs("phoneCameraPreview");
 
     if (retry) retry.hidden = true;
-    if (fallback) fallback.hidden = true;
+    if (fallback) fallback.hidden = false;
     if (activate) activate.hidden = true;
     if (shot) shot.disabled = true;
     setLoading("Ouverture de la caméra", "Autorisez l’accès à la caméra si votre téléphone le demande.", false);
@@ -129,18 +161,15 @@
         throw Object.assign(new Error("getUserMedia indisponible"), { name: "NotSupportedError" });
       }
 
-      var attempts = fromUserGesture ? 1 : 3;
+      var attempts = 1;
       var lastError = null;
       for (var attempt = 0; attempt < attempts; attempt += 1) {
         try {
-          if (attempt) await sleep(650 * attempt);
           stream = await getCameraStream();
           lastError = null;
           break;
         } catch (error) {
           lastError = error;
-          var n = String(error && error.name || "");
-          if (n === "NotAllowedError" || n === "SecurityError" || n === "NotFoundError") break;
         }
       }
       if (lastError) throw lastError;
@@ -195,7 +224,7 @@
       setStatus("Lien photo invalide. Re-scanez le QR code affiché sur le PC.", true);
       return false;
     }
-    sendEvent("page_loaded", "v4");
+    sendEvent("page_loaded", "v5");
     try {
       var response = await fetch("/api/estimation-carte/capture/session/" + encodeURIComponent(sessionId), {
         cache: "no-store",
@@ -337,14 +366,26 @@
 
     var valid = await refreshStatus();
     if (!valid || count >= 6) return;
-    startCamera(false);
+
+    setLoading(
+      "Caméra prête",
+      "Appuyez sur « Activer la caméra » pour autoriser et ouvrir l'appareil photo.",
+      true
+    );
+    setStatus("Appuyez sur « Activer la caméra » pour commencer.");
   }
 
   window.addEventListener("pagehide", stopCamera);
   window.addEventListener("pageshow", function (event) {
     if (event.persisted && sessionId && count < 6) {
       refreshStatus().then(function (valid) {
-        if (valid) startCamera(false);
+        if (!valid) return;
+        setLoading(
+          "Caméra prête",
+          "Appuyez sur « Activer la caméra » pour reprendre.",
+          true
+        );
+        setStatus("Appuyez sur « Activer la caméra » pour reprendre.");
       });
     }
   });
