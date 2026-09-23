@@ -1,3 +1,5 @@
+// Android camera v5 regression: explicit user gesture is mandatory before getUserMedia.
+// Mobile camera runtime v5 regression: camera starts only from a user gesture.
 // Mobile camera runtime v4 regression: no-cache, explicit activation, retries and upload telemetry.
 // Camera UI regression: QR page must stay dark, branded and full-screen.
 // Direct-camera QR regression: getUserMedia remains the primary mobile capture path.
@@ -76,7 +78,8 @@ test("mobile capture page opens a direct camera preview with fallback only", () 
   assert.match(root, /id="phoneCameraShot"[^>]*camera-shot/);
   assert.match(root, /id="phoneCameraFlash"/);
   assert.match(root, /background:#050608!important/);
-  assert.match(root, /id="phoneCameraFallback"[^>]*hidden/);
+  assert.match(root, /id="phoneCameraFallback"/);
+  assert.doesNotMatch(root, /id="phoneCameraFallback"[^>]*hidden/);
   assert.match(script, /navigator\.mediaDevices\.getUserMedia/);
   assert.match(script, /facingMode:\s*\{\s*ideal:\s*"environment"/);
   assert.match(script, /videoFrameToDataUrl/);
@@ -105,9 +108,11 @@ test("mobile camera runtime is no-cache and has explicit activation fallback", (
   const route = fs.readFileSync(new URL("../backend/routes/estimation.js", import.meta.url), "utf8");
 
   assert.match(html, /id="phoneCameraActivate"/);
-  assert.match(html, /estimation-phone\.js\?v=4/);
+  assert.match(html, /estimation-phone\.js\?v=5/);
   assert.match(script, /startCamera\(true\)/);
-  assert.match(script, /for \(var attempt = 0; attempt < attempts; attempt \+= 1\)/);
+  assert.match(script, /requestCameraWithTimeout/);
+  assert.match(script, /Appuyez sur « Activer la caméra » pour commencer/);
+  assert.doesNotMatch(script, /startCamera\(false\)/);
   assert.match(script, /upload_success/);
   assert.match(script, /maxDimension = 1280/);
   assert.match(security, /estimationCameraRuntime/);
