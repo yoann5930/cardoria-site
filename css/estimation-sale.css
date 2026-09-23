@@ -25,3 +25,15 @@
 .estimate-phone-status.is-error{color:#ffb6b6;border:1px solid rgba(255,90,90,.35)}
 #estimateSubmit:disabled{opacity:.45;cursor:not-allowed;filter:saturate(.45)}
 @media (max-width:899px){.estimate-phone-capture{grid-template-columns:1fr}.estimate-phone-capture__session{max-width:320px;margin:0 auto;width:100%}}
+
+
+.estimate-direct-camera{display:grid;gap:12px}
+.estimate-direct-camera__viewport{position:relative;overflow:hidden;border-radius:18px;background:#050505;aspect-ratio:3/4;border:1px solid rgba(212,175,55,.28)}
+.estimate-direct-camera__viewport video{width:100%;height:100%;object-fit:cover;display:block;background:#050505}
+.estimate-direct-camera__loading{position:absolute;inset:0;display:grid;place-items:center;padding:20px;text-align:center;background:rgba(0,0,0,.72);color:#ffe18a;font-weight:700}
+.estimate-direct-camera__loading[hidden]{display:none}
+.estimate-direct-camera__actions{display:grid;grid-template-columns:1fr auto;gap:10px}
+.estimate-direct-camera__actions .primary{min-height:54px;font-size:17px}
+.estimate-camera-fallback{padding:12px;border:1px solid rgba(212,175,55,.22);border-radius:12px;background:rgba(255,255,255,.03)}
+.estimate-camera-fallback p{margin:0 0 10px;color:#c9bea9;font-size:13px}
+@media (max-width:560px){.estimate-direct-camera__actions{grid-template-columns:1fr}.estimate-direct-camera__viewport{aspect-ratio:3/4}}
