@@ -194,12 +194,12 @@ try {
   await spectatorFromAdmin.waitForLoadState("domcontentloaded");
   assert.match(spectatorFromAdmin.url(), new RegExp(`[?&]session=${liveId}`));
   await spectatorFromAdmin.waitForSelector("#claChatDock", { timeout: 15000 });
+  assert.equal(await spectatorFromAdmin.locator("body").getAttribute("data-live-view"), "room");
   assert.equal(await spectatorFromAdmin.locator("#claChatDock").evaluate((el) => el.classList.contains("is-collapsed")), false, "Chat should open automatically on desktop");
-  await spectatorFromAdmin.waitForSelector("#cardoriaLiveScheduledDirectory", { timeout: 15000 });
-  await spectatorFromAdmin.waitForFunction((id) => {
-    const selected = document.querySelector('[data-session-id][data-selected="true"]');
-    return selected?.dataset.sessionId === id;
-  }, liveId, { timeout: 20000 });
+  assert.ok(await spectatorFromAdmin.locator("#cardoriaLiveStage").isVisible(), "Spectator room video should be visible");
+  assert.equal(await spectatorFromAdmin.locator("#cardoriaLiveNowWrap").isVisible(), false, "Live directory must be hidden inside a spectator room");
+  assert.equal(await spectatorFromAdmin.locator("#cardoriaLiveScheduledWrap").isVisible(), false, "Scheduled directory must be hidden inside a spectator room");
+  assert.equal(await spectatorFromAdmin.locator("#cardoriaLiveFilterWrap").isVisible(), false, "Directory filters must be hidden inside a spectator room");
   const adminSpectatorHtml = await spectatorFromAdmin.content();
   assert.doesNotMatch(adminSpectatorHtml, /Mode Admin \/ Cardoria/);
   assert.equal(await spectatorFromAdmin.locator("#cardoriaLiveAdminBar").count(), 0);
@@ -219,22 +219,12 @@ try {
   const anonSignals = collectPageSignals(anonPage);
   await anonPage.goto(`${base}/live.html?session=${encodeURIComponent(liveId)}`, { waitUntil: "domcontentloaded" });
   await anonPage.waitForSelector("#claChatDock");
+  assert.equal(await anonPage.locator("body").getAttribute("data-live-view"), "room");
   assert.equal(await anonPage.locator("#claChatDock").evaluate((el) => el.classList.contains("is-collapsed")), false, "Chat should be visible immediately with ?session=");
-  await anonPage.waitForFunction((id) => document.querySelector(`[data-session-id="${id}"][data-selected="true"]`), liveId, { timeout: 20000 });
-  await anonPage.waitForFunction((title) => (document.querySelector("#cardoriaLiveScheduledDirectory")?.innerText || "").includes(title), scheduledTitle, { timeout: 20000 });
-  assert.match(await anonPage.locator("#cardoriaLiveNowWrap").innerText(), /Lives en cours/i);
-  assert.match(await anonPage.locator("#cardoriaLiveScheduledWrap").innerText(), /Lives programmés/i);
-  assert.match(await anonPage.locator(`[data-session-id="${liveId}"]`).innerText(), /Cardoria/);
-  assert.match(await anonPage.locator(`[data-session-id="${liveId}"]`).innerText(), /Officiel/);
-  await anonPage.waitForSelector("#cardoriaLiveCategoryFilter");
-  await anonPage.selectOption("#cardoriaLiveCategoryFilter", "pokemon");
-  await anonPage.waitForFunction((id) => !document.querySelector(`#cardoriaLiveDirectory [data-session-id="${id}"]`), liveId, { timeout: 10000 });
-  await anonPage.selectOption("#cardoriaLiveCategoryFilter", "");
-  await anonPage.waitForFunction((id) => document.querySelector(`#cardoriaLiveDirectory [data-session-id="${id}"]`), liveId, { timeout: 10000 });
-  await anonPage.locator(`[data-session-id="${scheduledId}"]`).click();
-  await anonPage.waitForFunction((id) => document.querySelector(`[data-session-id="${id}"]`)?.dataset.selected === "true", scheduledId, { timeout: 10000 });
-  await anonPage.locator(`[data-session-id="${liveId}"][data-live-open="true"]`).click();
-  await anonPage.waitForFunction((id) => document.querySelector(`[data-session-id="${id}"][data-live-open="true"][data-selected="true"]`), liveId, { timeout: 20000 });
+  assert.ok(await anonPage.locator("#cardoriaLiveStage").isVisible(), "Live room video should be visible");
+  assert.equal(await anonPage.locator("#cardoriaLiveNowWrap").isVisible(), false, "Current Live directory should not be visible inside the Live room");
+  assert.equal(await anonPage.locator("#cardoriaLiveScheduledWrap").isVisible(), false, "Scheduled Live directory should not be visible inside the Live room");
+  assert.equal(await anonPage.locator("#cardoriaLiveFilterWrap").isVisible(), false, "Category filter should not be visible inside the Live room");
   assert.equal(await anonPage.locator("#cardoriaLiveAdminBar").count(), 0);
   assert.equal(await anonPage.locator("#claName").count(), 0);
   assert.equal(await anonPage.evaluate(() => document.querySelector('script[src*="cardoria-live-admin-studio"]')), null);
@@ -284,17 +274,34 @@ try {
   assertCleanBrowser(anonSignals, "anonymous/client");
   await anonContext.close();
 
-  const landingContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const landingContext = await browser.newContext({ viewport: { width: 1365, height: 900 } });
   const landingPage = await landingContext.newPage();
   const landingSignals = collectPageSignals(landingPage);
   await landingPage.goto(base + "/live.html", { waitUntil: "domcontentloaded" });
-  await landingPage.waitForSelector("#claChatDock");
-  await landingPage.waitForFunction(() => document.querySelector("#claChatDock")?.classList.contains("is-collapsed"), null, { timeout: 10000 });
-  assert.ok(await landingPage.locator("#claChatOpen").isVisible(), "Mobile chat launcher hidden on arrival");
-  await landingPage.locator("#claChatOpen").click();
-  assert.ok(await landingPage.locator("#claMessage").isVisible(), "Mobile chat did not open from the launcher");
+  assert.equal(await landingPage.locator("body").getAttribute("data-live-view"), "directory");
+  await landingPage.waitForFunction((id) => document.querySelector(`#cardoriaLiveDirectory [data-session-id="${id}"]`), liveId, { timeout: 20000 });
   await landingPage.waitForFunction((title) => (document.querySelector("#cardoriaLiveScheduledDirectory")?.innerText || "").includes(title), scheduledTitle, { timeout: 20000 });
-  assertCleanBrowser(landingSignals, "mobile landing");
+  assert.ok(await landingPage.locator("#cardoriaLiveNowWrap").isVisible(), "Current Lives directory should be visible");
+  assert.ok(await landingPage.locator("#cardoriaLiveScheduledWrap").isVisible(), "Scheduled Lives directory should be visible");
+  assert.ok(await landingPage.locator("#cardoriaLiveFilterWrap").isVisible(), "Category filter should be visible on the directory");
+  assert.equal(await landingPage.locator("#cardoriaLiveStage").isVisible(), false, "Video player must not be visible on the Live directory");
+  assert.equal(await landingPage.locator("#claChatDock").isVisible(), false, "Chat must not be visible on the Live directory");
+  assert.equal(await landingPage.locator("#cardoriaLiveActionPanel").count(), 0, "Action panel must not be created on the Live directory");
+  assert.match(await landingPage.locator(`[data-session-id="${liveId}"]`).innerText(), /Cardoria/);
+  assert.match(await landingPage.locator(`[data-session-id="${liveId}"]`).innerText(), /Officiel/);
+  await landingPage.selectOption("#cardoriaLiveCategoryFilter", "pokemon");
+  await landingPage.waitForFunction((id) => !document.querySelector(`#cardoriaLiveDirectory [data-session-id="${id}"]`), liveId, { timeout: 10000 });
+  await landingPage.selectOption("#cardoriaLiveCategoryFilter", "");
+  await landingPage.waitForFunction((id) => document.querySelector(`#cardoriaLiveDirectory [data-session-id="${id}"]`), liveId, { timeout: 10000 });
+  await Promise.all([
+    landingPage.waitForURL(new RegExp(`[?&]session=${liveId}`), { timeout: 15000 }),
+    landingPage.locator(`[data-session-id="${liveId}"][data-live-open="true"]`).click()
+  ]);
+  assert.equal(await landingPage.locator("body").getAttribute("data-live-view"), "room");
+  assert.ok(await landingPage.locator("#cardoriaLiveStage").isVisible(), "Video player should appear after opening a Live");
+  assert.ok(await landingPage.locator("#claChatDock").isVisible(), "Chat should appear only after opening a Live");
+  assert.equal(await landingPage.locator("#cardoriaLiveNowWrap").isVisible(), false, "Directory should disappear after opening a Live");
+  assertCleanBrowser(landingSignals, "directory to room");
   await landingContext.close();
   await adminContext.close();
   console.log("LIVE_PUBLIC_JOURNEY_BROWSER_PASS " + liveId);
