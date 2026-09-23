@@ -9,9 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  logs:
+  smtp:
     uses: ./.github/workflows/ovh-ops-run.yml
     with:
-      action: logs
+      action: smtp-configure
       branch: main
     secrets: inherit
