@@ -321,6 +321,24 @@ export async function createLivePayPalOrder({ checkoutId, amount, sellerId, desc
   return { provider: "paypal", id: result.id, status: result.status, url, platformFee: fee, sellerNet: round2(amount - fee) };
 }
 
+export function mapLivePayPalOrderStatus(status) {
+  const value = String(status || "").toUpperCase();
+  if (value === "COMPLETED") return "paid";
+  if (value === "APPROVED") return "authorized";
+  if (value === "VOIDED") return "failed";
+  return "pending";
+}
+
+export async function retrieveLivePayPalOrder(paypalOrderId, sellerId) {
+  const orderId = String(paypalOrderId || "").trim();
+  if (!orderId) throw Object.assign(new Error("Identifiant de paiement PayPal requis."), { status: 400 });
+  const seller = getSeller(String(sellerId || ""));
+  if (!seller?.paypalMerchantId) throw Object.assign(new Error("Compte PayPal vendeur introuvable pour ce paiement Live."), { status: 409 });
+  return paypalRequest(`/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
+    sellerMerchantId: seller.paypalMerchantId
+  });
+}
+
 export function liveCaptureReplayState(checkout) {
   const status = String(checkout?.status || "").toLowerCase();
   if (["refunded", "refund_reconciliation_required"].includes(status)) {
