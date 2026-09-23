@@ -8,7 +8,6 @@ import { buildPremiumPrompt, parseAiResponse, normalizeLicense } from "./prompts
 import { normalizeCondition } from "./condition.js";
 import { buildSmartEstimate, formatClientEstimateBlock, flattenPricing, toClientEstimate } from "./smart-estimate.js";
 import { buildCardoriaIntelligence, toClientIntelligence } from "./intelligence.js";
-import { ingestEstimationOutcome } from "../market/ingest.js";
 import { getPriceHistory } from "./history.js";
 import { computeTrendForCard } from "./trends.js";
 import { saveAnalysis, getTrainingExamples } from "./training.js";
@@ -99,18 +98,6 @@ export async function analyzeCardPremium(data) {
   saveAnalysis(record);
 
   if (estimate.cardId && !suspicionAlert) {
-    try {
-      ingestEstimationOutcome({
-        analysisId: id,
-        cardId: estimate.cardId,
-        detection,
-        buybackPrice: pricing.buyback,
-        salePrice: pricing.resell,
-        condition: condition.label,
-        language: detection.language
-      });
-    } catch (e) { console.warn("[Market] ingest estimation:", e.message); }
-
     try {
       recordEnterpriseEstimation({
         analysisId: id,
