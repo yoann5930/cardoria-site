@@ -58,10 +58,20 @@ test("desktop and mirrored estimation pages stay synchronized", () => {
   assert.match(root, /estimation-phone-capture\.js/);
 });
 
-test("mobile capture page is mirrored and noindex", () => {
+test("mobile capture page opens a direct camera preview with fallback only", () => {
   const root = fs.readFileSync(new URL("../estimation-photo.html", import.meta.url), "utf8");
   const mirror = fs.readFileSync(new URL("../backend/public/estimation-photo.html", import.meta.url), "utf8");
+  const script = fs.readFileSync(new URL("../js/estimation-phone.js", import.meta.url), "utf8");
+  const scriptMirror = fs.readFileSync(new URL("../backend/public/js/estimation-phone.js", import.meta.url), "utf8");
+
   assert.equal(root, mirror);
+  assert.equal(script, scriptMirror);
   assert.match(root, /noindex,nofollow/);
-  assert.match(root, /capture="environment"/);
+  assert.match(root, /id="phoneCameraPreview"/);
+  assert.match(root, /id="phoneCameraShot"/);
+  assert.match(root, /id="phoneCameraFallback"[^>]*hidden/);
+  assert.match(script, /navigator\.mediaDevices\.getUserMedia/);
+  assert.match(script, /facingMode:\s*\{\s*ideal:\s*"environment"/);
+  assert.match(script, /videoFrameToDataUrl/);
+  assert.match(root, /id="phoneCameraFile"[^>]*capture="environment"/);
 });
