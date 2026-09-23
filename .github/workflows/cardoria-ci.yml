@@ -96,6 +96,7 @@ jobs:
           node --check ../js/estimation-image.js
           node --check ../js/estimation-phone-capture.js
           node --check ../js/estimation-phone.js
+          node --check ../js/estimation-account-prefill.js
           node --check ../js/ai-client.js
           node --check ../js/admin/admin-estimations.js
           node --check ../js/admin/admin-login-secure.js
@@ -113,7 +114,7 @@ jobs:
 
       - name: Lot market and catalog regression tests
         working-directory: .
-        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs tests/pokemon-multisource-catalog.test.mjs tests/pokemon-showcase.test.mjs tests/boutique-quick-search.test.mjs tests/order-document-live-data.test.mjs tests/auto-colissimo-save.test.mjs tests/boutique-shipping.test.mjs tests/boutique-stock-integrity.test.mjs tests/global-card-price-floor.test.mjs backend/tests/colissimo-direct.test.mjs backend/tests/boutique-customer-emails.test.mjs backend/tests/email-delivery.test.mjs backend/tests/password-reset-canonical-link.test.mjs backend/tests/password-reset-flow.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs tests/estimation-phone-capture.test.mjs tests/estimation-pricing-reliability.test.mjs tests/ovh-smtp-bridge.test.mjs tests/ovh-colissimo-bridge.test.mjs tests/domain-mail-deliverability.test.mjs
+        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs tests/pokemon-multisource-catalog.test.mjs tests/pokemon-showcase.test.mjs tests/boutique-quick-search.test.mjs tests/order-document-live-data.test.mjs tests/auto-colissimo-save.test.mjs tests/boutique-shipping.test.mjs tests/boutique-stock-integrity.test.mjs tests/global-card-price-floor.test.mjs backend/tests/colissimo-direct.test.mjs backend/tests/boutique-customer-emails.test.mjs backend/tests/email-delivery.test.mjs backend/tests/password-reset-canonical-link.test.mjs backend/tests/password-reset-flow.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs tests/estimation-phone-capture.test.mjs tests/estimation-pricing-reliability.test.mjs tests/estimation-account-prefill.test.mjs tests/ovh-smtp-bridge.test.mjs tests/ovh-colissimo-bridge.test.mjs tests/domain-mail-deliverability.test.mjs
 
       - name: Reject client-side admin bypass
         working-directory: .
