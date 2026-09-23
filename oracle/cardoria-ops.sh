@@ -157,9 +157,65 @@ cmd_backup() {
   echo "BACKUP OK"
 }
 
+cmd_auth_reset_status() {
+  echo "=== AUTH RESET STATUS ==="
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "auth_env_file: missing"
+    return 1
+  fi
+  (
+    set -a
+    . "$ENV_FILE"
+    set +a
+    cd "$APP_DIR/backend"
+    node --input-type=module <<'NODE'
+import { getDb } from "./lib/engine/database.js";
+import { migrateAuth } from "./lib/auth/migrate.js";
+
+migrateAuth();
+const db = getDb();
+const canonical = "cardoria59330@gmail.com";
+const adminEmail = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+
+function userFor(email) {
+  if (!email) return null;
+  return db.prepare("SELECT id, email, role, active FROM auth_users WHERE lower(email) = ?").get(email.toLowerCase()) || null;
+}
+
+function resetSummary(userId) {
+  if (!userId) return { count: 0, pending: 0, latest: null };
+  const count = db.prepare("SELECT COUNT(*) AS n FROM auth_reset_tokens WHERE user_id = ?").get(userId)?.n || 0;
+  const pending = db.prepare("SELECT COUNT(*) AS n FROM auth_reset_tokens WHERE user_id = ? AND used = 0 AND expires_at > ?")
+    .get(userId, new Date().toISOString())?.n || 0;
+  const latest = db.prepare("SELECT created_at, expires_at, used FROM auth_reset_tokens WHERE user_id = ? ORDER BY created_at DESC LIMIT 1").get(userId) || null;
+  return { count, pending, latest };
+}
+
+const configured = userFor(adminEmail);
+const gmail = userFor(canonical);
+const gmailReset = resetSummary(gmail?.id);
+
+console.log("admin_env_configured:", adminEmail ? "yes" : "no");
+console.log("admin_env_matches_cardoria_gmail:", adminEmail === canonical ? "yes" : "no");
+console.log("configured_admin_account_exists:", configured ? "yes" : "no");
+console.log("configured_admin_role:", configured?.role || "none");
+console.log("configured_admin_active:", configured ? (configured.active ? "yes" : "no") : "none");
+console.log("cardoria_gmail_account_exists:", gmail ? "yes" : "no");
+console.log("cardoria_gmail_role:", gmail?.role || "none");
+console.log("cardoria_gmail_active:", gmail ? (gmail.active ? "yes" : "no") : "none");
+console.log("cardoria_gmail_reset_tokens_total:", gmailReset.count);
+console.log("cardoria_gmail_reset_tokens_pending:", gmailReset.pending);
+console.log("cardoria_gmail_latest_reset_created_at:", gmailReset.latest?.created_at || "none");
+console.log("cardoria_gmail_latest_reset_expires_at:", gmailReset.latest?.expires_at || "none");
+console.log("cardoria_gmail_latest_reset_used:", gmailReset.latest ? (gmailReset.latest.used ? "yes" : "no") : "none");
+NODE
+  )
+}
+
 cmd_report() {
   echo "=== CARDORIA OPS REPORT ==="
   cmd_status
+  cmd_auth_reset_status
 }
 
 cmd_backup_check() {
