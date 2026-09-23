@@ -1,0 +1,66 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { validateEstimationPayload } from "../backend/routes/estimation.js";
+import {
+  addCapturePhotos,
+  createCaptureSession,
+  deleteCaptureSession,
+  getCapturePhotos,
+  getCaptureStatus
+} from "../backend/lib/estimation/capture-sessions.js";
+
+const SAMPLE = "data:image/jpeg;base64,AA==";
+
+test("estimation rejects requests without a photo", () => {
+  const result = validateEstimationPayload({ cardName: "Pikachu", imagesBase64: [] });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 400);
+  assert.match(result.error, /photo/i);
+});
+
+test("estimation accepts a valid image data URL", () => {
+  const result = validateEstimationPayload({ cardName: "Pikachu", imagesBase64: [SAMPLE] });
+  assert.equal(result.ok, true);
+  assert.equal(result.body.imagesBase64.length, 1);
+});
+
+test("temporary phone capture session stores and returns photos", () => {
+  const session = createCaptureSession({ origin: "https://www.cardoriashop.fr" });
+  assert.ok(session.sessionId);
+  assert.match(session.captureUrl, /estimation-photo\.html\?session=/);
+
+  const before = getCaptureStatus(session.sessionId);
+  assert.equal(before.count, 0);
+
+  const added = addCapturePhotos(session.sessionId, [SAMPLE]);
+  assert.equal(added.ok, true);
+  assert.equal(added.count, 1);
+
+  const duplicate = addCapturePhotos(session.sessionId, [SAMPLE]);
+  assert.equal(duplicate.ok, true);
+  assert.equal(duplicate.count, 1);
+
+  const photos = getCapturePhotos(session.sessionId);
+  assert.deepEqual(photos.imagesBase64, [SAMPLE]);
+
+  assert.equal(deleteCaptureSession(session.sessionId), true);
+  assert.equal(getCaptureStatus(session.sessionId), null);
+});
+
+test("desktop and mirrored estimation pages stay synchronized", () => {
+  const root = fs.readFileSync(new URL("../estimation.html", import.meta.url), "utf8");
+  const mirror = fs.readFileSync(new URL("../backend/public/estimation.html", import.meta.url), "utf8");
+  assert.equal(root, mirror);
+  assert.match(root, /id="estimateSubmit"[^>]*disabled/);
+  assert.match(root, /id="phoneCaptureQr"/);
+  assert.match(root, /estimation-phone-capture\.js/);
+});
+
+test("mobile capture page is mirrored and noindex", () => {
+  const root = fs.readFileSync(new URL("../estimation-photo.html", import.meta.url), "utf8");
+  const mirror = fs.readFileSync(new URL("../backend/public/estimation-photo.html", import.meta.url), "utf8");
+  assert.equal(root, mirror);
+  assert.match(root, /noindex,nofollow/);
+  assert.match(root, /capture="environment"/);
+});
