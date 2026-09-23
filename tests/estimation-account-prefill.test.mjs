@@ -1,3 +1,4 @@
+// Estimation account prefill regression: logged-in clients get name + email automatically.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
