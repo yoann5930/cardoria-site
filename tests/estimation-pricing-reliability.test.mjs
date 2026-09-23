@@ -1,3 +1,4 @@
+// Pricing reliability regression: real sources only, real sales only, one condition adjustment.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
