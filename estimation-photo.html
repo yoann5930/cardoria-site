@@ -2,56 +2,103 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#050608">
+<meta name="color-scheme" content="dark">
 <meta name="robots" content="noindex,nofollow,noarchive">
-<title>Photos estimation — Cardoria</title>
-<link rel="stylesheet" href="/style.css">
-<link rel="stylesheet" href="/css/estimation-sale.css?v=2">
+<title>Appareil photo — Cardoria</title>
 <link rel="icon" href="/assets/logo/cardoria-premium.png">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/css/estimation-sale.css?v=4">
+<style>
+html,body{margin:0;min-height:100%;background:#050608!important;color:#fff8e8;font-family:Arial,Helvetica,sans-serif}
+body.estimation-camera-body{min-height:100dvh;overflow-x:hidden;background:radial-gradient(circle at 50% -10%,rgba(212,175,55,.14),transparent 32%),#050608!important}
+.camera-app{width:min(100%,760px);min-height:100dvh;margin:0 auto;display:flex;flex-direction:column;background:#050608}
+.camera-topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:max(12px,env(safe-area-inset-top)) 16px 12px;border-bottom:1px solid rgba(212,175,55,.18);background:rgba(5,6,8,.96);position:sticky;top:0;z-index:10}
+.camera-brand{display:flex;align-items:center;gap:10px;min-width:0}
+.camera-brand img{width:38px;height:38px;object-fit:contain}
+.camera-brand strong{display:block;color:#ffe18a;font-size:15px;letter-spacing:.08em}
+.camera-brand small{display:block;color:#9e9789;font-size:11px;margin-top:2px}
+.camera-counter{flex:0 0 auto;padding:8px 11px;border:1px solid rgba(212,175,55,.25);border-radius:999px;color:#ffe18a;background:rgba(212,175,55,.08);font-size:12px;font-weight:800}
+.camera-stage{display:flex;flex:1;flex-direction:column;padding:12px 12px max(16px,env(safe-area-inset-bottom));gap:12px}
+.camera-viewport{position:relative;min-height:0;flex:1;aspect-ratio:3/4;max-height:calc(100dvh - 225px);overflow:hidden;border-radius:24px;background:#000;border:1px solid rgba(212,175,55,.28);box-shadow:0 24px 80px rgba(0,0,0,.55)}
+.camera-viewport video{width:100%;height:100%;display:block;object-fit:cover;background:#000}
+.camera-guide{position:absolute;inset:8%;pointer-events:none;border:1px solid rgba(255,225,138,.2);border-radius:18px;box-shadow:0 0 0 999px rgba(0,0,0,.12)}
+.camera-guide:before,.camera-guide:after,.camera-guide span:before,.camera-guide span:after{content:"";position:absolute;width:34px;height:34px;border-color:#ffe18a;border-style:solid}
+.camera-guide:before{left:-2px;top:-2px;border-width:3px 0 0 3px;border-radius:12px 0 0 0}
+.camera-guide:after{right:-2px;top:-2px;border-width:3px 3px 0 0;border-radius:0 12px 0 0}
+.camera-guide span:before{left:-2px;bottom:-2px;border-width:0 0 3px 3px;border-radius:0 0 0 12px}
+.camera-guide span:after{right:-2px;bottom:-2px;border-width:0 3px 3px 0;border-radius:0 0 12px 0}
+.camera-guide-label{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);white-space:nowrap;padding:7px 10px;border-radius:999px;background:rgba(0,0,0,.58);color:#fff0bc;font-size:11px;font-weight:800;letter-spacing:.02em}
+.camera-loading{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;background:radial-gradient(circle at 50% 42%,rgba(212,175,55,.13),transparent 34%),#050608;z-index:4}
+.camera-loading[hidden]{display:none}
+.camera-loading-inner{display:grid;justify-items:center;gap:10px}
+.camera-spinner{width:42px;height:42px;border-radius:50%;border:3px solid rgba(255,225,138,.18);border-top-color:#ffe18a;animation:camera-spin .8s linear infinite}
+.camera-loading strong{color:#ffe18a;font-size:16px}
+.camera-loading small{max-width:260px;color:#a69e90;line-height:1.45}
+@keyframes camera-spin{to{transform:rotate(360deg)}}
+.camera-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:5}
+.camera-flash.is-active{animation:camera-flash .22s ease-out}
+@keyframes camera-flash{0%{opacity:0}35%{opacity:.78}100%{opacity:0}}
+.camera-status{min-height:42px;display:flex;align-items:center;justify-content:center;text-align:center;padding:8px 12px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);color:#bbb3a4;font-size:12px;line-height:1.45}
+.camera-status.is-error{color:#ffb9b9;border-color:rgba(255,90,90,.3);background:rgba(255,90,90,.07)}
+.camera-controls{display:grid;grid-template-columns:54px 1fr 54px;align-items:center;gap:12px}
+.camera-shot{width:76px!important;height:76px!important;min-width:76px!important;justify-self:center;border-radius:50%!important;padding:0!important;border:6px solid #f3d97f!important;box-shadow:0 0 0 4px rgba(255,225,138,.16),0 14px 32px rgba(0,0,0,.45);background:#fff6d6!important;color:#171103!important;font-size:0!important}
+.camera-shot:after{content:"";width:48px;height:48px;border-radius:50%;background:linear-gradient(180deg,#ffe18a,#d4af37);display:block}
+.camera-shot:disabled{opacity:.38;filter:none!important}
+.camera-retry{grid-column:1/4;min-height:46px}
+.camera-help{display:flex;align-items:center;justify-content:center;gap:8px;color:#80796d;font-size:11px;text-align:center}
+.camera-help b{color:#baaf97}
+.camera-fallback{padding:12px;border:1px solid rgba(212,175,55,.22);border-radius:14px;background:rgba(212,175,55,.06);text-align:center}
+.camera-fallback p{margin:0 0 10px;color:#b6ad9e;font-size:12px}
+.camera-fallback label{display:inline-flex;align-items:center;justify-content:center;min-height:44px;border:1px solid rgba(212,175,55,.32);border-radius:12px;padding:0 14px;color:#ffe18a;background:rgba(255,255,255,.04);font-weight:800}
+.estimate-phone-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+@media(max-width:420px){.camera-stage{padding-left:8px;padding-right:8px}.camera-viewport{border-radius:18px}.camera-topbar{padding-left:12px;padding-right:12px}}
+</style>
 </head>
-<body>
-<header class="header">
-  <div class="container nav">
-    <a class="brand" href="/"><img src="/assets/logo/cardoria-header-mark.svg?v=4" alt="Cardoria"><span>CARDORIA</span></a>
-  </div>
-</header>
-<main class="container estimation-phone-page">
-  <section class="section estimation-phone-card">
-    <span class="badge">APPAREIL PHOTO</span>
-    <h1>Photographier la carte</h1>
-    <p>Les photos prises ici sont envoyées directement vers votre estimation ouverte sur le PC.</p>
-
-    <div class="estimate-phone-guide">
-      <strong>Pour une meilleure estimation :</strong>
-      <span>1. Recto complet</span>
-      <span>2. Verso complet</span>
-      <span>3. Coins et défauts visibles</span>
-      <span>4. Photo sous lumière si nécessaire</span>
+<body class="estimation-camera-body">
+<main class="camera-app">
+  <header class="camera-topbar">
+    <div class="camera-brand">
+      <img src="/assets/logo/cardoria-header-mark.svg?v=4" alt="">
+      <div><strong>CARDORIA</strong><small>Photos pour estimation</small></div>
     </div>
+    <div id="phonePhotoCount" class="camera-counter">0 / 6</div>
+  </header>
 
-    <div id="phoneCameraStage" class="estimate-direct-camera">
-      <div class="estimate-direct-camera__viewport">
-        <video id="phoneCameraPreview" autoplay muted playsinline></video>
-        <div id="phoneCameraLoading" class="estimate-direct-camera__loading">Ouverture de la caméra arrière…</div>
-      </div>
-      <div class="estimate-direct-camera__actions">
-        <button id="phoneCameraShot" class="primary" type="button" disabled>📷 Prendre la photo</button>
-        <button id="phoneCameraRetry" class="secondary" type="button" hidden>Réessayer la caméra</button>
-      </div>
-      <div id="phoneCameraFallback" class="estimate-camera-fallback" hidden>
-        <p>Si votre navigateur ne permet pas la caméra directe, utilisez le mode de secours.</p>
-        <label class="secondary" for="phoneCameraFile">Choisir / prendre une photo</label>
-        <input id="phoneCameraFile" class="estimate-phone-input" type="file" accept="image/*" capture="environment" multiple>
+  <section id="phoneCameraStage" class="camera-stage">
+    <div class="camera-viewport">
+      <video id="phoneCameraPreview" autoplay muted playsinline></video>
+      <div class="camera-guide" aria-hidden="true"><span></span><div class="camera-guide-label">Placez la carte dans le cadre</div></div>
+      <div id="phoneCameraFlash" class="camera-flash" aria-hidden="true"></div>
+      <div id="phoneCameraLoading" class="camera-loading">
+        <div class="camera-loading-inner">
+          <div class="camera-spinner" aria-hidden="true"></div>
+          <strong>Ouverture de la caméra</strong>
+          <small>Autorisez l’accès à la caméra si votre téléphone le demande.</small>
+        </div>
       </div>
     </div>
 
-    <div id="phonePhotoCount" class="estimate-phone-count">0 / 6 photos envoyées</div>
-    <div id="phonePhotoStatus" class="estimate-phone-status">Connexion à la session Cardoria…</div>
+    <div id="phonePhotoStatus" class="camera-status">Connexion à votre estimation…</div>
 
-    <p class="small">La session est temporaire. Une fois les photos envoyées, revenez sur le PC pour lancer l'estimation.</p>
+    <div class="camera-controls">
+      <span></span>
+      <button id="phoneCameraShot" class="camera-shot" type="button" aria-label="Prendre la photo" disabled>Prendre la photo</button>
+      <span></span>
+      <button id="phoneCameraRetry" class="secondary camera-retry" type="button" hidden>Réessayer la caméra</button>
+    </div>
+
+    <div id="phoneCameraFallback" class="camera-fallback" hidden>
+      <p>La caméra directe n’est pas disponible sur ce navigateur.</p>
+      <label for="phoneCameraFile">Utiliser l’appareil photo du téléphone</label>
+      <input id="phoneCameraFile" class="estimate-phone-input" type="file" accept="image/*" capture="environment" multiple>
+    </div>
+
+    <div class="camera-help"><b>Conseil :</b> recto, verso puis détails des coins ou défauts.</div>
   </section>
 </main>
 <script src="/js/estimation-image.js?v=1"></script>
-<script src="/js/estimation-phone.js?v=2"></script>
+<script src="/js/estimation-phone.js?v=3"></script>
 </body>
 </html>
