@@ -55,3 +55,14 @@ test("provider sync does not require inventing Scrydex secrets", () => {
   assert.match(source, /auth\.configured \? requestedLimit : Math\.min\(requestedLimit, 1\)/);
   assert.doesNotMatch(source, /YOUR_API_KEY|YOUR_TEAM_ID/);
 });
+
+
+test("TCGCSV card creation keeps SQL values aligned and does not reference Scrydex auth state", () => {
+  assert.ok(source.includes("?,?,?,?,?,?,1,?,?)"));
+  assert.ok(!source.includes("?,?,?,?,?,?,?,1,?,?)"));
+  const tcgcsvStart = source.indexOf("export async function syncPokemonTcgcsvCatalog");
+  const scrydexStart = source.indexOf("function scrydexHeaders", tcgcsvStart);
+  const tcgcsvBlock = source.slice(tcgcsvStart, scrydexStart);
+  assert.match(tcgcsvBlock, /authMode:"public"/);
+  assert.doesNotMatch(tcgcsvBlock, /auth\.configured/);
+});
