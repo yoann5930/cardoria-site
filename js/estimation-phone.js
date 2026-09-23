@@ -19,7 +19,7 @@
   function setCount(nextCount) {
     count = Math.max(0, Math.min(6, Number(nextCount || 0)));
     var counter = qs("phonePhotoCount");
-    if (counter) counter.textContent = count + " / 6 photos envoyées";
+    if (counter) counter.textContent = count + " / 6";
     var shot = qs("phoneCameraShot");
     if (shot) shot.disabled = count >= 6 || !stream;
     var file = qs("phoneCameraFile");
@@ -178,7 +178,13 @@
 
   async function takePhoto() {
     var shot = qs("phoneCameraShot");
+    var flash = qs("phoneCameraFlash");
     if (shot) shot.disabled = true;
+    if (flash) {
+      flash.classList.remove("is-active");
+      void flash.offsetWidth;
+      flash.classList.add("is-active");
+    }
     try {
       var image = videoFrameToDataUrl();
       await uploadImages([image]);
