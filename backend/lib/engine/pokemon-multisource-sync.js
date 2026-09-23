@@ -195,7 +195,7 @@ function upsertProviderCard(db, providerCard) {
   db.prepare(`INSERT INTO cards (id,license_slug,language,slug,name,name_normalized,extension,extension_code,number,rarity,hit_family,
     variants_json,illustration,image_hd,image_thumb,condition_note,avg_price,low_price,high_price,recommended_price,market_trend,trend_percent,
     sales_count,views,meta_title,meta_description,catalog_source,catalog_source_url,catalog_sources_json,external_refs_json,active,created_at,updated_at)
-    VALUES (?,'pokemon',?,?,?,?,?,?,?,?,?,'{}',?,?,?,'NM',0,0,0,0,'stable',0,0,0,?,?,?,?,?,?,?,1,?,?)`)
+    VALUES (?,'pokemon',?,?,?,?,?,?,?,?,?,'{}',?,?,?,'NM',0,0,0,0,'stable',0,0,0,?,?,?,?,?,?,1,?,?)`)
     .run(id, providerCard.language, slug, name, normalizeText(name), extension, providerCard.extensionCode, number, providerCard.rarity,
       pokemonHitFamily(providerCard.rarity, name), providerCard.illustration, providerCard.imageHd, providerCard.imageThumb || providerCard.imageHd,
       metaTitle, metaDescription, provider, providerCard.sourceUrl, sourcesJson, refsJson, now, now);
@@ -267,7 +267,7 @@ export async function syncPokemonTcgcsvCatalog({ groupLimit = 12, reset = false 
     const stats = { groupsTotal:groups.length, groupsProcessed:batch.length, cursor:complete ? 0 : next, scannedProducts, cardProducts, created, matched, updated, failures };
     saveState(db, provider, { cursor:String(complete ? 0 : next),status:complete?"complete":"partial",stats_json:safeJson(stats),completed_at:complete?nowIso():"",error:"" });
     if (created || updated) rebuildFts(db);
-    return { ok:true, provider, complete, authMode:auth.configured?"authenticated":"anonymous-low-rate", ...stats, counts:catalogCounts(db) };
+    return { ok:true, provider, complete, authMode:"public", ...stats, counts:catalogCounts(db) };
   } catch (error) {
     saveState(db, provider, { status:"error",error:error?.message||String(error),last_run_at:nowIso() });
     throw error;
