@@ -174,7 +174,7 @@ cmd_estimation_capture_check() {
   code=$(curl -sS -o "$tmp/page.html" -w '%{http_code}' --max-time 20     "https://www.cardoriashop.fr/estimation-photo.html?session=$sid")
   echo "capture_page_http: $code"
   grep -q 'phoneCameraPreview' "$tmp/page.html" && echo "capture_page_camera_ui: present" || { echo "capture_page_camera_ui: missing"; return 1; }
-  grep -q 'estimation-phone.js?v=3' "$tmp/page.html" && echo "capture_page_script_v3: present" || { echo "capture_page_script_v3: missing"; return 1; }
+  grep -q 'estimation-phone.js?v=5' "$tmp/page.html" && echo "capture_page_script_v5: present" || { echo "capture_page_script_v5: missing"; return 1; }
 
   echo "ESTIMATION CAPTURE CHECK OK"
 }
