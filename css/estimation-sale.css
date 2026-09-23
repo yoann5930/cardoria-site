@@ -1,1 +1,27 @@
 .estimate-sell-action{margin-top:18px;padding:20px;border:1px solid rgba(217,185,108,.24);border-radius:16px;background:linear-gradient(145deg,rgba(217,185,108,.08),rgba(255,255,255,.02));display:flex;align-items:center;justify-content:space-between;gap:20px}.estimate-sell-action__copy span{display:block;color:#d9b96c;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.estimate-sell-action__copy strong{display:block;margin-top:4px;font-size:18px}.estimate-sell-action__copy p{margin:5px 0 0;color:#9aa5b5;font-size:13px}.estimate-sell-action__button{flex:0 0 auto;display:inline-flex;min-height:46px;align-items:center;justify-content:center;padding:0 17px;border-radius:12px;background:linear-gradient(135deg,#efd895,#caa552);color:#0a0c10!important;text-decoration:none;font-size:12px;font-weight:800;box-shadow:0 12px 30px rgba(202,165,82,.16);transition:transform .2s ease,box-shadow .2s ease}.estimate-sell-action__button:hover{transform:translateY(-2px);box-shadow:0 16px 36px rgba(202,165,82,.22)}@media(max-width:700px){.estimate-sell-action{align-items:stretch;flex-direction:column}.estimate-sell-action__button{width:100%}}
+
+.estimate-photo-required{display:grid;gap:8px;padding:14px;border:1px solid rgba(212,175,55,.22);border-radius:16px;background:rgba(255,255,255,.02)}
+.estimate-photo-requirement{margin:0;color:#d8c9aa;font-size:13px}
+.estimate-photo-requirement.is-ready{color:#9ee6b0}
+.estimate-phone-capture{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,340px);gap:18px;align-items:start;padding:18px;border:1px solid rgba(212,175,55,.22);border-radius:18px;background:linear-gradient(145deg,rgba(212,175,55,.06),rgba(255,255,255,.015))}
+.estimate-phone-capture__copy h3{margin:8px 0 6px;color:#ffe18a}
+.estimate-phone-capture__copy p{margin:0 0 12px;color:#c9bea9}
+.estimate-phone-capture__session{display:grid;justify-items:center;gap:10px;text-align:center}
+.estimate-phone-qr{width:min(280px,100%);aspect-ratio:1/1;background:#fff;border-radius:14px;padding:10px}
+.estimate-phone-thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+.estimate-phone-thumb{margin:0;aspect-ratio:1/1;border-radius:10px;overflow:hidden;border:1px solid rgba(212,175,55,.18)}
+.estimate-phone-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.estimation-phone-page{max-width:720px}
+.estimation-phone-card{margin-top:18px}
+.estimate-phone-guide{display:grid;gap:8px;margin:18px 0;padding:14px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(212,175,55,.18)}
+.estimate-phone-guide strong{color:#ffe18a}
+.estimate-phone-camera{display:grid;place-items:center;gap:4px;padding:28px 16px;border:2px dashed rgba(212,175,55,.45);border-radius:18px;background:rgba(212,175,55,.05);cursor:pointer;text-align:center}
+.estimate-phone-camera>span{font-size:40px}
+.estimate-phone-camera strong{font-size:18px;color:#ffe18a}
+.estimate-phone-camera small{color:#c9bea9}
+.estimate-phone-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.estimate-phone-count{margin-top:14px;font-weight:700;color:#ffe18a}
+.estimate-phone-status{margin-top:8px;padding:12px;border-radius:12px;background:rgba(255,255,255,.04)}
+.estimate-phone-status.is-error{color:#ffb6b6;border:1px solid rgba(255,90,90,.35)}
+#estimateSubmit:disabled{opacity:.45;cursor:not-allowed;filter:saturate(.45)}
+@media (max-width:899px){.estimate-phone-capture{grid-template-columns:1fr}.estimate-phone-capture__session{max-width:320px;margin:0 auto;width:100%}}
