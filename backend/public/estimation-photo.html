@@ -73,10 +73,9 @@ body.estimation-camera-body{min-height:100dvh;overflow-x:hidden;background:radia
       <div id="phoneCameraFlash" class="camera-flash" aria-hidden="true"></div>
       <div id="phoneCameraLoading" class="camera-loading">
         <div class="camera-loading-inner">
-          <div class="camera-spinner" aria-hidden="true"></div>
-          <strong id="phoneCameraLoadingText">Ouverture de la caméra</strong>
-          <small id="phoneCameraLoadingHint">Autorisez l’accès à la caméra si votre téléphone le demande.</small>
-          <button id="phoneCameraActivate" class="secondary camera-activate" type="button">Activer la caméra</button>
+          <strong id="phoneCameraLoadingText">Caméra prête</strong>
+          <small id="phoneCameraLoadingHint">Appuyez sur le bouton ci-dessous pour autoriser et ouvrir la caméra.</small>
+          <button id="phoneCameraActivate" class="secondary camera-activate" type="button">📷 Activer la caméra</button>
         </div>
       </div>
     </div>
@@ -90,9 +89,9 @@ body.estimation-camera-body{min-height:100dvh;overflow-x:hidden;background:radia
       <button id="phoneCameraRetry" class="secondary camera-retry" type="button" hidden>Réessayer la caméra</button>
     </div>
 
-    <div id="phoneCameraFallback" class="camera-fallback" hidden>
-      <p>La caméra directe n’est pas disponible sur ce navigateur.</p>
-      <label for="phoneCameraFile">Utiliser l’appareil photo du téléphone</label>
+    <div id="phoneCameraFallback" class="camera-fallback">
+      <p>Si la caméra directe ne s’ouvre pas, utilisez l’appareil photo natif.</p>
+      <label for="phoneCameraFile">📸 Ouvrir l’appareil photo</label>
       <input id="phoneCameraFile" class="estimate-phone-input" type="file" accept="image/*" capture="environment" multiple>
     </div>
 
@@ -100,6 +99,6 @@ body.estimation-camera-body{min-height:100dvh;overflow-x:hidden;background:radia
   </section>
 </main>
 <script src="/js/estimation-image.js?v=1"></script>
-<script src="/js/estimation-phone.js?v=4"></script>
+<script src="/js/estimation-phone.js?v=5"></script>
 </body>
 </html>
