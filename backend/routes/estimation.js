@@ -131,6 +131,22 @@ router.post("/capture/session/:sessionId/photos", (req, res) => {
   res.json(result);
 });
 
+router.post("/capture/session/:sessionId/event", (req, res) => {
+  const status = getCaptureStatus(req.params.sessionId);
+  if (!status) return res.status(404).json({ ok: false, error: "Session photo expirée ou introuvable." });
+  const allowed = new Set([
+    "page_loaded", "session_ready", "session_invalid", "session_error",
+    "camera_start", "camera_ready", "camera_error",
+    "photo_taken", "upload_start", "upload_success", "upload_error"
+  ]);
+  const event = String(req.body?.event || "").trim();
+  if (!allowed.has(event)) return res.status(400).json({ ok: false, error: "Événement capture invalide." });
+  const detail = String(req.body?.detail || "").replace(/[\r\n]/g, " ").slice(0, 160);
+  const sid = String(req.params.sessionId || "").slice(0, 8);
+  console.log(`[estimation-capture] session=${sid} event=${event} detail=${detail || "-"}`);
+  res.json({ ok: true });
+});
+
 router.delete("/capture/session/:sessionId", (req, res) => {
   deleteCaptureSession(req.params.sessionId);
   res.json({ ok: true });
