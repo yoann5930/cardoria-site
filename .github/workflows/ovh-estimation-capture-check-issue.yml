@@ -1,0 +1,31 @@
+name: OVH Estimation Capture Check
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: ovh-estimation-capture-check
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'ovh-estimation-capture-check:') &&
+      contains(github.event.issue.labels.*.name, 'ovh-ops:deploy')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Authorized owner-only estimation capture diagnostic."
+
+  capture_check:
+    needs: authorize
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: estimation-capture-check
+      branch: main
+    secrets: inherit
