@@ -6,7 +6,10 @@
   const stageNode = document.getElementById("cardoriaLiveStage");
   const directoryNode = document.getElementById("cardoriaLiveDirectory");
   const directoryStateNode = document.getElementById("cardoriaLiveDirectoryState");
-  if (!(video instanceof HTMLVideoElement) || !stateNode || !viewersNode || !stageNode || !directoryNode) return;
+  const scheduledNode = document.getElementById("cardoriaLiveScheduledDirectory");
+  const scheduledStateNode = document.getElementById("cardoriaLiveScheduledState");
+  if (!(video instanceof HTMLVideoElement) || !stateNode || !viewersNode || !stageNode || !directoryNode || !scheduledNode) return;
+  const esc = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 
   const search = new URLSearchParams(window.location.search);
   let focusLiveId = String(search.get("session") || "").trim();
@@ -32,6 +35,7 @@
   let answerTimer = null;
   let webrtcConfigured = null;
   let connectingSessionId = null;
+  let directorySelection = { id: "", kind: "live" };
 
   const setOfflineCopy = (title, detail) => {
     const offline = stageNode.querySelector(".live-offline");
@@ -303,14 +307,66 @@
   };
 
   const highlightDirectory = (sessionId) => {
-    directoryNode.querySelectorAll("[data-session-id]").forEach((button) => {
+    document.querySelectorAll("[data-session-id]").forEach((button) => {
       button.dataset.selected = button.dataset.sessionId === sessionId ? "true" : "false";
     });
+  };
+
+  const safeCover = (session) => {
+    const cover = String(session?.coverUrl || "/assets/logo/cardoria-premium.png");
+    return cover.startsWith("/") && !cover.startsWith("//") && !cover.includes("..") ? cover : "/assets/logo/cardoria-premium.png";
+  };
+
+  const formatWhen = (value) => {
+    const date = value ? new Date(value) : null;
+    return date && !Number.isNaN(date.getTime()) ? date.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "";
+  };
+
+  const appendDirectoryCard = (target, session, { selectable, selected }) => {
+    const card = document.createElement("article");
+    card.className = "live-card-select";
+    card.dataset.sessionId = session.id;
+    card.dataset.liveStatus = session.status || "";
+    if (selectable) card.dataset.liveOpen = "true";
+    card.dataset.selected = selected ? "true" : "false";
+    const host = session.hostName || (session.ownerRole === "admin" ? "Cardoria" : "Liveur Cardoria");
+    const live = session.status === "live";
+    const statusLabel = live
+      ? (session.streamPublished ? "En direct · vidéo en cours" : "En direct · en attente de diffusion")
+      : "Programmé";
+    const when = live
+      ? (formatWhen(session.startedAt) ? "Démarré le " + formatWhen(session.startedAt) : "En cours")
+      : (formatWhen(session.scheduledAt) ? formatWhen(session.scheduledAt) : "Bientôt");
+    const products = live ? (session.products || []).map((item) => `<button type="button" class="live-card-buy" data-live-buy="${esc(session.id)}" data-product-id="${esc(item.id)}">Acheter ${esc(item.name)} (${Number(item.price || 0).toFixed(2)} €)</button>`).join("") : "";
+    card.innerHTML = `<span class="live-card-thumb"><img src="${esc(safeCover(session))}" alt=""></span><span><strong>${esc(session.title || "Live Cardoria")}</strong><small>${esc(host)}</small><small>${esc(statusLabel)} · ${esc(when)}</small>${products}</span><button type="button" class="live-card-cta${selectable ? "" : " is-soon"}">${selectable ? "Regarder" : "À venir"}</button>`;
+    const openLive = () => {
+      if (!selectable) {
+        directorySelection = { id: session.id, kind: "scheduled" };
+        setStatus(`Live programmé${when ? " · " + when : ""}. La diffusion n'a pas encore commencé.`, false, false);
+        setOfflineCopy("Live programmé", `${session.title || "Live Cardoria"} · ${host}${when ? " · " + when : ""}`);
+        highlightDirectory(session.id);
+        return;
+      }
+      focusLiveId = session.id;
+      try { history.replaceState({}, "", "/live.html?session=" + encodeURIComponent(session.id)); } catch {}
+      void connectSession(session.id);
+    };
+    card.addEventListener("click", (event) => {
+      if (event.target.closest("[data-live-buy]")) return;
+      openLive();
+    });
+    target.appendChild(card);
+    card.querySelectorAll("[data-live-buy]").forEach((buy) => buy.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      buyLiveProduct(buy.dataset.liveBuy, buy.dataset.productId).catch((error) => alert(error.message));
+    }));
   };
 
   const connectSession = async (sessionId) => {
     if (!sessionId || connectingSessionId === sessionId) return;
     connectingSessionId = sessionId;
+    directorySelection = { id: sessionId, kind: "live" };
     await disconnectSession();
     activeSessionId = sessionId;
     setStatus("Connexion au live…", false, true);
@@ -336,16 +392,15 @@
     }
   };
 
-  const renderDirectory = (sessions) => {
+  const renderLiveDirectory = (sessions) => {
     if (directoryStateNode) directoryStateNode.textContent = sessions.length ? `${sessions.length} live${sessions.length > 1 ? "s" : ""} en cours` : "Aucun live en cours";
     directoryNode.innerHTML = "";
     if (!sessions.length) {
       const empty = document.createElement("div");
       empty.className = "live-directory-empty";
-      empty.textContent = "Aucun vendeur n’est en direct pour le moment.";
+      empty.textContent = "Aucun liveur n’est en direct pour le moment.";
       directoryNode.appendChild(empty);
-      if (focusLiveId) return;
-      if (!liveActive) {
+      if (!focusLiveId && !liveActive) {
         activeSessionId = null;
         setStatus("Aucun live public n’est actuellement en cours.", false, false);
         setViewers(0);
@@ -353,22 +408,17 @@
       return;
     }
     sessions.forEach((session) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "live-card-select";
-      button.dataset.sessionId = session.id;
-      button.dataset.selected = session.id === activeSessionId ? "true" : "false";
-      const started = session.startedAt ? new Date(session.startedAt) : null;
-      const timeLabel = started && !Number.isNaN(started.getTime()) ? started.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "maintenant";
-      const streamLabel = session.streamPublished ? "vidéo en cours" : "en attente de diffusion";
-      button.innerHTML = `<span class="live-card-dot"></span><span><strong>${session.title || "Live Cardoria"}</strong><small>Démarré à ${timeLabel} · ${streamLabel}</small></span>`;
-      button.addEventListener("click", () => {
-        focusLiveId = session.id;
-        try { history.replaceState({}, "", "/live.html?session=" + encodeURIComponent(session.id)); } catch {}
-        void connectSession(session.id);
-      });
-      directoryNode.appendChild(button);
+      appendDirectoryCard(directoryNode, session, { selectable: true, selected: session.id === directorySelection.id || session.id === activeSessionId || session.id === focusLiveId });
     });
+    const promoted = directorySelection.kind === "scheduled"
+      ? sessions.find((session) => session.id === directorySelection.id)
+      : null;
+    if (promoted) {
+      directorySelection = { id: promoted.id, kind: "live" };
+      if (webrtcConfigured && promoted.id !== activeSessionId) void connectSession(promoted.id);
+      return;
+    }
+    if (directorySelection.kind === "scheduled") return;
     const preferred = focusLiveId
       ? sessions.find((session) => session.id === focusLiveId)
       : sessions.find((session) => session.id === activeSessionId) || sessions.find((session) => session.streamPublished) || sessions[0];
@@ -377,6 +427,21 @@
       return;
     }
     if (webrtcConfigured && preferred && preferred.id !== activeSessionId) void connectSession(preferred.id);
+  };
+
+  const renderScheduledDirectory = (sessions) => {
+    if (scheduledStateNode) scheduledStateNode.textContent = sessions.length ? `${sessions.length} live${sessions.length > 1 ? "s" : ""} programmé${sessions.length > 1 ? "s" : ""}` : "Aucun live programmé";
+    scheduledNode.innerHTML = "";
+    if (!sessions.length) {
+      const empty = document.createElement("div");
+      empty.className = "live-directory-empty";
+      empty.textContent = "Aucun live n’est programmé pour le moment.";
+      scheduledNode.appendChild(empty);
+      return;
+    }
+    sessions.forEach((session) => {
+      appendDirectoryCard(scheduledNode, session, { selectable: false, selected: session.id === directorySelection.id });
+    });
   };
 
   async function checkRealtime() {
@@ -393,14 +458,18 @@
   async function loadDirectory() {
     const ready = await checkRealtime();
     try {
-      const response = await fetch("/api/live/sessions?status=live", { headers: { Accept: "application/json" }, cache: "no-store" });
+      const response = await fetch("/api/live/sessions?status=all", { headers: { Accept: "application/json" }, cache: "no-store" });
       if (!response.ok) throw new Error("directory");
       const payload = await response.json();
       const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
-      renderDirectory(sessions);
-      if (!ready && directoryStateNode) directoryStateNode.textContent = sessions.length ? `${sessions.length} live${sessions.length > 1 ? "s" : ""} · Service vidéo Live indisponible` : "Service vidéo Live indisponible";
+      const liveSessions = sessions.filter((session) => session.status === "live");
+      const scheduledSessions = sessions.filter((session) => session.status === "scheduled");
+      renderLiveDirectory(liveSessions);
+      renderScheduledDirectory(scheduledSessions);
+      if (!ready && directoryStateNode) directoryStateNode.textContent = liveSessions.length ? `${liveSessions.length} live${liveSessions.length > 1 ? "s" : ""} · Service vidéo Live indisponible` : "Service vidéo Live indisponible";
     } catch {
       if (directoryStateNode) directoryStateNode.textContent = ready ? "Impossible de lister les Lives." : "Service vidéo Live indisponible";
+      if (scheduledStateNode) scheduledStateNode.textContent = "Impossible de lister les Lives programmés.";
     }
   }
 
@@ -459,33 +528,6 @@
     else throw new Error("Lien de paiement Live non reçu.");
   };
 
-  const loadCardoriaSales = async () => {
-    const list = document.getElementById("cardoriaLivePayList");
-    const state = document.getElementById("cardoriaLivePayState");
-    if (!list) return;
-    try {
-      const response = await fetch("/api/live/sessions?status=all", { cache: "no-store" });
-      const payload = await response.json().catch(() => ({}));
-      const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
-      if (!sessions.length) {
-        list.innerHTML = "<p class='live-directory-empty'>Aucun Live Cardoria programmé. Le lecteur ci-dessus reste disponible.</p>";
-        if (state) state.textContent = "";
-        return;
-      }
-      list.innerHTML = sessions.map((session) => {
-        const isLive = session.status === "live";
-        const when = session.scheduledAt ? new Date(session.scheduledAt) : null;
-        const whenLabel = when && !Number.isNaN(when.getTime()) ? when.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "";
-        const products = isLive ? (session.products || []).map((item) => `<button type="button" class="live-tools" data-live-buy="${session.id}" data-product-id="${item.id}">Acheter ${item.name} (${Number(item.price || 0).toFixed(2)} €)</button>`).join("") : "";
-        const selected = focusLiveId && session.id === focusLiveId ? "true" : "false";
-        const label = isLive ? `EN DIRECT${session.streamPublished ? " · vidéo en cours" : ""}` : `Programmé${whenLabel ? " · " + whenLabel : ""}`;
-        return `<article class="live-card-select" data-live-pay="${session.id}" data-selected="${selected}"><span class="live-card-dot"></span><span><strong>${session.title || "Live Cardoria"}</strong><small>${label}</small>${products}</span></article>`;
-      }).join("");
-      list.querySelectorAll("[data-live-buy]").forEach((button) => button.addEventListener("click", () => buyLiveProduct(button.dataset.liveBuy, button.dataset.productId).catch((error) => alert(error.message))));
-      if (state) state.textContent = `${sessions.length} session(s)`;
-    } catch { if (state) state.textContent = ""; }
-  };
-
   soundButton?.addEventListener("click", () => {
     video.muted = !video.muted;
     soundButton.textContent = video.muted ? "Activer le son" : "Couper le son";
@@ -493,10 +535,8 @@
   });
 
   void loadDirectory();
-  void loadCardoriaSales();
   void loadFocusedLive();
   directoryTimer = setInterval(loadDirectory, 5000);
-  setInterval(loadCardoriaSales, 8000);
   window.addEventListener("beforeunload", () => {
     if (directoryTimer) clearInterval(directoryTimer);
     stopHeartbeat();

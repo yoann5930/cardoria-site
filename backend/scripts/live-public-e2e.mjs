@@ -71,6 +71,21 @@ const sender = await auth(token, `/api/marketplace/v1/sellers/${encodeURICompone
   body: JSON.stringify({ name: "Live Public Seller", addressLine1: "12 rue Test", postalCode: "59330", city: "Hautmont", countryCode: "FR", phone: "0600000000" })
 });
 assert(sender.response.status === 200 && sender.body.ready === true, "Sender profile setup failed");
+const scheduledAt = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString();
+const scheduled = await auth(token, "/api/live/seller/sessions", {
+  method: "POST",
+  body: JSON.stringify({
+    title: `Scheduled Public ${suffix}`,
+    scheduledAt,
+    products: [{ id: `LOT-S-${suffix}`, name: "Lot programmé", qty: 1, stock: 1, price: 8.5, mode: "buy_now" }]
+  })
+});
+assert(scheduled.response.status === 200 && scheduled.body.session?.status === "scheduled", "Scheduled live creation failed");
+const scheduledId = scheduled.body.session.id;
+const scheduledDirectory = await json("/api/live/sessions?status=scheduled");
+assert(scheduledDirectory.response.status === 200 && scheduledDirectory.body.sessions?.some((session) => session.id === scheduledId), "Scheduled live missing from public scheduled directory");
+const liveOnlyBeforeStart = await json("/api/live/sessions?status=live");
+assert(!liveOnlyBeforeStart.body.sessions?.some((session) => session.id === scheduledId), "Scheduled live leaked into live directory");
 const started = await auth(token, `/api/live/seller/sessions/${encodeURIComponent(liveId)}/start`, { method: "POST", body: "{}" });
 assert(started.response.status === 200 && started.body.session?.status === "live", "Seller live start failed");
 
@@ -78,11 +93,19 @@ const directory = await json("/api/live/sessions");
 assert(directory.response.status === 200, "Public live directory failed after start");
 const listed = directory.body.sessions?.find((session) => session.id === liveId);
 assert(listed, "Started live missing from public directory");
+assert(listed.hostName === "Live Public Seller", "Public live is missing the liveur name");
+assert(String(listed.coverUrl || "").startsWith("/"), "Public live is missing a cover image");
 assert(!/[<>]/.test(String(listed.title || "")), "Public live title contains HTML markup characters");
 assert(!/[<>]/.test(String(listed.products?.[0]?.name || "")), "Public product name contains HTML markup characters");
 assert(!JSON.stringify(listed).includes("ownerEmail"), "Public live leaks ownerEmail");
 assert(!JSON.stringify(listed).includes("<script") && !JSON.stringify(listed).includes("<img"), "Public live leaks executable markup");
 assert(!JSON.stringify(listed).includes("12 rue Test"), "Public live leaks sender address");
+const directoryAll = await json("/api/live/sessions?status=all");
+assert(directoryAll.body.sessions?.some((session) => session.id === liveId && session.status === "live"), "Started live missing from combined public directory");
+assert(directoryAll.body.sessions?.some((session) => session.id === scheduledId && session.status === "scheduled"), "Scheduled live missing from combined public directory");
+const liveIndex = directoryAll.body.sessions.findIndex((session) => session.id === liveId);
+const scheduledIndex = directoryAll.body.sessions.findIndex((session) => session.id === scheduledId);
+assert(liveIndex >= 0 && scheduledIndex >= 0 && liveIndex < scheduledIndex, "Live sessions must appear before scheduled sessions");
 
 const detail = await json(`/api/live/sessions/${encodeURIComponent(liveId)}`);
 assert(detail.response.status === 200 && detail.body.session?.id === liveId, "Active live public detail unavailable");

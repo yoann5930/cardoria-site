@@ -50,10 +50,40 @@ function sanitizePublicValue(value) {
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizePublicValue(item)]));
   return value;
 }
+function publicHostName(session) {
+  if (String(session?.ownerRole || "").toLowerCase() === "admin") return "Cardoria";
+  try {
+    const name = String(getSeller(session?.ownerId)?.displayName || "").trim();
+    if (name) return name.slice(0, 80);
+  } catch {}
+  return "Liveur Cardoria";
+}
+function publicCoverUrl(session) {
+  try {
+    const avatar = String(getSeller(session?.ownerId)?.avatar || "").trim();
+    if (avatar.startsWith("/") && !avatar.startsWith("//") && !avatar.includes("..")) return avatar.slice(0, 240);
+  } catch {}
+  return "/assets/logo/cardoria-premium.png";
+}
 function publicRealtimeSession(session) {
   const live = publicLiveSession(session);
   if (!live) return null;
-  return sanitizePublicValue({ ...live, mimeType: "application/x-cloudflare-webrtc", streamPublished: isRealtimePublished(live.id) });
+  return sanitizePublicValue({
+    ...live,
+    hostName: publicHostName(session),
+    coverUrl: publicCoverUrl(session),
+    mimeType: "application/x-cloudflare-webrtc",
+    streamPublished: isRealtimePublished(live.id)
+  });
+}
+function sortPublicSessions(sessions) {
+  return [...sessions].sort((left, right) => {
+    const leftLive = String(left.status || "") === "live";
+    const rightLive = String(right.status || "") === "live";
+    if (leftLive !== rightLive) return leftLive ? -1 : 1;
+    if (leftLive) return Date.parse(right.startedAt || 0) - Date.parse(left.startedAt || 0);
+    return Date.parse(left.scheduledAt || 0) - Date.parse(right.scheduledAt || 0);
+  });
 }
 function getPublicLiveSession(id) {
   const session = getLiveSession(id);
@@ -69,7 +99,7 @@ router.get("/sessions", (req, res) => {
     : requested==="scheduled"
       ? listLiveSessions({status:"scheduled"})
       : listLiveSessions({status:"live"});
-  res.json({ ok: true, sessions: sessions.map(publicRealtimeSession) });
+  res.json({ ok: true, sessions: sortPublicSessions(sessions).map(publicRealtimeSession) });
 });
 router.get("/sessions/:id", (req, res) => {
   const session = getPublicLiveSession(req.params.id);
