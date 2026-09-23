@@ -23,7 +23,7 @@ test("password reset sends a canonical HTTPS mail, confirms once, then rejects t
   assert.equal(unknown.ok, true);
   assert.equal(fs.existsSync(outbox), false);
 
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
     assert.equal(authenticateUser(email, "Mauvais-MotDePasse-999"), null);
   }
   assert.throws(
