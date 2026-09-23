@@ -63,6 +63,7 @@ import { migrateAuth } from "./lib/auth/migrate.js";
 import { scheduleAutoBackup } from "./lib/backup/full.js";
 import { cleanupLegacyLiveTestsOnce } from "./lib/live/cleanup-tests.js";
 import { promoteDueScheduledLiveSessions } from "./lib/live/sessions.js";
+import { reconcileStaleLiveCheckouts } from "./lib/live/payment-reconciliation.js";
 import { initLaunch, connectionJournalMiddleware, maintenanceMiddleware } from "./lib/launch/index.js";
 import systemRoutes from "./routes/system.js";
 import sendcloudRoutes from "./routes/sendcloud.js";
@@ -607,6 +608,18 @@ promoteScheduledLives();
 const liveScheduleTimer = setInterval(promoteScheduledLives, liveScheduleIntervalMs);
 liveScheduleTimer.unref?.();
 
+async function reconcileStaleLivePayments() {
+  try {
+    const result = await reconcileStaleLiveCheckouts();
+    if (result.checked) console.log(`[live-payment] stale checkouts=${result.checked} released=${result.released} settled=${result.settled} deferred=${result.deferred}`);
+  } catch (error) {
+    console.error("[live-payment] stale reconciliation error", error?.message || String(error));
+  }
+}
+const livePaymentReconcileIntervalMs = Math.max(30000, Number(process.env.LIVE_PAYMENT_RECONCILE_INTERVAL_MS) || 60000);
+const livePaymentReconcileTimer = setInterval(() => { void reconcileStaleLivePayments(); }, livePaymentReconcileIntervalMs);
+livePaymentReconcileTimer.unref?.();
+
 const skipCatalogPreload = process.env.NODE_ENV === "test";
 if (skipCatalogPreload) {
   console.log("[startup] catalog-preload: skipped in test");
@@ -717,6 +730,7 @@ function shutdown(signal) {
   clearTimeout(firstMarketRefresh);
   clearInterval(marketRefreshTimer);
   clearInterval(liveScheduleTimer);
+  clearInterval(livePaymentReconcileTimer);
   const forceExit = setTimeout(() => process.exit(1), 10000); forceExit.unref();
   server.close(async () => {
     const enginePersisted = await flushEnginePersistence(`shutdown-${signal.toLowerCase()}`);
