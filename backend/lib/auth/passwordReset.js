@@ -60,20 +60,23 @@ export function confirmPasswordReset(token, newPassword) {
 
   if (!row) throw Object.assign(new Error("Lien expiré ou invalide."), { status: 400 });
 
-  const consumed = db.prepare("UPDATE auth_reset_tokens SET used = 1 WHERE id = ? AND used = 0").run(row.id);
-  if (consumed.changes !== 1) throw Object.assign(new Error("Lien expiré ou invalide."), { status: 400 });
-
-  updatePassword(row.user_id, newPassword);
+  const applyReset = db.transaction(() => {
+    const consumed = db.prepare("UPDATE auth_reset_tokens SET used = 1 WHERE id = ? AND used = 0").run(row.id);
+    if (consumed.changes !== 1) throw Object.assign(new Error("Lien expiré ou invalide."), { status: 400 });
+    updatePassword(row.user_id, newPassword);
+  });
+  applyReset();
   revokeAllUserSessions(row.user_id);
 
   const user = getUserById(row.user_id);
   if (user?.email) {
+    const loginPage = ADMIN_ROLES.includes(user.role) ? "admin-login.html" : "client-login.html";
     notifySafely(sendEmail({
       kind: "password_changed",
       to: user.email,
       subject: "Votre mot de passe Cardoria a été modifié",
       text: "Bonjour,\n\nLe mot de passe de votre compte Cardoria vient d'être modifié.\nSi vous n'êtes pas à l'origine de ce changement, contactez-nous immédiatement.",
-      actionUrl: `${RESET_PUBLIC_ORIGIN}/client-login.html`,
+      actionUrl: `${RESET_PUBLIC_ORIGIN}/${loginPage}`,
       actionLabel: "Se connecter"
     }), "password_changed");
   }
