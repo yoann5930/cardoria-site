@@ -16,6 +16,7 @@ function isPrivateIndexPath(pathname = "") {
     path.startsWith("/client-orders") ||
     path.startsWith("/client-login") ||
     path.startsWith("/reset-password") ||
+    path.startsWith("/estimation-photo") ||
     path.startsWith("/favoris") ||
     path.startsWith("/souhaits") ||
     path.startsWith("/document-commande") ||
