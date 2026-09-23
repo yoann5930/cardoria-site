@@ -17,7 +17,64 @@ async function checkoutBoutique(){if(!cart.length){alert("Panier vide.");return}
 function confirmBoutiqueReturn(){const p=new URLSearchParams(location.search);if(!p.get("paid"))return;const order=p.get("order");const msg=qs("shopPayMsg");if(msg)msg.textContent=order?"Merci ! Commande "+order+" — confirmation Revolut en cours.":"Paiement Revolut reçu.";cart=[];renderCart()}
 function fileToBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file)})}
 function sanitizeClientResult(text){if(!text)return"";return String(text).replace(/SCORE_CONFIANCE\s*:\s*\d+/gi,"").replace(/score d['']authenticit[eé][^\n]*/gi,"").replace(/(?:niveau|indice|taux)\s+(?:de\s+)?confiance[^\n]*/gi,"").replace(/confiance\s*(?:d['']authenticit[eé])?\s*[:\-]?\s*\d+\s*%/gi,"").replace(/prix de rachat[^\n]*/gi,"").replace(/rachat cardoria[^\n]*/gi,"").replace(/marge estim[eé]e[^\n]*/gi,"").replace(/marge[^\n]*%/gi,"").replace(/revente conseill[eé]e[^\n]*/gi,"").replace(/prix de revente[^\n]*/gi,"").replace(/cardoria market score[^\n]*/gi,"").replace(/recommandation[^\n]*/gi,"").replace(/acheter imm[eé]diatement[^\n]*/gi,"").replace(/vendre aux ench[eè]res[^\n]*/gi,"").replace(/produit premium[^\n]*/gi,"").replace(/\n{3,}/g,"\n\n").trim()}
-async function sendCardEstimate(){const result=qs("estimateResult");if(!result){alert("Zone résultat introuvable.");return}result.innerHTML="<p>Analyse IA Cardoria en cours…</p>";try{const files=Array.from(qs("cardFiles")?.files||[]);const imagesBase64=[];for(const file of files.slice(0,6)){imagesBase64.push(await fileToBase64(file))}const attr=window.CardoriaAttribution?CardoriaAttribution.getPayload():{};const payload={customerName:qs("customerName")?.value||"",customerEmail:qs("customerEmail")?.value||"",cardName:qs("cardName")?.value||"",cardGame:qs("cardGame")?.value||"",cardNotes:qs("cardNotes")?.value||"",cardId:qs("cardId")?.value||"",cardCondition:qs("cardCondition")?.value||"nm",imagesBase64,...attr};const response=await fetch(`${BACKEND_URL}/api/estimation-carte`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});let data;try{data=await response.json()}catch{throw new Error("Réponse serveur illisible.")}if(!response.ok||!data.ok){result.textContent="Erreur : "+(data.error||data.details||"Analyse impossible.");return}const clean=sanitizeClientResult(data.clientResult||data.result);data.clientResult=clean;if(window.CardoriaAI){CardoriaAI.renderAiResult(result,data)}else{result.textContent=clean}}catch(e){result.textContent="Erreur de connexion au système Cardoria : "+e.message}}
+async function sendCardEstimate(){
+  const result=qs("estimateResult");
+  const submit=qs("estimateSubmit");
+  if(!result){alert("Zone résultat introuvable.");return}
+  try{
+    const files=Array.from(qs("cardFiles")?.files||[]);
+    const imagesBase64=[];
+    for(const file of files.slice(0,6)){
+      if(window.CardoriaEstimationImage?.fileToOptimizedDataUrl){
+        imagesBase64.push(await window.CardoriaEstimationImage.fileToOptimizedDataUrl(file));
+      }else{
+        imagesBase64.push(await fileToBase64(file));
+      }
+    }
+    const remote=window.CardoriaEstimationCapture?.getImages?.()||[];
+    for(const image of remote){
+      if(imagesBase64.length>=6)break;
+      if(image&&!imagesBase64.includes(image))imagesBase64.push(image);
+    }
+    if(!imagesBase64.length){
+      result.textContent="Ajoutez au moins une photo de la carte avant de lancer l'estimation.";
+      window.CardoriaEstimationCapture?.updateSubmitState?.();
+      return;
+    }
+    if(submit)submit.disabled=true;
+    result.innerHTML="<p>Analyse IA Cardoria en cours…</p>";
+    const attr=window.CardoriaAttribution?CardoriaAttribution.getPayload():{};
+    const payload={
+      customerName:qs("customerName")?.value||"",
+      customerEmail:qs("customerEmail")?.value||"",
+      cardName:qs("cardName")?.value||"",
+      cardGame:qs("cardGame")?.value||"",
+      cardNotes:qs("cardNotes")?.value||"",
+      cardId:qs("cardId")?.value||"",
+      cardCondition:qs("cardCondition")?.value||"nm",
+      imagesBase64,
+      ...attr
+    };
+    const response=await fetch(`${BACKEND_URL}/api/estimation-carte`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
+    let data;
+    try{data=await response.json()}catch{throw new Error("Réponse serveur illisible.")}
+    if(!response.ok||!data.ok){
+      result.textContent="Erreur : "+(data.error||data.details||"Analyse impossible.");
+      return;
+    }
+    const clean=sanitizeClientResult(data.clientResult||data.result);
+    data.clientResult=clean;
+    if(window.CardoriaAI){CardoriaAI.renderAiResult(result,data)}else{result.textContent=clean}
+  }catch(e){
+    result.textContent="Erreur de connexion au système Cardoria : "+e.message;
+  }finally{
+    window.CardoriaEstimationCapture?.updateSubmitState?.();
+  }
+}
 function initCardAutocomplete(){const input=qs("cardName");const box=qs("cardSuggest");const hidden=qs("cardId");if(!input||!box)return;const cLicenseMap={pokemon:"Pokémon",yugioh:"Yu-Gi-Oh!",onepiece:"One Piece",lorcana:"Lorcana",magic:"Magic",dragonball:"Dragon Ball",starwars:"Star Wars Unlimited",sports:"Autre"};let timer=null;input.addEventListener("input",function(){hidden&&(hidden.value="");clearTimeout(timer);const q=input.value.trim();if(q.length<2){box.classList.remove("open");box.innerHTML="";return}timer=setTimeout(function(){fetch(`${BACKEND_URL}/api/engine/cards/search?q=${encodeURIComponent(q)}&limit=8`).then(r=>r.json()).then(function(d){const list=d.results||[];if(!list.length){box.classList.remove("open");return}box.innerHTML=list.map(function(c){return `<button type="button" data-id="${c.id}" data-name="${c.name}" data-license="${c.license}">${c.imageThumb?`<img src="${c.imageThumb}" alt="">`:"🃏"} <span>${c.name} — ${c.extension} (${c.number})</span></button>`}).join("");box.classList.add("open");box.querySelectorAll("button").forEach(function(btn){btn.onclick=function(){input.value=btn.dataset.name;hidden.value=btn.dataset.id;box.classList.remove("open");const game=qs("cardGame");if(game&&cLicenseMap[btn.dataset.license])game.value=cLicenseMap[btn.dataset.license]}})})},280)})};document.addEventListener("click",function(e){if(!e.target.closest(".engine-autocomplete")){const b=qs("cardSuggest");if(b)b.classList.remove("open")}});function prefillEstimationCard(){const id=new URLSearchParams(location.search).get("card");if(!id)return;fetch(`${BACKEND_URL}/api/engine/cards/${encodeURIComponent(id)}`).then(r=>r.json()).then(function(d){if(!d.card)return;const n=qs("cardName"),h=qs("cardId");if(n)n.value=d.card.name;if(h)h.value=d.card.id})}
 function trackPageView(){if(location.pathname.includes("admin"))return;if(window.CardoriaAttribution){window.CardoriaAttribution.trackPageView();return}const device=window.innerWidth<768?"mobile":window.innerWidth<1024?"tablet":"desktop";fetch(`${BACKEND_URL}/api/analytics/track`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({page:location.pathname+location.search,referrer:document.referrer||"direct",device})}).catch(function(){})}
 async function protectAdmin(){const page=location.pathname.split("/").pop();const protectedPages=["admin.html","admin-comptabilite.html","admin-utilisateurs.html","admin-statistiques.html","admin-journal.html","admin-integrations.html","admin-catalogue.html","admin-marketplace.html","admin-ia.html","admin-performance-ia.html","admin-ai-enterprise.html","admin-ultimate.html","admin-bigdata.html","admin-sante.html","admin-marche.html","admin-scanner.html","admin-paiements.html","admin-seo.html","admin-commandes.html","admin-stock.html","admin-analytics.html","admin-estimations.html","admin-system.html"];if(!protectedPages.includes(page))return;const token=sessionStorage.getItem("cardoria_session_token");if(!token){sessionStorage.removeItem("cardoria_admin_connected");location.href="admin-login.html";return}try{const r=await fetch(`${BACKEND_URL}/api/auth/me`,{headers:{Authorization:"Bearer "+token},cache:"no-store"});const d=await r.json();if(!r.ok||!d.ok){throw new Error("session invalid")};sessionStorage.setItem("cardoria_admin_connected","yes")}catch(e){sessionStorage.removeItem("cardoria_admin_connected");sessionStorage.removeItem("cardoria_session_token");sessionStorage.removeItem("cardoria_csrf_token");sessionStorage.removeItem("cardoria_admin_email");location.href="admin-login.html"}}
