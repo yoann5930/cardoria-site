@@ -11,7 +11,7 @@ import { requestPasswordReset, confirmPasswordReset } from "../lib/auth/password
 import { requestMagicLogin, consumeMagicLogin } from "../lib/auth/magicLink.js";
 import { notifySafely, publicSiteOrigin, sendEmail } from "../lib/email.js";
 import { validateBody, SCHEMAS } from "../lib/security/validate.js";
-import { authRateLimit, passwordResetRateLimit } from "../lib/security/rateLimit.js";
+import { authRateLimit, passwordResetRateLimit, passwordResetConfirmRateLimit } from "../lib/security/rateLimit.js";
 import { generateCsrfToken } from "../lib/security/csrf.js";
 import { logAudit } from "../lib/audit.js";
 import { readJson } from "../lib/storage.js";
@@ -259,7 +259,7 @@ router.post("/password/request", passwordResetRateLimit, async (req, res) => {
   catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
 });
 
-router.post("/password/confirm", authRateLimit, (req, res) => {
+router.post("/password/confirm", passwordResetConfirmRateLimit, (req, res) => {
   const v = validateBody(SCHEMAS.passwordResetConfirm, req.body);
   if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
   try { confirmPasswordReset(v.data.token, v.data.password); res.json({ ok: true, message: "Mot de passe mis a jour." }); }
