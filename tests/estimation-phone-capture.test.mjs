@@ -95,3 +95,22 @@ test("OVH exposes a safe production estimation capture diagnostic", () => {
   assert.match(wrapper, /cardoria-ops estimation-capture-check/);
   assert.match(sudoers, /cardoria-ops estimation-capture-check/);
 });
+
+
+test("mobile camera runtime is no-cache and has explicit activation fallback", () => {
+  const html = fs.readFileSync(new URL("../estimation-photo.html", import.meta.url), "utf8");
+  const script = fs.readFileSync(new URL("../js/estimation-phone.js", import.meta.url), "utf8");
+  const security = fs.readFileSync(new URL("../backend/lib/security/index.js", import.meta.url), "utf8");
+  const route = fs.readFileSync(new URL("../backend/routes/estimation.js", import.meta.url), "utf8");
+
+  assert.match(html, /id="phoneCameraActivate"/);
+  assert.match(html, /estimation-phone\.js\?v=4/);
+  assert.match(script, /startCamera\(true\)/);
+  assert.match(script, /for \(var attempt = 0; attempt < attempts; attempt \+= 1\)/);
+  assert.match(script, /upload_success/);
+  assert.match(script, /maxDimension = 1280/);
+  assert.match(security, /estimationCameraRuntime/);
+  assert.match(security, /no-store, no-cache, must-revalidate/);
+  assert.match(route, /capture\/session\/:sessionId\/event/);
+  assert.match(route, /\[estimation-capture\]/);
+});
