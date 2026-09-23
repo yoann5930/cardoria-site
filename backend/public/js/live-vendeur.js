@@ -105,14 +105,14 @@
       "<section class='live-studio-activity'><article><h3>Spectateurs</h3><p id='liveStudioViewers'>0</p></article><article><h3>Chat</h3><div id='liveStudioChat'>Aucun message</div></article><article><h3>Dernière vente</h3><p id='liveStudioLastSale'>—</p></article><article><h3>Paiements</h3><p id='lvPaymentsSummary'>Payés: 0 · En attente: 0 · Refusés: 0</p></article></section>",
       "<details class='live-studio-prepare'><summary>Préparer le Live / historique</summary>",
       "<p>Salle d’abord, ventes ensuite. Aucun produit ni prix n'est demandé pour créer une salle.</p>",
-      "<div><input id='lvTitle' placeholder='Titre du Live' value='Live vendeur'> <button id='lvCreate' type='button'>Créer le Live</button></div>",
+      "<div><input id='lvTitle' placeholder='Titre du Live' value='Live vendeur'> <select id='lvCategory'><option value='pokemon'>Pokémon</option><option value='yugioh'>Yu-Gi-Oh!</option><option value='onepiece'>One Piece</option><option value='lorcana'>Lorcana</option><option value='magic'>Magic</option><option value='other' selected>Autre</option></select> <button id='lvCreate' type='button'>Créer le Live</button></div>",
       "<h2>Paiements du Live</h2><table><thead><tr><th>Statut</th><th>Acheteur</th><th>Lot</th><th>Montant</th><th>Paiement</th><th>Mise à jour</th></tr></thead><tbody id='lvPaymentsBody'></tbody></table>",
       "<h2>Mes Lives</h2><div id='lvSessions'></div></details></div>"
     ].join("");
     document.getElementById("lvCreate").onclick = function () {
       var b = this;
       b.disabled = true;
-      api("/seller/sessions", { method: "POST", body: JSON.stringify({ title: document.getElementById("lvTitle").value, products:[] }) }).then(function (d) {
+      api("/seller/sessions", { method: "POST", body: JSON.stringify({ title: document.getElementById("lvTitle").value, category: (document.getElementById("lvCategory") && document.getElementById("lvCategory").value) || "other", products:[] }) }).then(function (d) {
         if (d && d.session && d.session.id) selectedLiveId = d.session.id;
         return load();
       }).catch(function (e) { alert(e.message); }).finally(function () { b.disabled = false; });

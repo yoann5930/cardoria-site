@@ -16,6 +16,7 @@ const clientName = "Camille Live";
 const clientEmail = `live-journey-client-${suffix}@cardoria.invalid`;
 const clientPassword = "LiveClient2026";
 const liveTitle = `Live public journey ${suffix}`;
+const scheduledTitle = `Live programmé journey ${suffix}`;
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -124,6 +125,7 @@ try {
   assert.doesNotMatch(servedHtml, /cardoria-live-admin-studio\.js/);
   assert.doesNotMatch(servedHtml, /cardoria_admin_handoff_token/);
   assert.match(servedHtml, /Live en cours — en attente de diffusion/);
+  assert.match(servedHtml, /cardoriaLiveCategoryFilter/);
   const viewerHeaders = await fetch(base + "/js/cardoria-live-viewer.js", { method: "HEAD" });
   assert.match(viewerHeaders.headers.get("cache-control") || "", /no-store/i);
   const loginHeaders = await fetch(base + "/client-login.html", { method: "HEAD" });
@@ -160,19 +162,31 @@ try {
   const created = (listed.data.sessions || []).find((session) => session.title === liveTitle);
   assert.ok(created?.id, "Admin Live was not created");
   const liveId = created.id;
+  const adminToken = await adminPage.evaluate(() => sessionStorage.getItem("cardoria_session_token") || "");
   if (created.status !== "live") {
     const started = await json(base, `/api/admin/live/sessions/${encodeURIComponent(liveId)}/start`, {
       method: "POST",
       body: {},
-      token: await adminPage.evaluate(() => sessionStorage.getItem("cardoria_session_token") || "")
+      token: adminToken
     });
     assert.equal(started.status, 200, "Admin could not start the Live");
   }
+  const scheduledAt = new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString();
+  const scheduledCreate = await json(base, "/api/admin/live/sessions", {
+    method: "POST",
+    body: { title: scheduledTitle, ownerRole: "admin", scheduledAt, products: [] },
+    token: adminToken
+  });
+  assert.equal(scheduledCreate.status, 200, "Admin could not create a scheduled Live");
+  const scheduledId = scheduledCreate.data.session?.id;
+  assert.ok(scheduledId, "Scheduled Live id missing");
   const publicDetail = await json(base, `/api/live/sessions/${encodeURIComponent(liveId)}`);
   assert.equal(publicDetail.status, 200);
   assert.equal(publicDetail.data.session?.status, "live");
-  const directory = await json(base, "/api/live/sessions?status=live");
-  assert.ok((directory.data.sessions || []).some((session) => session.id === liveId), "Started Live missing from public directory");
+  const directory = await json(base, "/api/live/sessions?status=all");
+  assert.ok((directory.data.sessions || []).some((session) => session.id === liveId && session.status === "live"), "Started Live missing from public directory");
+  assert.ok((directory.data.sessions || []).some((session) => session.id === scheduledId && session.status === "scheduled"), "Scheduled Live missing from public directory");
+  assert.equal((directory.data.sessions || []).find((session) => session.id === liveId)?.hostName, "Cardoria");
 
   const popupPromise = adminPage.waitForEvent("popup");
   await adminPage.click("#liveGoWatch");
@@ -180,6 +194,8 @@ try {
   await spectatorFromAdmin.waitForLoadState("domcontentloaded");
   assert.match(spectatorFromAdmin.url(), new RegExp(`[?&]session=${liveId}`));
   await spectatorFromAdmin.waitForSelector("#claChatDock", { timeout: 15000 });
+  assert.equal(await spectatorFromAdmin.locator("#claChatDock").evaluate((el) => el.classList.contains("is-collapsed")), false, "Chat should open automatically on desktop");
+  await spectatorFromAdmin.waitForSelector("#cardoriaLiveScheduledDirectory", { timeout: 15000 });
   await spectatorFromAdmin.waitForFunction((id) => {
     const selected = document.querySelector('[data-session-id][data-selected="true"]');
     return selected?.dataset.sessionId === id;
@@ -203,7 +219,22 @@ try {
   const anonSignals = collectPageSignals(anonPage);
   await anonPage.goto(`${base}/live.html?session=${encodeURIComponent(liveId)}`, { waitUntil: "domcontentloaded" });
   await anonPage.waitForSelector("#claChatDock");
+  assert.equal(await anonPage.locator("#claChatDock").evaluate((el) => el.classList.contains("is-collapsed")), false, "Chat should be visible immediately with ?session=");
   await anonPage.waitForFunction((id) => document.querySelector(`[data-session-id="${id}"][data-selected="true"]`), liveId, { timeout: 20000 });
+  await anonPage.waitForFunction((title) => (document.querySelector("#cardoriaLiveScheduledDirectory")?.innerText || "").includes(title), scheduledTitle, { timeout: 20000 });
+  assert.match(await anonPage.locator("#cardoriaLiveNowWrap").innerText(), /Lives en cours/i);
+  assert.match(await anonPage.locator("#cardoriaLiveScheduledWrap").innerText(), /Lives programmés/i);
+  assert.match(await anonPage.locator(`[data-session-id="${liveId}"]`).innerText(), /Cardoria/);
+  assert.match(await anonPage.locator(`[data-session-id="${liveId}"]`).innerText(), /Officiel/);
+  await anonPage.waitForSelector("#cardoriaLiveCategoryFilter");
+  await anonPage.selectOption("#cardoriaLiveCategoryFilter", "pokemon");
+  await anonPage.waitForFunction((id) => !document.querySelector(`#cardoriaLiveDirectory [data-session-id="${id}"]`), liveId, { timeout: 10000 });
+  await anonPage.selectOption("#cardoriaLiveCategoryFilter", "");
+  await anonPage.waitForFunction((id) => document.querySelector(`#cardoriaLiveDirectory [data-session-id="${id}"]`), liveId, { timeout: 10000 });
+  await anonPage.locator(`[data-session-id="${scheduledId}"]`).click();
+  await anonPage.waitForFunction((id) => document.querySelector(`[data-session-id="${id}"]`)?.dataset.selected === "true", scheduledId, { timeout: 10000 });
+  await anonPage.locator(`[data-session-id="${liveId}"][data-live-open="true"]`).click();
+  await anonPage.waitForFunction((id) => document.querySelector(`[data-session-id="${id}"][data-live-open="true"][data-selected="true"]`), liveId, { timeout: 20000 });
   assert.equal(await anonPage.locator("#cardoriaLiveAdminBar").count(), 0);
   assert.equal(await anonPage.locator("#claName").count(), 0);
   assert.equal(await anonPage.evaluate(() => document.querySelector('script[src*="cardoria-live-admin-studio"]')), null);
@@ -252,6 +283,19 @@ try {
   assert.ok(await anonPage.locator("#claMessage").isVisible(), "Mobile chat composer hidden");
   assertCleanBrowser(anonSignals, "anonymous/client");
   await anonContext.close();
+
+  const landingContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const landingPage = await landingContext.newPage();
+  const landingSignals = collectPageSignals(landingPage);
+  await landingPage.goto(base + "/live.html", { waitUntil: "domcontentloaded" });
+  await landingPage.waitForSelector("#claChatDock");
+  await landingPage.waitForFunction(() => document.querySelector("#claChatDock")?.classList.contains("is-collapsed"), null, { timeout: 10000 });
+  assert.ok(await landingPage.locator("#claChatOpen").isVisible(), "Mobile chat launcher hidden on arrival");
+  await landingPage.locator("#claChatOpen").click();
+  assert.ok(await landingPage.locator("#claMessage").isVisible(), "Mobile chat did not open from the launcher");
+  await landingPage.waitForFunction((title) => (document.querySelector("#cardoriaLiveScheduledDirectory")?.innerText || "").includes(title), scheduledTitle, { timeout: 20000 });
+  assertCleanBrowser(landingSignals, "mobile landing");
+  await landingContext.close();
   await adminContext.close();
   console.log("LIVE_PUBLIC_JOURNEY_BROWSER_PASS " + liveId);
 } finally {
