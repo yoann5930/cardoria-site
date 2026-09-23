@@ -68,8 +68,12 @@ test("mobile capture page opens a direct camera preview with fallback only", () 
   assert.equal(root, mirror);
   assert.equal(script, scriptMirror);
   assert.match(root, /noindex,nofollow/);
+  assert.match(root, /class="estimation-camera-body"/);
+  assert.match(root, /class="camera-app"/);
   assert.match(root, /id="phoneCameraPreview"/);
-  assert.match(root, /id="phoneCameraShot"/);
+  assert.match(root, /id="phoneCameraShot"[^>]*camera-shot/);
+  assert.match(root, /id="phoneCameraFlash"/);
+  assert.match(root, /background:#050608!important/);
   assert.match(root, /id="phoneCameraFallback"[^>]*hidden/);
   assert.match(script, /navigator\.mediaDevices\.getUserMedia/);
   assert.match(script, /facingMode:\s*\{\s*ideal:\s*"environment"/);
