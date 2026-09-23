@@ -98,9 +98,15 @@ export function updateClientProfile(userId, patch = {}) {
 }
 
 export function updatePassword(userId, newPassword) {
+  const db = getDb();
+  const row = db.prepare("SELECT email FROM auth_users WHERE id = ?").get(userId);
+  if (!row) throw Object.assign(new Error("Utilisateur introuvable"), { status: 404 });
+
   const now = new Date().toISOString();
-  getDb().prepare("UPDATE auth_users SET password_hash = ?, updated_at = ? WHERE id = ?")
+  db.prepare("UPDATE auth_users SET password_hash = ?, updated_at = ? WHERE id = ?")
     .run(hashPassword(newPassword), now, userId);
+
+  clearFailedLogin(String(row.email || "").trim().toLowerCase());
 }
 
 export function setTotpSecret(userId, secret, enabled = false) {

@@ -10,6 +10,8 @@ const source = fs.readFileSync(path.join(__dirname, "../lib/auth/passwordReset.j
 const magic = fs.readFileSync(path.join(__dirname, "../lib/auth/magicLink.js"), "utf8");
 const cors = fs.readFileSync(path.join(__dirname, "../lib/security/index.js"), "utf8");
 const client = fs.readFileSync(path.join(__dirname, "../../js/client-password-reset.js"), "utf8");
+const authRoute = fs.readFileSync(path.join(__dirname, "../routes/auth.js"), "utf8");
+const rateLimit = fs.readFileSync(path.join(__dirname, "../lib/security/rateLimit.js"), "utf8");
 
 test("password reset email always uses the canonical public HTTPS origin", () => {
   assert.match(source, /const RESET_PUBLIC_ORIGIN = "https:\/\/www\.cardoriashop\.fr";/);
@@ -37,4 +39,12 @@ test("client reset maps network failures instead of showing Failed to fetch", ()
   assert.doesNotMatch(client, /CARDORIA_BACKEND/);
   assert.match(client, /\/api\/auth\/password\/request/);
   assert.match(client, /\/api\/auth\/password\/confirm/);
+});
+
+
+test("password reset confirmation is isolated from login throttling", () => {
+  assert.match(rateLimit, /passwordResetConfirmRateLimit/);
+  assert.match(rateLimit, /auth-reset-confirm:/);
+  assert.match(authRoute, /router\.post\("\/password\/confirm", passwordResetConfirmRateLimit/);
+  assert.doesNotMatch(authRoute, /router\.post\("\/password\/confirm", authRateLimit/);
 });
