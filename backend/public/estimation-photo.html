@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>Photos estimation — Cardoria</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/css/estimation-sale.css?v=2">
+<link rel="icon" href="/assets/logo/cardoria-premium.png">
+</head>
+<body>
+<header class="header">
+  <div class="container nav">
+    <a class="brand" href="/"><img src="/assets/logo/cardoria-header-mark.svg?v=4" alt="Cardoria"><span>CARDORIA</span></a>
+  </div>
+</header>
+<main class="container estimation-phone-page">
+  <section class="section estimation-phone-card">
+    <span class="badge">APPAREIL PHOTO</span>
+    <h1>Photographier la carte</h1>
+    <p>Les photos prises ici sont envoyées directement vers votre estimation ouverte sur le PC.</p>
+
+    <div class="estimate-phone-guide">
+      <strong>Pour une meilleure estimation :</strong>
+      <span>1. Recto complet</span>
+      <span>2. Verso complet</span>
+      <span>3. Coins et défauts visibles</span>
+      <span>4. Photo sous lumière si nécessaire</span>
+    </div>
+
+    <label class="estimate-phone-camera" for="phoneCamera">
+      <span>📷</span>
+      <strong>Prendre une photo</strong>
+      <small>Appareil photo arrière recommandé</small>
+    </label>
+    <input id="phoneCamera" class="estimate-phone-input" type="file" accept="image/*" capture="environment" multiple>
+
+    <div id="phonePhotoCount" class="estimate-phone-count">0 / 6 photos envoyées</div>
+    <div id="phonePhotoStatus" class="estimate-phone-status">Connexion à la session Cardoria…</div>
+
+    <p class="small">La session est temporaire. Une fois les photos envoyées, revenez sur le PC pour lancer l'estimation.</p>
+  </section>
+</main>
+<script src="/js/estimation-image.js?v=1"></script>
+<script src="/js/estimation-phone.js?v=1"></script>
+</body>
+</html>
