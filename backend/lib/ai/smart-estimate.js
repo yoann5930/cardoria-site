@@ -2,9 +2,8 @@
  * Estimation intelligente Cardoria — marché + logique achat / revente + indice marché.
  */
 import { getCardById, searchCards } from "../engine/cards.js";
-import { estimatePrice } from "../engine/pricing.js";
+import { conditionMultiplierFor, estimatePrice, getPriceSources } from "../engine/pricing.js";
 import { comparePrices } from "../marketplace/compare.js";
-import { searchListings } from "../marketplace/listings.js";
 import { normalizeCondition, conditionToEngineKey } from "./condition.js";
 import { normalizeLicense } from "./prompts.js";
 import {
@@ -16,21 +15,14 @@ import { formatClientIntelligenceBlock, toClientIntelligence } from "./intellige
 import { getCardMarketStats } from "../market/stats.js";
 
 const MARKET_SOURCES = [
-  { id: "cardoria_engine", label: "Moteur Cardoria", weight: 0.35 },
-  { id: "cardoria_marketplace", label: "Marketplace Cardoria", weight: 0.25 },
-  { id: "cardmarket", label: "Cardmarket (ref.)", weight: 0.2 },
-  { id: "tcgplayer", label: "TCGPlayer (ref.)", weight: 0.12 },
-  { id: "ebay", label: "eBay (ref.)", weight: 0.08 }
+  { id: "actual_sales", label: "Ventes réelles Cardoria", weight: 0.65 },
+  { id: "cardmarket", label: "Cardmarket", weight: 0.55 },
+  { id: "tcgplayer", label: "TCGPlayer", weight: 0.45 },
+  { id: "zebradex", label: "ZebraDex", weight: 0.35 },
+  { id: "cardoria", label: "Référence Cardoria", weight: 0.25 },
+  { id: "cardoria_marketplace", label: "Annonces Cardoria", weight: 0.18 },
+  { id: "cardoria_engine", label: "Moteur Cardoria", weight: 0.15 }
 ];
-
-const CONDITION_MARKET_FACTOR = {
-  mint: 1.1,
-  near_mint: 1.0,
-  excellent: 0.88,
-  good: 0.68,
-  played: 0.52,
-  poor: 0.3
-};
 
 const CONDITION_BUYBACK_FACTOR = {
   mint: 1.0,
@@ -45,12 +37,131 @@ function round2(n) {
   return Math.round(Number(n || 0) * 100) / 100;
 }
 
-export function matchCatalogCard(detection) {
-  if (!detection?.name) return null;
+function textKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function compactKey(value) {
+  return textKey(value).replace(/\s+/g, "");
+}
+
+function numberKey(value) {
+  return compactKey(String(value || "").split("/")[0].replace(/^0+(?=\d)/, ""));
+}
+
+function languageKey(value) {
+  const key = compactKey(value);
+  const map = {
+    fr: "fr", french: "fr", francais: "fr",
+    en: "en", english: "en", anglais: "en",
+    jp: "ja", ja: "ja", japanese: "ja", japonais: "ja",
+    kr: "ko", ko: "ko", korean: "ko", coreen: "ko"
+  };
+  return map[key] || key;
+}
+
+export function scoreCatalogMatch(card, detection = {}) {
+  if (!card) return { score: 0, exact: false, signals: {} };
+
+  const wantedLicense = normalizeLicense(detection.license);
+  const cardLicense = normalizeLicense(card.license);
+  const wantedName = textKey(detection.name);
+  const cardName = textKey(card.name);
+  const wantedNumber = numberKey(detection.number);
+  const cardNumber = numberKey(card.number);
+  const wantedExtension = textKey(detection.extension);
+  const cardExtension = textKey(card.extension);
+  const wantedLanguage = languageKey(detection.language);
+  const cardLanguage = languageKey(card.language);
+
+  const signals = {
+    license: Boolean(wantedLicense && wantedLicense !== "autre" && wantedLicense === cardLicense),
+    nameExact: Boolean(wantedName && wantedName === cardName),
+    namePartial: Boolean(wantedName && cardName && (wantedName.includes(cardName) || cardName.includes(wantedName))),
+    numberExact: Boolean(wantedNumber && wantedNumber === cardNumber),
+    extensionExact: Boolean(wantedExtension && wantedExtension === cardExtension),
+    extensionPartial: Boolean(wantedExtension && cardExtension && (wantedExtension.includes(cardExtension) || cardExtension.includes(wantedExtension))),
+    language: Boolean(wantedLanguage && wantedLanguage === cardLanguage)
+  };
+
+  let score = 0;
+  if (signals.license) score += 3;
+  if (signals.nameExact) score += 6;
+  else if (signals.namePartial) score += 3;
+  if (signals.numberExact) score += 7;
+  if (signals.extensionExact) score += 5;
+  else if (signals.extensionPartial) score += 2;
+  if (signals.language) score += 2;
+
+  const exact = Boolean(
+    signals.numberExact &&
+    (signals.nameExact || signals.extensionExact) &&
+    (!wantedLicense || wantedLicense === "autre" || signals.license)
+  );
+
+  return { score, exact, signals };
+}
+
+export function resolveCatalogCard({ detection = {}, cardId = "" } = {}) {
+  if (cardId) {
+    const selected = getCardById(cardId);
+    if (!selected) {
+      return { card: null, method: "selected_missing", score: 0, exact: false, ambiguous: false };
+    }
+    const scored = scoreCatalogMatch(selected, detection);
+    const acceptable = scored.exact || scored.score >= 9;
+    return {
+      card: acceptable ? selected : null,
+      selectedCard: selected,
+      method: acceptable ? "selected_verified" : "selected_mismatch",
+      score: scored.score,
+      exact: scored.exact,
+      ambiguous: !acceptable,
+      signals: scored.signals
+    };
+  }
+
+  if (!detection?.name) {
+    return { card: null, method: "missing_identity", score: 0, exact: false, ambiguous: true };
+  }
+
   const license = normalizeLicense(detection.license);
-  const q = [detection.name, detection.number, detection.extension].filter(Boolean).join(" ");
-  const result = searchCards({ q, license: license !== "autre" ? license : "", limit: 1 });
-  return result.cards?.[0] || null;
+  const language = languageKey(detection.language);
+  const result = searchCards({
+    q: detection.name,
+    license: license !== "autre" ? license : "",
+    language: ["fr", "en", "ja", "ko"].includes(language) ? language : "",
+    limit: 20
+  });
+
+  const ranked = (result.cards || [])
+    .map((card) => ({ card, ...scoreCatalogMatch(card, detection) }))
+    .sort((a, b) => b.score - a.score);
+
+  const top = ranked[0];
+  const second = ranked[1];
+  if (!top) return { card: null, method: "no_match", score: 0, exact: false, ambiguous: true };
+
+  const uniqueEnough = !second || top.score - second.score >= 2;
+  const acceptable = top.exact || (top.score >= 9 && uniqueEnough);
+
+  return {
+    card: acceptable ? top.card : null,
+    method: acceptable ? "automatic_verified" : "automatic_ambiguous",
+    score: top.score,
+    exact: top.exact,
+    ambiguous: !acceptable,
+    signals: top.signals
+  };
+}
+
+export function matchCatalogCard(detection) {
+  return resolveCatalogCard({ detection }).card;
 }
 
 function cardMeta(card) {
@@ -59,11 +170,42 @@ function cardMeta(card) {
     id: card.id,
     name: card.name,
     extension: card.extension,
+    number: card.number,
     rarity: card.rarity,
     license: card.license,
+    language: card.language,
+    variants: card.variants || {},
     salesCount: card.salesCount || 0,
     views: card.views || 0
   };
+}
+
+function sourceLabel(source) {
+  return MARKET_SOURCES.find((item) => item.id === source)?.label || String(source || "Source marché");
+}
+
+function sourceBaseWeight(source, explicitWeight) {
+  const configured = Number(explicitWeight);
+  if (Number.isFinite(configured) && configured > 0) return configured;
+  return MARKET_SOURCES.find((item) => item.id === source)?.weight || 0.12;
+}
+
+function freshnessFactor(fetchedAt) {
+  const at = Date.parse(String(fetchedAt || ""));
+  if (!Number.isFinite(at)) return 1;
+  const ageDays = Math.max(0, (Date.now() - at) / 86400000);
+  if (ageDays <= 2) return 1;
+  if (ageDays <= 7) return 0.9;
+  if (ageDays <= 30) return 0.7;
+  if (ageDays <= 90) return 0.45;
+  return 0.25;
+}
+
+function median(values) {
+  const nums = values.map(Number).filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
+  if (!nums.length) return 0;
+  const mid = Math.floor(nums.length / 2);
+  return nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
 }
 
 function computeLiquidityProfile({ marketTrend, trendPercent, salesCount, resellPrice }) {
@@ -84,29 +226,23 @@ function computeLiquidityProfile({ marketTrend, trendPercent, salesCount, resell
 
 function computeBaseBuyResellPricing(base, { suspicionAlert = false, confidenceScore = null } = {}) {
   const condKey = base.conditionKey || "near_mint";
-  const marketFactor = CONDITION_MARKET_FACTOR[condKey] ?? 1;
   const buybackFactor = CONDITION_BUYBACK_FACTOR[condKey] ?? 0.9;
 
-  const rawLow = base.prices?.low || 0;
-  const rawHigh = base.prices?.high || 0;
-  const rawAvg = base.prices?.avg || 0;
+  const rawLow = Number(base.prices?.low || 0);
+  const rawHigh = Number(base.prices?.high || 0);
+  const rawAvg = Number(base.prices?.avg || 0);
+  const rawRecommended = Number(base.prices?.recommended || rawAvg || 0);
 
   const market = {
-    low: round2(rawLow > 0 ? rawLow * 0.98 : 0),
-    avg: round2(rawAvg * marketFactor),
-    high: round2(Math.max(rawHigh, rawAvg * marketFactor * 1.12, marketFactor * rawAvg))
+    low: round2(rawLow),
+    avg: round2(rawAvg),
+    high: round2(Math.max(rawHigh, rawAvg)),
+    recommended: round2(rawRecommended)
   };
 
-  if (market.avg <= 0 && rawAvg > 0) market.avg = round2(rawAvg);
-  if (market.high <= market.avg && market.avg > 0) market.high = round2(market.avg * 1.15);
-
-  let resell = market.avg;
-  if (condKey === "mint" || condKey === "near_mint") {
-    resell = round2((market.avg + market.high) / 2);
-  } else if (condKey === "excellent") {
-    resell = round2(market.avg * 1.02);
-  }
-  resell = Math.max(resell, market.low);
+  let resell = market.recommended || market.avg;
+  if (market.low > 0) resell = Math.max(resell, market.low);
+  if (market.high > 0) resell = Math.min(resell, market.high);
 
   const cardMetaData = base.card || {};
   const liquidity = computeLiquidityProfile({
@@ -125,9 +261,11 @@ function computeBaseBuyResellPricing(base, { suspicionAlert = false, confidenceS
   let buybackStatus = "ok";
   let adminNote = "";
 
-  if (suspicionAlert) {
+  if (suspicionAlert || base.catalogMatch?.ambiguous || !base.cardId) {
     buybackStatus = "manual_verification_required";
-    adminNote = "À vérifier en main — authenticité douteuse, pas de rachat automatique";
+    adminNote = suspicionAlert
+      ? "À vérifier en main — authenticité douteuse, pas de rachat automatique"
+      : "Identification catalogue insuffisamment certaine — vérification manuelle requise";
   } else if (resell > 0) {
     buyback = round2(resell * (1 - marginRate) * buybackFactor);
     buyback = Math.min(buyback, round2(resell - 0.5));
@@ -188,84 +326,128 @@ export function computeBuyResellPricing(base, opts = {}) {
 export function buildSmartEstimate({ detection, conditionGrade, cardId, suspicionAlert = false, confidenceScore = null }) {
   const cond = normalizeCondition(conditionGrade);
   const engineKey = conditionToEngineKey(cond.key);
-  let card = cardId ? getCardById(cardId) : matchCatalogCard(detection);
+  const conditionFactor = conditionMultiplierFor(engineKey);
+  const catalogMatch = resolveCatalogCard({ detection, cardId });
+  const card = catalogMatch.card;
   const resolvedCardId = card?.id || null;
   const meta = cardMeta(card);
 
   const sources = [];
-  const prices = [];
+  const rangeCandidates = [];
 
   if (card) {
-    const mstats = getCardMarketStats(card.id);
-    if (mstats?.volume > 0) {
-      sources.push({ source: "cardoria_engine", price: mstats.medianPrice || mstats.avgPrice, label: "Données marché Cardoria" });
-      prices.push(mstats.avgPrice, mstats.medianPrice, mstats.minPrice, mstats.maxPrice);
-    }
-    const eng = estimatePrice(card.id, engineKey);
-    if (eng) {
-      sources.push({ source: "cardoria_engine", price: eng.recommended, label: "Moteur Cardoria" });
-      prices.push(eng.recommended);
-      if (eng.range?.low) prices.push(eng.range.low);
-      if (eng.range?.high) prices.push(eng.range.high);
-    }
-    const cmp = comparePrices({ cardId: card.id });
-    (cmp.comparison || []).forEach((c) => {
-      if (c.type === "marketplace" || c.type === "listing" || c.type === "engine") {
-        sources.push({ source: c.type === "engine" ? "cardoria_engine" : "cardoria_marketplace", price: c.price, label: c.source });
-        prices.push(c.price);
+    const actualStats = getCardMarketStats(card.id);
+    if (actualStats?.volume > 0) {
+      const saleRef = Number(actualStats.medianPrice || actualStats.avgPrice || 0);
+      if (saleRef > 0) {
+        sources.push({
+          source: "actual_sales",
+          price: saleRef,
+          label: "Ventes réelles Cardoria",
+          weight: MARKET_SOURCES.find((item) => item.id === "actual_sales").weight
+        });
       }
+      [actualStats.minPrice, actualStats.maxPrice].forEach((value) => {
+        if (Number(value) > 0) rangeCandidates.push(Number(value));
+      });
+    }
+
+    getPriceSources(card.id).forEach((row) => {
+      const price = Number(row.price || 0);
+      if (price <= 0) return;
+      sources.push({
+        source: row.source,
+        price,
+        label: sourceLabel(row.source),
+        fetchedAt: row.fetchedAt || null,
+        weight: sourceBaseWeight(row.source, row.weight) * freshnessFactor(row.fetchedAt)
+      });
     });
-    const refLow = card.prices?.low || eng?.range?.low;
-    const refHigh = card.prices?.high || eng?.range?.high;
-    if (refLow) { sources.push({ source: "cardmarket", price: refLow * 0.98, label: "Cardmarket (ref.)" }); prices.push(refLow * 0.98); }
-    if (refHigh) { sources.push({ source: "tcgplayer", price: refHigh * 0.95, label: "TCGPlayer (ref.)" }); prices.push(refHigh * 0.95); }
-  } else if (detection?.name) {
-    searchListings({ q: detection.name, limit: 5 }).listings.forEach((l) => {
-      sources.push({ source: "cardoria_marketplace", price: l.price, label: l.title });
-      prices.push(l.price);
-    });
+
+    const cmp = comparePrices({ cardId: card.id });
+    const listingPrices = (cmp.comparison || [])
+      .filter((row) => row.type === "marketplace" || row.type === "listing")
+      .map((row) => Number(row.price || 0))
+      .filter((price) => price > 0);
+    const listingMedian = median(listingPrices);
+    if (listingMedian > 0) {
+      sources.push({
+        source: "cardoria_marketplace",
+        price: listingMedian,
+        label: "Annonces Cardoria",
+        weight: MARKET_SOURCES.find((item) => item.id === "cardoria_marketplace").weight
+      });
+      rangeCandidates.push(...listingPrices);
+    }
+
+    if (!sources.length) {
+      const engine = estimatePrice(card.id, "nm");
+      if (engine?.recommended > 0) {
+        sources.push({
+          source: "cardoria_engine",
+          price: engine.recommended,
+          label: "Moteur Cardoria",
+          weight: MARKET_SOURCES.find((item) => item.id === "cardoria_engine").weight
+        });
+        if (engine.range?.low > 0) rangeCandidates.push(engine.range.low);
+        if (engine.range?.high > 0) rangeCandidates.push(engine.range.high);
+      }
+    }
   }
 
   const emptyBase = {
     cardId: resolvedCardId,
     card: meta,
+    catalogMatch,
     detection: detection || {},
     condition: cond.label,
     conditionKey: cond.key,
+    conditionMultiplier: conditionFactor,
     prices: { low: 0, avg: 0, high: 0, recommended: 0 },
     sources: [],
     marketTrend: "unknown",
     trendPercent: 0
   };
 
-  if (!prices.length) {
+  if (!sources.length) {
     const trade = computeBuyResellPricing(emptyBase, { suspicionAlert, confidenceScore });
     return { ...emptyBase, trade, marketIndex: trade.marketIndex };
   }
 
-  const low = round2(Math.min(...prices));
-  const high = round2(Math.max(...prices));
-  const avg = round2(prices.reduce((a, b) => a + b, 0) / prices.length);
+  const sourcePrices = sources.map((source) => Number(source.price)).filter((price) => price > 0);
+  const rawLow = Math.min(...sourcePrices, ...(rangeCandidates.length ? rangeCandidates : sourcePrices));
+  const rawHigh = Math.max(...sourcePrices, ...(rangeCandidates.length ? rangeCandidates : sourcePrices));
+  const rawAvg = sourcePrices.reduce((sum, price) => sum + price, 0) / sourcePrices.length;
 
-  let recommended = 0;
-  let totalW = 0;
-  sources.forEach((s) => {
-    const w = MARKET_SOURCES.find((m) => m.id === s.source)?.weight || 0.15;
-    recommended += s.price * w;
-    totalW += w;
+  let weighted = 0;
+  let totalWeight = 0;
+  sources.forEach((source) => {
+    const weight = Number(source.weight || sourceBaseWeight(source.source));
+    weighted += Number(source.price || 0) * weight;
+    totalWeight += weight;
   });
-  recommended = round2(recommended / (totalW || 1));
+  const rawRecommended = totalWeight > 0 ? weighted / totalWeight : rawAvg;
 
-  const trend = card?.marketTrend || (recommended > avg * 1.05 ? "up" : recommended < avg * 0.95 ? "down" : "stable");
+  const prices = {
+    low: round2(rawLow * conditionFactor),
+    avg: round2(rawAvg * conditionFactor),
+    high: round2(rawHigh * conditionFactor),
+    recommended: round2(rawRecommended * conditionFactor)
+  };
+
+  const trend = card?.marketTrend ||
+    (prices.recommended > prices.avg * 1.05 ? "up" : prices.recommended < prices.avg * 0.95 ? "down" : "stable");
 
   const base = {
     cardId: resolvedCardId,
     card: meta,
+    catalogMatch,
     detection: detection || {},
     condition: cond.label,
     conditionKey: cond.key,
-    prices: { low, avg, high, recommended },
-    sources: sources.slice(0, 8),
+    conditionMultiplier: conditionFactor,
+    prices,
+    sources: sources.slice(0, 10),
     marketTrend: trend,
     trendPercent: card?.trendPercent || 0
   };
@@ -288,6 +470,14 @@ export function flattenPricing(estimate, intelligence = null) {
     high: m.high ?? estimate.prices?.high ?? 0,
     recommended: t.resell ?? estimate.prices?.recommended ?? 0,
     market: { low: m.low, avg: m.avg, high: m.high },
+    sources: (estimate.sources || []).map((source) => ({
+      source: source.source,
+      label: source.label,
+      price: source.price,
+      fetchedAt: source.fetchedAt || null
+    })),
+    catalogMatch: estimate.catalogMatch || null,
+    conditionMultiplier: estimate.conditionMultiplier ?? null,
     buyback: t.buyback,
     resell: t.resell,
     margin: t.margin,

@@ -44,48 +44,20 @@ export function ingestEstimationOutcome({
   language,
   daysToSell
 }) {
+  // Une estimation n'est ni une vente ni un rachat réel.
+  // Elle est conservée par le module IA/enterprise, mais ne doit jamais
+  // alimenter market_transactions, sales_history ou les statistiques marché.
   if (!cardId) return null;
-
-  const results = [];
-
-  if (buybackPrice > 0) {
-    results.push(recordMarketTransaction({
-      id: makeTransactionId("BB"),
-      cardId,
-      type: "estimate_buyback",
-      buybackPrice,
-      condition,
-      language: language || detection.language,
-      license: detection.license,
-      extension: detection.extension,
-      number: detection.number,
-      buyer: "Cardoria",
-      channel: "Cardoria",
-      sourceRef: analysisId,
-      notes: "Offre rachat estimation IA"
-    }));
-  }
-
-  if (salePrice > 0) {
-    results.push(recordMarketTransaction({
-      id: makeTransactionId("ES"),
-      cardId,
-      type: "sale",
-      salePrice,
-      condition,
-      language: language || detection.language,
-      license: detection.license,
-      extension: detection.extension,
-      number: detection.number,
-      seller: detection.seller || "",
-      daysToSell: daysToSell,
-      channel: "Cardoria",
-      sourceRef: analysisId,
-      notes: "Prix revente estimé validé"
-    }));
-  }
-
-  return results;
+  return {
+    analysisId,
+    cardId,
+    recordedAsMarketTransaction: false,
+    estimatedBuybackPrice: Number(buybackPrice || 0),
+    estimatedSalePrice: Number(salePrice || 0),
+    condition: condition || "",
+    language: language || detection.language || "",
+    daysToSell: daysToSell ?? null
+  };
 }
 
 export function ingestAdminFeedbackOutcome({

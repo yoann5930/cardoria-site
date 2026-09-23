@@ -45,13 +45,17 @@ jobs:
           node --check backend/lib/payments/routing.js
           node --check backend/lib/boutique/checkout.js
           node --check backend/lib/live/checkout.js
+          node --check backend/lib/ai/smart-estimate.js
+          node --check backend/lib/ai/analyze.js
+          node --check backend/lib/market/ingest.js
+          node --check backend/lib/market/stats.js
           node --check backend/lib/marketplace/paypal.js
           node --check js/boutique.js
           node --check js/admin/admin-orders.js
           node --check js/client-auth.js
           node --check js/client-password-reset.js
       - name: Core regression tests
-        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs
+        run: node --test tests/lot-draft-store.test.mjs tests/catalog-reference-regression.test.mjs backend/tests/market-schedule.test.mjs tests/client-boutique-orders.test.mjs backend/tests/payment-matrix.test.mjs tests/estimation-pricing-reliability.test.mjs
       - name: Architecture guards
         run: |
           grep -q 'boutique: "sumup"' backend/lib/payments/routing.js

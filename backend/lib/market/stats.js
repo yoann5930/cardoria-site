@@ -8,7 +8,11 @@ import { computeTrendForCard } from "../ai/trends.js";
 import { computeIndicesFromStats } from "./indices.js";
 
 const SALE_TYPES = ["sale", "listing_sale", "admin_sale", "boutique_sale"];
-const BUYBACK_TYPES = ["buyback", "estimate_buyback", "admin_buyback"];
+const BUYBACK_TYPES = ["buyback", "admin_buyback"];
+
+function placeholders(values) {
+  return values.map(() => "?").join(",");
+}
 
 function round2(n) {
   return Math.round(Number(n || 0) * 100) / 100;
@@ -49,15 +53,23 @@ export function recomputeCardStats(cardId) {
   const saleRows = db.prepare(`
     SELECT sale_price, buyback_price, transaction_at, days_to_sell, transaction_type
     FROM market_transactions
-    WHERE card_id = ? AND sale_price IS NOT NULL AND sale_price > 0
+    WHERE card_id = ?
+      AND transaction_type IN (${placeholders(SALE_TYPES)})
+      AND sale_price IS NOT NULL
+      AND sale_price > 0
+      AND notes <> 'Prix revente estimé validé'
     ORDER BY transaction_at ASC
-  `).all(cardId);
+  `).all(cardId, ...SALE_TYPES);
 
   const buybackRows = db.prepare(`
     SELECT buyback_price, transaction_at FROM market_transactions
-    WHERE card_id = ? AND buyback_price IS NOT NULL AND buyback_price > 0
+    WHERE card_id = ?
+      AND transaction_type IN (${placeholders(BUYBACK_TYPES)})
+      AND buyback_price IS NOT NULL
+      AND buyback_price > 0
+      AND notes <> 'Offre rachat estimation IA'
     ORDER BY transaction_at DESC LIMIT 100
-  `).all(cardId);
+  `).all(cardId, ...BUYBACK_TYPES);
 
   const prices = saleRows.map((r) => Number(r.sale_price));
   const avg = prices.length ? round2(prices.reduce((a, b) => a + b, 0) / prices.length) : 0;
@@ -71,10 +83,15 @@ export function recomputeCardStats(cardId) {
     ? round2(buybackPrices.reduce((a, b) => a + b, 0) / buybackPrices.length)
     : 0;
 
+  const internalTypes = [...SALE_TYPES, ...BUYBACK_TYPES];
   const internalRows = db.prepare(`
     SELECT sale_price, buyback_price FROM market_transactions
-    WHERE card_id = ? AND channel = 'Cardoria' AND transaction_at >= date('now', '-365 day')
-  `).all(cardId);
+    WHERE card_id = ?
+      AND channel = 'Cardoria'
+      AND transaction_type IN (${placeholders(internalTypes)})
+      AND notes NOT IN ('Prix revente estimé validé', 'Offre rachat estimation IA')
+      AND transaction_at >= date('now', '-365 day')
+  `).all(cardId, ...internalTypes);
   const internalVals = internalRows.flatMap((r) => [r.sale_price, r.buyback_price].filter((v) => v > 0));
   const internalAvg = internalVals.length
     ? round2(internalVals.reduce((a, b) => a + b, 0) / internalVals.length)

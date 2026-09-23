@@ -26,8 +26,12 @@ const CONDITION_MULTIPLIERS = {
 
 export function getPriceSources(cardId) {
   return getDb().prepare(
-    "SELECT source, price, currency, fetched_at AS fetchedAt FROM price_sources WHERE card_id = ? ORDER BY fetched_at DESC"
+    "SELECT source, price, currency, weight, fetched_at AS fetchedAt FROM price_sources WHERE card_id = ? ORDER BY fetched_at DESC"
   ).all(cardId);
+}
+
+export function conditionMultiplierFor(condition = "nm") {
+  return CONDITION_MULTIPLIERS[normalizeCondition(condition)] ?? 1;
 }
 
 export function setPriceSources(cardId, sources) {
@@ -112,7 +116,7 @@ export function estimatePrice(cardId, condition = "nm") {
   const card = db.prepare("SELECT recommended_price, avg_price, low_price, high_price, market_trend, trend_percent FROM cards WHERE id = ?").get(cardId);
   if (!card) return null;
 
-  const mult = CONDITION_MULTIPLIERS[normalizeCondition(condition)] ?? 1;
+  const mult = conditionMultiplierFor(condition);
   const base = card.recommended_price || card.avg_price;
   const adjusted = floorCardPrice(base * mult);
 

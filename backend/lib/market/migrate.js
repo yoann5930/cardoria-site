@@ -59,3 +59,56 @@ export function migrateMarketData() {
 export function makeTransactionId(prefix = "MKT") {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
 }
+
+
+/**
+ * Supprime les anciennes pseudo-transactions créées par les estimations IA.
+ * Ces lignes ne sont pas des ventes/rachats réels et ne doivent jamais alimenter la cote marché.
+ * Retourne les cartes affectées pour recalculer leurs statistiques.
+ */
+export function purgeEstimatedMarketPollution() {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT DISTINCT card_id
+    FROM market_transactions
+    WHERE card_id IS NOT NULL
+      AND (
+        transaction_type = 'estimate_buyback'
+        OR notes = 'Offre rachat estimation IA'
+        OR notes = 'Prix revente estimé validé'
+      )
+  `).all();
+  const affectedCardIds = rows.map((row) => row.card_id).filter(Boolean);
+
+  if (!affectedCardIds.length) {
+    return { removedTransactions: 0, removedLegacySales: 0, affectedCardIds: [] };
+  }
+
+  const result = db.transaction(() => {
+    const legacy = db.prepare(`
+      DELETE FROM sales_history
+      WHERE EXISTS (
+        SELECT 1
+        FROM market_transactions mt
+        WHERE mt.card_id = sales_history.card_id
+          AND mt.transaction_at = sales_history.sold_at
+          AND mt.sale_price = sales_history.price
+          AND mt.notes = 'Prix revente estimé validé'
+      )
+    `).run();
+
+    const tx = db.prepare(`
+      DELETE FROM market_transactions
+      WHERE transaction_type = 'estimate_buyback'
+         OR notes = 'Offre rachat estimation IA'
+         OR notes = 'Prix revente estimé validé'
+    `).run();
+
+    return {
+      removedTransactions: Number(tx.changes || 0),
+      removedLegacySales: Number(legacy.changes || 0)
+    };
+  })();
+
+  return { ...result, affectedCardIds };
+}

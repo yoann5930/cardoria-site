@@ -8,8 +8,7 @@ import { buildPremiumPrompt, parseAiResponse, normalizeLicense } from "./prompts
 import { normalizeCondition } from "./condition.js";
 import { buildSmartEstimate, formatClientEstimateBlock, flattenPricing, toClientEstimate } from "./smart-estimate.js";
 import { buildCardoriaIntelligence, toClientIntelligence } from "./intelligence.js";
-import { ingestEstimationOutcome } from "../market/ingest.js";
-import { recordPriceSnapshot, seedPriceHistoryIfEmpty, getPriceHistory } from "./history.js";
+import { getPriceHistory } from "./history.js";
 import { computeTrendForCard } from "./trends.js";
 import { saveAnalysis, getTrainingExamples } from "./training.js";
 import { makeAnalysisId } from "./migrate.js";
@@ -66,13 +65,8 @@ export async function analyzeCardPremium(data) {
   let trend = null;
   let historyPreview = null;
   if (estimate.cardId) {
-    seedPriceHistoryIfEmpty(estimate.cardId, pricing.resell || pricing.avg);
-    recordPriceSnapshot(estimate.cardId, {
-      low: pricing.market?.low ?? pricing.low,
-      avg: pricing.market?.avg ?? pricing.avg,
-      high: pricing.market?.high ?? pricing.high,
-      recommended: pricing.resell || pricing.avg
-    });
+    // Lecture seule : une estimation ne doit jamais créer un point de marché.
+    // Les snapshots sont alimentés par les synchronisations de prix et ventes réelles.
     trend = computeTrendForCard(estimate.cardId, estimate.card?.name, detection.license);
     historyPreview = getPriceHistory(estimate.cardId, "30");
   }
@@ -104,18 +98,6 @@ export async function analyzeCardPremium(data) {
   saveAnalysis(record);
 
   if (estimate.cardId && !suspicionAlert) {
-    try {
-      ingestEstimationOutcome({
-        analysisId: id,
-        cardId: estimate.cardId,
-        detection,
-        buybackPrice: pricing.buyback,
-        salePrice: pricing.resell,
-        condition: condition.label,
-        language: detection.language
-      });
-    } catch (e) { console.warn("[Market] ingest estimation:", e.message); }
-
     try {
       recordEnterpriseEstimation({
         analysisId: id,
