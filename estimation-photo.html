@@ -29,12 +29,21 @@
       <span>4. Photo sous lumière si nécessaire</span>
     </div>
 
-    <label class="estimate-phone-camera" for="phoneCamera">
-      <span>📷</span>
-      <strong>Prendre une photo</strong>
-      <small>Appareil photo arrière recommandé</small>
-    </label>
-    <input id="phoneCamera" class="estimate-phone-input" type="file" accept="image/*" capture="environment" multiple>
+    <div id="phoneCameraStage" class="estimate-direct-camera">
+      <div class="estimate-direct-camera__viewport">
+        <video id="phoneCameraPreview" autoplay muted playsinline></video>
+        <div id="phoneCameraLoading" class="estimate-direct-camera__loading">Ouverture de la caméra arrière…</div>
+      </div>
+      <div class="estimate-direct-camera__actions">
+        <button id="phoneCameraShot" class="primary" type="button" disabled>📷 Prendre la photo</button>
+        <button id="phoneCameraRetry" class="secondary" type="button" hidden>Réessayer la caméra</button>
+      </div>
+      <div id="phoneCameraFallback" class="estimate-camera-fallback" hidden>
+        <p>Si votre navigateur ne permet pas la caméra directe, utilisez le mode de secours.</p>
+        <label class="secondary" for="phoneCameraFile">Choisir / prendre une photo</label>
+        <input id="phoneCameraFile" class="estimate-phone-input" type="file" accept="image/*" capture="environment" multiple>
+      </div>
+    </div>
 
     <div id="phonePhotoCount" class="estimate-phone-count">0 / 6 photos envoyées</div>
     <div id="phonePhotoStatus" class="estimate-phone-status">Connexion à la session Cardoria…</div>
@@ -43,6 +52,6 @@
   </section>
 </main>
 <script src="/js/estimation-image.js?v=1"></script>
-<script src="/js/estimation-phone.js?v=1"></script>
+<script src="/js/estimation-phone.js?v=2"></script>
 </body>
 </html>
