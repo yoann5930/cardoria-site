@@ -11,6 +11,19 @@
     return Number(n || 0).toFixed(2).replace(".", ",") + " €";
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function safeMultiline(value) {
+    return escapeHtml(value).replace(/\n/g, "<br>");
+  }
+
   function recClass(code) {
     if (code === "ACHETER") return "buy";
     if (code === "VENDRE") return "sell";
@@ -27,7 +40,7 @@
 
     var trendIcon = ev.direction === "up" ? "↗" : ev.direction === "down" ? "↘" : "→";
     var forecastHtml = (fc.horizons || []).map(function (h) {
-      return "<div class='ai-forecast-row'><span>" + h.label + "</span><strong>" + euro(h.price) + "</strong>" +
+      return "<div class='ai-forecast-row'><span>" + escapeHtml(h.label) + "</span><strong>" + euro(h.price) + "</strong>" +
         "<em>" + h.confidencePercent + "% conf.</em></div>";
     }).join("");
 
@@ -37,7 +50,7 @@
       "<div class='ai-prices ai-prices--premium'>" +
       "<div class='ai-price-box rec'><label>Prix conseillé</label><strong>" + euro(est.recommendedPrice) + "</strong></div>" +
       "<div class='ai-price-box'><label>Indice marché</label><strong>" + (mi.score != null ? mi.score + "/100" : "—") + "</strong>" +
-        (mi.label ? "<small>" + mi.label + "</small>" : "") + "</div>" +
+        (mi.label ? "<small>" + escapeHtml(mi.label) + "</small>" : "") + "</div>" +
       "<div class='ai-price-box'><label>Évolution</label><strong>" + trendIcon + " " + (mi.trendPercent != null ? mi.trendPercent + "%" : "—") + "</strong></div>" +
       "</div>" +
       (ev.values && ev.values.length
@@ -86,8 +99,8 @@
         : "") +
       "</div>" +
       (rec.label
-        ? "<div class='ai-rec ai-rec--" + recClass(rec.code) + "'><span class='ai-rec-label'>" + rec.label + "</span>" +
-          (rec.hint ? "<p>" + rec.hint + "</p>" : "") + "</div>"
+        ? "<div class='ai-rec ai-rec--" + recClass(rec.code) + "'><span class='ai-rec-label'>" + escapeHtml(rec.label) + "</span>" +
+          (rec.hint ? "<p>" + escapeHtml(rec.hint) + "</p>" : "") + "</div>"
         : "") +
       (data.requiresExpertReview ? "<p style='color:#baaf97;font-size:14px;margin-top:10px'>Examen expert requis avant offre de rachat.</p>" : "") +
       "</div>"
@@ -109,7 +122,7 @@
       ["Version", det.version],
       ["État", data.condition]
     ].filter(function (x) { return x[1]; }).map(function (x) {
-      return "<div><label>" + x[0] + "</label><strong>" + x[1] + "</strong></div>";
+      return "<div><label>" + escapeHtml(x[0]) + "</label><strong>" + escapeHtml(x[1]) + "</strong></div>";
     }).join("");
 
     container.innerHTML =
@@ -118,7 +131,7 @@
       renderIntelligencePanel(intel) +
       renderEnterprisePanel(data.enterprise) +
       "<h3 style='color:#ffe18a;margin:20px 0 8px'>Analyse Cardoria</h3>" +
-      "<div class='ai-message'>" + (data.clientResult || "") + "</div>" +
+      "<div class='ai-message'>" + safeMultiline(data.clientResult || "") + "</div>" +
       (data.cardId ? "<p style='margin-top:14px'><a href='carte.html?id=" + encodeURIComponent(data.cardId) + "' style='color:#ffe18a'>Voir la fiche catalogue →</a></p>" : "") +
       "</div>";
 
