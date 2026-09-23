@@ -681,7 +681,11 @@ app.use("/api/payments", marketplacePersistenceMiddleware, apiRateLimit, payment
 app.use("/api/live", marketplacePersistenceMiddleware, apiRateLimit, liveRoutes);
 app.use("/api/seo", apiRateLimit, seoRoutes);
 
-app.use("/api/estimation-carte", (req, res, next) => { if (req.method === "POST") return aiRateLimit(req, res, next); next(); }, estimationRoutes);
+app.use("/api/estimation-carte", (req, res, next) => {
+  if (req.method !== "POST") return next();
+  if (req.path.startsWith("/capture/")) return apiRateLimit(req, res, next);
+  return aiRateLimit(req, res, next);
+}, estimationRoutes);
 app.use("/api/rachat", marketplacePersistenceMiddleware, apiRateLimit, rachatRoutes);
 app.use("/api/admin", adminDashboardRoutes);
 app.use("/api/admin/accounting", adminFinanceRoutes);
