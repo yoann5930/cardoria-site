@@ -98,6 +98,10 @@ jobs:
           grep -q 'Lives programmés' live.html
           grep -q 'cardoriaLiveScheduledDirectory' live.html
           grep -q 'cardoriaLiveCategoryFilter' live.html
+          grep -q 'data-live-directory-only' live.html
+          grep -q 'data-live-room-only' live.html
+          grep -q 'if(!focus)return' js/cardoria-live-actions.js
+          grep -q 'location.assign(`/live.html?session=' js/cardoria-live-viewer.js
           grep -q 'planId: plan.planId' backend/routes/live.js
           grep -q 'Elite' backend/lib/live/public-directory.js
           grep -q 'CLIENT_LOGIN_REQUIRED' backend/routes/live-actions.js
@@ -108,8 +112,8 @@ jobs:
           ! grep -q 'cardoria_admin_handoff_token' live.html
           grep -q 'Live en cours — en attente de diffusion' live.html
           grep -q 'waiting:!sources.length' backend/lib/live/realtime-sessions.js
-          grep -q 'cardoria-live-actions.js?v=20260923-live-rank' live.html
-          grep -q 'cardoria-live-viewer.js?v=20260923-live-rank' live.html
+          grep -q 'cardoria-live-actions.js?v=20260923-live-split' live.html
+          grep -q 'cardoria-live-viewer.js?v=20260923-live-split' live.html
           grep -q 'client-auth.js?v=20260923-live-public-journey' client-login.html
           grep -q 'ALWAYS_REVALIDATE_PUBLIC_PATHS' backend/server.js
       - name: Start clean backend
@@ -135,7 +139,7 @@ jobs:
           curl -sSI http://127.0.0.1:10000/js/cardoria-live-actions.js | tr -d "\r" | grep -qi '^cache-control: .*no-store'
           curl -sSI http://127.0.0.1:10000/js/cardoria-live-viewer.js | tr -d "\r" | grep -qi '^cache-control: .*no-store'
           curl -sSI http://127.0.0.1:10000/client-login.html | tr -d "\r" | grep -qi '^x-frame-options: *sameorigin'
-          curl -fsS http://127.0.0.1:10000/live.html | grep -q 'cardoria-live-actions.js?v=20260923-live-rank'
+          curl -fsS http://127.0.0.1:10000/live.html | grep -q 'cardoria-live-actions.js?v=20260923-live-split'
           curl -fsS http://127.0.0.1:10000/live.html | grep -q 'cardoriaLiveCategoryFilter'
           curl -fsS http://127.0.0.1:10000/live.html | grep -q 'Lives programmés'
           curl -fsS http://127.0.0.1:10000/live.html | grep -q 'Live en cours — en attente de diffusion'
