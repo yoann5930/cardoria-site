@@ -94,6 +94,12 @@ jobs:
           grep -q 'promoteScheduledLives' backend/server.js
           grep -q 'setInterval(promoteScheduledLives' backend/server.js
           grep -q 'live-chat-dock' live.html
+          grep -q 'id="claChatDock"' live.html
+          grep -q 'Lives programmés' live.html
+          grep -q 'cardoriaLiveScheduledDirectory' live.html
+          grep -q 'cardoriaLiveCategoryFilter' live.html
+          grep -q 'planId: plan.planId' backend/routes/live.js
+          grep -q 'Elite' backend/lib/live/public-directory.js
           grep -q 'CLIENT_LOGIN_REQUIRED' backend/routes/live-actions.js
           grep -q 'cardoria_account' js/cardoria-live-actions.js
           ! grep -q 'id="claName"' js/cardoria-live-actions.js
@@ -102,8 +108,8 @@ jobs:
           ! grep -q 'cardoria_admin_handoff_token' live.html
           grep -q 'Live en cours — en attente de diffusion' live.html
           grep -q 'waiting:!sources.length' backend/lib/live/realtime-sessions.js
-          grep -q 'cardoria-live-actions.js?v=20260923-live-public-journey' live.html
-          grep -q 'cardoria-live-viewer.js?v=20260923-live-public-journey' live.html
+          grep -q 'cardoria-live-actions.js?v=20260923-live-rank' live.html
+          grep -q 'cardoria-live-viewer.js?v=20260923-live-rank' live.html
           grep -q 'client-auth.js?v=20260923-live-public-journey' client-login.html
           grep -q 'ALWAYS_REVALIDATE_PUBLIC_PATHS' backend/server.js
       - name: Start clean backend
@@ -129,7 +135,9 @@ jobs:
           curl -sSI http://127.0.0.1:10000/js/cardoria-live-actions.js | tr -d "\r" | grep -qi '^cache-control: .*no-store'
           curl -sSI http://127.0.0.1:10000/js/cardoria-live-viewer.js | tr -d "\r" | grep -qi '^cache-control: .*no-store'
           curl -sSI http://127.0.0.1:10000/client-login.html | tr -d "\r" | grep -qi '^x-frame-options: *sameorigin'
-          curl -fsS http://127.0.0.1:10000/live.html | grep -q 'cardoria-live-actions.js?v=20260923-live-public-journey'
+          curl -fsS http://127.0.0.1:10000/live.html | grep -q 'cardoria-live-actions.js?v=20260923-live-rank'
+          curl -fsS http://127.0.0.1:10000/live.html | grep -q 'cardoriaLiveCategoryFilter'
+          curl -fsS http://127.0.0.1:10000/live.html | grep -q 'Lives programmés'
           curl -fsS http://127.0.0.1:10000/live.html | grep -q 'Live en cours — en attente de diffusion'
           ! curl -fsS http://127.0.0.1:10000/live.html | grep -q 'cardoria-live-admin-studio.js'
           curl -fsS http://127.0.0.1:10000/js/cardoria-live-actions.js | grep -q 'live-chat-dock'
@@ -144,6 +152,8 @@ jobs:
           node --test backend/tests/live-scheduling.test.mjs
           node --test backend/tests/live-camera.test.mjs
           node --test backend/tests/live-admin-embedded-studio.test.mjs
+          node --test backend/tests/live-public-directory.test.mjs
+          node --test backend/tests/live-public-cleanup.test.mjs
       - name: Stop backend
         if: always()
         run: |

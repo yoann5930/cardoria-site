@@ -12,7 +12,8 @@ import liveLabelRoutes from "./live-labels.js";
 import liveRealtimeRoutes from "./live-realtime.js";
 import liveActionRoutes from "./live-actions.js";
 import liveAdminStudioRoutes from "./live-admin-studio.js";
-import { isRealtimePublished } from "../lib/live/realtime-sessions.js";
+import { isRealtimePublished, viewerCountForLive } from "../lib/live/realtime-sessions.js";
+import { LIVE_CATEGORY_OPTIONS, publicClientSession, publicPlanMeta, requestedLiveCategory, sortPublicSessions } from "../lib/live/public-directory.js";
 import { createLiveSession, getLiveSession, listLiveCheckouts, listLiveSessions, promoteDueScheduledLiveSessions, publicLiveSession, resolveAdminLiveAccess, setLiveStatus, updateLiveSession } from "../lib/live/sessions.js";
 import { archiveLiveSession, getLiveArchive, listLiveArchives } from "../lib/live/archive.js";
 import { createLiveShipmentsForLive, listLiveShipments } from "../lib/live/shipments.js";
@@ -50,10 +51,39 @@ function sanitizePublicValue(value) {
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizePublicValue(item)]));
   return value;
 }
+function publicHostName(session) {
+  if (String(session?.ownerRole || "").toLowerCase() === "admin") return "Cardoria";
+  try {
+    const name = String(getSeller(session?.ownerId)?.displayName || "").trim();
+    if (name) return name.slice(0, 80);
+  } catch {}
+  return "Liveur Cardoria";
+}
+function publicCoverUrl(session) {
+  try {
+    const avatar = String(getSeller(session?.ownerId)?.avatar || "").trim();
+    if (avatar.startsWith("/") && !avatar.startsWith("//") && !avatar.includes("..")) return avatar.slice(0, 240);
+  } catch {}
+  return "/assets/logo/cardoria-premium.png";
+}
 function publicRealtimeSession(session) {
   const live = publicLiveSession(session);
   if (!live) return null;
-  return sanitizePublicValue({ ...live, mimeType: "application/x-cloudflare-webrtc", streamPublished: isRealtimePublished(live.id) });
+  const plan = publicPlanMeta(session);
+  return {
+    ...sanitizePublicValue({
+      ...live,
+      hostName: publicHostName(session),
+      coverUrl: publicCoverUrl(session),
+      mimeType: "application/x-cloudflare-webrtc",
+      streamPublished: isRealtimePublished(live.id),
+      planId: plan.planId,
+      planLabel: plan.planLabel,
+      featured: plan.featured,
+      viewerCount: viewerCountForLive(live.id)
+    }),
+    planRank: plan.rank
+  };
 }
 function getPublicLiveSession(id) {
   const session = getLiveSession(id);
@@ -69,12 +99,15 @@ router.get("/sessions", (req, res) => {
     : requested==="scheduled"
       ? listLiveSessions({status:"scheduled"})
       : listLiveSessions({status:"live"});
-  res.json({ ok: true, sessions: sessions.map(publicRealtimeSession) });
+  const category = requestedLiveCategory(req.query.category);
+  const ranked = sortPublicSessions(sessions.map(publicRealtimeSession).filter(Boolean));
+  const visible = category ? ranked.filter((session) => session.category === category) : ranked;
+  res.json({ ok: true, categories: LIVE_CATEGORY_OPTIONS, sessions: visible.map(publicClientSession) });
 });
 router.get("/sessions/:id", (req, res) => {
   const session = getPublicLiveSession(req.params.id);
   if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." });
-  res.json({ ok: true, session: publicRealtimeSession(session) });
+  res.json({ ok: true, session: publicClientSession(publicRealtimeSession(session)) });
 });
 router.get("/sessions/:id/admin-access", (req, res) => {
   const session = getLiveSession(req.params.id); if (!session) return res.status(404).json({ ok: false, error: "Live introuvable." });
@@ -82,7 +115,7 @@ router.get("/sessions/:id/admin-access", (req, res) => {
   const user = validateSession(sessionToken); const actor = user && ADMIN_ROLES.includes(user.role) ? user : null;
   const access = resolveAdminLiveAccess({ liveId: session.id, grantToken: String(req.headers["x-live-admin-grant"] || ""), actor });
   if (!access) return res.status(401).json({ ok: false, error: "Accès admin Live refusé." });
-  res.json({ ok: true, accessRole: access.accessRole, accessContext: access.accessContext, title: safePublicText(session.title), ownerRole: session.ownerRole, paymentProvider: session.paymentProvider, session: publicRealtimeSession(session) });
+  res.json({ ok: true, accessRole: access.accessRole, accessContext: access.accessContext, title: safePublicText(session.title), ownerRole: session.ownerRole, paymentProvider: session.paymentProvider, session: publicClientSession(publicRealtimeSession(session)) });
 });
 router.post("/checkout", async (req, res) => {
   try {
@@ -98,7 +131,7 @@ router.post("/checkout/plan", (req, res) => {
   } catch (error) { fail(res, error); }
 });
 router.get("/seller/sessions", (req, res) => { try { const actor = sellerActor(req); res.json({ ok: true, provider: "paypal", sessions: listLiveSessions({ ownerRole: "seller", ownerId: actor.sellerId }).map(publicLiveSession) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 401); } });
-router.post("/seller/sessions", (req, res) => { try { const actor = sellerActor(req); const body = req.body || {}; const session = createLiveSession({ title: body.title, ownerRole: "seller", ownerId: actor.sellerId, ownerEmail: actor.email, products: body.products, scheduledAt: body.scheduledAt, actor }); logAudit({ type: "live", action: "seller_live_created", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
+router.post("/seller/sessions", (req, res) => { try { const actor = sellerActor(req); const body = req.body || {}; const session = createLiveSession({ title: body.title, ownerRole: "seller", ownerId: actor.sellerId, ownerEmail: actor.email, products: body.products, scheduledAt: body.scheduledAt, category: body.category, actor }); logAudit({ type: "live", action: "seller_live_created", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
 router.patch("/seller/sessions/:id", (req, res) => { try { const actor = sellerActor(req); const session = updateLiveSession(req.params.id, req.body || {}, actor); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
 router.post("/seller/sessions/:id/start", (req, res) => { try { const actor = sellerActor(req); assertSellerLiveCanStart(actor, req.params.id); const session = setLiveStatus(req.params.id, "live", actor); logAudit({ type: "live", action: "seller_live_started", user: actor.email || actor.sellerId, detail: session.id }); res.json({ ok: true, provider: "paypal", session: publicLiveSession(session) }); } catch (error) { fail(res, error, error instanceof MarketplaceAuthError ? error.status : 400); } });
 router.post("/seller/sessions/:id/stop", async (req, res) => { try {
