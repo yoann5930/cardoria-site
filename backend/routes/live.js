@@ -7,6 +7,7 @@ import { MarketplaceAuthError, assertSellerSession } from "../lib/marketplace/v1
 import { getSeller } from "../lib/marketplace/sellers.js";
 import { PAYMENT_MATRIX } from "../lib/payments/routing.js";
 import { createLiveCheckout, planLiveCheckout } from "../lib/live/checkout.js";
+import { reconcileStaleLiveCheckouts } from "../lib/live/payment-reconciliation.js";
 import { authenticatedCheckoutInput } from "../lib/live/buyer-identity.js";
 import liveLabelRoutes from "./live-labels.js";
 import liveRealtimeRoutes from "./live-realtime.js";
@@ -124,9 +125,11 @@ router.post("/checkout", async (req, res) => {
     res.json({ ok: true, provider: checkout.provider, channel: checkout.channel, checkout });
   } catch (error) { fail(res, error); }
 });
-router.post("/checkout/plan", (req, res) => {
+router.post("/checkout/plan", async (req, res) => {
   try {
-    const checkout = planLiveCheckout(authenticatedCheckoutInput(req));
+    const input = authenticatedCheckoutInput(req);
+    await reconcileStaleLiveCheckouts({ liveId: input.liveId, customerId: input.customerId, customerEmail: input.customerEmail });
+    const checkout = planLiveCheckout(input);
     res.json({ ok: true, provider: checkout.provider, channel: checkout.channel, checkout });
   } catch (error) { fail(res, error); }
 });
