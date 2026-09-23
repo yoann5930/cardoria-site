@@ -23,6 +23,7 @@ on:
           - smtp-configure
           - smtp-domain-configure
           - mail-dns-check
+          - admin-password-reset-request
           - sumup-configure
           - mondial-relay-configure
           - colissimo-configure

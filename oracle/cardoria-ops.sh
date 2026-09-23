@@ -27,7 +27,7 @@ redact() {
 
 require_action() {
   case "$1" in
-    status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check) return 0 ;;
+    status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request) return 0 ;;
     *) echo "FORBIDDEN action"; exit 1 ;;
   esac
 }
@@ -473,6 +473,38 @@ NODE
   echo "SMTP DOMAIN CONFIGURE OK"
 }
 
+cmd_admin_password_reset_request() {
+  echo "=== ADMIN PASSWORD RESET REQUEST ==="
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "env_file: missing"
+    return 1
+  fi
+  (
+    set -a
+    . "$ENV_FILE"
+    set +a
+    cd "$APP_DIR/backend"
+    node --input-type=module <<'NODE'
+import { migrateAuth } from "./lib/auth/migrate.js";
+import { requestPasswordReset } from "./lib/auth/passwordReset.js";
+
+const email = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+if (!email) {
+  console.error("admin_email: missing");
+  process.exit(2);
+}
+
+migrateAuth();
+const result = await requestPasswordReset(email);
+if (!result?.ok) {
+  console.error("admin_password_reset_request: fail");
+  process.exit(1);
+}
+console.log("admin_password_reset_request: accepted");
+NODE
+  )
+}
+
 cmd_mail_dns_check() {
   echo "=== MAIL DNS CHECK ==="
   if [ ! -f "$ENV_FILE" ]; then
@@ -595,4 +627,5 @@ case "$ACTION" in
   smtp-configure) cmd_smtp_configure ;;
   smtp-domain-configure) cmd_smtp_domain_configure ;;
   mail-dns-check) cmd_mail_dns_check ;;
+  admin-password-reset-request) cmd_admin_password_reset_request ;;
 esac

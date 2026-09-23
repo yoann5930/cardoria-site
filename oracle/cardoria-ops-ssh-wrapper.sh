@@ -47,6 +47,9 @@ case "$cmd" in
   mail-dns-check)
     exec sudo -n /usr/local/bin/cardoria-ops mail-dns-check
     ;;
+  admin-password-reset-request)
+    exec sudo -n /usr/local/bin/cardoria-ops admin-password-reset-request
+    ;;
   sumup-configure)
     exec sudo -n /usr/local/bin/cardoria-sumup-configure
     ;;
