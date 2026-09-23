@@ -125,6 +125,7 @@ try {
   assert.doesNotMatch(servedHtml, /cardoria-live-admin-studio\.js/);
   assert.doesNotMatch(servedHtml, /cardoria_admin_handoff_token/);
   assert.match(servedHtml, /Live en cours — en attente de diffusion/);
+  assert.match(servedHtml, /cardoriaLiveCategoryFilter/);
   const viewerHeaders = await fetch(base + "/js/cardoria-live-viewer.js", { method: "HEAD" });
   assert.match(viewerHeaders.headers.get("cache-control") || "", /no-store/i);
   const loginHeaders = await fetch(base + "/client-login.html", { method: "HEAD" });
@@ -224,6 +225,12 @@ try {
   assert.match(await anonPage.locator("#cardoriaLiveNowWrap").innerText(), /Lives en cours/i);
   assert.match(await anonPage.locator("#cardoriaLiveScheduledWrap").innerText(), /Lives programmés/i);
   assert.match(await anonPage.locator(`[data-session-id="${liveId}"]`).innerText(), /Cardoria/);
+  assert.match(await anonPage.locator(`[data-session-id="${liveId}"]`).innerText(), /Officiel/);
+  await anonPage.waitForSelector("#cardoriaLiveCategoryFilter");
+  await anonPage.selectOption("#cardoriaLiveCategoryFilter", "pokemon");
+  await anonPage.waitForFunction((id) => !document.querySelector(`#cardoriaLiveDirectory [data-session-id="${id}"]`), liveId, { timeout: 10000 });
+  await anonPage.selectOption("#cardoriaLiveCategoryFilter", "");
+  await anonPage.waitForFunction((id) => document.querySelector(`#cardoriaLiveDirectory [data-session-id="${id}"]`), liveId, { timeout: 10000 });
   await anonPage.locator(`[data-session-id="${scheduledId}"]`).click();
   await anonPage.waitForFunction((id) => document.querySelector(`[data-session-id="${id}"]`)?.dataset.selected === "true", scheduledId, { timeout: 10000 });
   await anonPage.locator(`[data-session-id="${liveId}"][data-live-open="true"]`).click();

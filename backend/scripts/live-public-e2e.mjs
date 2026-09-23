@@ -1,4 +1,6 @@
 // Public Live account chat regression coverage.
+import { setSellerPlan } from "../lib/subscriptions/seller-plans.js";
+
 const BASE = process.env.TEST_BASE_URL || "http://127.0.0.1:10000";
 const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 const password = "Live-Public-E2E-Password-2026!";
@@ -94,6 +96,10 @@ assert(directory.response.status === 200, "Public live directory failed after st
 const listed = directory.body.sessions?.find((session) => session.id === liveId);
 assert(listed, "Started live missing from public directory");
 assert(listed.hostName === "Live Public Seller", "Public live is missing the liveur name");
+assert(listed.planId === "starter", "Seller without Elite/Pro pack must appear as Starter");
+assert(Number.isFinite(Number(listed.viewerCount)), "Public live is missing viewerCount");
+assert(listed.category === "other", "Untitled seller live should default to Autre");
+assert(!Object.prototype.hasOwnProperty.call(listed, "planRank"), "Public live leaks internal planRank");
 assert(String(listed.coverUrl || "").startsWith("/"), "Public live is missing a cover image");
 assert(!/[<>]/.test(String(listed.title || "")), "Public live title contains HTML markup characters");
 assert(!/[<>]/.test(String(listed.products?.[0]?.name || "")), "Public product name contains HTML markup characters");
@@ -106,6 +112,66 @@ assert(directoryAll.body.sessions?.some((session) => session.id === scheduledId 
 const liveIndex = directoryAll.body.sessions.findIndex((session) => session.id === liveId);
 const scheduledIndex = directoryAll.body.sessions.findIndex((session) => session.id === scheduledId);
 assert(liveIndex >= 0 && scheduledIndex >= 0 && liveIndex < scheduledIndex, "Live sessions must appear before scheduled sessions");
+
+setSellerPlan(sellerId, "starter", { status: "active" });
+const eliteEmail = `live-elite-${suffix}@cardoria.invalid`;
+const eliteRegistration = await json("/api/auth/register", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ email: eliteEmail, password, name: "Live Elite Seller" })
+});
+assert(eliteRegistration.response.status === 201 && eliteRegistration.body.token && eliteRegistration.body.user?.id, "Elite seller client registration failed");
+const eliteToken = eliteRegistration.body.token;
+const eliteSellerRegistration = await auth(eliteToken, "/api/marketplace/v1/paypal/sellers/register", {
+  method: "POST",
+  body: JSON.stringify({ displayName: "Live Elite Seller", sellerType: "individual" })
+});
+assert(eliteSellerRegistration.response.status === 200 && eliteSellerRegistration.body.seller?.id, "Elite seller profile registration failed");
+const eliteSellerId = eliteSellerRegistration.body.seller.id;
+setSellerPlan(eliteSellerId, "elite", { status: "active" });
+const eliteSender = await auth(eliteToken, `/api/marketplace/v1/sellers/${encodeURIComponent(eliteSellerId)}/sender-profile`, {
+  method: "PUT",
+  body: JSON.stringify({ name: "Live Elite Seller", addressLine1: "14 rue Test", postalCode: "59330", city: "Hautmont", countryCode: "FR", phone: "0600000001" })
+});
+assert(eliteSender.response.status === 200 && eliteSender.body.ready === true, "Elite sender profile setup failed");
+const eliteCreated = await auth(eliteToken, "/api/live/seller/sessions", {
+  method: "POST",
+  body: JSON.stringify({
+    title: `Elite Pokemon Public ${suffix}`,
+    category: "pokemon",
+    products: [{ id: `LOT-E-${suffix}`, name: "Lot Elite", qty: 1, stock: 1, price: 12.5, mode: "buy_now" }]
+  })
+});
+assert(eliteCreated.response.status === 200 && eliteCreated.body.session?.id, "Elite live creation failed");
+assert(eliteCreated.body.session.category === "pokemon", "Elite live category was not persisted");
+const eliteLiveId = eliteCreated.body.session.id;
+const eliteStarted = await auth(eliteToken, `/api/live/seller/sessions/${encodeURIComponent(eliteLiveId)}/start`, { method: "POST", body: "{}" });
+assert(eliteStarted.response.status === 200 && eliteStarted.body.session?.status === "live", "Elite live start failed");
+const eliteScheduledAt = new Date(Date.now() + 21 * 24 * 3600 * 1000).toISOString();
+const eliteScheduled = await auth(eliteToken, "/api/live/seller/sessions", {
+  method: "POST",
+  body: JSON.stringify({
+    title: `Elite Pokemon Scheduled ${suffix}`,
+    category: "pokemon",
+    scheduledAt: eliteScheduledAt,
+    products: [{ id: `LOT-ES-${suffix}`, name: "Lot Elite programmé", qty: 1, stock: 1, price: 11, mode: "buy_now" }]
+  })
+});
+assert(eliteScheduled.response.status === 200 && eliteScheduled.body.session?.status === "scheduled", "Elite scheduled live creation failed");
+const eliteScheduledId = eliteScheduled.body.session.id;
+const rankedDirectory = await json("/api/live/sessions?status=all");
+const rankedSessions = rankedDirectory.body.sessions || [];
+const liveRows = rankedSessions.filter((session) => session.status === "live");
+const scheduledRows = rankedSessions.filter((session) => session.status === "scheduled");
+const eliteLive = liveRows.find((session) => session.id === eliteLiveId);
+assert(eliteLive?.planId === "elite" && eliteLive.featured === true, "Elite pack live is not featured");
+assert(liveRows.findIndex((session) => session.id === eliteLiveId) < liveRows.findIndex((session) => session.id === liveId), "Elite lives must appear before Starter lives");
+assert(scheduledRows.findIndex((session) => session.id === eliteScheduledId) < scheduledRows.findIndex((session) => session.id === scheduledId), "Elite scheduled lives must appear before Starter scheduled lives");
+const pokemonDirectory = await json("/api/live/sessions?status=all&category=pokemon");
+assert((pokemonDirectory.body.sessions || []).every((session) => session.category === "pokemon"), "Category dropdown filter leaked another licence");
+assert((pokemonDirectory.body.sessions || []).some((session) => session.id === eliteLiveId), "Pokemon filter missed the Elite live");
+assert(!(pokemonDirectory.body.sessions || []).some((session) => session.id === liveId), "Pokemon filter still shows uncategorized Starter live");
+assert(Array.isArray(pokemonDirectory.body.categories) && pokemonDirectory.body.categories.some((item) => item.id === "pokemon"), "Public directory is missing category options");
 
 const detail = await json(`/api/live/sessions/${encodeURIComponent(liveId)}`);
 assert(detail.response.status === 200 && detail.body.session?.id === liveId, "Active live public detail unavailable");

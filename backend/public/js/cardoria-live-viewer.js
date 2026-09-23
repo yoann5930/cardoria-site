@@ -8,6 +8,7 @@
   const directoryStateNode = document.getElementById("cardoriaLiveDirectoryState");
   const scheduledNode = document.getElementById("cardoriaLiveScheduledDirectory");
   const scheduledStateNode = document.getElementById("cardoriaLiveScheduledState");
+  const categoryFilter = document.getElementById("cardoriaLiveCategoryFilter");
   if (!(video instanceof HTMLVideoElement) || !stateNode || !viewersNode || !stageNode || !directoryNode || !scheduledNode) return;
   const esc = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 
@@ -36,6 +37,9 @@
   let webrtcConfigured = null;
   let connectingSessionId = null;
   let directorySelection = { id: "", kind: "live" };
+  let selectedCategory = String(search.get("category") || "").trim().toLowerCase();
+  const CATEGORY_LABELS = { pokemon: "Pokémon", yugioh: "Yu-Gi-Oh!", onepiece: "One Piece", lorcana: "Lorcana", magic: "Magic", other: "Autre" };
+  const PLAN_BADGE_CLASS = { cardoria: "is-cardoria", elite: "is-elite", pro: "is-pro", starter: "is-starter" };
 
   const setOfflineCopy = (title, detail) => {
     const offline = stageNode.querySelector(".live-offline");
@@ -324,9 +328,12 @@
 
   const appendDirectoryCard = (target, session, { selectable, selected }) => {
     const card = document.createElement("article");
-    card.className = "live-card-select";
+    const planId = String(session.planId || "starter");
+    card.className = "live-card-select" + (session.featured ? " is-featured" : planId === "pro" ? " is-pro" : "");
     card.dataset.sessionId = session.id;
     card.dataset.liveStatus = session.status || "";
+    card.dataset.liveCategory = session.category || "other";
+    card.dataset.livePlan = planId;
     if (selectable) card.dataset.liveOpen = "true";
     card.dataset.selected = selected ? "true" : "false";
     const host = session.hostName || (session.ownerRole === "admin" ? "Cardoria" : "Liveur Cardoria");
@@ -337,8 +344,11 @@
     const when = live
       ? (formatWhen(session.startedAt) ? "Démarré le " + formatWhen(session.startedAt) : "En cours")
       : (formatWhen(session.scheduledAt) ? formatWhen(session.scheduledAt) : "Bientôt");
+    const viewers = live ? `${Math.max(0, Number(session.viewerCount || 0))} spectateur${Number(session.viewerCount || 0) > 1 ? "s" : ""}` : "";
+    const planLabel = session.planLabel || (planId === "elite" ? "Elite" : planId === "pro" ? "Pro" : planId === "cardoria" ? "Officiel" : "Starter");
+    const categoryLabel = CATEGORY_LABELS[session.category] || "";
     const products = live ? (session.products || []).map((item) => `<button type="button" class="live-card-buy" data-live-buy="${esc(session.id)}" data-product-id="${esc(item.id)}">Acheter ${esc(item.name)} (${Number(item.price || 0).toFixed(2)} €)</button>`).join("") : "";
-    card.innerHTML = `<span class="live-card-thumb"><img src="${esc(safeCover(session))}" alt=""></span><span><strong>${esc(session.title || "Live Cardoria")}</strong><small>${esc(host)}</small><small>${esc(statusLabel)} · ${esc(when)}</small>${products}</span><button type="button" class="live-card-cta${selectable ? "" : " is-soon"}">${selectable ? "Regarder" : "À venir"}</button>`;
+    card.innerHTML = `<span class="live-card-thumb"><img src="${esc(safeCover(session))}" alt=""></span><span><strong>${esc(session.title || "Live Cardoria")}</strong><small>${esc(host)}</small><small>${esc(statusLabel)} · ${esc(when)}${viewers ? " · " + esc(viewers) : ""}</small><span class="live-plan-badge ${PLAN_BADGE_CLASS[planId] || "is-starter"}">${esc(planLabel)}</span>${categoryLabel ? `<span class="live-cat-badge">${esc(categoryLabel)}</span>` : ""}${products}</span><button type="button" class="live-card-cta${selectable ? "" : " is-soon"}">${selectable ? "Regarder" : "À venir"}</button>`;
     const openLive = () => {
       if (!selectable) {
         directorySelection = { id: session.id, kind: "scheduled" };
@@ -348,7 +358,11 @@
         return;
       }
       focusLiveId = session.id;
-      try { history.replaceState({}, "", "/live.html?session=" + encodeURIComponent(session.id)); } catch {}
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set("session", session.id);
+        history.replaceState({}, "", url.pathname + url.search + url.hash);
+      } catch {}
       void connectSession(session.id);
     };
     card.addEventListener("click", (event) => {
@@ -392,26 +406,26 @@
     }
   };
 
-  const renderLiveDirectory = (sessions) => {
-    if (directoryStateNode) directoryStateNode.textContent = sessions.length ? `${sessions.length} live${sessions.length > 1 ? "s" : ""} en cours` : "Aucun live en cours";
+  const renderLiveDirectory = (visible, allLive = visible) => {
+    if (directoryStateNode) directoryStateNode.textContent = visible.length ? `${visible.length} live${visible.length > 1 ? "s" : ""} en cours` : "Aucun live en cours";
     directoryNode.innerHTML = "";
-    if (!sessions.length) {
+    if (!visible.length) {
       const empty = document.createElement("div");
       empty.className = "live-directory-empty";
-      empty.textContent = "Aucun liveur n’est en direct pour le moment.";
+      empty.textContent = selectedCategory ? "Aucun live en cours dans cette catégorie." : "Aucun liveur n’est en direct pour le moment.";
       directoryNode.appendChild(empty);
-      if (!focusLiveId && !liveActive) {
+      if (!focusLiveId && !liveActive && !allLive.length) {
         activeSessionId = null;
         setStatus("Aucun live public n’est actuellement en cours.", false, false);
         setViewers(0);
       }
-      return;
+    } else {
+      visible.forEach((session) => {
+        appendDirectoryCard(directoryNode, session, { selectable: true, selected: session.id === directorySelection.id || session.id === activeSessionId || session.id === focusLiveId });
+      });
     }
-    sessions.forEach((session) => {
-      appendDirectoryCard(directoryNode, session, { selectable: true, selected: session.id === directorySelection.id || session.id === activeSessionId || session.id === focusLiveId });
-    });
     const promoted = directorySelection.kind === "scheduled"
-      ? sessions.find((session) => session.id === directorySelection.id)
+      ? allLive.find((session) => session.id === directorySelection.id)
       : null;
     if (promoted) {
       directorySelection = { id: promoted.id, kind: "live" };
@@ -420,8 +434,8 @@
     }
     if (directorySelection.kind === "scheduled") return;
     const preferred = focusLiveId
-      ? sessions.find((session) => session.id === focusLiveId)
-      : sessions.find((session) => session.id === activeSessionId) || sessions.find((session) => session.streamPublished) || sessions[0];
+      ? allLive.find((session) => session.id === focusLiveId)
+      : allLive.find((session) => session.id === activeSessionId) || allLive.find((session) => session.streamPublished) || allLive[0];
     if (focusLiveId && !preferred && activeSessionId !== focusLiveId) {
       void markLiveEnded("Ce Live n'est plus disponible. Retour à l'annuaire.");
       return;
@@ -435,7 +449,7 @@
     if (!sessions.length) {
       const empty = document.createElement("div");
       empty.className = "live-directory-empty";
-      empty.textContent = "Aucun live n’est programmé pour le moment.";
+      empty.textContent = selectedCategory ? "Aucun live programmé dans cette catégorie." : "Aucun live n’est programmé pour le moment.";
       scheduledNode.appendChild(empty);
       return;
     }
@@ -464,9 +478,11 @@
       const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
       const liveSessions = sessions.filter((session) => session.status === "live");
       const scheduledSessions = sessions.filter((session) => session.status === "scheduled");
-      renderLiveDirectory(liveSessions);
-      renderScheduledDirectory(scheduledSessions);
-      if (!ready && directoryStateNode) directoryStateNode.textContent = liveSessions.length ? `${liveSessions.length} live${liveSessions.length > 1 ? "s" : ""} · Service vidéo Live indisponible` : "Service vidéo Live indisponible";
+      const visibleLive = selectedCategory ? liveSessions.filter((session) => session.category === selectedCategory) : liveSessions;
+      const visibleScheduled = selectedCategory ? scheduledSessions.filter((session) => session.category === selectedCategory) : scheduledSessions;
+      renderLiveDirectory(visibleLive, liveSessions);
+      renderScheduledDirectory(visibleScheduled);
+      if (!ready && directoryStateNode) directoryStateNode.textContent = visibleLive.length ? `${visibleLive.length} live${visibleLive.length > 1 ? "s" : ""} · Service vidéo Live indisponible` : "Service vidéo Live indisponible";
     } catch {
       if (directoryStateNode) directoryStateNode.textContent = ready ? "Impossible de lister les Lives." : "Service vidéo Live indisponible";
       if (scheduledStateNode) scheduledStateNode.textContent = "Impossible de lister les Lives programmés.";
@@ -527,6 +543,25 @@
     if (payload.checkout?.url) location.assign(payload.checkout.url);
     else throw new Error("Lien de paiement Live non reçu.");
   };
+
+  const syncCategoryUrl = (value) => {
+    selectedCategory = String(value || "").trim().toLowerCase();
+    try {
+      const url = new URL(window.location.href);
+      if (selectedCategory) url.searchParams.set("category", selectedCategory);
+      else url.searchParams.delete("category");
+      history.replaceState({}, "", url.pathname + url.search + url.hash);
+    } catch {}
+  };
+
+  if (categoryFilter) {
+    if (selectedCategory && ![...categoryFilter.options].some((option) => option.value === selectedCategory)) selectedCategory = "";
+    categoryFilter.value = selectedCategory;
+    categoryFilter.addEventListener("change", () => {
+      syncCategoryUrl(categoryFilter.value);
+      void loadDirectory();
+    });
+  }
 
   soundButton?.addEventListener("click", () => {
     video.muted = !video.muted;
