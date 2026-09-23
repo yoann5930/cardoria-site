@@ -18,7 +18,7 @@ test("buyer giveaway is enabled and subscriber giveaway remains restricted to se
   assert.match(css,/#lasGiveFollow\[hidden\]\{display:none!important\}/);
   assert.doesNotMatch(css,/#lasGiveFollow,#lasGiveBuyer/);
 });
-test("admin runtime uses cache-busted final sales menu assets",()=>{assert.match(adminHtml,/live-studio-clean\.css\?v=20260918-sales-menu-final/);assert.match(adminHtml,/live-studio-actions-ui\.js\?v=20260918-sales-menu-final/);assert.match(adminHtml,/live-studio-sales-controls\.js\?v=20260918-sales-menu-final/);});
+test("admin runtime uses cache-busted final sales menu assets",()=>{assert.match(adminHtml,/live-studio-clean\.css\?v=20260918-sales-menu-final/);assert.match(adminHtml,/live-studio-actions-ui\.js\?v=20260923-live-public-journey/);assert.match(adminHtml,/live-studio-sales-controls\.js\?v=20260918-sales-menu-final/);});
 test("sales editor keeps destructive rerender loops disabled",()=>{assert.doesNotMatch(ui,/setInterval\s*\(\s*loadEditor/);assert.doesNotMatch(controls,/new MutationObserver/);});
 test("buyer giveaway route exists and only uses validated paid buyers",()=>{assert.match(routes,/giveaway\/buyer\/start/);assert.match(routes,/startBuyerGiveaway/);});
 test("paid and completed buyers participate once; authorized and pending buyers are excluded",()=>{

@@ -30,10 +30,11 @@ export function applySecurityMiddleware(app) {
     res.setHeader("X-Request-Id", req.requestId);
     res.setHeader("X-Cardoria-Release", PUBLIC_RELEASE);
     res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "DENY");
+    const publicPath = String(req.path || "");
+    const embeddableLogin = publicPath === "/client-login.html";
+    res.setHeader("X-Frame-Options", embeddableLogin ? "SAMEORIGIN" : "DENY");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("Permissions-Policy", LIVE_PERMISSIONS_POLICY);
-    const publicPath = String(req.path || "");
     const host = String(req.hostname || req.headers.host || "").split(":")[0].toLowerCase();
     const technicalHost = host.endsWith(".onrender.com") || host === "cardoria.vercel.app";
     if (technicalHost || isPrivateIndexPath(publicPath)) {
@@ -50,7 +51,8 @@ export function applySecurityMiddleware(app) {
         res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=2592000");
       }
     }
-    res.setHeader("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' blob:; connect-src 'self' https: stun: turn:; form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com; upgrade-insecure-requests");
+    const frameAncestors = embeddableLogin ? "'self'" : "'none'";
+    res.setHeader("Content-Security-Policy", `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors ${frameAncestors}; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' blob:; connect-src 'self' https: stun: turn:; form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com; upgrade-insecure-requests`);
     if (process.env.NODE_ENV === "production") res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     next();
   });

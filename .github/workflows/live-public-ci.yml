@@ -9,18 +9,23 @@ on:
       - "backend/routes/live-realtime.js"
       - "backend/routes/live-actions.js"
       - "backend/lib/live/**"
+      - "backend/lib/security/index.js"
       - "backend/scripts/live-public-e2e.mjs"
       - "backend/tests/live-scheduling.test.mjs"
       - "js/cardoria-live-viewer.js"
       - "js/cardoria-live-actions.js"
       - "js/client-auth.js"
+      - "js/admin/admin-live.js"
       - "client-login.html"
+      - "admin-live.html"
       - "backend/public/js/cardoria-live-viewer.js"
       - "backend/public/js/cardoria-live-actions.js"
       - "backend/public/js/client-auth.js"
+      - "backend/public/js/admin/admin-live.js"
       - "backend/public/client-login.html"
       - "live.html"
       - "backend/public/live.html"
+      - "tests/live-public-journey-browser.mjs"
       - ".github/workflows/live-public-ci.yml"
   push:
     branches: [main]
@@ -30,18 +35,23 @@ on:
       - "backend/routes/live-realtime.js"
       - "backend/routes/live-actions.js"
       - "backend/lib/live/**"
+      - "backend/lib/security/index.js"
       - "backend/scripts/live-public-e2e.mjs"
       - "backend/tests/live-scheduling.test.mjs"
       - "js/cardoria-live-viewer.js"
       - "js/cardoria-live-actions.js"
       - "js/client-auth.js"
+      - "js/admin/admin-live.js"
       - "client-login.html"
+      - "admin-live.html"
       - "backend/public/js/cardoria-live-viewer.js"
       - "backend/public/js/cardoria-live-actions.js"
       - "backend/public/js/client-auth.js"
+      - "backend/public/js/admin/admin-live.js"
       - "backend/public/client-login.html"
       - "live.html"
       - "backend/public/live.html"
+      - "tests/live-public-journey-browser.mjs"
       - ".github/workflows/live-public-ci.yml"
 
 permissions:
@@ -87,8 +97,14 @@ jobs:
           grep -q 'CLIENT_LOGIN_REQUIRED' backend/routes/live-actions.js
           grep -q 'cardoria_account' js/cardoria-live-actions.js
           ! grep -q 'id="claName"' js/cardoria-live-actions.js
-          grep -q 'cardoria-live-actions.js?v=20260922-chat-account-v3' live.html
-          grep -q 'client-auth.js?v=20260922-live-chat-auth-v2' client-login.html
+          ! grep -q 'placeholder="Votre nom"' js/cardoria-live-actions.js
+          ! grep -q 'cardoria-live-admin-studio.js' live.html
+          ! grep -q 'cardoria_admin_handoff_token' live.html
+          grep -q 'Live en cours — en attente de diffusion' live.html
+          grep -q 'waiting:!sources.length' backend/lib/live/realtime-sessions.js
+          grep -q 'cardoria-live-actions.js?v=20260923-live-public-journey' live.html
+          grep -q 'cardoria-live-viewer.js?v=20260923-live-public-journey' live.html
+          grep -q 'client-auth.js?v=20260923-live-public-journey' client-login.html
           grep -q 'ALWAYS_REVALIDATE_PUBLIC_PATHS' backend/server.js
       - name: Start clean backend
         working-directory: backend
@@ -111,7 +127,11 @@ jobs:
           set -euo pipefail
           curl -sSI http://127.0.0.1:10000/live.html | tr -d "\r" | grep -qi '^cache-control: .*no-store'
           curl -sSI http://127.0.0.1:10000/js/cardoria-live-actions.js | tr -d "\r" | grep -qi '^cache-control: .*no-store'
-          curl -fsS http://127.0.0.1:10000/live.html | grep -q 'cardoria-live-actions.js?v=20260922-chat-account-v3'
+          curl -sSI http://127.0.0.1:10000/js/cardoria-live-viewer.js | tr -d "\r" | grep -qi '^cache-control: .*no-store'
+          curl -sSI http://127.0.0.1:10000/client-login.html | tr -d "\r" | grep -qi '^x-frame-options: *sameorigin'
+          curl -fsS http://127.0.0.1:10000/live.html | grep -q 'cardoria-live-actions.js?v=20260923-live-public-journey'
+          curl -fsS http://127.0.0.1:10000/live.html | grep -q 'Live en cours — en attente de diffusion'
+          ! curl -fsS http://127.0.0.1:10000/live.html | grep -q 'cardoria-live-admin-studio.js'
           curl -fsS http://127.0.0.1:10000/js/cardoria-live-actions.js | grep -q 'live-chat-dock'
           ! curl -fsS http://127.0.0.1:10000/js/cardoria-live-actions.js | grep -q 'id="claName"'
       - name: Live public visibility privacy and viewer E2E
@@ -122,8 +142,34 @@ jobs:
           node --test backend/tests/live-realtime-contract.test.mjs
           node --test backend/tests/live-architecture.test.mjs
           node --test backend/tests/live-scheduling.test.mjs
+          node --test backend/tests/live-camera.test.mjs
+          node --test backend/tests/live-admin-embedded-studio.test.mjs
       - name: Stop backend
         if: always()
         run: |
           if [ -f /tmp/cardoria-live-public.pid ]; then kill $(cat /tmp/cardoria-live-public.pid) || true; fi
           cat /tmp/cardoria-live-public.log || true
+
+  live-public-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      ALERT_EMAIL: "false"
+      MARKETPLACE_DEMO_MODE: "false"
+      ADMIN_REQUIRE_2FA: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.0"
+          package-manager-cache: false
+      - name: Install backend
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Real Admin to public Live browser journey
+        run: node tests/live-public-journey-browser.mjs

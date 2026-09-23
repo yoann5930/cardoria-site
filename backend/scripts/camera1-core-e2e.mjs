@@ -65,10 +65,34 @@ assert(stopped.response.status === 200 && Number(stopped.body.sourceCount || 0) 
 const statusAfterStop = await request(`/api/live/webrtc/status/${encodeURIComponent(liveId)}`);
 assert(statusAfterStop.response.status === 200 && statusAfterStop.body.published === false, "Camera 1 remains published after stop");
 
+const liveAfterStop = await request(`/api/live/sessions/${encodeURIComponent(liveId)}`);
+assert(liveAfterStop.response.status === 200 && liveAfterStop.body.session?.status === "live", "Live is no longer public after Camera 1 stopped");
+const directoryAfterStop = await request("/api/live/sessions");
+assert(directoryAfterStop.body.sessions?.some((session) => session.id === liveId), "Live left the public directory after Camera 1 stopped");
+
 const viewerAfterStop = await request("/api/live/webrtc/viewer/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ liveSessionId: liveId }) });
-assert(viewerAfterStop.response.status === 404, "Spectator can start after Camera 1 stopped");
+assert(viewerAfterStop.response.status === 200, "Waiting spectator cannot start after Camera 1 stopped");
+assert(viewerAfterStop.body.viewerId, "Waiting spectator did not receive a viewerId after Camera 1 stopped");
+assert(viewerAfterStop.body.waiting === true, "Spectator after Camera 1 stop is not in waiting mode");
+assert(Number(viewerAfterStop.body.sourceCount || 0) === 0, "Waiting spectator still sees Camera 1 after stop");
+
+const waitingBeat = await request("/api/live/webrtc/viewer/heartbeat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ viewerId: viewerAfterStop.body.viewerId }) });
+assert(waitingBeat.response.status === 200 && waitingBeat.body.active === true, "Waiting spectator heartbeat is not active after Camera 1 stopped");
+assert(waitingBeat.body.waiting === true, "Waiting spectator heartbeat is not waiting after Camera 1 stopped");
+assert(Number(waitingBeat.body.sourceCount || 0) === 0, "Waiting spectator heartbeat still lists Camera 1 after stop");
 
 const reconnected = await auth(adminToken, "/api/live/webrtc/publisher/start", { method: "POST", body: JSON.stringify({ liveSessionId: liveId, sourceId: "primary", offer: OFFER, tracks: VIDEO_TRACKS }) });
 assert(reconnected.response.status === 200, "Camera 1 cannot reconnect after stop");
+assert(reconnected.body.sourceId === "primary", "Camera 1 reconnect did not restore the primary source");
+
+const beatAfterReconnect = await request("/api/live/webrtc/viewer/heartbeat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ viewerId: viewerAfterStop.body.viewerId }) });
+assert(beatAfterReconnect.response.status === 200 && beatAfterReconnect.body.active === true, "Waiting spectator heartbeat died after Camera 1 republished");
+assert(beatAfterReconnect.body.waiting === false, "Waiting spectator did not leave waiting mode after Camera 1 republished");
+assert(Number(beatAfterReconnect.body.sourceCount || 0) === 1, "Waiting spectator did not see Camera 1 after republish");
+assert((beatAfterReconnect.body.sources || []).includes("primary"), "Waiting spectator heartbeat missing primary source after Camera 1 republish");
+
+const viewerAfterReconnect = await request("/api/live/webrtc/viewer/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ liveSessionId: liveId }) });
+assert(viewerAfterReconnect.response.status === 200 && viewerAfterReconnect.body.viewerId, "Spectator cannot start after Camera 1 reconnect");
+assert(Number(viewerAfterReconnect.body.sourceCount || 0) === 1, "Spectator does not see Camera 1 after reconnect");
 
 console.log("CAMERA1_CORE_E2E_PASS");

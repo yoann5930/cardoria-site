@@ -23,11 +23,12 @@ test("admin Live restores the handoff before admin-core protects the page", () =
   assert.match(adminLive, /sessionStorage\.setItem\("cardoria_session_token", token\)/);
 });
 
-test("public Live keeps an authenticated Cardoria admin in the admin Studio path", () => {
+test("public Live stays a spectator page and does not restore admin handoff", () => {
   assert.match(publicLive, /id="cardoriaLiveEntry"/);
   assert.match(publicLive, /entry\.href="\/admin-live\.html"/);
   assert.match(publicLive, /Ouvrir le Studio Live Admin/);
-  assert.match(publicLive, /cardoria_admin_handoff_token/);
+  assert.doesNotMatch(publicLive, /cardoria_admin_handoff_token/);
+  assert.doesNotMatch(publicLive, /cardoria-live-admin-studio\.js/);
 });
 
 test("embedded admin Studio still accepts session or admin grant access", () => {

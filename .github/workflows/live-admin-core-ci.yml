@@ -66,7 +66,8 @@ jobs:
           grep -q 'Ouvrir le Live public' js/admin/admin-live.js
           grep -q 'window.open(liveUrl, "_blank", "noopener")' js/admin/admin-live.js
           ! grep -q 'window.open("about:blank", "_blank")' js/admin/admin-live.js
-          grep -q 'admin-live.js?v=20260922-public-open-v2' admin-live.html
+          ! grep -q 'Voir comme spectateur' js/admin/admin-live.js
+          grep -q 'admin-live.js?v=20260923-live-public-journey' admin-live.html
       - name: Start clean backend
         run: |
           rm -rf backend/data

@@ -484,8 +484,11 @@ const ALWAYS_REVALIDATE_PUBLIC_PATHS = new Set([
   "/client-login.html",
   "/admin-live.html",
   "/js/cardoria-live-actions.js",
+  "/js/cardoria-live-viewer.js",
+  "/js/cardoria-live-publisher.js",
   "/js/client-auth.js",
-  "/js/admin/admin-live.js"
+  "/js/admin/admin-live.js",
+  "/css/client-auth.css"
 ]);
 
 function sendPublicFile(req, res, next) {
