@@ -1,0 +1,17 @@
+name: Email Reset Diagnostic
+
+on:
+  push:
+    branches:
+      - diag/email-reset-20260923
+
+permissions:
+  contents: read
+
+jobs:
+  logs:
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: logs
+      branch: main
+    secrets: inherit
