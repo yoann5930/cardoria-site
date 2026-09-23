@@ -51,6 +51,25 @@ test("catalog identity scoring rewards exact name number set and language", () =
   assert.ok(wrong.score < exact.score);
 });
 
+test("catalog matching preserves Japanese and Korean names", () => {
+  const japanese = scoreCatalogMatch({
+    id: "pokemon-ja-test",
+    license: "pokemon",
+    language: "ja",
+    name: "リザードンex",
+    number: "201",
+    extension: "シャイニートレジャーex"
+  }, {
+    license: "pokemon",
+    language: "JP",
+    name: "リザードンex",
+    number: "201",
+    extension: "シャイニートレジャーex"
+  });
+  assert.equal(japanese.exact, true);
+  assert.ok(japanese.score >= 20);
+});
+
 test("AI estimates are observations, never real market transactions", () => {
   const result = ingestEstimationOutcome({
     analysisId: "AI-TEST",
