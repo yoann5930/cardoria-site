@@ -1,3 +1,4 @@
+// Camera UI regression: QR page must stay dark, branded and full-screen.
 // Direct-camera QR regression: getUserMedia remains the primary mobile capture path.
 // Regression tests for mandatory estimation photos and PC-to-phone QR capture.
 import test from "node:test";
