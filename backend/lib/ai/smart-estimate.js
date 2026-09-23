@@ -470,6 +470,14 @@ export function flattenPricing(estimate, intelligence = null) {
     high: m.high ?? estimate.prices?.high ?? 0,
     recommended: t.resell ?? estimate.prices?.recommended ?? 0,
     market: { low: m.low, avg: m.avg, high: m.high },
+    sources: (estimate.sources || []).map((source) => ({
+      source: source.source,
+      label: source.label,
+      price: source.price,
+      fetchedAt: source.fetchedAt || null
+    })),
+    catalogMatch: estimate.catalogMatch || null,
+    conditionMultiplier: estimate.conditionMultiplier ?? null,
     buyback: t.buyback,
     resell: t.resell,
     margin: t.margin,
