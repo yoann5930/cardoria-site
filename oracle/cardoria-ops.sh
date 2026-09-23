@@ -27,7 +27,7 @@ redact() {
 
 require_action() {
   case "$1" in
-    status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request) return 0 ;;
+    status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check) return 0 ;;
     *) echo "FORBIDDEN action"; exit 1 ;;
   esac
 }
@@ -124,6 +124,59 @@ cmd_nginx_test() {
   ss -tlnH | awk '$4 ~ /:(80|443|10000)$/ {print $4}'
   echo "ufw:"
   ufw status | redact
+}
+
+cmd_estimation_capture_check() {
+  echo "=== ESTIMATION CAPTURE CHECK ==="
+
+  echo "--- recent nginx capture traffic ---"
+  if [ -f /var/log/nginx/access.log ]; then
+    grep -E 'estimation-photo|/api/estimation-carte/capture/' /var/log/nginx/access.log 2>/dev/null       | tail -n 80       | sed -E 's#(/api/estimation-carte/capture/session/)[A-Za-z0-9_-]+#\1<redacted>#g; s#(session=)[A-Za-z0-9_-]+#\1<redacted>#g; s#^([0-9a-fA-F:.]+)#<ip>#' || true
+  else
+    echo "nginx_access_log: missing"
+  fi
+
+  echo "--- recent nginx capture errors ---"
+  if [ -f /var/log/nginx/error.log ]; then
+    grep -Ei 'estimation|capture|client intended to send too large body|413|upstream' /var/log/nginx/error.log 2>/dev/null       | tail -n 80       | sed -E 's#(/api/estimation-carte/capture/session/)[A-Za-z0-9_-]+#\1<redacted>#g; s#(session=)[A-Za-z0-9_-]+#\1<redacted>#g; s#client: [0-9a-fA-F:.]+#client: <ip>#g' || true
+  else
+    echo "nginx_error_log: missing"
+  fi
+
+  echo "--- synthetic https bridge test ---"
+  local tmp create sid upload photos code
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' RETURN
+
+  code=$(curl -sS -o "$tmp/create.json" -w '%{http_code}' --max-time 20     -X POST 'https://www.cardoriashop.fr/api/estimation-carte/capture/session'     -H 'content-type: application/json' --data '{}')
+  echo "capture_create_http: $code"
+  [ "$code" = "201" ] || { cat "$tmp/create.json" | redact; return 1; }
+
+  sid=$(node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('$tmp/create.json','utf8'));process.stdout.write(d.sessionId||'')")
+  [ -n "$sid" ] || { echo "capture_session_id: missing"; return 1; }
+  echo "capture_session_id: present"
+
+  code=$(curl -sS -o "$tmp/upload.json" -w '%{http_code}' --max-time 20     -X POST "https://www.cardoriashop.fr/api/estimation-carte/capture/session/$sid/photos"     -H 'content-type: application/json'     --data '{"imagesBase64":["data:image/jpeg;base64,AA=="]}')
+  echo "capture_upload_http: $code"
+  [ "$code" = "200" ] || { cat "$tmp/upload.json" | redact; return 1; }
+
+  code=$(curl -sS -o "$tmp/photos.json" -w '%{http_code}' --max-time 20     "https://www.cardoriashop.fr/api/estimation-carte/capture/session/$sid/photos")
+  echo "capture_fetch_http: $code"
+  [ "$code" = "200" ] || { cat "$tmp/photos.json" | redact; return 1; }
+
+  photos=$(node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('$tmp/photos.json','utf8'));process.stdout.write(String(d.count||0))")
+  echo "capture_photo_count: $photos"
+  [ "$photos" = "1" ] || return 1
+
+  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 -X DELETE     "https://www.cardoriashop.fr/api/estimation-carte/capture/session/$sid")
+  echo "capture_delete_http: $code"
+
+  code=$(curl -sS -o "$tmp/page.html" -w '%{http_code}' --max-time 20     "https://www.cardoriashop.fr/estimation-photo.html?session=$sid")
+  echo "capture_page_http: $code"
+  grep -q 'phoneCameraPreview' "$tmp/page.html" && echo "capture_page_camera_ui: present" || { echo "capture_page_camera_ui: missing"; return 1; }
+  grep -q 'estimation-phone.js?v=3' "$tmp/page.html" && echo "capture_page_script_v3: present" || { echo "capture_page_script_v3: missing"; return 1; }
+
+  echo "ESTIMATION CAPTURE CHECK OK"
 }
 
 cmd_logs() {
@@ -628,4 +681,5 @@ case "$ACTION" in
   smtp-domain-configure) cmd_smtp_domain_configure ;;
   mail-dns-check) cmd_mail_dns_check ;;
   admin-password-reset-request) cmd_admin_password_reset_request ;;
+  estimation-capture-check) cmd_estimation_capture_check ;;
 esac
