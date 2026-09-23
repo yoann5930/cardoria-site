@@ -34,6 +34,7 @@ jobs:
         run: |
           node --check js/client-auth.js
           node --check js/client-password-reset.js
+          node --check js/estimation-account-prefill.js
           grep -q '/api/auth/login' js/client-auth.js
           grep -q '/api/auth/register' js/client-auth.js
           grep -q '/api/auth/me' js/client-auth.js
@@ -50,6 +51,11 @@ jobs:
           grep -q 'Connexion au serveur Cardoria impossible' js/client-password-reset.js
           grep -q 'AbortController' js/client-password-reset.js
           grep -q '/reset-password.html' client-login.html
+          grep -q '/api/auth/me' js/estimation-account-prefill.js
+          grep -q 'cardoria_session_token' js/estimation-account-prefill.js
+          grep -q 'customerName' estimation.html
+          grep -q 'customerEmail' estimation.html
+          node --test tests/estimation-account-prefill.test.mjs
       - name: Start backend
         working-directory: backend
         run: |
