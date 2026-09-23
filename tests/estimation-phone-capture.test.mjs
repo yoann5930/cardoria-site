@@ -1,3 +1,4 @@
+// Android camera v5 regression: explicit user gesture is mandatory before getUserMedia.
 // Mobile camera runtime v5 regression: camera starts only from a user gesture.
 // Mobile camera runtime v4 regression: no-cache, explicit activation, retries and upload telemetry.
 // Camera UI regression: QR page must stay dark, branded and full-screen.
