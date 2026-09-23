@@ -47,7 +47,8 @@ check_plans() {
 check_live_public_chat() {
   local headers
   check /live.html 200
-  grep -Fq 'cardoria-live-actions.js?v=20260923-live-directory' "$OUT"
+  grep -Fq 'cardoria-live-actions.js?v=20260923-live-rank' "$OUT"
+  grep -Fq 'cardoria-live-viewer.js?v=20260923-live-rank' "$OUT"
 
   headers=$(curl -sSI "$BASE/live.html" | tr -d '\r')
   printf '%s\n' "$headers" | grep -qi '^Cache-Control: .*no-store'
