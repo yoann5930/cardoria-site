@@ -44,7 +44,14 @@ export function applySecurityMiddleware(app) {
       res.setHeader("X-Robots-Tag", "index, follow, max-image-preview:large,max-snippet:-1,max-video-preview:-1");
     }
     if (req.method === "GET" || req.method === "HEAD") {
-      if (publicPath === "/" || publicPath.endsWith(".html") || publicPath.endsWith("/")) {
+      const estimationCameraRuntime = publicPath === "/estimation-photo.html" ||
+        publicPath === "/js/estimation-phone.js" ||
+        publicPath === "/js/estimation-image.js";
+      if (estimationCameraRuntime) {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      } else if (publicPath === "/" || publicPath.endsWith(".html") || publicPath.endsWith("/")) {
         res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
       } else if (publicPath.endsWith(".css") || publicPath.endsWith(".js")) {
         res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
