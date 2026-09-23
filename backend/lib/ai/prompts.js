@@ -21,7 +21,10 @@ Ne certifie JAMAIS officiellement une carte. Analyse uniquement ce qui est visib
 Client : ${data.customerName || "Non renseigné"} / ${data.customerEmail || "Non renseigné"}
 Jeu indiqué : ${data.cardGame || "Non renseigné"}
 Carte indiquée : ${data.cardName || "Non renseigné"}
+État indiqué par le client : ${data.cardCondition || "Non renseigné"}
 Notes : ${data.cardNotes || "Aucune"}
+
+L'état indiqué par le client est seulement une indication. Vérifie-le visuellement sur les photos et corrige-le si nécessaire.
 
 ${examples ? "Références admin validées :\n" + examples + "\n" : ""}
 
