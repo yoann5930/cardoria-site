@@ -13,12 +13,35 @@ const pages = [
   "marketplace-paiement-echec.html"
 ];
 
+const sellerUtilityPages = [
+  "espace-vendeur.html",
+  "mes-annonces.html"
+];
+
+const headerOnlyNoindexPaths = [
+  "/carte.html",
+  "/annonce.html",
+  "/pages/extension",
+  "/pages/extension/",
+  "/espace-vendeur.html",
+  "/mes-annonces.html"
+];
+
 const security = fs.readFileSync(new URL("../backend/lib/security/index.js", import.meta.url), "utf8");
 const sitemap = fs.readFileSync(new URL("../backend/lib/seo/sitemap.js", import.meta.url), "utf8");
 const staticPages = sitemap.split("const STATIC_PAGES = [")[1].split("];")[0];
 
 test("technical live and marketplace payment pages declare noindex in both public mirrors", () => {
   for (const page of pages) {
+    const root = fs.readFileSync(new URL("../" + page, import.meta.url), "utf8");
+    const mirror = fs.readFileSync(new URL("../backend/public/" + page, import.meta.url), "utf8");
+    assert.equal(root, mirror, page + " frontend/runtime mirror mismatch");
+    assert.match(root, /<meta name="robots" content="noindex,nofollow,noarchive">/i, page);
+  }
+});
+
+test("seller utility pages declare noindex in both public mirrors", () => {
+  for (const page of sellerUtilityPages) {
     const root = fs.readFileSync(new URL("../" + page, import.meta.url), "utf8");
     const mirror = fs.readFileSync(new URL("../backend/public/" + page, import.meta.url), "utf8");
     assert.equal(root, mirror, page + " frontend/runtime mirror mismatch");
@@ -57,6 +80,24 @@ test("real security middleware returns noindex header for every technical page",
       const response = await fetch(base + "/" + page, { method: "HEAD" });
       assert.equal(response.status, 200, page);
       assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow, noarchive", page);
+    }
+
+    for (const path of headerOnlyNoindexPaths) {
+      const response = await fetch(base + path, { method: "HEAD" });
+      assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow, noarchive", path);
+    }
+
+    for (const path of [
+      "/cartes/pokemon/pikachu-test",
+      "/annonces/annonce-test",
+      "/extensions/pokemon/base-set"
+    ]) {
+      const response = await fetch(base + path, { method: "HEAD" });
+      assert.equal(
+        response.headers.get("x-robots-tag"),
+        "index, follow, max-image-preview:large,max-snippet:-1,max-video-preview:-1",
+        path
+      );
     }
   } finally {
     server.closeAllConnections();
