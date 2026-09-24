@@ -126,10 +126,199 @@ jobs:
           curl -fsS -H 'Host: www.cardoriashop.fr' http://127.0.0.1:10000/api/marketplace/v1/sitemap.xml > /tmp/marketplace-sitemap.xml
           grep -q '^<?xml version="1.0" encoding="UTF-8"?>' /tmp/marketplace-sitemap.xml
           grep -q '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' /tmp/marketplace-sitemap.xml
-          for path in /live-vendeur.html /live-camera.html /marketplace-paiement-succes.html /marketplace-paiement-echec.html; do
+          for path in /live-vendeur.html /live-camera.html /marketplace-paiement-succes.html /marketplace-paiement-echec.html /carte.html /annonce.html /pages/extension/ /espace-vendeur.html /mes-annonces.html; do
             curl -fsSI "http://127.0.0.1:10000${path}" | tr -d '\r' > /tmp/robots-headers.txt
-            grep -qi '^x-robots-tag: noindex, nofollow, noarchive$' /tmp/robots-headers.txt
+            grep -qi '^x-robots-tag: noindex, nofollow, noarchive          for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/system/backups; do
+            code=$(curl -sS -o /tmp/anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
+            test "$code" = "401"
           done
+          code=$(curl -sS -o /tmp/retired.json -w '%{http_code}' http://127.0.0.1:10000/api/payments/revolut/checkout)
+          test "$code" = "410"
+      - name: Client authentication E2E
+        run: |
+          EMAIL="client-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@cardoria.invalid"
+          PASSWORD='ClientTest2026!'
+          code=$(curl -sS -o /tmp/register.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"name\":\"Client CI\",\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}" http://127.0.0.1:10000/api/auth/register)
+          test "$code" = "201"
+          grep -q '"ok":true' /tmp/register.json
+          grep -q '"role":"client"' /tmp/register.json
+          TOKEN=$(node -e "const d=require('fs').readFileSync('/tmp/register.json','utf8');process.stdout.write(JSON.parse(d).token||'')")
+          test -n "$TOKEN"
+          code=$(curl -sS -o /tmp/me.json -w '%{http_code}' -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:10000/api/auth/me)
+          test "$code" = "200"
+          grep -q '"role":"client"' /tmp/me.json
+          grep -q "${EMAIL}" /tmp/me.json
+          code=$(curl -sS -o /tmp/logout.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${TOKEN}" -d '{}' http://127.0.0.1:10000/api/auth/logout)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/logout.json
+          code=$(curl -sS -o /tmp/me-after-logout.json -w '%{http_code}' -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:10000/api/auth/me)
+          test "$code" = "401"
+          code=$(curl -sS -o /tmp/login.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}" http://127.0.0.1:10000/api/auth/login)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/login.json
+          grep -q '"role":"client"' /tmp/login.json
+          LOGIN_TOKEN=$(node -e "const d=require('fs').readFileSync('/tmp/login.json','utf8');process.stdout.write(JSON.parse(d).token||'')")
+          test -n "$LOGIN_TOKEN"
+          code=$(curl -sS -o /tmp/bad-login.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"${EMAIL}\",\"password\":\"WrongPassword2026!\"}" http://127.0.0.1:10000/api/auth/login)
+          test "$code" = "401"
+          grep -q 'Email ou mot de passe incorrect' /tmp/bad-login.json
+          code=$(curl -sS -o /tmp/reset-unknown.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"unknown-client-ci@cardoria.invalid"}' http://127.0.0.1:10000/api/auth/password/request)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/reset-unknown.json
+          grep -q 'Si le compte existe' /tmp/reset-unknown.json
+          code=$(curl -sS -o /tmp/reset-invalid.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"token":"invalid-token","password":"NewClient2026!"}' http://127.0.0.1:10000/api/auth/password/confirm)
+          test "$code" = "400"
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-final.pid ]; then kill $(cat /tmp/cardoria-final.pid) || true; fi
+          if [ -f /tmp/cardoria-final.log ]; then cat /tmp/cardoria-final.log; fi
+ /tmp/robots-headers.txt
+          done
+          curl -fsSI http://127.0.0.1:10000/carte.html | tr -d '\r' > /tmp/card-template-headers.txt
+          grep -q '^HTTP/.* 301' /tmp/card-template-headers.txt
+          grep -qi '^location: /pages/licences/          for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/system/backups; do
+            code=$(curl -sS -o /tmp/anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
+            test "$code" = "401"
+          done
+          code=$(curl -sS -o /tmp/retired.json -w '%{http_code}' http://127.0.0.1:10000/api/payments/revolut/checkout)
+          test "$code" = "410"
+      - name: Client authentication E2E
+        run: |
+          EMAIL="client-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@cardoria.invalid"
+          PASSWORD='ClientTest2026!'
+          code=$(curl -sS -o /tmp/register.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"name\":\"Client CI\",\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}" http://127.0.0.1:10000/api/auth/register)
+          test "$code" = "201"
+          grep -q '"ok":true' /tmp/register.json
+          grep -q '"role":"client"' /tmp/register.json
+          TOKEN=$(node -e "const d=require('fs').readFileSync('/tmp/register.json','utf8');process.stdout.write(JSON.parse(d).token||'')")
+          test -n "$TOKEN"
+          code=$(curl -sS -o /tmp/me.json -w '%{http_code}' -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:10000/api/auth/me)
+          test "$code" = "200"
+          grep -q '"role":"client"' /tmp/me.json
+          grep -q "${EMAIL}" /tmp/me.json
+          code=$(curl -sS -o /tmp/logout.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${TOKEN}" -d '{}' http://127.0.0.1:10000/api/auth/logout)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/logout.json
+          code=$(curl -sS -o /tmp/me-after-logout.json -w '%{http_code}' -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:10000/api/auth/me)
+          test "$code" = "401"
+          code=$(curl -sS -o /tmp/login.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}" http://127.0.0.1:10000/api/auth/login)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/login.json
+          grep -q '"role":"client"' /tmp/login.json
+          LOGIN_TOKEN=$(node -e "const d=require('fs').readFileSync('/tmp/login.json','utf8');process.stdout.write(JSON.parse(d).token||'')")
+          test -n "$LOGIN_TOKEN"
+          code=$(curl -sS -o /tmp/bad-login.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"${EMAIL}\",\"password\":\"WrongPassword2026!\"}" http://127.0.0.1:10000/api/auth/login)
+          test "$code" = "401"
+          grep -q 'Email ou mot de passe incorrect' /tmp/bad-login.json
+          code=$(curl -sS -o /tmp/reset-unknown.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"unknown-client-ci@cardoria.invalid"}' http://127.0.0.1:10000/api/auth/password/request)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/reset-unknown.json
+          grep -q 'Si le compte existe' /tmp/reset-unknown.json
+          code=$(curl -sS -o /tmp/reset-invalid.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"token":"invalid-token","password":"NewClient2026!"}' http://127.0.0.1:10000/api/auth/password/confirm)
+          test "$code" = "400"
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-final.pid ]; then kill $(cat /tmp/cardoria-final.pid) || true; fi
+          if [ -f /tmp/cardoria-final.log ]; then cat /tmp/cardoria-final.log; fi
+ /tmp/card-template-headers.txt
+          curl -fsSI http://127.0.0.1:10000/annonce.html | tr -d '\r' > /tmp/listing-template-headers.txt
+          grep -q '^HTTP/.* 301' /tmp/listing-template-headers.txt
+          grep -qi '^location: /marketplace.html          for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/system/backups; do
+            code=$(curl -sS -o /tmp/anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
+            test "$code" = "401"
+          done
+          code=$(curl -sS -o /tmp/retired.json -w '%{http_code}' http://127.0.0.1:10000/api/payments/revolut/checkout)
+          test "$code" = "410"
+      - name: Client authentication E2E
+        run: |
+          EMAIL="client-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@cardoria.invalid"
+          PASSWORD='ClientTest2026!'
+          code=$(curl -sS -o /tmp/register.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"name\":\"Client CI\",\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}" http://127.0.0.1:10000/api/auth/register)
+          test "$code" = "201"
+          grep -q '"ok":true' /tmp/register.json
+          grep -q '"role":"client"' /tmp/register.json
+          TOKEN=$(node -e "const d=require('fs').readFileSync('/tmp/register.json','utf8');process.stdout.write(JSON.parse(d).token||'')")
+          test -n "$TOKEN"
+          code=$(curl -sS -o /tmp/me.json -w '%{http_code}' -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:10000/api/auth/me)
+          test "$code" = "200"
+          grep -q '"role":"client"' /tmp/me.json
+          grep -q "${EMAIL}" /tmp/me.json
+          code=$(curl -sS -o /tmp/logout.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${TOKEN}" -d '{}' http://127.0.0.1:10000/api/auth/logout)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/logout.json
+          code=$(curl -sS -o /tmp/me-after-logout.json -w '%{http_code}' -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:10000/api/auth/me)
+          test "$code" = "401"
+          code=$(curl -sS -o /tmp/login.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}" http://127.0.0.1:10000/api/auth/login)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/login.json
+          grep -q '"role":"client"' /tmp/login.json
+          LOGIN_TOKEN=$(node -e "const d=require('fs').readFileSync('/tmp/login.json','utf8');process.stdout.write(JSON.parse(d).token||'')")
+          test -n "$LOGIN_TOKEN"
+          code=$(curl -sS -o /tmp/bad-login.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"${EMAIL}\",\"password\":\"WrongPassword2026!\"}" http://127.0.0.1:10000/api/auth/login)
+          test "$code" = "401"
+          grep -q 'Email ou mot de passe incorrect' /tmp/bad-login.json
+          code=$(curl -sS -o /tmp/reset-unknown.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"unknown-client-ci@cardoria.invalid"}' http://127.0.0.1:10000/api/auth/password/request)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/reset-unknown.json
+          grep -q 'Si le compte existe' /tmp/reset-unknown.json
+          code=$(curl -sS -o /tmp/reset-invalid.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"token":"invalid-token","password":"NewClient2026!"}' http://127.0.0.1:10000/api/auth/password/confirm)
+          test "$code" = "400"
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-final.pid ]; then kill $(cat /tmp/cardoria-final.pid) || true; fi
+          if [ -f /tmp/cardoria-final.log ]; then cat /tmp/cardoria-final.log; fi
+ /tmp/listing-template-headers.txt
+          curl -fsSI http://127.0.0.1:10000/pages/extension/ | tr -d '\r' > /tmp/extension-template-headers.txt
+          grep -q '^HTTP/.* 301' /tmp/extension-template-headers.txt
+          grep -qi '^location: /pages/licences/          for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/system/backups; do
+            code=$(curl -sS -o /tmp/anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
+            test "$code" = "401"
+          done
+          code=$(curl -sS -o /tmp/retired.json -w '%{http_code}' http://127.0.0.1:10000/api/payments/revolut/checkout)
+          test "$code" = "410"
+      - name: Client authentication E2E
+        run: |
+          EMAIL="client-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@cardoria.invalid"
+          PASSWORD='ClientTest2026!'
+          code=$(curl -sS -o /tmp/register.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"name\":\"Client CI\",\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}" http://127.0.0.1:10000/api/auth/register)
+          test "$code" = "201"
+          grep -q '"ok":true' /tmp/register.json
+          grep -q '"role":"client"' /tmp/register.json
+          TOKEN=$(node -e "const d=require('fs').readFileSync('/tmp/register.json','utf8');process.stdout.write(JSON.parse(d).token||'')")
+          test -n "$TOKEN"
+          code=$(curl -sS -o /tmp/me.json -w '%{http_code}' -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:10000/api/auth/me)
+          test "$code" = "200"
+          grep -q '"role":"client"' /tmp/me.json
+          grep -q "${EMAIL}" /tmp/me.json
+          code=$(curl -sS -o /tmp/logout.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${TOKEN}" -d '{}' http://127.0.0.1:10000/api/auth/logout)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/logout.json
+          code=$(curl -sS -o /tmp/me-after-logout.json -w '%{http_code}' -H "Authorization: Bearer ${TOKEN}" http://127.0.0.1:10000/api/auth/me)
+          test "$code" = "401"
+          code=$(curl -sS -o /tmp/login.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}" http://127.0.0.1:10000/api/auth/login)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/login.json
+          grep -q '"role":"client"' /tmp/login.json
+          LOGIN_TOKEN=$(node -e "const d=require('fs').readFileSync('/tmp/login.json','utf8');process.stdout.write(JSON.parse(d).token||'')")
+          test -n "$LOGIN_TOKEN"
+          code=$(curl -sS -o /tmp/bad-login.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"${EMAIL}\",\"password\":\"WrongPassword2026!\"}" http://127.0.0.1:10000/api/auth/login)
+          test "$code" = "401"
+          grep -q 'Email ou mot de passe incorrect' /tmp/bad-login.json
+          code=$(curl -sS -o /tmp/reset-unknown.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"unknown-client-ci@cardoria.invalid"}' http://127.0.0.1:10000/api/auth/password/request)
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/reset-unknown.json
+          grep -q 'Si le compte existe' /tmp/reset-unknown.json
+          code=$(curl -sS -o /tmp/reset-invalid.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"token":"invalid-token","password":"NewClient2026!"}' http://127.0.0.1:10000/api/auth/password/confirm)
+          test "$code" = "400"
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/cardoria-final.pid ]; then kill $(cat /tmp/cardoria-final.pid) || true; fi
+          if [ -f /tmp/cardoria-final.log ]; then cat /tmp/cardoria-final.log; fi
+ /tmp/extension-template-headers.txt
           for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/system/backups; do
             code=$(curl -sS -o /tmp/anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
             test "$code" = "401"
