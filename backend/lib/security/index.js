@@ -15,7 +15,13 @@ const PRIVATE_PUBLIC_INDEX_PATHS = new Set([
 
 function isPrivateIndexPath(pathname = "") {
   const path = String(pathname || "").toLowerCase();
-  if (path === "/robots.txt" || path === "/sitemap.xml" || path === "/sitemap-index.xml" || /^\/api\/seo\/.+\.xml$/.test(path)) {
+  if (
+    path === "/robots.txt" ||
+    path === "/sitemap.xml" ||
+    path === "/sitemap-index.xml" ||
+    path === "/api/marketplace/v1/sitemap.xml" ||
+    /^\/api\/seo\/.+\.xml$/.test(path)
+  ) {
     return false;
   }
   if (PRIVATE_PUBLIC_INDEX_PATHS.has(path)) return true;
