@@ -10,7 +10,13 @@ const PRIVATE_PUBLIC_INDEX_PATHS = new Set([
   "/live-vendeur.html",
   "/live-camera.html",
   "/marketplace-paiement-succes.html",
-  "/marketplace-paiement-echec.html"
+  "/marketplace-paiement-echec.html",
+  "/carte.html",
+  "/annonce.html",
+  "/pages/extension",
+  "/pages/extension/",
+  "/espace-vendeur.html",
+  "/mes-annonces.html"
 ]);
 
 function isPrivateIndexPath(pathname = "") {
