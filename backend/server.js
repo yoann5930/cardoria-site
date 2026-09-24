@@ -152,10 +152,10 @@ function absoluteSiteUrl() {
   return "https://www.cardoriashop.fr";
 }
 
-function seoHead({ title, description, canonical, image, type = "website", jsonLd = [], bootstrap = "" }) {
+function seoHead({ title, description, canonical, image, type = "website", jsonLd = [], bootstrap = "", robots = "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" }) {
   const parts = [
     `<link rel="canonical" href="${escapeHtml(canonical)}">`,
-    `<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">`,
+    `<meta name="robots" content="${escapeHtml(robots)}">`,
     `<meta property="og:type" content="${escapeHtml(type)}">`,
     `<meta property="og:site_name" content="Cardoria">`,
     `<meta property="og:locale" content="fr_FR">`,
@@ -265,6 +265,7 @@ function buildLicenseSeoHtml(req, licenseSlug) {
   if (!fs.existsSync(templatePath)) return null;
   const license = getLicense(licenseSlug);
   if (!license) return null;
+  const indexable = Number(license.cardCount || 0) > 0;
   const template = fs.readFileSync(templatePath, "utf8");
   const siteUrl = absoluteSiteUrl(req);
   const canonical = `${siteUrl}/pages/licences/${encodeURIComponent(licenseSlug)}/`;
@@ -307,7 +308,14 @@ function buildLicenseSeoHtml(req, licenseSlug) {
     inLanguage: "fr-FR",
     isPartOf: { "@type": "WebSite", name: "Cardoria", url: siteUrl }
   };
-  const head = seoHead({ title, description, canonical, image, jsonLd: [collection, breadcrumbs] });
+  const head = seoHead({
+    title,
+    description,
+    canonical,
+    image,
+    robots: indexable ? "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" : "noindex,follow",
+    jsonLd: [collection, breadcrumbs]
+  });
   return injectSeoIntoTemplate(template, {
     title,
     description,
@@ -321,7 +329,10 @@ function sendLicenseSeoPage(req, res, next) {
   try {
     const html = buildLicenseSeoHtml(req, req.params.license);
     if (!html) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Licence introuvable | Cardoria</title></head><body><h1>Licence introuvable</h1></body></html>");
-    return res.status(200).set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600").type("text/html; charset=utf-8").send(html);
+    const license = getLicense(req.params.license);
+    const response = res.status(200).set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
+    if (Number(license?.cardCount || 0) <= 0) response.set("X-Robots-Tag", "noindex, follow");
+    return response.type("text/html; charset=utf-8").send(html);
   } catch (error) {
     return next(error);
   }
