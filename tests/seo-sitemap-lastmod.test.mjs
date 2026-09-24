@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
+import { URL } from 'node:url';
 import * as sitemapUrls from '../backend/lib/seo/sitemap-urls.js';
 
 // Execute the actual production module; only database-backed imports are stubbed.
@@ -16,6 +17,7 @@ async function load({ cards = [], posts = [], licenses = [], extensions = [], co
   const calls = [];
   const context = vm.createContext({});
   const imports = {
+    'node:url': { URL },
     './blog.js': { listBlogPosts: () => posts },
     './generator.js': { SITE, listExtensions: () => extensions, listGeneratedPages: () => [] },
     './sitemap-urls.js': sitemapUrls,
@@ -167,6 +169,31 @@ test('card sitemap exposes only real catalogue images with escaped metadata', as
   assert.match(xml, /<image:image>/);
   assert.match(xml, /<image:loc>https:\/\/images\.example\/card\?a=1&amp;b=2<\/image:loc>/);
   assert.match(xml, /<image:title>Pikachu &amp; Friends — Test &lt;Set&gt; — 1\/100<\/image:title>/);
+  assert.equal((xml.match(/<image:image>/g) || []).length, 1);
+});
+
+test('card sitemap refuses unsafe image URLs and falls back to a valid thumbnail', async () => {
+  const { api } = await load({ cards: [
+    {
+      license_slug: 'pokemon',
+      slug: 'unsafe-image',
+      name: 'Unsafe',
+      image_hd: 'javascript:alert(1)',
+      image_thumb: 'https://images.example/safe-thumb.png',
+      updated_at: '2026-09-24'
+    },
+    {
+      license_slug: 'pokemon',
+      slug: 'credential-image',
+      name: 'Credentials',
+      image_hd: 'https://user:pass@images.example/secret.png',
+      image_thumb: '',
+      updated_at: '2026-09-24'
+    }
+  ] });
+  const xml = api.generateCardsSitemapXml();
+  assert.match(xml, /<image:loc>https:\/\/images\.example\/safe-thumb\.png<\/image:loc>/);
+  assert.doesNotMatch(xml, /javascript:|user:pass@|secret\.png/);
   assert.equal((xml.match(/<image:image>/g) || []).length, 1);
 });
 

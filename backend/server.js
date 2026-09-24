@@ -198,7 +198,8 @@ function buildCardSeoHtml(req, card) {
   const seoMeta = buildCardSeoMeta(card);
   const title = String(card.meta?.title || seoMeta.title);
   const description = String(card.meta?.description || seoMeta.description);
-  const image = safeImage(card.imageHd) || safeImage(card.imageThumb) || `${siteUrl}/assets/logo/cardoria-premium.png`;
+  const productImage = safeImage(card.imageHd) || safeImage(card.imageThumb);
+  const socialImage = productImage || `${siteUrl}/assets/logo/cardoria-premium.png`;
   const prices = card.prices || {};
   const recommended = positivePrice(prices.recommended);
   const product = {
@@ -206,7 +207,7 @@ function buildCardSeoHtml(req, card) {
     "@type": "Product",
     name: card.name,
     description,
-    image,
+    ...(productImage ? { image: productImage } : {}),
     url: canonical,
     sku: card.number || card.id,
     brand: { "@type": "Brand", name: card.licenseName || licenseSlug },
@@ -230,7 +231,7 @@ function buildCardSeoHtml(req, card) {
     title,
     description,
     canonical,
-    image,
+    image: socialImage,
     type: "product",
     bootstrap: `window.CARDORIA_CARD_ROUTE=${safeJson({ license: licenseSlug, slug: card.slug })};`,
     jsonLd: [product, breadcrumbs]

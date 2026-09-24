@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { once } from 'node:events';
-import { cleanSeoTemplate, renderCardMain, positivePrice, safeImage } from '../backend/lib/seo/card-render.js';
+import { cleanSeoTemplate, renderCardMain, positivePrice, safeImage, cardImageAlt } from '../backend/lib/seo/card-render.js';
 import { buildCardSeoMeta } from '../backend/lib/seo/card-meta.js';
 
 // Production functions and templates are executed; only catalogue storage is
@@ -43,7 +43,28 @@ test('real card renderer sends one H1, identifiers and image before JavaScript',
   assert.match(output, /Extension test/);
   assert.match(output, /data-server-rendered="true"/);
   assert.match(output, /https:\/\/images.example.test\/card.png/);
+  assert.match(output, /alt="Pikachu 25 Extension test — Carte Pokémon FR"/);
   assert.doesNotMatch(output, /Chargement de la fiche carte/);
+});
+
+test('card image alt text describes the real card and language without keyword stuffing', () => {
+  assert.equal(
+    cardImageAlt({ ...card, name: 'Jirachi', number: '9', extension: 'EX Deoxys', language: 'fr' }),
+    'Jirachi 9 EX Deoxys — Carte Pokémon FR'
+  );
+  assert.equal(
+    cardImageAlt({ ...card, name: 'Pikachu', number: '025', extension: '151', language: 'ja' }),
+    'Pikachu 025 151 — Carte Pokémon JP'
+  );
+});
+
+test('card without a real image stays indexable without inventing a Product image', () => {
+  const output = html({ ...card, imageHd: '', imageThumb: '' });
+  const product = schemas(output).find((item) => item['@type'] === 'Product');
+  assert.ok(product);
+  assert.equal(product.image, undefined);
+  assert.match(output, /Visuel indisponible/);
+  assert.match(output, /<meta property="og:image" content="https:\/\/www\.cardoriashop\.fr\/assets\/logo\/cardoria-premium\.png">/);
 });
 
 test('canonical, description and robots are unique in the real card response', () => {

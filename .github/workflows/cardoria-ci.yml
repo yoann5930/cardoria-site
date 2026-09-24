@@ -72,6 +72,8 @@ jobs:
           node --check lib/auth/passwordReset.js
           node --check lib/engine/tcgdex-sync.js
           node --check lib/seo/card-meta.js
+          node --check lib/seo/card-render.js
+          node --check lib/seo/sitemap.js
           node --check lib/seo/marketplace-sitemap.js
           node --check lib/colissimo.js
           node --check lib/boutique/shipping.js

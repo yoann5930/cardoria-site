@@ -2,6 +2,7 @@
  * Générateurs de sitemaps Cardoria.
  * Le catalogue est découpé afin de rester largement sous la limite de 50 000 URL.
  */
+import { URL } from "node:url";
 import { listBlogPosts } from "./blog.js";
 import { listExtensions, listGeneratedPages, SITE } from "./generator.js";
 import { listLicenses } from "../engine/licenses.js";
@@ -44,6 +45,16 @@ function xmlEscape(value) {
 
 function normalizeBase(siteUrl) {
   return String(siteUrl || SITE).replace(/\/$/, "");
+}
+
+function publicImageUrl(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) return "";
+    return url.href;
+  } catch {
+    return "";
+  }
 }
 
 // A sitemap lastmod describes a real content update, not sitemap generation.
@@ -141,7 +152,7 @@ export function generateCardsSitemapXml(siteUrl = SITE, page = 1, pageSize = CAR
 
   getSitemapCards(safePageSize, offset).forEach((card) => {
     const cardUrl = `/cartes/${encodeURIComponent(card.license_slug)}/${encodeURIComponent(card.slug)}`;
-    const image = String(card.image_hd || card.image_thumb || "").trim();
+    const image = publicImageUrl(card.image_hd) || publicImageUrl(card.image_thumb);
     const imageTitle = [card.name, card.extension, card.number].filter(Boolean).join(" — ");
     urls += urlEntry(base, cardUrl, {
       lastmod: storedLastmod(card.updated_at),
