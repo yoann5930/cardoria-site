@@ -173,10 +173,17 @@ function seoHead({ title, description, canonical, image, type = "website", jsonL
 }
 
 function injectSeoIntoTemplate(template, { title, description, head, mainHtml, mainPattern }) {
+  const metaDescription = `<meta name="description" content="${escapeHtml(description)}">`;
   let html = cleanSeoTemplate(template)
-    .replace(/<title>[\s\S]*?<\/title>/i, () => `<title>${escapeHtml(title)}</title>`)
-    .replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?\s*>/i, () => `<meta name="description" content="${escapeHtml(description)}">`)
-    .replace("</head>", () => `${head}\n</head>`);
+    .replace(/<title>[\s\S]*?<\/title>/i, () => `<title>${escapeHtml(title)}</title>`);
+
+  if (/<meta\b[^>]*\bname\s*=\s*["']description["'][^>]*>/i.test(html)) {
+    html = html.replace(/<meta\b[^>]*\bname\s*=\s*["']description["'][^>]*>/i, () => metaDescription);
+  } else {
+    html = html.replace("</head>", () => `${metaDescription}\n</head>`);
+  }
+
+  html = html.replace("</head>", () => `${head}\n</head>`);
   if (mainPattern && mainHtml) html = html.replace(mainPattern, () => mainHtml);
   return html;
 }
