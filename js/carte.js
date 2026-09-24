@@ -163,21 +163,29 @@
     setLink("canonical", url);
     if (image) setMeta("og:image", image, "property");
 
-    var ldProduct = document.getElementById("cardoria-reference-product") || document.createElement("script");
-    ldProduct.id = "cardoria-reference-product";
-    ldProduct.type = "application/ld+json";
-    // Market reference prices and past sales are not current sale offers.
-    ldProduct.textContent = JSON.stringify({
+    var staleProduct = document.getElementById("cardoria-reference-product");
+    if (staleProduct) staleProduct.remove();
+    var ldPage = document.getElementById("cardoria-reference-page") || document.createElement("script");
+    ldPage.id = "cardoria-reference-page";
+    ldPage.type = "application/ld+json";
+    // Catalogue reference pages are not sale offers. Avoid Product rich-result
+    // markup so Google does not expect offers, reviews or aggregate ratings.
+    ldPage.textContent = JSON.stringify({
       "@context": "https://schema.org",
-      "@type": "Product",
-      name: card.name,
+      "@type": "WebPage",
+      name: title,
       description: desc,
       image: image || undefined,
-      brand: { "@type": "Brand", name: card.licenseName || licenseSlug },
-      sku: card.number || card.id,
-      url: url
+      url: url,
+      inLanguage: "fr-FR",
+      mainEntity: {
+        "@type": "Thing",
+        name: card.name,
+        identifier: card.number || card.id,
+        url: url
+      }
     });
-    if (!ldProduct.parentNode) document.head.appendChild(ldProduct);
+    if (!ldPage.parentNode) document.head.appendChild(ldPage);
 
     var ldCrumb = document.getElementById("cardoria-reference-breadcrumb") || document.createElement("script");
     ldCrumb.id = "cardoria-reference-breadcrumb";
