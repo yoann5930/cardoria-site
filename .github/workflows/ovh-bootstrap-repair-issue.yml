@@ -1,0 +1,74 @@
+name: OVH Bootstrap Repair Issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: ovh-bootstrap-repair
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'ovh-bootstrap-repair:') &&
+      contains(github.event.issue.labels.*.name, 'ovh-ops:deploy') &&
+      contains(github.event.issue.labels.*.name, 'ovh-branch:main')
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Authorized owner-only bootstrap repair."
+          echo "This path is reserved for repairing the OVH backup/deploy tooling."
+
+  status_before:
+    needs: authorize
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: status
+      branch: main
+    secrets: inherit
+
+  deploy:
+    needs: status_before
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: deploy
+      branch: main
+    secrets: inherit
+
+  healthcheck:
+    needs: deploy
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: healthcheck
+      branch: main
+    secrets: inherit
+
+  backup:
+    needs: healthcheck
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: backup
+      branch: main
+    secrets: inherit
+
+  backup_check:
+    needs: backup
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: backup-check
+      branch: main
+    secrets: inherit
+
+  report:
+    needs: backup_check
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: report
+      branch: main
+    secrets: inherit
