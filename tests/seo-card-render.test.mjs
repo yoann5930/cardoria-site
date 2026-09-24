@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { once } from 'node:events';
 import { cleanSeoTemplate, renderCardMain, positivePrice, safeImage } from '../backend/lib/seo/card-render.js';
+import { buildCardSeoMeta } from '../backend/lib/seo/card-meta.js';
 
 // Production functions and templates are executed; only catalogue storage is
 // replaced with fixtures. No server bootstrap, payments or production database.
@@ -16,11 +17,11 @@ const start = source.indexOf('function escapeHtml(');
 const end = source.indexOf('function sendPublicFile(', start);
 assert.ok(start >= 0 && end > start);
 const SITE = 'https://www.cardoriashop.fr';
-const card = { id: 'seo-fixture', slug: 'pikachu-test', license: 'pokemon', licenseName: 'Pokémon', name: 'Pikachu', extension: 'Extension test', number: '25', rarity: 'Commune', imageThumb: 'https://images.example.test/card.png', prices: { avg: 0, low: 0, high: 0, recommended: 0 }, salesHistory: [] };
+const card = { id: 'seo-fixture', slug: 'pikachu-test', license: 'pokemon', licenseName: 'Pokémon', language: 'fr', name: 'Pikachu', extension: 'Extension test', number: '25', rarity: 'Commune', imageThumb: 'https://images.example.test/card.png', prices: { avg: 0, low: 0, high: 0, recommended: 0 }, salesHistory: [] };
 const CARD_PATH = '/cartes/pokemon/' + card.slug;
 
 function renderers(publicRoot = ROOT) {
-  const context = vm.createContext({ fs, path, PUBLIC_ROOT: publicRoot, cleanSeoTemplate, renderCardMain, positivePrice, safeImage,
+  const context = vm.createContext({ fs, path, PUBLIC_ROOT: publicRoot, cleanSeoTemplate, renderCardMain, positivePrice, safeImage, buildCardSeoMeta,
     getCardBySlug: (_license, slug) => slug === card.slug ? card : null,
     getLicense: (slug) => slug === 'pokemon' ? { slug, name: 'Pokémon' } : null,
     getLicenseSeoContent: () => ({ title: 'Catalogue Pokémon | Cardoria', metaDescription: 'Catalogue de cartes Pokémon.', h1: 'Cartes Pokémon', content: { intro: 'Retrouvez les cartes et leurs extensions.' } }),
@@ -52,6 +53,31 @@ test('canonical, description and robots are unique in the real card response', (
   assert.equal(count(output, /name="robots"/g), 1);
   assert.ok(output.includes(`href="${SITE}${CARD_PATH}"`));
   assert.ok(output.indexOf('name="cardoria:server-seo"') < output.indexOf('src="/js/seo.js"'));
+});
+
+test('card SSR title and description include identity, extension, language and licence', () => {
+  const jirachi = {
+    ...card,
+    slug: 'jirachi-ex-deoxys-9',
+    name: 'Jirachi',
+    number: '9',
+    extension: 'EX Deoxys',
+    rarity: 'Rare',
+    language: 'fr'
+  };
+  const output = html(jirachi);
+  assert.match(output, /<title>Jirachi 9 EX Deoxys FR – Carte Pokémon, prix &amp; cote \| Cardoria<\/title>/);
+  assert.match(output, /<meta name="description" content="Jirachi 9, carte Pokémon de l&#39;extension EX Deoxys, version FR, rareté Rare\. Consultez son visuel, son prix et sa cote sur Cardoria\.">/);
+});
+
+test('card SEO language codes are explicit and metadata stays compact', () => {
+  for (const [language, code] of [['fr', 'FR'], ['en', 'EN'], ['ja', 'JP'], ['ko', 'KR']]) {
+    const meta = buildCardSeoMeta({ ...card, language });
+    assert.ok(meta.title.includes(' ' + code + ' – Carte Pokémon, prix & cote | Cardoria'), meta.title);
+    assert.ok(meta.title.length <= 95, meta.title);
+    assert.ok(meta.description.length <= 158, meta.description);
+    assert.ok(meta.description.includes('version ' + code), meta.description);
+  }
 });
 
 test('unknown prices are not zero-valued offers or reference estimates', () => {

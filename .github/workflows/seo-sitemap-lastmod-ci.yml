@@ -61,6 +61,7 @@ jobs:
           node --check backend/lib/seo/sitemap.js
           node --check backend/lib/seo/sitemap-urls.js
           node --check backend/lib/seo/card-render.js
+          node --check backend/lib/seo/card-meta.js
           node --check backend/server.js
           node --check backend/lib/security/index.js
           node --check backend/routes/marketplace-v1.js
