@@ -26,7 +26,7 @@ import liveRoutes from "./routes/live.js";
 import liveAdminRoutes from "./routes/live-admin.js";
 import { seedEngineIfEmpty } from "./lib/engine/seed.js";
 import { getCardBySlug, searchCards } from "./lib/engine/cards.js";
-import { getLicense } from "./lib/engine/licenses.js";
+import { getLicense, listLicenses } from "./lib/engine/licenses.js";
 import { syncPokemonCatalog, syncPokemonReferenceCatalog } from "./lib/engine/tcgdex-sync.js";
 import { initMarketplace } from "./lib/marketplace/index.js";
 import { getListingV1, getListingV1BySlug } from "./lib/marketplace/v1/listings.js";
@@ -254,6 +254,68 @@ function sendCardSeoPage(req, res, next) {
       .set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600")
       .type("text/html; charset=utf-8")
       .send(buildCardSeoHtml(req, card));
+  } catch (error) {
+    return next(error);
+  }
+}
+
+function buildLicenseHubSeoHtml(req) {
+  const templatePath = path.join(PUBLIC_ROOT, "pages", "licences", "index.html");
+  const template = fs.readFileSync(templatePath, "utf8");
+  const siteUrl = absoluteSiteUrl(req);
+  const canonical = `${siteUrl}/pages/licences/`;
+  const licenses = listLicenses().filter((license) => Number(license.cardCount || 0) > 0);
+  const names = licenses.map((license) => license.name).filter(Boolean);
+  const title = names.length
+    ? `Catalogues ${names.slice(0, 4).join(", ")} | Cardoria`
+    : "Catalogues cartes à collectionner | Cardoria";
+  const description = names.length
+    ? `Explorez les licences réellement référencées sur Cardoria : ${names.join(", ")}. Accédez aux extensions, fiches cartes, prix et cotes.`
+    : "Explorez les catalogues de cartes à collectionner référencés sur Cardoria.";
+  const cards = licenses.map((license) => `<a href="/pages/licences/${encodeURIComponent(license.slug)}/"><span class="icon">${escapeHtml(license.icon || "🃏")}</span><strong>${escapeHtml(license.name)}</strong><small>${Number(license.cardCount || 0)} cartes</small></a>`).join("");
+  const mainHtml = `<main class="container seo-page" id="licenceHubSeoRoot">
+    <span class="badge">LICENCES TCG</span>
+    <h1>Licences de cartes référencées sur Cardoria</h1>
+    <p class="seo-lead">Accédez aux licences contenant actuellement des cartes actives, puis parcourez leurs extensions et fiches détaillées.</p>
+    <div class="seo-catalog" id="licenceGrid">${cards || "<p>Catalogue en cours de référencement.</p>"}</div>
+  </main>`;
+  const collection = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Licences de cartes référencées sur Cardoria",
+    description,
+    url: canonical,
+    inLanguage: "fr-FR",
+    hasPart: licenses.map((license) => ({
+      "@type": "CollectionPage",
+      name: license.name,
+      url: `${siteUrl}/pages/licences/${encodeURIComponent(license.slug)}/`
+    }))
+  };
+  const head = seoHead({
+    title,
+    description,
+    canonical,
+    image: `${siteUrl}/assets/logo/cardoria-premium.png`,
+    type: "website",
+    jsonLd: [collection]
+  });
+  return injectSeoIntoTemplate(template, {
+    title,
+    description,
+    head,
+    mainHtml,
+    mainPattern: /<main class="container seo-page">[\s\S]*?<\/main>/i
+  });
+}
+
+function sendLicenseHubSeoPage(req, res, next) {
+  try {
+    return res
+      .status(200)
+      .set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600")
+      .type("text/html; charset=utf-8")
+      .send(buildLicenseHubSeoHtml(req));
   } catch (error) {
     return next(error);
   }
@@ -555,6 +617,7 @@ app.get("/carte.html", (req, res, next) => {
   if (!req.query.license || !req.query.slug) return next();
   return res.redirect(301, `/cartes/${encodeURIComponent(req.query.license)}/${encodeURIComponent(req.query.slug)}`);
 });
+app.get("/pages/licences/", sendLicenseHubSeoPage);
 app.get("/pages/licences/:license", (req, res, next) => {
   // Express matches an optional trailing slash: do not redirect the canonical URL to itself.
   if (req.path.endsWith("/")) return next();
