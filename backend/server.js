@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { cleanSeoTemplate, renderCardMain, positivePrice, safeImage } from "./lib/seo/card-render.js";
+import { cleanSeoTemplate, renderCardMain, positivePrice, safeImage, cardExtensionUrl } from "./lib/seo/card-render.js";
 import { buildCardSeoMeta } from "./lib/seo/card-meta.js";
 import estimationRoutes from "./routes/estimation.js";
 import rachatRoutes from "./routes/rachat.js";
@@ -195,6 +195,7 @@ function buildCardSeoHtml(req, card) {
   const licenseSlug = card.license || card.licenseSlug || "pokemon";
   const canonical = `${siteUrl}/cartes/${encodeURIComponent(licenseSlug)}/${encodeURIComponent(card.slug)}`;
   const extension = card.extension || "Pokémon";
+  const extensionUrl = cardExtensionUrl(card);
   const seoMeta = buildCardSeoMeta(card);
   const title = String(card.meta?.title || seoMeta.title);
   const description = String(card.meta?.description || seoMeta.description);
@@ -224,7 +225,8 @@ function buildCardSeoHtml(req, card) {
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Accueil", item: `${siteUrl}/` },
       { "@type": "ListItem", position: 2, name: card.licenseName || licenseSlug, item: `${siteUrl}/pages/licences/${encodeURIComponent(licenseSlug)}/` },
-      { "@type": "ListItem", position: 3, name: card.name, item: canonical }
+      ...(extensionUrl ? [{ "@type": "ListItem", position: 3, name: extension, item: `${siteUrl}${extensionUrl}` }] : []),
+      { "@type": "ListItem", position: extensionUrl ? 4 : 3, name: card.name, item: canonical }
     ]
   };
   const head = seoHead({
