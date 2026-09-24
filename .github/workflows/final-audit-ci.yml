@@ -126,10 +126,19 @@ jobs:
           curl -fsS -H 'Host: www.cardoriashop.fr' http://127.0.0.1:10000/api/marketplace/v1/sitemap.xml > /tmp/marketplace-sitemap.xml
           grep -q '^<?xml version="1.0" encoding="UTF-8"?>' /tmp/marketplace-sitemap.xml
           grep -q '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' /tmp/marketplace-sitemap.xml
-          for path in /live-vendeur.html /live-camera.html /marketplace-paiement-succes.html /marketplace-paiement-echec.html; do
+          for path in /live-vendeur.html /live-camera.html /marketplace-paiement-succes.html /marketplace-paiement-echec.html /carte.html /annonce.html /pages/extension/ /espace-vendeur.html /mes-annonces.html; do
             curl -fsSI "http://127.0.0.1:10000${path}" | tr -d '\r' > /tmp/robots-headers.txt
             grep -qi '^x-robots-tag: noindex, nofollow, noarchive$' /tmp/robots-headers.txt
           done
+          curl -fsSI http://127.0.0.1:10000/carte.html | tr -d '\r' > /tmp/card-template-headers.txt
+          grep -q '^HTTP/.* 301' /tmp/card-template-headers.txt
+          grep -qi '^location: /pages/licences/$' /tmp/card-template-headers.txt
+          curl -fsSI http://127.0.0.1:10000/annonce.html | tr -d '\r' > /tmp/listing-template-headers.txt
+          grep -q '^HTTP/.* 301' /tmp/listing-template-headers.txt
+          grep -qi '^location: /marketplace.html$' /tmp/listing-template-headers.txt
+          curl -fsSI http://127.0.0.1:10000/pages/extension/ | tr -d '\r' > /tmp/extension-template-headers.txt
+          grep -q '^HTTP/.* 301' /tmp/extension-template-headers.txt
+          grep -qi '^location: /pages/licences/$' /tmp/extension-template-headers.txt
           for path in /api/admin/dashboard /api/admin/users /api/admin/payments/summary /api/admin/marketplace/orders /api/admin/live/sessions /api/system/backups; do
             code=$(curl -sS -o /tmp/anon.json -w '%{http_code}' "http://127.0.0.1:10000${path}")
             test "$code" = "401"
