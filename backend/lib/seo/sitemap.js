@@ -2,6 +2,7 @@
  * Générateurs de sitemaps Cardoria.
  * Le catalogue est découpé afin de rester largement sous la limite de 50 000 URL.
  */
+import { URL } from "node:url";
 import { listBlogPosts } from "./blog.js";
 import { listExtensions, listGeneratedPages, SITE } from "./generator.js";
 import { listLicenses } from "../engine/licenses.js";
