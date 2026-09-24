@@ -24,10 +24,11 @@ function seoLicenseName(card = {}) {
 function compactSeoTitle(prefix, suffix, maxLength = 95) {
   const cleanPrefix = String(prefix || "").replace(/\s+/g, " ").trim();
   const cleanSuffix = String(suffix || "").replace(/\s+/g, " ").trim();
-  const full = cleanPrefix + cleanSuffix;
+  const full = [cleanPrefix, cleanSuffix].filter(Boolean).join(" ");
   if (full.length <= maxLength) return full;
-  const room = Math.max(12, maxLength - cleanSuffix.length - 2);
-  return cleanPrefix.slice(0, room).trimEnd() + "…" + cleanSuffix;
+  if (!cleanSuffix) return cleanPrefix.slice(0, maxLength - 1).trimEnd() + "…";
+  const room = Math.max(12, maxLength - cleanSuffix.length - 3);
+  return cleanPrefix.slice(0, room).trimEnd() + "… " + cleanSuffix;
 }
 
 export function buildCardSeoMeta(card = {}) {
@@ -41,7 +42,7 @@ export function buildCardSeoMeta(card = {}) {
   const licenseName = seoLicenseName(card);
   const identity = [name, number].filter(Boolean).join(" ");
 
-  const titleSuffix = ` – Carte ${licenseName}, prix & cote | Cardoria`;
+  const titleSuffix = `– Carte ${licenseName}, prix & cote | Cardoria`;
   const titleContext = [identity, extension, languageCode].filter(Boolean).join(" ");
   const title = compactSeoTitle(titleContext, titleSuffix);
 
