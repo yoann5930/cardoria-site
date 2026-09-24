@@ -1,3 +1,5 @@
+import { slugifyExtensionName } from "./sitemap-urls.js";
+
 const htmlEscape = (value = '') => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
 export function positivePrice(value) {
@@ -20,6 +22,22 @@ export function cardImageAlt(card = {}) {
   const license = String(card.licenseName || card.license || card.licenseSlug || 'TCG').trim();
   const identity = [card.name, card.number, card.extension].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
   return [identity, `Carte ${license}${language ? ' ' + language : ''}`].filter(Boolean).join(' — ');
+}
+
+export function cardExtensionUrl(card = {}) {
+  const license = String(card.license || card.licenseSlug || "pokemon").trim();
+  const extensionSlug = slugifyExtensionName(card.extension);
+  if (!/^[a-z0-9-]+$/.test(license) || !extensionSlug) return "";
+  return `/extensions/${encodeURIComponent(license)}/${encodeURIComponent(extensionSlug)}`;
+}
+
+function cardLanguageLabel(language = "fr") {
+  return {
+    fr: "française",
+    en: "anglaise",
+    ja: "japonaise",
+    ko: "coréenne"
+  }[String(language || "fr").toLowerCase()] || String(language || "").trim();
 }
 
 function attribute(tag, name) {
@@ -52,7 +70,10 @@ export function renderCardMain(card) {
   const license = card.license || card.licenseSlug || 'pokemon';
   const licenseName = card.licenseName || license;
   const name = card.name || 'Carte';
+  const languageLabel = cardLanguageLabel(card.language);
+  const extensionUrl = cardExtensionUrl(card);
   const detail = (label, value) => `<div class="engine-meta-item"><label>${htmlEscape(label)}</label><strong>${htmlEscape(value || 'Non renseigné')}</strong></div>`;
+  const detailHtml = (label, valueHtml) => `<div class="engine-meta-item"><label>${htmlEscape(label)}</label><strong>${valueHtml}</strong></div>`;
   const money = (value) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
   const prices = card.prices || {};
   const priceBox = (label, value, recommended = false) => {
@@ -63,11 +84,25 @@ export function renderCardMain(card) {
   const visual = image
     ? `<img src="${htmlEscape(image)}" alt="${htmlEscape(cardImageAlt(card))}" loading="eager" fetchpriority="high" width="360" height="504">`
     : '<div class="placeholder" aria-label="Visuel indisponible">Visuel indisponible</div>';
+  const extensionDetail = extensionUrl
+    ? detailHtml('Extension', `<a href="${extensionUrl}">${htmlEscape(card.extension)}</a>`)
+    : detail('Extension', card.extension);
+  const breadcrumbExtension = extensionUrl
+    ? ` › <a href="${extensionUrl}">${htmlEscape(card.extension)}</a>`
+    : "";
+  const identity = [name, card.number].filter(Boolean).join(' ');
+  const leadParts = [
+    `${htmlEscape(identity)} est une carte ${htmlEscape(licenseName)}`,
+    languageLabel ? `en version ${htmlEscape(languageLabel)}` : "",
+    card.extension ? `de l’extension ${htmlEscape(card.extension)}` : "",
+    card.rarity ? `de rareté ${htmlEscape(card.rarity)}` : ""
+  ].filter(Boolean);
   return `<main class="container engine-hero" id="cardPage" data-server-rendered="true">
-<nav class="engine-breadcrumb" aria-label="Fil d’Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/${encodeURIComponent(license)}/">${htmlEscape(licenseName)}</a> › ${htmlEscape(name)}</nav>
+<nav class="engine-breadcrumb" aria-label="Fil d’Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/${encodeURIComponent(license)}/">${htmlEscape(licenseName)}</a>${breadcrumbExtension} › ${htmlEscape(name)}</nav>
 <h1>${htmlEscape(name)}</h1>
+<p class="seo-lead">${leadParts.join(' ') }.</p>
 <div class="engine-card-layout"><div class="engine-card-visual">${visual}</div><div>
-<div class="engine-meta-grid">${detail('Extension', card.extension)}${detail('Numéro', card.number)}${detail('Rareté', card.rarity)}${detail('Illustrateur', card.illustration)}${detail('État réf.', card.condition)}${detail('Licence', licenseName)}</div>
+<div class="engine-meta-grid">${extensionDetail}${detail('Numéro', card.number)}${detail('Langue', languageLabel)}${detail('Rareté', card.rarity)}${detail('Illustrateur', card.illustration)}${detail('État réf.', card.condition)}${detail('Licence', licenseName)}</div>
 <div class="engine-prices">${priceBox('Prix moyen', prices.avg)}${priceBox('Prix bas', prices.low)}${priceBox('Prix haut', prices.high)}${priceBox('Prix conseillé', prices.recommended, true)}</div>
 <p class="small">Données de référence lorsqu’elles sont disponibles, et non une offre de vente. La valeur dépend notamment de l’état, de la langue et de la version de la carte.</p>
 <div class="actions" style="margin-top:18px"><a class="btn btn-primary" href="/estimation.html?card=${encodeURIComponent(card.id || '')}">Faire estimer cette carte</a> <a class="btn btn-secondary" href="/rachat-cartes.html">Vendre à Cardoria</a></div>
