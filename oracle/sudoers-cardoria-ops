@@ -3,6 +3,7 @@ github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops status
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops healthcheck
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops restart
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops backup
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops backup-prune
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops nginx-test
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops logs
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops rollback
