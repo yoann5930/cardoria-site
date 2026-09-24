@@ -91,7 +91,8 @@ function urlBlocks(xml) {
 }
 
 function attr(tag, name) {
-  return new RegExp('\\b' + name + '\\s*=\\s*["\\']([^"\\']*)["\\']', 'i').exec(tag)?.[1] || '';
+  const match = new RegExp("\\b" + name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')", "i").exec(tag);
+  return match?.[1] ?? match?.[2] ?? '';
 }
 
 function stripHtml(value) {
