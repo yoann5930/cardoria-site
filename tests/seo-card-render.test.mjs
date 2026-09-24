@@ -37,10 +37,15 @@ const html = (value = card) => api.buildCardSeoHtml({}, value);
 const schemas = (value) => [...value.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
 const count = (value, pattern) => [...value.matchAll(pattern)].length;
 
+test('card H1 stays concise and includes the catalogue number', () => {
+  assert.match(html({ ...card, name: 'Jirachi', number: '9', extension: 'EX Deoxys' }), /<h1>Jirachi 9<\/h1>/);
+  assert.match(html({ ...card, name: 'Pikachu', number: '' }), /<h1>Pikachu<\/h1>/);
+});
+
 test('real card renderer sends one H1, identifiers and image before JavaScript', () => {
   const output = html();
   assert.equal(count(output, /<h1\b/g), 1);
-  assert.match(output, /<h1>Pikachu<\/h1>/);
+  assert.match(output, /<h1>Pikachu 25<\/h1>/);
   assert.match(output, /Extension test/);
   assert.match(output, /data-server-rendered="true"/);
   assert.match(output, /https:\/\/images.example.test\/card.png/);
@@ -194,7 +199,7 @@ test('metadata cleanup preserves verification, styles and explicit noindex', () 
 
 test('OVH mirror template receives the same useful initial card content', () => {
   const output = renderers(path.join(ROOT, 'backend/public')).buildCardSeoHtml({}, card);
-  assert.match(output, /<h1>Pikachu<\/h1>/);
+  assert.match(output, /<h1>Pikachu 25<\/h1>/);
   assert.equal(count(output, /rel="canonical"/g), 1);
 });
 
