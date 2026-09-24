@@ -196,8 +196,8 @@ function buildCardSeoHtml(req, card) {
   const canonical = `${siteUrl}/cartes/${encodeURIComponent(licenseSlug)}/${encodeURIComponent(card.slug)}`;
   const extension = card.extension || "Pokémon";
   const seoMeta = buildCardSeoMeta(card);
-  const title = seoMeta.title;
-  const description = seoMeta.description;
+  const title = String(card.meta?.title || seoMeta.title);
+  const description = String(card.meta?.description || seoMeta.description);
   const image = safeImage(card.imageHd) || safeImage(card.imageThumb) || `${siteUrl}/assets/logo/cardoria-premium.png`;
   const prices = card.prices || {};
   const recommended = positivePrice(prices.recommended);
