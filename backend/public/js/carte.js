@@ -95,7 +95,7 @@
 
     root.innerHTML =
       '<nav class="engine-breadcrumb"><a href="/">Accueil</a> › <a href="/pages/licences/' + encodeURIComponent(licenseSlug) + '/">' + escape(card.licenseName || licenseSlug) + '</a> › ' + escape(card.name) + "</nav>" +
-      "<h1>" + escape(card.name) + "</h1>" +
+      "<h1>" + escape([card.name, card.number].filter(Boolean).join(" ")) + "</h1>" +
       '<div class="engine-card-layout">' +
       '<div class="engine-card-visual">' + img + "</div>" +
       "<div>" +
