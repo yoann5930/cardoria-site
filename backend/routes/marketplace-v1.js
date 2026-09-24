@@ -12,6 +12,7 @@ import { createInvoiceForOrder, getInvoiceHtmlByOrder } from "../lib/marketplace
 import { createDispute } from "../lib/marketplace/v1/disputes.js";
 import { getMarketplaceStats } from "../lib/marketplace/v1/index.js";
 import { isMarketplaceDemoMode } from "../lib/marketplace/demo-mode.js";
+import { generateMarketplaceSitemapXml } from "../lib/seo/marketplace-sitemap.js";
 import { listSellerPlans } from "../lib/subscriptions/plans.js";
 import { assertActiveSellerPlan, getSellerPlanState } from "../lib/subscriptions/seller-plans.js";
 import paypalMarketplaceRoutes from "./marketplace-paypal.js";
@@ -82,10 +83,9 @@ router.get("/v1/sellers/:id/subscription", (req, res) => {
 });
 router.get("/v1/sitemap/listings", (req, res) => res.json({ ok: true, entries: getListingsSitemapEntries(Number(req.query.limit) || 5000) }));
 router.get("/v1/sitemap.xml", (req, res) => {
-  const base = "https://www.cardoriashop.fr";
   const entries = getListingsSitemapEntries(Number(req.query.limit) || 5000);
-  const urls = entries.map((e) => `  <url><loc>${base}${e.url}</loc>${e.lastmod ? `<lastmod>${e.lastmod}</lastmod>` : ""}<changefreq>daily</changefreq><priority>0.7</priority></url>`).join("\n");
-  res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`);
+  res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=1800");
+  res.type("application/xml").send(generateMarketplaceSitemapXml(entries));
 });
 router.get("/v1/listings/slug/:slug", (req, res) => {
   const listing = publicListingOrNull(getListingV1BySlug(req.params.slug, { trackView: true }));

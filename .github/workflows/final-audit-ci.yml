@@ -36,6 +36,7 @@ jobs:
         run: |
           node --check backend/server.js
           node --check backend/lib/security/index.js
+          node --check backend/lib/seo/marketplace-sitemap.js
           node --check backend/routes/auth.js
           node --check backend/routes/payments.js
           node --check backend/routes/payments-admin.js
@@ -112,6 +113,16 @@ jobs:
           curl -fsS http://127.0.0.1:10000/api/payments/status > /tmp/payments.json
           grep -q '"provider":"sumup"' /tmp/payments.json
           grep -q '"webhookMode":"api-verification"' /tmp/payments.json
+          curl -fsSI -H 'Host: www.cardoriashop.fr' http://127.0.0.1:10000/api/marketplace/v1/sitemap.xml | tr -d '\r' > /tmp/marketplace-sitemap-headers.txt
+          grep -qi '^content-type: application/xml' /tmp/marketplace-sitemap-headers.txt
+          if grep -qi '^x-robots-tag: .*noindex' /tmp/marketplace-sitemap-headers.txt; then
+            echo "Marketplace sitemap must stay crawlable"
+            exit 1
+          fi
+          grep -qi '^x-robots-tag: index, follow' /tmp/marketplace-sitemap-headers.txt
+          curl -fsS -H 'Host: www.cardoriashop.fr' http://127.0.0.1:10000/api/marketplace/v1/sitemap.xml > /tmp/marketplace-sitemap.xml
+          grep -q '^<?xml version="1.0" encoding="UTF-8"?>' /tmp/marketplace-sitemap.xml
+          grep -q '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' /tmp/marketplace-sitemap.xml
           for path in /live-vendeur.html /live-camera.html /marketplace-paiement-succes.html /marketplace-paiement-echec.html; do
             curl -fsSI "http://127.0.0.1:10000${path}" | tr -d '\r' > /tmp/robots-headers.txt
             grep -qi '^x-robots-tag: noindex, nofollow, noarchive$' /tmp/robots-headers.txt

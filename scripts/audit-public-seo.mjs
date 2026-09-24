@@ -105,6 +105,12 @@ if (index.check.xmlKind === 'sitemapindex') {
     child.check.entryCount = urls.length;
     child.check.sampleLocations = urls.slice(0, 3);
     child.check.lastmodCount = [...child.text.matchAll(/<lastmod>/g)].length;
+    if (/\bnoindex\b/i.test(child.check.xRobotsTag || '')) {
+      report.warnings.push(`${address}: sitemap response must not carry noindex`);
+    }
+    if (child.check.status === 200 && !/xml/i.test(child.check.contentType || '')) {
+      report.warnings.push(`${address}: sitemap content-type is not XML`);
+    }
     const sampleCard = urls.find((url) => url.startsWith(BASE + '/cartes/'));
     if (sampleCard) pageMetadata(await readPublic(sampleCard));
   }
