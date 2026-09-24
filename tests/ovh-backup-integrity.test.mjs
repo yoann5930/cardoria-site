@@ -25,3 +25,9 @@ test("OVH backup wrapper propagates backup script failures", () => {
   assert.match(ops, /pg_restore -l "\$dump"/);
   assert.match(ops, /tar -tzf "\$tarfile"/);
 });
+
+test("external data archive excludes nested local backup history", () => {
+  assert.match(backup, /dirs\[:\] = \[name for name in dirs if name != 'backups'\]/);
+  assert.match(ops, /du -sh "\$APP_DIR\/backend\/data\/backups"/);
+  assert.match(ops, /du -sh "\$BACKUP_DIR"/);
+});
