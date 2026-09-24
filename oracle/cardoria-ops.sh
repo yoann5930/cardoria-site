@@ -27,7 +27,7 @@ redact() {
 
 require_action() {
   case "$1" in
-    status|healthcheck|deploy|restart|backup|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check) return 0 ;;
+    status|healthcheck|deploy|restart|backup|backup-prune|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check) return 0 ;;
     *) echo "FORBIDDEN action"; exit 1 ;;
   esac
 }
@@ -292,6 +292,19 @@ cmd_report() {
   echo "=== CARDORIA OPS REPORT ==="
   cmd_status
   cmd_auth_reset_status
+}
+
+cmd_backup_prune() {
+  echo "=== BACKUP PRUNE ==="
+  if [ ! -f "$APP_DIR/oracle/prune-backups.py" ]; then
+    echo "backup_prune_script: missing"
+    return 1
+  fi
+  python3 "$APP_DIR/oracle/prune-backups.py" "$BACKUP_DIR"
+  echo "--- disk after prune ---"
+  df -hT / | awk 'NR==1 || /\/$/'
+  du -sh "$BACKUP_DIR" 2>/dev/null || true
+  echo "BACKUP PRUNE OK"
 }
 
 cmd_backup_check() {
@@ -687,6 +700,7 @@ case "$ACTION" in
   nginx-test) cmd_nginx_test ;;
   logs) cmd_logs ;;
   backup) cmd_backup ;;
+  backup-prune) cmd_backup_prune ;;
   restart) cmd_restart ;;
   deploy)
     BRANCH=${1:-}
