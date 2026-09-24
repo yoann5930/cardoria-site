@@ -308,7 +308,7 @@ async function browserCheck({ javascript = true, apiFailure = false, pagePath = 
 
 test('Chromium without JavaScript displays the full initial reference card', browserOptions, async () => {
   await browserCheck({ javascript: false }, async (page) => {
-    assert.equal(await page.locator('#cardPage h1').textContent(), card.name);
+    assert.equal(await page.locator('#cardPage h1').textContent(), [card.name, card.number].filter(Boolean).join(' '));
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), SITE + CARD_PATH);
     assert.equal(await page.locator('.engine-price-box strong').allTextContents().then((v) => v.join('|')), Array(4).fill('Non disponible').join('|'));
   });
@@ -317,7 +317,7 @@ test('Chromium without JavaScript displays the full initial reference card', bro
 test('Chromium with JavaScript keeps the card canonical and exactly one Product and breadcrumb', browserOptions, async () => {
   await browserCheck({}, async (page) => {
     await page.locator('#historyPeriods').waitFor(); // Proves carte.js rendered.
-    assert.equal(await page.locator('#cardPage h1').textContent(), card.name);
+    assert.equal(await page.locator('#cardPage h1').textContent(), [card.name, card.number].filter(Boolean).join(' '));
     assert.equal(await page.locator('link[rel="canonical"]').count(), 1);
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), SITE + CARD_PATH);
     assert.match(await page.title(), /Pikachu/);
@@ -332,7 +332,7 @@ test('Chromium with JavaScript keeps the card canonical and exactly one Product 
 
 test('Chromium retains useful server HTML when the catalogue API is unavailable', browserOptions, async () => {
   await browserCheck({ apiFailure: true }, async (page) => {
-    assert.equal(await page.locator('#cardPage h1').textContent(), card.name);
+    assert.equal(await page.locator('#cardPage h1').textContent(), [card.name, card.number].filter(Boolean).join(' '));
     assert.equal(await page.locator('#cardPage').getAttribute('data-server-rendered'), 'true');
     assert.doesNotMatch(await page.locator('#cardPage').textContent(), /Erreur de chargement/);
   });
