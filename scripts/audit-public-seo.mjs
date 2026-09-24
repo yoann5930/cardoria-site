@@ -1,124 +1,323 @@
 import fs from 'node:fs/promises';
 
-// Diagnostic trigger 2026-09-25: no production behavior change; PR must not be merged.
-
-// Public GET requests only: no credentials, administration endpoints or mutations.
-// These checks do not query Search Console or prove Google indexing.
+// Temporary deep production SEO diagnostic. Public GET/HEAD requests only.
+// This branch is diagnostic-only and must never be merged.
 const BASE = 'https://www.cardoriashop.fr';
 const ALLOWED = new Set(['www.cardoriashop.fr', 'cardoriashop.fr']);
-const report = { checkedAt: new Date().toISOString(), checks: [], warnings: [], indexingVerified: false };
+const report = {
+  checkedAt: new Date().toISOString(),
+  productionBase: BASE,
+  sitemap: {},
+  licences: [],
+  technicalPages: [],
+  cards: {},
+  warnings: [],
+  indexingVerified: false
+};
 
-function allowedUrl(value) {
+function allowed(value) {
   const url = new URL(value);
   if (url.protocol !== 'https:' || !ALLOWED.has(url.hostname) || url.port || url.username || url.password) {
-    throw new Error('Redirect or sitemap URL outside the permitted public HTTPS origins');
+    throw new Error('URL outside allowed Cardoria HTTPS origins');
   }
   return url;
 }
 
-async function readPublic(address) {
-  const check = { requestedUrl: address, redirects: [] };
-  report.checks.push(check);
-  try {
-    let url = allowedUrl(address);
-    for (let hop = 0; hop < 5; hop += 1) {
-      const response = await fetch(url, {
-        redirect: 'manual',
-        signal: AbortSignal.timeout(12000),
-        headers: { 'User-Agent': 'CardoriaSEOAudit/1.0', Accept: 'text/html,application/xml,text/plain,*/*;q=0.5' }
-      });
-      check.status = response.status;
-      check.finalUrl = url.href;
-      check.contentType = response.headers.get('content-type');
-      check.xRobotsTag = response.headers.get('x-robots-tag');
-      if ([301, 302, 303, 307, 308].includes(response.status)) {
-        const location = response.headers.get('location');
-        if (!location) throw new Error('Redirect without Location');
-        const next = new URL(location, url);
-        check.redirects.push({ status: response.status, from: url.href, to: next.href });
-        await response.body?.cancel();
-        url = allowedUrl(next.href);
-        continue;
+async function read(address, maxBytes = 20 * 1024 * 1024) {
+  let url = allowed(address);
+  const redirects = [];
+  for (let hop = 0; hop < 5; hop += 1) {
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(25000),
+      headers: {
+        'User-Agent': 'CardoriaSEODeepAudit/1.0',
+        Accept: 'text/html,application/xml,text/plain,*/*;q=0.5'
       }
-      // Bound downloaded sitemap/HTML size to 5 MiB.
-      const reader = response.body?.getReader();
-      const chunks = [];
-      let size = 0;
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          size += value.byteLength;
-          if (size > 5 * 1024 * 1024) {
-            await reader.cancel();
-            throw new Error('Response exceeds the 5 MiB audit limit');
-          }
-          chunks.push(value);
+    });
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get('location');
+      if (!location) throw new Error('Redirect without Location');
+      const next = allowed(new URL(location, url).href);
+      redirects.push({ status: response.status, from: url.href, to: next.href });
+      await response.body?.cancel();
+      url = next;
+      continue;
+    }
+    const reader = response.body?.getReader();
+    const chunks = [];
+    let size = 0;
+    if (reader) {
+      while (true) {
+        const part = await reader.read();
+        if (part.done) break;
+        size += part.value.byteLength;
+        if (size > maxBytes) {
+          await reader.cancel();
+          throw new Error('Response exceeds audit size limit');
         }
+        chunks.push(part.value);
       }
-      check.bytes = size;
-      if (!response.ok) report.warnings.push(`${address}: HTTP ${response.status}`);
-      return { check, text: Buffer.concat(chunks).toString('utf8') };
     }
-    throw new Error('Too many redirects');
+    return {
+      requestedUrl: address,
+      finalUrl: url.href,
+      redirects,
+      status: response.status,
+      contentType: response.headers.get('content-type') || '',
+      xRobotsTag: response.headers.get('x-robots-tag') || '',
+      text: Buffer.concat(chunks).toString('utf8'),
+      bytes: size
+    };
+  }
+  throw new Error('Too many redirects');
+}
+
+function xmlDecode(value) {
+  return String(value || '')
+    .replaceAll('&amp;', '&')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&apos;', "'");
+}
+
+function locs(xml) {
+  return [...xml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)].map((m) => xmlDecode(m[1]));
+}
+
+function urlBlocks(xml) {
+  return [...xml.matchAll(/<url\b[^>]*>([\s\S]*?)<\/url>/gi)].map((m) => m[0]);
+}
+
+function attr(tag, name) {
+  return new RegExp('\\b' + name + '\\s*=\\s*["\\']([^"\\']*)["\\']', 'i').exec(tag)?.[1] || '';
+}
+
+function stripHtml(value) {
+  return xmlDecode(String(value || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+}
+
+function metaByName(html, name) {
+  for (const m of html.matchAll(/<meta\b[^>]*>/gi)) {
+    const tag = m[0];
+    if (attr(tag, 'name').toLowerCase() === name.toLowerCase()) return attr(tag, 'content');
+  }
+  return '';
+}
+
+function metaByProperty(html, name) {
+  for (const m of html.matchAll(/<meta\b[^>]*>/gi)) {
+    const tag = m[0];
+    if (attr(tag, 'property').toLowerCase() === name.toLowerCase()) return attr(tag, 'content');
+  }
+  return '';
+}
+
+function canonical(html) {
+  for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
+    const tag = m[0];
+    if (attr(tag, 'rel').toLowerCase() === 'canonical') return attr(tag, 'href');
+  }
+  return '';
+}
+
+function findProduct(value) {
+  if (!value || typeof value !== 'object') return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findProduct(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  const type = value['@type'];
+  if (type === 'Product' || (Array.isArray(type) && type.includes('Product'))) return value;
+  if (value['@graph']) {
+    const found = findProduct(value['@graph']);
+    if (found) return found;
+  }
+  return null;
+}
+
+function pageSeo(result) {
+  const html = result.text;
+  const title = stripHtml(/<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] || '');
+  const description = metaByName(html, 'description');
+  const robots = metaByName(html, 'robots');
+  const h1 = stripHtml(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html)?.[1] || '');
+  const alts = [...html.matchAll(/<img\b[^>]*>/gi)]
+    .map((m) => attr(m[0], 'alt'))
+    .filter(Boolean)
+    .slice(0, 12);
+  const ld = [];
+  for (const m of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { ld.push(JSON.parse(m[1])); } catch {}
+  }
+  let product = null;
+  for (const item of ld) {
+    product = findProduct(item);
+    if (product) break;
+  }
+  return {
+    status: result.status,
+    finalUrl: result.finalUrl,
+    xRobotsTag: result.xRobotsTag,
+    title,
+    description,
+    canonical: canonical(html),
+    robots,
+    h1,
+    h1Count: [...html.matchAll(/<h1\b/gi)].length,
+    structuredDataBlocks: ld.length,
+    productPresent: Boolean(product),
+    productHasImage: Boolean(product && Object.prototype.hasOwnProperty.call(product, 'image')),
+    productImage: product?.image || null,
+    productHasOffers: Boolean(product && Object.prototype.hasOwnProperty.call(product, 'offers')),
+    ogImage: metaByProperty(html, 'og:image') || null,
+    twitterImage: metaByName(html, 'twitter:image') || null,
+    imageAlts: alts
+  };
+}
+
+async function safeRead(address, maxBytes) {
+  try {
+    return await read(address, maxBytes);
   } catch (error) {
-    check.error = error.cause?.code || error.message;
-    report.warnings.push(`${address}: ${check.error}`);
-    return { check, text: '' };
+    report.warnings.push(address + ': ' + (error.cause?.code || error.message));
+    return null;
   }
 }
 
-function attribute(tag, name) {
-  return new RegExp('\\b' + name + '\\s*=\\s*["\']([^"\']*)["\']', 'i').exec(tag)?.[1] || '';
-}
-function pageMetadata(result) {
-  const { check, text } = result;
-  check.title = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(text)?.[1]?.trim() || '';
-  check.canonical = [...text.matchAll(/<link\b[^>]*>/gi)]
-    .map((match) => match[0]).filter((tag) => attribute(tag, 'rel').toLowerCase() === 'canonical')
-    .map((tag) => attribute(tag, 'href'));
-  check.robots = [...text.matchAll(/<meta\b[^>]*>/gi)]
-    .map((match) => match[0]).filter((tag) => ['robots', 'googlebot'].includes(attribute(tag, 'name').toLowerCase()))
-    .map((tag) => attribute(tag, 'content'));
-  check.h1Count = [...text.matchAll(/<h1\b/gi)].length;
-  check.structuredDataBlocks = [...text.matchAll(/<script\b[^>]*type=["']application\/ld\+json["']/gi)].length;
-  if (text && check.status === 200 && !check.title) report.warnings.push(`${check.requestedUrl}: missing HTML title`);
-  if (text && check.status === 200 && check.canonical.length !== 1) report.warnings.push(`${check.requestedUrl}: expected one canonical`);
-  if ([...check.robots, check.xRobotsTag || ''].some((value) => /\bnoindex\b/i.test(value))) report.warnings.push(`${check.requestedUrl}: noindex present`);
-}
-function locations(text) {
-  return [...text.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)].map((match) => match[1].replace(/&amp;/g, '&'));
+const robots = await safeRead(BASE + '/robots.txt', 2 * 1024 * 1024);
+report.robots = robots ? {
+  status: robots.status,
+  bytes: robots.bytes,
+  sitemapDeclared: /Sitemap:\s*https:\/\/www\.cardoriashop\.fr\/sitemap\.xml/i.test(robots.text),
+  blocksTechnicalLivePayment: [
+    '/live-vendeur.html',
+    '/live-camera.html',
+    '/marketplace-paiement-succes.html',
+    '/marketplace-paiement-echec.html'
+  ].every((path) => robots.text.includes('Disallow: ' + path))
+} : null;
+
+const index = await safeRead(BASE + '/sitemap.xml');
+if (!index) throw new Error('Cannot read production sitemap index');
+const childMaps = locs(index.text);
+report.sitemap.index = {
+  status: index.status,
+  contentType: index.contentType,
+  xRobotsTag: index.xRobotsTag,
+  childCount: childMaps.length
+};
+
+let totalUrls = 0;
+let totalImageEntries = 0;
+let sampleWithImage = '';
+let sampleWithoutImage = '';
+const childReports = [];
+let coreLocs = [];
+
+for (const mapUrl of childMaps) {
+  const child = await safeRead(mapUrl);
+  if (!child) continue;
+  const blocks = urlBlocks(child.text);
+  const urls = blocks.map((block) => locs(block)[0]).filter(Boolean);
+  const imageEntries = [...child.text.matchAll(/<image:image\b/gi)].length;
+  totalUrls += urls.length;
+  totalImageEntries += imageEntries;
+  if (mapUrl.endsWith('/api/seo/core.xml')) coreLocs = urls;
+  if (mapUrl.includes('/api/seo/cards-')) {
+    if (!sampleWithImage) {
+      const block = blocks.find((item) => /<image:image\b/i.test(item));
+      if (block) sampleWithImage = locs(block)[0] || '';
+    }
+    if (!sampleWithoutImage) {
+      const block = blocks.find((item) => !/<image:image\b/i.test(item));
+      if (block) sampleWithoutImage = locs(block)[0] || '';
+    }
+  }
+  childReports.push({
+    url: mapUrl,
+    status: child.status,
+    contentType: child.contentType,
+    xRobotsTag: child.xRobotsTag,
+    urlCount: urls.length,
+    imageEntries
+  });
 }
 
-pageMetadata(await readPublic(BASE + '/'));
-await readPublic('https://cardoriashop.fr/');
-const robots = await readPublic(BASE + '/robots.txt');
-robots.check.rules = robots.text.slice(0, 4000);
-const index = await readPublic(BASE + '/sitemap.xml');
-const maps = locations(index.text);
-index.check.xmlKind = /<sitemapindex\b/.test(index.text) ? 'sitemapindex' : /<urlset\b/.test(index.text) ? 'urlset' : 'unknown';
-index.check.entryCount = maps.length;
-index.check.sampleLocations = maps.slice(0, 5);
-if (index.text && index.check.xmlKind === 'unknown') report.warnings.push('The public sitemap response is not a sitemap XML document');
-if (index.check.xmlKind === 'sitemapindex') {
-  for (const address of maps.slice(0, 2)) {
-    const child = await readPublic(address);
-    const urls = locations(child.text);
-    child.check.entryCount = urls.length;
-    child.check.sampleLocations = urls.slice(0, 3);
-    child.check.lastmodCount = [...child.text.matchAll(/<lastmod>/g)].length;
-    if (/\bnoindex\b/i.test(child.check.xRobotsTag || '')) {
-      report.warnings.push(`${address}: sitemap response must not carry noindex`);
-    }
-    if (child.check.status === 200 && !/xml/i.test(child.check.contentType || '')) {
-      report.warnings.push(`${address}: sitemap content-type is not XML`);
-    }
-    const sampleCard = urls.find((url) => url.startsWith(BASE + '/cartes/'));
-    if (sampleCard) pageMetadata(await readPublic(sampleCard));
-  }
+report.sitemap.totalUrls = totalUrls;
+report.sitemap.totalImageEntries = totalImageEntries;
+report.sitemap.children = childReports;
+
+const licenceSlugs = ['pokemon', 'dragonball', 'lorcana', 'magic', 'onepiece', 'sports', 'yugioh'];
+for (const slug of licenceSlugs) {
+  const address = BASE + '/pages/licences/' + slug + '/';
+  const page = await safeRead(address, 3 * 1024 * 1024);
+  if (!page) continue;
+  const robotsMeta = metaByName(page.text, 'robots');
+  const noindex = /\bnoindex\b/i.test(robotsMeta + ' ' + page.xRobotsTag);
+  report.licences.push({
+    slug,
+    status: page.status,
+    inCoreSitemap: coreLocs.includes(address),
+    xRobotsTag: page.xRobotsTag,
+    robots: robotsMeta,
+    noindex,
+    title: stripHtml(/<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(page.text)?.[1] || ''),
+    h1: stripHtml(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(page.text)?.[1] || '')
+  });
 }
-pageMetadata(await readPublic(BASE + '/pages/licences/pokemon/'));
+
+const technical = [
+  '/live-vendeur.html',
+  '/live-camera.html',
+  '/marketplace-paiement-succes.html',
+  '/marketplace-paiement-echec.html',
+  '/espace-vendeur.html',
+  '/mes-annonces.html'
+];
+for (const path of technical) {
+  const page = await safeRead(BASE + path, 3 * 1024 * 1024);
+  if (!page) continue;
+  const robotsMeta = metaByName(page.text, 'robots');
+  report.technicalPages.push({
+    path,
+    status: page.status,
+    redirects: page.redirects,
+    xRobotsTag: page.xRobotsTag,
+    robots: robotsMeta,
+    noindex: /\bnoindex\b/i.test(robotsMeta + ' ' + page.xRobotsTag),
+    nofollow: /\bnofollow\b/i.test(robotsMeta + ' ' + page.xRobotsTag)
+  });
+}
+
+if (sampleWithImage) {
+  const page = await safeRead(sampleWithImage, 5 * 1024 * 1024);
+  report.cards.withImage = page ? { sitemapUrl: sampleWithImage, ...pageSeo(page) } : { sitemapUrl: sampleWithImage, error: true };
+}
+if (sampleWithoutImage) {
+  const page = await safeRead(sampleWithoutImage, 5 * 1024 * 1024);
+  report.cards.withoutImage = page ? { sitemapUrl: sampleWithoutImage, ...pageSeo(page) } : { sitemapUrl: sampleWithoutImage, error: true };
+}
+
+const emptyLicenceProblems = report.licences.filter((x) => x.slug !== 'pokemon' && (!x.noindex || x.inCoreSitemap));
+if (emptyLicenceProblems.length) {
+  report.warnings.push('Empty licence SEO policy mismatch: ' + emptyLicenceProblems.map((x) => x.slug).join(','));
+}
+const technicalProblems = report.technicalPages.filter((x) => !x.noindex || !x.nofollow);
+if (technicalProblems.length) {
+  report.warnings.push('Technical page robots mismatch: ' + technicalProblems.map((x) => x.path).join(','));
+}
+if (report.cards.withoutImage?.productHasImage) {
+  report.warnings.push('No-image card still exposes Product.image');
+}
+if (report.cards.withImage && !report.cards.withImage.productHasImage) {
+  report.warnings.push('Image card does not expose Product.image');
+}
+
 await fs.writeFile('seo-public-audit.json', JSON.stringify(report, null, 2) + '\n');
-console.log(JSON.stringify(report, null, 2));
-// Report diagnostics without equating temporary remote failures with code test failures.
-if (report.warnings.length) console.log('PUBLIC_AUDIT_WARNINGS=' + report.warnings.length);
+console.log('SEO_DEEP_AUDIT=' + JSON.stringify(report));
+if (report.warnings.length) console.log('SEO_DEEP_AUDIT_WARNINGS=' + report.warnings.length);
