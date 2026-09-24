@@ -1,3 +1,5 @@
+import { buildCardPageSeo } from "./card-meta.js";
+
 const htmlEscape = (value = '') => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
 export function positivePrice(value) {
@@ -51,13 +53,14 @@ export function renderCardMain(card) {
     const amount = positivePrice(value);
     return `<div class="engine-price-box${recommended ? ' recommended' : ''}"><label>${htmlEscape(label)}</label><strong>${amount === null ? 'Non disponible' : htmlEscape(money(amount))}</strong></div>`;
   };
+  const seo = buildCardPageSeo(card);
   const image = safeImage(card.imageHd) || safeImage(card.imageThumb);
   const visual = image
-    ? `<img src="${htmlEscape(image)}" alt="${htmlEscape([name, card.extension, card.number].filter(Boolean).join(' — '))}" loading="eager" fetchpriority="high" width="360" height="504">`
+    ? `<img src="${htmlEscape(image)}" alt="${htmlEscape(seo.alt)}" loading="eager" fetchpriority="high" width="360" height="504">`
     : '<div class="placeholder" aria-label="Visuel indisponible">Visuel indisponible</div>';
   return `<main class="container engine-hero" id="cardPage" data-server-rendered="true">
 <nav class="engine-breadcrumb" aria-label="Fil d’Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/${encodeURIComponent(license)}/">${htmlEscape(licenseName)}</a> › ${htmlEscape(name)}</nav>
-<h1>${htmlEscape(name)}</h1>
+<h1>${htmlEscape(seo.h1)}</h1>
 <div class="engine-card-layout"><div class="engine-card-visual">${visual}</div><div>
 <div class="engine-meta-grid">${detail('Extension', card.extension)}${detail('Numéro', card.number)}${detail('Rareté', card.rarity)}${detail('Illustrateur', card.illustration)}${detail('État réf.', card.condition)}${detail('Licence', licenseName)}</div>
 <div class="engine-prices">${priceBox('Prix moyen', prices.avg)}${priceBox('Prix bas', prices.low)}${priceBox('Prix haut', prices.high)}${priceBox('Prix conseillé', prices.recommended, true)}</div>

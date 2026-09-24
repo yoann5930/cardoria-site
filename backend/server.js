@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { cleanSeoTemplate, renderCardMain, positivePrice, safeImage } from "./lib/seo/card-render.js";
+import { buildCardPageSeo, extensionMetaDescription } from "./lib/seo/card-meta.js";
 import estimationRoutes from "./routes/estimation.js";
 import rachatRoutes from "./routes/rachat.js";
 import rachatAdminRoutes from "./routes/rachat-admin.js";
@@ -151,10 +152,11 @@ function absoluteSiteUrl() {
   return "https://www.cardoriashop.fr";
 }
 
-function seoHead({ title, description, canonical, image, type = "website", jsonLd = [], bootstrap = "" }) {
+function seoHead({ title, description, canonical, image, type = "website", jsonLd = [], bootstrap = "", robots = "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" }) {
   const parts = [
     `<link rel="canonical" href="${escapeHtml(canonical)}">`,
-    `<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">`,
+    `<meta name="description" content="${escapeHtml(description)}">`,
+    `<meta name="robots" content="${escapeHtml(robots)}">`,
     `<meta property="og:type" content="${escapeHtml(type)}">`,
     `<meta property="og:site_name" content="Cardoria">`,
     `<meta property="og:locale" content="fr_FR">`,
@@ -175,7 +177,7 @@ function seoHead({ title, description, canonical, image, type = "website", jsonL
 function injectSeoIntoTemplate(template, { title, description, head, mainHtml, mainPattern }) {
   let html = cleanSeoTemplate(template)
     .replace(/<title>[\s\S]*?<\/title>/i, () => `<title>${escapeHtml(title)}</title>`)
-    .replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?\s*>/i, () => `<meta name="description" content="${escapeHtml(description)}">`)
+    .replace(/<meta\b[^>]*\bname=["']description["'][^>]*>/gi, "")
     .replace("</head>", () => `${head}\n</head>`);
   if (mainPattern && mainHtml) html = html.replace(mainPattern, () => mainHtml);
   return html;
@@ -186,10 +188,10 @@ function buildCardSeoHtml(req, card) {
   const siteUrl = absoluteSiteUrl(req);
   const licenseSlug = card.license || card.licenseSlug || "pokemon";
   const canonical = `${siteUrl}/cartes/${encodeURIComponent(licenseSlug)}/${encodeURIComponent(card.slug)}`;
-  const cardNumber = card.number ? ` ${card.number}` : "";
   const extension = card.extension || "Pokémon";
-  const title = card.meta?.title || `${card.name}${cardNumber} — Prix, cote et rareté ${extension} | Cardoria`;
-  const description = card.meta?.description || `Prix, cote, rareté et historique de ${card.name}${cardNumber}, carte de l'extension ${extension}. Consultez sa fiche complète sur Cardoria.`;
+  const pageSeo = buildCardPageSeo(card);
+  const title = pageSeo.title;
+  const description = pageSeo.description;
   const image = safeImage(card.imageHd) || safeImage(card.imageThumb) || `${siteUrl}/assets/logo/cardoria-premium.png`;
   const prices = card.prices || {};
   const recommended = positivePrice(prices.recommended);
@@ -296,7 +298,14 @@ function buildLicenseSeoHtml(req, licenseSlug) {
     inLanguage: "fr-FR",
     isPartOf: { "@type": "WebSite", name: "Cardoria", url: siteUrl }
   };
-  const head = seoHead({ title, description, canonical, image, jsonLd: [collection, breadcrumbs] });
+  const head = seoHead({
+    title,
+    description,
+    canonical,
+    image,
+    robots: Number(license.cardCount) > 0 ? "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" : "noindex,follow",
+    jsonLd: [collection, breadcrumbs]
+  });
   return injectSeoIntoTemplate(template, {
     title,
     description,
@@ -328,7 +337,7 @@ function buildExtensionSeoHtml(req, licenseSlug, extensionSlug) {
   const siteUrl = absoluteSiteUrl(req);
   const canonical = `${siteUrl}/extensions/${encodeURIComponent(licenseSlug)}/${encodeURIComponent(extensionSlug)}`;
   const title = `${extension.extension} — cartes, prix & liste ${license.name} | Cardoria`;
-  const description = `Découvrez les cartes ${extension.extension} (${license.name}) : liste, numéros, raretés et données de prix. ${extension.cardCount} cartes référencées sur Cardoria.`;
+  const description = extensionMetaDescription(license.name, extension.extension);
   const image = `${siteUrl}/assets/logo/cardoria-premium.png`;
   const cards = searchCards({ license: licenseSlug, extension: extension.extension, page: 1, limit: 36, sort: "extension", maxLimit: 50 }).cards;
   const cardLinks = cards.map((card) => {

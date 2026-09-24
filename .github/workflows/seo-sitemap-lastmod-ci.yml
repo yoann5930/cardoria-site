@@ -70,7 +70,7 @@ jobs:
       - name: Test sitemaps, redirects, initial HTML and Chromium rendering
         env:
           SEO_BROWSER_TESTS: '1'
-        run: node --experimental-vm-modules --test tests/seo-sitemap-lastmod.test.mjs tests/seo-license-redirect.test.mjs tests/seo-card-render.test.mjs tests/seo-canonical-navigation.test.mjs tests/sitemap-404-indexing.test.mjs
+        run: node --experimental-vm-modules --test tests/seo-sitemap-lastmod.test.mjs tests/seo-license-redirect.test.mjs tests/seo-card-render.test.mjs tests/seo-canonical-navigation.test.mjs tests/sitemap-404-indexing.test.mjs tests/seo-indexation-guards.test.mjs
   public-seo-diagnostic:
     runs-on: ubuntu-latest
     timeout-minutes: 4

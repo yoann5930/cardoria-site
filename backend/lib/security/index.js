@@ -3,14 +3,14 @@ import { raw } from "express";
 import { sanitizeObject } from "./sanitize.js";
 import { logError } from "../monitoring/errors.js";
 import { LIVE_PERMISSIONS_POLICY } from "../live/camera-media.js";
+import { isCrawlableSitemapPath, isTechnicalNoindexPath } from "../seo/sitemap-urls.js";
 
 const PUBLIC_RELEASE = "cardoria-seo-20260902-1";
 
-function isPrivateIndexPath(pathname = "") {
+export function isPrivateIndexPath(pathname = "") {
   const path = String(pathname || "").toLowerCase();
-  if (path === "/robots.txt" || path === "/sitemap.xml" || path === "/sitemap-index.xml" || /^\/api\/seo\/.+\.xml$/.test(path)) {
-    return false;
-  }
+  if (isCrawlableSitemapPath(path)) return false;
+  if (isTechnicalNoindexPath(path)) return true;
   return path.startsWith("/admin") ||
     path.startsWith("/mes-commandes") ||
     path.startsWith("/client-orders") ||

@@ -25,8 +25,44 @@ export function slugifyExtensionName(name) {
     .replace(/^-|-$/g, "");
 }
 
-export function isIndexableLicenseSitemapSlug(slug) {
-  return PUBLIC_LICENSE_SITEMAP_SLUGS.has(String(slug || ""));
+export const TECHNICAL_NOINDEX_PATHS = [
+  "/live-vendeur.html",
+  "/live-camera.html",
+  "/marketplace-paiement-succes.html",
+  "/marketplace-paiement-echec.html"
+];
+
+export function isTechnicalNoindexPath(pathname = "") {
+  const path = String(pathname || "").split("?")[0].toLowerCase();
+  return TECHNICAL_NOINDEX_PATHS.some((item) => path === item || path.endsWith(item));
+}
+
+export function isCrawlableSitemapPath(pathname = "") {
+  const path = String(pathname || "").split("?")[0].toLowerCase();
+  if (path === "/robots.txt" || path === "/sitemap.xml" || path === "/sitemap-index.xml") return true;
+  if (/^\/api\/seo\/.+\.xml$/.test(path)) return true;
+  return /\/sitemap\.xml$/.test(path) && !path.startsWith("/admin");
+}
+
+// A missing card count means "the public template exists".
+// Sitemap generation always passes the live count so an empty licence drops out
+// and returns automatically once real cards are linked.
+export function isIndexableLicenseSitemapSlug(slug, cardCount) {
+  if (!PUBLIC_LICENSE_SITEMAP_SLUGS.has(String(slug || ""))) return false;
+  if (arguments.length < 2) return true;
+  return Number(cardCount) > 0;
+}
+
+export function sitemapImageLoc(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || !url.hostname) return "";
+    return url.href;
+  } catch {
+    return "";
+  }
 }
 
 export function extensionSitemapEntry(row = {}) {

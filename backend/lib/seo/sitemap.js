@@ -6,7 +6,7 @@ import { listBlogPosts } from "./blog.js";
 import { listExtensions, listGeneratedPages, SITE } from "./generator.js";
 import { listLicenses } from "../engine/licenses.js";
 import { getSitemapCards, getCardCount } from "../engine/cards.js";
-import { isIndexableExtensionSitemapEntry, isIndexableLicenseSitemapSlug } from "./sitemap-urls.js";
+import { isIndexableExtensionSitemapEntry, isIndexableLicenseSitemapSlug, isTechnicalNoindexPath, sitemapImageLoc } from "./sitemap-urls.js";
 
 export const CARD_SITEMAP_PAGE_SIZE = 10000;
 
@@ -60,14 +60,16 @@ function storedLastmod(value) {
 }
 
 function urlEntry(base, path, opts = {}) {
+  if (isTechnicalNoindexPath(path)) return "";
   const loc = path.startsWith("http") ? path : base + path;
+  const image = sitemapImageLoc(opts.image);
   let xml = "  <url>\n    <loc>" + xmlEscape(loc) + "</loc>\n";
   if (opts.lastmod) xml += "    <lastmod>" + xmlEscape(opts.lastmod) + "</lastmod>\n";
   if (opts.changefreq) xml += "    <changefreq>" + opts.changefreq + "</changefreq>\n";
   if (opts.priority) xml += "    <priority>" + opts.priority + "</priority>\n";
-  if (opts.image) {
+  if (image) {
     xml += "    <image:image>\n";
-    xml += "      <image:loc>" + xmlEscape(opts.image) + "</image:loc>\n";
+    xml += "      <image:loc>" + xmlEscape(image) + "</image:loc>\n";
     if (opts.imageTitle) xml += "      <image:title>" + xmlEscape(opts.imageTitle) + "</image:title>\n";
     xml += "    </image:image>\n";
   }
@@ -108,7 +110,7 @@ export function generateCoreSitemapXml(siteUrl = SITE) {
   });
 
   listLicenses().forEach((license) => {
-    if (!isIndexableLicenseSitemapSlug(license.slug)) return;
+    if (!isIndexableLicenseSitemapSlug(license.slug, license.cardCount)) return;
     urls += urlEntry(base, `/pages/licences/${license.slug}/`, {
       changefreq: "weekly",
       priority: license.slug === "pokemon" ? "0.95" : "0.88"
@@ -193,6 +195,10 @@ export function generateRobotsTxt(siteUrl = SITE) {
     "Disallow: /souhaits.html",
     "Disallow: /panier-marketplace.html",
     "Disallow: /document-commande.html",
+    "Disallow: /live-vendeur.html",
+    "Disallow: /live-camera.html",
+    "Disallow: /marketplace-paiement-succes.html",
+    "Disallow: /marketplace-paiement-echec.html",
     "",
     "Sitemap: " + base + "/sitemap.xml"
   ].join("\n");

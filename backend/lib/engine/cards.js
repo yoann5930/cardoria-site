@@ -1,12 +1,12 @@
 /**
  * CRUD cartes + recherche paginée (FTS5 / fallback LIKE).
  */
+import { buildCardPageSeo } from "../seo/card-meta.js";
 import { getDb, normalizeText, slugify, makeCardId, rowToCard, syncFts } from "./database.js";
 import { getLicense } from "./licenses.js";
 import { setPriceSources, recalculateCardPrices, getSalesHistory } from "./pricing.js";
 
 const CARD_LANGUAGES = new Set(["fr", "en", "ja", "ko"]);
-const LANGUAGE_LABELS = { fr: "française", en: "anglaise", ja: "japonaise", ko: "coréenne" };
 
 function normalizeLanguage(value, fallback = "fr") {
   const language = String(value || fallback).trim().toLowerCase();
@@ -14,19 +14,8 @@ function normalizeLanguage(value, fallback = "fr") {
 }
 
 function buildCardSeoMeta(card) {
-  const number = String(card.number || "").trim();
-  const extension = String(card.extension || "").trim();
-  const rarity = String(card.rarity || card.hitFamily || "").trim();
-  const language = normalizeLanguage(card.language || "fr");
-  const languageLabel = LANGUAGE_LABELS[language] || language;
-  const identity = `${card.name}${number ? " " + number : ""}`.trim();
-  const title = `${identity}${extension ? " — Prix & cote " + extension : " — Prix & cote"} | CardoriaShop`;
-  const details = [extension, rarity, language !== "fr" ? `version ${languageLabel}` : ""].filter(Boolean).join(", ");
-  const description = `Prix et cote de ${identity}${details ? ` (${details})` : ""}. Consultez la fiche, la rareté, l'image et les données de valeur disponibles sur CardoriaShop.fr.`;
-  return {
-    title: title.slice(0, 180),
-    description: description.slice(0, 158)
-  };
+  const seo = buildCardPageSeo(card);
+  return { title: seo.title, description: seo.description };
 }
 
 const SEARCH_LANGUAGE_HINTS = new Map([

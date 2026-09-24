@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { once } from 'node:events';
 import { cleanSeoTemplate, renderCardMain, positivePrice, safeImage } from '../backend/lib/seo/card-render.js';
+import { buildCardPageSeo, extensionMetaDescription } from '../backend/lib/seo/card-meta.js';
 
 // Production functions and templates are executed; only catalogue storage is
 // replaced with fixtures. No server bootstrap, payments or production database.
@@ -20,9 +21,9 @@ const card = { id: 'seo-fixture', slug: 'pikachu-test', license: 'pokemon', lice
 const CARD_PATH = '/cartes/pokemon/' + card.slug;
 
 function renderers(publicRoot = ROOT) {
-  const context = vm.createContext({ fs, path, PUBLIC_ROOT: publicRoot, cleanSeoTemplate, renderCardMain, positivePrice, safeImage,
+  const context = vm.createContext({ fs, path, PUBLIC_ROOT: publicRoot, cleanSeoTemplate, renderCardMain, positivePrice, safeImage, buildCardPageSeo, extensionMetaDescription,
     getCardBySlug: (_license, slug) => slug === card.slug ? card : null,
-    getLicense: (slug) => slug === 'pokemon' ? { slug, name: 'Pokémon' } : null,
+    getLicense: (slug) => slug === 'pokemon' ? { slug, name: 'Pokémon', cardCount: 12 } : slug === 'magic' ? { slug, name: 'Magic', cardCount: 0 } : null,
     getLicenseSeoContent: () => ({ title: 'Catalogue Pokémon | Cardoria', metaDescription: 'Catalogue de cartes Pokémon.', h1: 'Cartes Pokémon', content: { intro: 'Retrouvez les cartes et leurs extensions.' } }),
     listExtensions: () => [{ slug: 'extension-test', extension: 'Extension test', cardCount: 1 }],
     searchCards: () => ({ cards: [card] })
@@ -38,7 +39,7 @@ const count = (value, pattern) => [...value.matchAll(pattern)].length;
 test('real card renderer sends one H1, identifiers and image before JavaScript', () => {
   const output = html();
   assert.equal(count(output, /<h1\b/g), 1);
-  assert.match(output, /<h1>Pikachu<\/h1>/);
+  assert.match(output, /<h1>Pikachu 25 — Extension test<\/h1>/);
   assert.match(output, /Extension test/);
   assert.match(output, /data-server-rendered="true"/);
   assert.match(output, /https:\/\/images.example.test\/card.png/);
@@ -86,7 +87,7 @@ test('markup and replacement tokens in catalogue text remain literal text', () =
   const output = html({ ...card, name: '<script>bad()</script> $&', meta: { title: '<img> $&', description: '<test> $&' } });
   assert.doesNotMatch(output, /<script>bad\(\)<\/script>/);
   assert.match(output, /&lt;script&gt;bad\(\)&lt;\/script&gt; \$&amp;/);
-  assert.match(output, /<title>&lt;img&gt; \$&amp;<\/title>/);
+  assert.match(output, /<title>&lt;script&gt;bad\(\)&lt;\/script&gt; \$&amp; 25 Extension test FR – Carte Pokémon, prix &amp; cote \| Cardoria<\/title>/);
   assert.equal(schemas(output).find((item) => item['@type'] === 'Product').name, '<script>bad()</script> $&');
 });
 
@@ -109,7 +110,7 @@ test('metadata cleanup preserves verification, styles and explicit noindex', () 
 
 test('OVH mirror template receives the same useful initial card content', () => {
   const output = renderers(path.join(ROOT, 'backend/public')).buildCardSeoHtml({}, card);
-  assert.match(output, /<h1>Pikachu<\/h1>/);
+  assert.match(output, /<h1>Pikachu 25 — Extension test<\/h1>/);
   assert.equal(count(output, /rel="canonical"/g), 1);
 });
 
@@ -124,6 +125,12 @@ test('real license and extension renderers retain their own metadata and card li
   }
   assert.ok(license.includes(`href="${SITE}/pages/licences/pokemon/"`));
   assert.ok(extension.includes(`href="${SITE}/extensions/pokemon/extension-test"`));
+  assert.match(extension, /name="description" content="Découvrez les cartes Pokémon de l’extension Extension test : liste des cartes, numéros, raretés, prix et cotes sur Cardoria."/);
+  assert.match(license, /name="robots" content="index,follow/);
+  const emptyLicense = api.buildLicenseSeoHtml({}, 'magic');
+  assert.match(emptyLicense, /name="robots" content="noindex,follow"/);
+  assert.match(html(), /<title>Pikachu 25 Extension test FR – Carte Pokémon, prix &amp; cote \| Cardoria<\/title>/);
+  assert.match(html(), /alt="Pikachu — Extension test — 25 — FR"/);
 });
 
 test('missing card stays a real 404 with noindex', () => {
@@ -181,7 +188,7 @@ async function browserCheck({ javascript = true, apiFailure = false, pagePath = 
 
 test('Chromium without JavaScript displays the full initial reference card', browserOptions, async () => {
   await browserCheck({ javascript: false }, async (page) => {
-    assert.equal(await page.locator('#cardPage h1').textContent(), card.name);
+    assert.equal(await page.locator('#cardPage h1').textContent(), "Pikachu 25 — Extension test");
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), SITE + CARD_PATH);
     assert.equal(await page.locator('.engine-price-box strong').allTextContents().then((v) => v.join('|')), Array(4).fill('Non disponible').join('|'));
   });
@@ -190,7 +197,7 @@ test('Chromium without JavaScript displays the full initial reference card', bro
 test('Chromium with JavaScript keeps the card canonical and exactly one Product and breadcrumb', browserOptions, async () => {
   await browserCheck({}, async (page) => {
     await page.locator('#historyPeriods').waitFor(); // Proves carte.js rendered.
-    assert.equal(await page.locator('#cardPage h1').textContent(), card.name);
+    assert.equal(await page.locator('#cardPage h1').textContent(), "Pikachu 25 — Extension test");
     assert.equal(await page.locator('link[rel="canonical"]').count(), 1);
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), SITE + CARD_PATH);
     assert.match(await page.title(), /Pikachu/);
@@ -205,7 +212,7 @@ test('Chromium with JavaScript keeps the card canonical and exactly one Product 
 
 test('Chromium retains useful server HTML when the catalogue API is unavailable', browserOptions, async () => {
   await browserCheck({ apiFailure: true }, async (page) => {
-    assert.equal(await page.locator('#cardPage h1').textContent(), card.name);
+    assert.equal(await page.locator('#cardPage h1').textContent(), "Pikachu 25 — Extension test");
     assert.equal(await page.locator('#cardPage').getAttribute('data-server-rendered'), 'true');
     assert.doesNotMatch(await page.locator('#cardPage').textContent(), /Erreur de chargement/);
   });

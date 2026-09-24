@@ -12,6 +12,9 @@ import {
 test("starwars stays out of sitemaps until a public licence page exists", () => {
   assert.equal(isIndexableLicenseSitemapSlug("starwars"), false);
   assert.equal(isIndexableLicenseSitemapSlug("pokemon"), true);
+  assert.equal(isIndexableLicenseSitemapSlug("pokemon", 12), true);
+  assert.equal(isIndexableLicenseSitemapSlug("magic", 0), false);
+  assert.equal(isIndexableLicenseSitemapSlug("yugioh", 0), false);
   assert.equal(fs.existsSync("pages/licences/starwars/index.html"), false);
   assert.equal(fs.existsSync("pages/licences/pokemon/index.html"), true);
 });

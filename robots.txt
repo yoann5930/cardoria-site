@@ -30,5 +30,9 @@ Disallow: /favoris.html
 Disallow: /souhaits.html
 Disallow: /panier-marketplace.html
 Disallow: /document-commande.html
+Disallow: /live-vendeur.html
+Disallow: /live-camera.html
+Disallow: /marketplace-paiement-succes.html
+Disallow: /marketplace-paiement-echec.html
 
 Sitemap: https://www.cardoriashop.fr/sitemap.xml

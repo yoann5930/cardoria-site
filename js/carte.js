@@ -83,8 +83,11 @@
   function renderCard(card) {
     applySeo(card);
     var image = safeImage(card.imageHd) || safeImage(card.imageThumb);
+    var lang = { fr: "FR", en: "EN", ja: "JA", ko: "KO" }[String(card.language || "fr").toLowerCase()] || "FR";
+    var alt = [card.name, card.extension, card.number, lang].filter(Boolean).join(" — ");
+    var heading = [card.name, card.number].filter(Boolean).join(" ") + (card.extension ? " — " + card.extension : "");
     var img = image
-      ? '<img src="' + escape(image) + '" alt="' + escape(card.name) + '" loading="eager" fetchpriority="high" width="360" height="504">'
+      ? '<img src="' + escape(image) + '" alt="' + escape(alt) + '" loading="eager" fetchpriority="high" width="360" height="504">'
       : '<div class="placeholder">Visuel indisponible</div>';
     var prices = card.prices || {};
     var licenseSlug = card.license || card.licenseSlug || "pokemon";
@@ -95,7 +98,7 @@
 
     root.innerHTML =
       '<nav class="engine-breadcrumb"><a href="/">Accueil</a> › <a href="/pages/licences/' + encodeURIComponent(licenseSlug) + '/">' + escape(card.licenseName || licenseSlug) + '</a> › ' + escape(card.name) + "</nav>" +
-      "<h1>" + escape(card.name) + "</h1>" +
+      "<h1>" + escape(heading) + "</h1>" +
       '<div class="engine-card-layout">' +
       '<div class="engine-card-visual">' + img + "</div>" +
       "<div>" +

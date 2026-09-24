@@ -52,7 +52,7 @@ test('index omits fabricated modification dates and keeps every card partition',
 
 test('static, license and extension pages do not pretend to change every day', async () => {
   const { api } = await load({
-    licenses: [{ slug: 'pokemon' }],
+    licenses: [{ slug: 'pokemon', cardCount: 4 }],
     extensions: [{ url: '/extensions/pokemon/test', license: 'pokemon' }]
   });
   const xml = api.generateCoreSitemapXml();
@@ -76,8 +76,12 @@ test('blog keeps genuine update and creation dates', async () => {
 });
 
 test('blog with no stored date has no invented lastmod', async () => {
-  const { api } = await load({ posts: [{ url: '/pages/blog/undated/' }] });
+  const { api } = await load({ posts: [{ url: '/pages/blog/undated/' }, { url: '/live-vendeur.html' }, { url: '/marketplace-paiement-succes.html' }] });
+  const locs = tags(api.generateCoreSitemapXml(), 'loc');
   assert.deepEqual(tags(api.generateCoreSitemapXml(), 'lastmod'), []);
+  assert.ok(locs.includes('https://www.cardoriashop.fr/pages/blog/undated/'));
+  assert.ok(!locs.includes('https://www.cardoriashop.fr/live-vendeur.html'));
+  assert.ok(!locs.includes('https://www.cardoriashop.fr/marketplace-paiement-succes.html'));
 });
 
 test('card keeps its database update date, SQL or ISO timestamp', async () => {
@@ -129,6 +133,10 @@ test('robots keeps public cards crawlable and advertises the canonical sitemap',
   assert.match(robots, /Allow: \/cartes\//);
   assert.match(robots, /Disallow: \/admin/);
   assert.match(robots, /Disallow: \/panier-marketplace\.html/);
+  assert.match(robots, /Disallow: \/live-vendeur\.html/);
+  assert.match(robots, /Disallow: \/live-camera\.html/);
+  assert.match(robots, /Disallow: \/marketplace-paiement-succes\.html/);
+  assert.match(robots, /Disallow: \/marketplace-paiement-echec\.html/);
   assert.ok(robots.endsWith(`Sitemap: ${SITE}/sitemap.xml`));
 });
 
@@ -150,7 +158,7 @@ test('card sitemap exposes only real catalogue images with escaped metadata', as
       slug: 'no-image',
       name: 'No image',
       image_hd: '',
-      image_thumb: '',
+      image_thumb: 'not a url',
       updated_at: '2026-09-19'
     }
   ] });
@@ -164,7 +172,7 @@ test('card sitemap exposes only real catalogue images with escaped metadata', as
 
 test('known 404 licence and empty extension paths are never emitted', async () => {
   const { api } = await load({
-    licenses: [{ slug: 'pokemon' }, { slug: 'starwars' }, { slug: 'yugioh' }],
+    licenses: [{ slug: 'pokemon', cardCount: 12 }, { slug: 'starwars', cardCount: 4 }, { slug: 'yugioh', cardCount: 0 }, { slug: 'magic', cardCount: 0 }],
     extensions: [
       { url: '/extensions/pokemon/base-set', license: 'pokemon', slug: 'base-set' },
       { url: '/extensions/pokemon/', license: 'pokemon', slug: '' },
@@ -175,7 +183,8 @@ test('known 404 licence and empty extension paths are never emitted', async () =
   const xml = api.generateCoreSitemapXml();
   const locs = tags(xml, 'loc');
   assert.ok(locs.includes(`${SITE}/pages/licences/pokemon/`));
-  assert.ok(locs.includes(`${SITE}/pages/licences/yugioh/`));
+  assert.ok(!locs.includes(`${SITE}/pages/licences/yugioh/`));
+  assert.ok(!locs.includes(`${SITE}/pages/licences/magic/`));
   assert.ok(locs.includes(`${SITE}/boutique.html`));
   assert.ok(locs.includes(`${SITE}/extensions/pokemon/base-set`));
   assert.ok(!locs.includes(`${SITE}/pages/licences/starwars/`));
