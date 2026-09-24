@@ -1,0 +1,62 @@
+name: OVH Backup Prune Issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ovh-backup-prune
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'ovh-backup-prune:') &&
+      contains(github.event.issue.labels.*.name, 'ovh-ops:deploy') &&
+      contains(github.event.issue.labels.*.name, 'ovh-branch:main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OVH_VPS_HOST: ${{ secrets.OVH_VPS_HOST }}
+      OVH_VPS_USER: ${{ secrets.OVH_VPS_USER }}
+      OVH_VPS_SSH_KEY: ${{ secrets.OVH_VPS_SSH_KEY }}
+      OVH_VPS_HOST_FINGERPRINT: ${{ secrets.OVH_VPS_HOST_FINGERPRINT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "${OVH_VPS_HOST:-}"
+          test -n "${OVH_VPS_USER:-}"
+          test -n "${OVH_VPS_SSH_KEY:-}"
+          test -n "${OVH_VPS_HOST_FINGERPRINT:-}"
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$OVH_VPS_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -t ed25519 -T 10 "$OVH_VPS_HOST" > "$HOME/.ssh/known_hosts"
+          got=$(ssh-keygen -lf "$HOME/.ssh/known_hosts" | awk '{print $2}')
+          expected=$(printf '%s' "$OVH_VPS_HOST_FINGERPRINT" | tr -d '\r\n')
+          test "$got" = "$expected"
+
+      - name: Prune only known Cardoria backup artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o BatchMode=yes -o PreferredAuthentications=publickey -o ConnectTimeout=15 "${OVH_VPS_USER}@${OVH_VPS_HOST}" 'sudo python3 - /opt/cardoria/backups' < oracle/prune-backups.py
+          ssh -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o BatchMode=yes -o PreferredAuthentications=publickey -o ConnectTimeout=15 "${OVH_VPS_USER}@${OVH_VPS_HOST}" 'df -hT /; du -sh /opt/cardoria/backups 2>/dev/null || true'
+
+      - name: Close request
+        if: success()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue close "${{ github.event.issue.number }}" --repo "${GITHUB_REPOSITORY}" --comment "Nettoyage sécurisé des anciennes sauvegardes terminé."

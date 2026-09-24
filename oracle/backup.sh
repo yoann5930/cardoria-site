@@ -2,6 +2,7 @@
 set -euo pipefail
 
 BACKUP_DIR=/opt/cardoria/backups
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ENV_FILE=/etc/cardoria/cardoria.env
 DATA_DIR=/opt/cardoria/current/backend/data
 mkdir -p "$BACKUP_DIR"
@@ -19,6 +20,8 @@ POSTGRES_STAGE="$STAGING_DIR/cardoria-postgres-$STAMP.dump"
 DATA_STAGE="$STAGING_DIR/cardoria-data-$STAMP.tar.gz"
 POSTGRES_FINAL="$BACKUP_DIR/cardoria-postgres-$STAMP.dump"
 DATA_FINAL="$BACKUP_DIR/cardoria-data-$STAMP.tar.gz"
+
+python3 "$SCRIPT_DIR/prune-backups.py" "$BACKUP_DIR"
 
 if [ -z "${MARKETPLACE_DATABASE_URL:-}" ]; then
   echo "MARKETPLACE_DATABASE_URL missing"
@@ -98,5 +101,5 @@ mv "$DATA_STAGE" "$DATA_FINAL"
 echo "postgres_dump_validated: $(basename "$POSTGRES_FINAL")"
 echo "data_archive_validated: $(basename "$DATA_FINAL")"
 
-find "$BACKUP_DIR" -type f -mtime +14 -delete
+python3 "$SCRIPT_DIR/prune-backups.py" "$BACKUP_DIR"
 find "$BACKUP_DIR" -type f -printf '%TY-%Tm-%Td %TH:%TM %p\n' | sort
