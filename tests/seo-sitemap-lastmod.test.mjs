@@ -52,7 +52,7 @@ test('index omits fabricated modification dates and keeps every card partition',
 
 test('static, license and extension pages do not pretend to change every day', async () => {
   const { api } = await load({
-    licenses: [{ slug: 'pokemon' }],
+    licenses: [{ slug: 'pokemon', cardCount: 1 }],
     extensions: [{ url: '/extensions/pokemon/test', license: 'pokemon' }]
   });
   const xml = api.generateCoreSitemapXml();
@@ -170,9 +170,18 @@ test('card sitemap exposes only real catalogue images with escaped metadata', as
   assert.equal((xml.match(/<image:image>/g) || []).length, 1);
 });
 
-test('known 404 licence and empty extension paths are never emitted', async () => {
+test('known 404 licences, empty licences and incomplete extension paths are never emitted', async () => {
   const { api } = await load({
-    licenses: [{ slug: 'pokemon' }, { slug: 'starwars' }, { slug: 'yugioh' }],
+    licenses: [
+      { slug: 'pokemon', cardCount: 42 },
+      { slug: 'starwars', cardCount: 12 },
+      { slug: 'yugioh', cardCount: 0 },
+      { slug: 'onepiece', cardCount: 0 },
+      { slug: 'lorcana', cardCount: 0 },
+      { slug: 'magic', cardCount: 0 },
+      { slug: 'dragonball', cardCount: 0 },
+      { slug: 'sports', cardCount: 0 }
+    ],
     extensions: [
       { url: '/extensions/pokemon/base-set', license: 'pokemon', slug: 'base-set' },
       { url: '/extensions/pokemon/', license: 'pokemon', slug: '' },
@@ -183,10 +192,11 @@ test('known 404 licence and empty extension paths are never emitted', async () =
   const xml = api.generateCoreSitemapXml();
   const locs = tags(xml, 'loc');
   assert.ok(locs.includes(`${SITE}/pages/licences/pokemon/`));
-  assert.ok(locs.includes(`${SITE}/pages/licences/yugioh/`));
   assert.ok(locs.includes(`${SITE}/boutique.html`));
   assert.ok(locs.includes(`${SITE}/extensions/pokemon/base-set`));
-  assert.ok(!locs.includes(`${SITE}/pages/licences/starwars/`));
+  for (const slug of ['starwars', 'yugioh', 'onepiece', 'lorcana', 'magic', 'dragonball', 'sports']) {
+    assert.ok(!locs.includes(`${SITE}/pages/licences/${slug}/`), slug);
+  }
   assert.ok(!locs.includes(`${SITE}/extensions/pokemon/`));
   assert.ok(!locs.includes(`${SITE}/extensions/pokemon`));
   assert.match(xml, /^<\?xml version="1.0" encoding="UTF-8"\?>/);
@@ -198,10 +208,19 @@ test('known 404 licence and empty extension paths are never emitted', async () =
     if (path.startsWith('/extensions/')) {
       assert.equal(path.split('/').filter(Boolean).length, 3, loc);
     }
-    if (/^\/pages\/licences\/[^/]+$/.test(path)) {
-      assert.ok(sitemapUrls.isIndexableLicenseSitemapSlug(path.split('/')[3]), loc);
-    }
   }
+});
+
+test('licence automatically returns to the sitemap when it has real active cards', async () => {
+  const { api } = await load({
+    licenses: [
+      { slug: 'pokemon', cardCount: 84060 },
+      { slug: 'magic', cardCount: 3 }
+    ]
+  });
+  const locs = tags(api.generateCoreSitemapXml(), 'loc');
+  assert.ok(locs.includes(`${SITE}/pages/licences/pokemon/`));
+  assert.ok(locs.includes(`${SITE}/pages/licences/magic/`));
 });
 
 test('sitemap index stays valid XML on the canonical host', async () => {
