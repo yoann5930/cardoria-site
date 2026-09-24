@@ -1,4 +1,4 @@
-// SEO H1 regression guard: server and client must keep the same card identity heading.
+// SEO H1 regression guard: server and client must keep the same card identity and extension heading.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
