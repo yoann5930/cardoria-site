@@ -14,6 +14,14 @@ export function safeImage(value) {
   } catch { return ''; }
 }
 
+export function cardImageAlt(card = {}) {
+  const languageCodes = { fr: 'FR', en: 'EN', ja: 'JP', ko: 'KR' };
+  const language = languageCodes[String(card.language || 'fr').toLowerCase()] || String(card.language || '').toUpperCase();
+  const license = String(card.licenseName || card.license || card.licenseSlug || 'TCG').trim();
+  const identity = [card.name, card.number, card.extension].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
+  return [identity, `Carte ${license}${language ? ' ' + language : ''}`].filter(Boolean).join(' — ');
+}
+
 function attribute(tag, name) {
   return new RegExp('\\b' + name + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')', 'i').exec(tag)?.slice(1).find((value) => value !== undefined) || '';
 }
@@ -53,7 +61,7 @@ export function renderCardMain(card) {
   };
   const image = safeImage(card.imageHd) || safeImage(card.imageThumb);
   const visual = image
-    ? `<img src="${htmlEscape(image)}" alt="${htmlEscape([name, card.extension, card.number].filter(Boolean).join(' — '))}" loading="eager" fetchpriority="high" width="360" height="504">`
+    ? `<img src="${htmlEscape(image)}" alt="${htmlEscape(cardImageAlt(card))}" loading="eager" fetchpriority="high" width="360" height="504">`
     : '<div class="placeholder" aria-label="Visuel indisponible">Visuel indisponible</div>';
   return `<main class="container engine-hero" id="cardPage" data-server-rendered="true">
 <nav class="engine-breadcrumb" aria-label="Fil d’Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/${encodeURIComponent(license)}/">${htmlEscape(licenseName)}</a> › ${htmlEscape(name)}</nav>
