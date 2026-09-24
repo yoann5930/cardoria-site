@@ -91,6 +91,7 @@ export function renderCardMain(card) {
     ? ` › <a href="${extensionUrl}">${htmlEscape(card.extension)}</a>`
     : "";
   const identity = [name, card.number].filter(Boolean).join(' ');
+  const heading = identity || name;
   const leadParts = [
     `${htmlEscape(identity)} est une carte ${htmlEscape(licenseName)}`,
     languageLabel ? `en version ${htmlEscape(languageLabel)}` : "",
@@ -99,7 +100,7 @@ export function renderCardMain(card) {
   ].filter(Boolean);
   return `<main class="container engine-hero" id="cardPage" data-server-rendered="true">
 <nav class="engine-breadcrumb" aria-label="Fil d’Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/${encodeURIComponent(license)}/">${htmlEscape(licenseName)}</a>${breadcrumbExtension} › ${htmlEscape(name)}</nav>
-<h1>${htmlEscape(name)}</h1>
+<h1>${htmlEscape(heading)}</h1>
 <p class="seo-lead">${leadParts.join(' ') }.</p>
 <div class="engine-card-layout"><div class="engine-card-visual">${visual}</div><div>
 <div class="engine-meta-grid">${extensionDetail}${detail('Numéro', card.number)}${detail('Langue', languageLabel)}${detail('Rareté', card.rarity)}${detail('Illustrateur', card.illustration)}${detail('État réf.', card.condition)}${detail('Licence', licenseName)}</div>
