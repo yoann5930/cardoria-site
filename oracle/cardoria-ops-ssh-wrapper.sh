@@ -17,6 +17,9 @@ case "$cmd" in
   backup)
     exec sudo -n /usr/local/bin/cardoria-ops backup
     ;;
+  backup-prune)
+    exec sudo -n /usr/local/bin/cardoria-ops backup-prune
+    ;;
   nginx-test)
     exec sudo -n /usr/local/bin/cardoria-ops nginx-test
     ;;
