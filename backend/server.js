@@ -201,23 +201,22 @@ function buildCardSeoHtml(req, card) {
   const description = String(card.meta?.description || seoMeta.description);
   const productImage = safeImage(card.imageHd) || safeImage(card.imageThumb);
   const socialImage = productImage || `${siteUrl}/assets/logo/cardoria-premium.png`;
-  const prices = card.prices || {};
-  const recommended = positivePrice(prices.recommended);
-  const product = {
+  // Reference catalogue page: do not advertise Google Product rich-result
+  // eligibility unless Cardoria is actually selling this specific item.
+  const referencePage = {
     "@context": "https://schema.org",
-    "@type": "Product",
-    name: card.name,
+    "@type": "WebPage",
+    name: title,
     description,
     ...(productImage ? { image: productImage } : {}),
     url: canonical,
-    sku: card.number || card.id,
-    brand: { "@type": "Brand", name: card.licenseName || licenseSlug },
-    category: "Carte à collectionner",
-    additionalProperty: [
-      { "@type": "PropertyValue", name: "Extension", value: extension },
-      { "@type": "PropertyValue", name: "Rareté", value: card.rarity || "Non renseignée" },
-      ...(recommended === null ? [] : [{ "@type": "PropertyValue", name: "Prix conseillé", value: recommended, unitText: "EUR" }])
-    ]
+    inLanguage: "fr-FR",
+    mainEntity: {
+      "@type": "Thing",
+      name: card.name,
+      identifier: card.number || card.id,
+      url: canonical
+    }
   };
   const breadcrumbs = {
     "@context": "https://schema.org",
@@ -234,9 +233,9 @@ function buildCardSeoHtml(req, card) {
     description,
     canonical,
     image: socialImage,
-    type: "product",
+    type: "website",
     bootstrap: `window.CARDORIA_CARD_ROUTE=${safeJson({ license: licenseSlug, slug: card.slug })};`,
-    jsonLd: [product, breadcrumbs]
+    jsonLd: [referencePage, breadcrumbs]
   });
   return injectSeoIntoTemplate(template, {
     title, description, head,
