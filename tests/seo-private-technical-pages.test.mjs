@@ -1,3 +1,4 @@
+// SEO technical-page regression: utility Live/payment pages must remain noindex.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
