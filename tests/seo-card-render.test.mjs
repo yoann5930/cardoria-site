@@ -171,6 +171,17 @@ test('unsafe image schemes and embedded credentials are refused', () => {
   assert.match(output, /images.example.test\/card.png/);
 });
 
+test('card without a real image stays indexable without inventing product imagery', () => {
+  const output = html({ ...card, imageHd: '', imageThumb: '' });
+  assert.match(output, /Visuel indisponible/);
+  assert.doesNotMatch(output, /<img[^>]+engine-card-visual/);
+  const product = schemas(output).find((item) => item['@type'] === 'Product');
+  assert.ok(product);
+  assert.equal(product.image, undefined);
+  assert.match(output, /property="og:image" content="https:\/\/www\.cardoriashop\.fr\/assets\/logo\/cardoria-premium\.png"/);
+  assert.doesNotMatch(output, /name="robots" content="noindex/);
+});
+
 test('metadata cleanup preserves verification, styles and explicit noindex', () => {
   const template = '<html><head><meta name="google-site-verification" content="keep"><meta name="robots" content="noindex,nofollow"><meta name="googlebot" content="noindex"><link rel="stylesheet" href="/style.css"><link rel="canonical" href="https://wrong.test/"><meta property="og:title" content="old"></head><body></body></html>';
   const output = cleanSeoTemplate(template);
