@@ -73,7 +73,13 @@ test('card SSR title and description include identity, extension, language and l
 test('card SEO language codes are explicit and metadata stays compact', () => {
   for (const [language, code] of [['fr', 'FR'], ['en', 'EN'], ['ja', 'JP'], ['ko', 'KR']]) {
     const meta = buildCardSeoMeta({ ...card, language });
-    assert.match(meta.title, new RegExp(' ' + code + ' – Carte Pokémon, prix & cote \\| Cardoria
+    assert.ok(meta.title.includes(' ' + code + ' – Carte Pokémon, prix & cote | Cardoria'), meta.title);
+    assert.ok(meta.title.length <= 95, meta.title);
+    assert.ok(meta.description.length <= 158, meta.description);
+    assert.ok(meta.description.includes('version ' + code), meta.description);
+  }
+});
+
 test('unknown prices are not zero-valued offers or reference estimates', () => {
   const output = html();
   assert.equal(count(output, />Non disponible</g), 4);
