@@ -70,11 +70,12 @@ test('card image alt text describes the real card and language without keyword s
   );
 });
 
-test('card without a real image stays indexable without inventing a Product image', () => {
+test('card without a real image stays indexable without inventing structured product imagery', () => {
   const output = html({ ...card, imageHd: '', imageThumb: '' });
-  const product = schemas(output).find((item) => item['@type'] === 'Product');
-  assert.ok(product);
-  assert.equal(product.image, undefined);
+  const pageSchema = schemas(output).find((item) => item['@type'] === 'WebPage');
+  assert.ok(pageSchema);
+  assert.equal(pageSchema.image, undefined);
+  assert.equal(schemas(output).some((item) => item['@type'] === 'Product'), false);
   assert.match(output, /Visuel indisponible/);
   assert.match(output, /<meta property="og:image" content="https:\/\/www\.cardoriashop\.fr\/assets\/logo\/cardoria-premium\.png">/);
 });
@@ -139,19 +140,24 @@ test('card SEO language codes are explicit and metadata stays compact', () => {
   }
 });
 
-test('unknown prices are not zero-valued offers or reference estimates', () => {
+test('reference cards never emit Product, Offer or rating rich-result markup', () => {
   const output = html();
   assert.equal(count(output, />Non disponible</g), 4);
-  const product = schemas(output).find((item) => item['@type'] === 'Product');
-  assert.ok(product);
-  assert.equal(product.offers, undefined);
-  assert.equal(product.additionalProperty.some((item) => item.name === 'Prix conseillé'), false);
+  const data = schemas(output);
+  const pageSchema = data.find((item) => item['@type'] === 'WebPage');
+  assert.ok(pageSchema);
+  assert.equal(data.some((item) => item['@type'] === 'Product'), false);
+  assert.equal(data.some((item) => item.offers || item.review || item.aggregateRating), false);
+  assert.equal(pageSchema.mainEntity['@type'], 'Thing');
+  assert.equal(pageSchema.mainEntity.name, 'Pikachu');
 });
 
-test('genuine positive reference price is retained without inventing sale offers', () => {
-  const product = schemas(html({ ...card, prices: { recommended: 12.5 } })).find((item) => item['@type'] === 'Product');
-  assert.equal(product.additionalProperty.find((item) => item.name === 'Prix conseillé').value, 12.5);
-  assert.equal(product.offers, undefined);
+test('genuine positive reference price stays visible without becoming a sale offer', () => {
+  const output = html({ ...card, prices: { recommended: 12.5 } });
+  assert.match(output, /12,50/);
+  const data = schemas(output);
+  assert.equal(data.some((item) => item['@type'] === 'Product'), false);
+  assert.equal(data.some((item) => item.offers), false);
 });
 
 test('price validation rejects absent, non-finite and nonnumeric values', () => {
@@ -172,7 +178,7 @@ test('markup and replacement tokens in catalogue text remain literal text', () =
   assert.doesNotMatch(output, /<script>bad\(\)<\/script>/);
   assert.match(output, /&lt;script&gt;bad\(\)&lt;\/script&gt; \$&amp;/);
   assert.match(output, /<title>&lt;img&gt; \$&amp;<\/title>/);
-  assert.equal(schemas(output).find((item) => item['@type'] === 'Product').name, '<script>bad()</script> $&');
+  assert.equal(schemas(output).find((item) => item['@type'] === 'WebPage').mainEntity.name, '<script>bad()</script>   assert.equal(schemas(output).find((item) => item['@type'] === 'Product').name, '<script>bad()</script> $&');');
 });
 
 test('unsafe image schemes and embedded credentials are refused', () => {
@@ -186,9 +192,10 @@ test('card without a real image stays indexable without inventing product imager
   const output = html({ ...card, imageHd: '', imageThumb: '' });
   assert.match(output, /Visuel indisponible/);
   assert.doesNotMatch(output, /<img[^>]+engine-card-visual/);
-  const product = schemas(output).find((item) => item['@type'] === 'Product');
-  assert.ok(product);
-  assert.equal(product.image, undefined);
+  const pageSchema = schemas(output).find((item) => item['@type'] === 'WebPage');
+  assert.ok(pageSchema);
+  assert.equal(pageSchema.image, undefined);
+  assert.equal(schemas(output).some((item) => item['@type'] === 'Product'), false);
   assert.match(output, /property="og:image" content="https:\/\/www\.cardoriashop\.fr\/assets\/logo\/cardoria-premium\.png"/);
   assert.doesNotMatch(output, /name="robots" content="noindex/);
 });
@@ -342,7 +349,7 @@ test('Chromium without JavaScript displays the full initial reference card', bro
   });
 });
 
-test('Chromium with JavaScript keeps the card canonical and exactly one Product and breadcrumb', browserOptions, async () => {
+test('Chromium with JavaScript keeps canonical, reference WebPage schema and breadcrumb without Product', browserOptions, async () => {
   await browserCheck({}, async (page) => {
     await page.locator('#historyPeriods').waitFor(); // Proves carte.js rendered.
     assert.equal(await page.locator('#cardPage h1').textContent(), [[card.name, card.number].filter(Boolean).join(' '), card.extension].filter(Boolean).join(' — '));
@@ -351,9 +358,10 @@ test('Chromium with JavaScript keeps the card canonical and exactly one Product 
     assert.match(await page.title(), /Pikachu/);
     const json = await page.locator('script[type="application/ld+json"]').allTextContents();
     const data = json.map((value) => JSON.parse(value));
-    assert.equal(data.filter((item) => item['@type'] === 'Product').length, 1);
+    assert.equal(data.filter((item) => item['@type'] === 'Product').length, 0);
+    assert.equal(data.filter((item) => item['@type'] === 'WebPage').length, 1);
     assert.equal(data.filter((item) => item['@type'] === 'BreadcrumbList').length, 1);
-    assert.equal(data.some((item) => item.offers), false);
+    assert.equal(data.some((item) => item.offers || item.review || item.aggregateRating), false);
     assert.equal(await page.locator('.engine-price-box strong').first().textContent(), 'Non disponible');
   });
 });
