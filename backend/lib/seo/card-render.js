@@ -91,7 +91,7 @@ export function renderCardMain(card) {
     ? ` › <a href="${extensionUrl}">${htmlEscape(card.extension)}</a>`
     : "";
   const identity = [name, card.number].filter(Boolean).join(' ');
-  const heading = identity || name;
+  const heading = [identity || name, card.extension].map((value) => String(value || '').trim()).filter(Boolean).join(' — ');
   const leadParts = [
     `${htmlEscape(identity)} est une carte ${htmlEscape(licenseName)}`,
     languageLabel ? `en version ${htmlEscape(languageLabel)}` : "",
