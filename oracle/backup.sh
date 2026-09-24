@@ -50,6 +50,9 @@ sqlite_exts = {'.db', '.sqlite', '.sqlite3'}
 sidecar_suffixes = ('-wal', '-shm', '-journal')
 
 for current, dirs, files in os.walk(src_root):
+    if os.path.abspath(current) == src_root:
+        dirs[:] = [name for name in dirs if name != 'backups']
+
     rel = os.path.relpath(current, src_root)
     dst_dir = dst_root if rel == '.' else os.path.join(dst_root, rel)
     os.makedirs(dst_dir, exist_ok=True)

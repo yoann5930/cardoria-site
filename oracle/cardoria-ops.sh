@@ -79,6 +79,10 @@ cmd_status() {
   echo "previous_commit: $( [ -s "$PREV_FILE" ] && cat "$PREV_FILE" || echo none )"
   echo "--- disk ---"
   df -hT / | awk 'NR==1 || /\/$/'
+  echo "--- storage detail ---"
+  du -sh "$APP_DIR/backend/data" 2>/dev/null || true
+  du -sh "$APP_DIR/backend/data/backups" 2>/dev/null || true
+  du -sh "$BACKUP_DIR" 2>/dev/null || true
   echo "--- memory ---"
   free -h
   echo "--- ports ---"
