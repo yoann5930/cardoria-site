@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
+import { URL } from 'node:url';
 import * as sitemapUrls from '../backend/lib/seo/sitemap-urls.js';
 
 // Execute the actual production module; only database-backed imports are stubbed.
@@ -16,6 +17,7 @@ async function load({ cards = [], posts = [], licenses = [], extensions = [], co
   const calls = [];
   const context = vm.createContext({});
   const imports = {
+    'node:url': { URL },
     './blog.js': { listBlogPosts: () => posts },
     './generator.js': { SITE, listExtensions: () => extensions, listGeneratedPages: () => [] },
     './sitemap-urls.js': sitemapUrls,
