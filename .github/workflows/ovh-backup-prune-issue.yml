@@ -27,6 +27,9 @@ jobs:
       OVH_VPS_SSH_KEY: ${{ secrets.OVH_VPS_SSH_KEY }}
       OVH_VPS_HOST_FINGERPRINT: ${{ secrets.OVH_VPS_HOST_FINGERPRINT }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Configure SSH
         shell: bash
         run: |
@@ -48,47 +51,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ssh -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o BatchMode=yes -o PreferredAuthentications=publickey -o ConnectTimeout=15 "${OVH_VPS_USER}@${OVH_VPS_HOST}" 'sudo python3 -' <<'PY'
-          import os
-          import re
-          from collections import defaultdict
-
-          root = "/opt/cardoria/backups"
-          pattern = re.compile(r"^cardoria-(postgres|data)-(\d{8}T\d{6}Z)\.(dump|tar\.gz)$")
-          groups = defaultdict(dict)
-
-          for name in os.listdir(root):
-              match = pattern.match(name)
-              if not match:
-                  continue
-              kind, stamp, _ext = match.groups()
-              groups[stamp][kind] = os.path.join(root, name)
-
-          complete = sorted(
-              (stamp for stamp, files in groups.items() if {"postgres", "data"} <= files.keys()),
-              reverse=True,
-          )
-          keep = set(complete[:12])
-          seen_days = set()
-          for stamp in complete:
-              day = stamp[:8]
-              if day not in seen_days and len(seen_days) < 7:
-                  keep.add(stamp)
-                  seen_days.add(day)
-
-          removed = 0
-          for stamp, files in groups.items():
-              if stamp in keep:
-                  continue
-              for path in files.values():
-                  os.remove(path)
-                  removed += 1
-
-          print("complete_sets_before:", len(complete))
-          print("kept_sets:", len(keep))
-          print("files_removed:", removed)
-          PY
-
+          ssh -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o BatchMode=yes -o PreferredAuthentications=publickey -o ConnectTimeout=15 "${OVH_VPS_USER}@${OVH_VPS_HOST}" 'sudo python3 - /opt/cardoria/backups' < oracle/prune-backups.py
           ssh -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o BatchMode=yes -o PreferredAuthentications=publickey -o ConnectTimeout=15 "${OVH_VPS_USER}@${OVH_VPS_HOST}" 'df -hT /; du -sh /opt/cardoria/backups 2>/dev/null || true'
 
       - name: Close request
