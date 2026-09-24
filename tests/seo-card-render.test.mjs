@@ -178,7 +178,7 @@ test('markup and replacement tokens in catalogue text remain literal text', () =
   assert.doesNotMatch(output, /<script>bad\(\)<\/script>/);
   assert.match(output, /&lt;script&gt;bad\(\)&lt;\/script&gt; \$&amp;/);
   assert.match(output, /<title>&lt;img&gt; \$&amp;<\/title>/);
-  assert.equal(schemas(output).find((item) => item['@type'] === 'WebPage').mainEntity.name, '<script>bad()</script>   assert.equal(schemas(output).find((item) => item['@type'] === 'Product').name, '<script>bad()</script> $&');');
+  assert.equal(schemas(output).find((item) => item['@type'] === 'WebPage').mainEntity.name, '<script>bad()</script> $&');
 });
 
 test('unsafe image schemes and embedded credentials are refused', () => {
