@@ -170,6 +170,31 @@ test('card sitemap exposes only real catalogue images with escaped metadata', as
   assert.equal((xml.match(/<image:image>/g) || []).length, 1);
 });
 
+test('card sitemap refuses unsafe image URLs and falls back to a valid thumbnail', async () => {
+  const { api } = await load({ cards: [
+    {
+      license_slug: 'pokemon',
+      slug: 'unsafe-image',
+      name: 'Unsafe',
+      image_hd: 'javascript:alert(1)',
+      image_thumb: 'https://images.example/safe-thumb.png',
+      updated_at: '2026-09-24'
+    },
+    {
+      license_slug: 'pokemon',
+      slug: 'credential-image',
+      name: 'Credentials',
+      image_hd: 'https://user:pass@images.example/secret.png',
+      image_thumb: '',
+      updated_at: '2026-09-24'
+    }
+  ] });
+  const xml = api.generateCardsSitemapXml();
+  assert.match(xml, /<image:loc>https:\/\/images\.example\/safe-thumb\.png<\/image:loc>/);
+  assert.doesNotMatch(xml, /javascript:|user:pass@|secret\.png/);
+  assert.equal((xml.match(/<image:image>/g) || []).length, 1);
+});
+
 test('known 404 licences, empty licences and incomplete extension paths are never emitted', async () => {
   const { api } = await load({
     licenses: [
