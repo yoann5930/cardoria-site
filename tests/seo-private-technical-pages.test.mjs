@@ -1,3 +1,4 @@
+// SEO regression guard: generic templates and seller utilities must not compete with canonical public pages.
 // SEO technical-page regression: utility Live/payment pages must remain noindex.
 import test from "node:test";
 import assert from "node:assert/strict";
