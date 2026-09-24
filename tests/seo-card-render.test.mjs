@@ -1,4 +1,4 @@
-// SEO H1 regression guard: server and client must keep the same card identity heading.
+// SEO H1 regression guard: server and client must keep the same card identity and extension heading.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -43,15 +43,15 @@ const html = (value = card) => api.buildCardSeoHtml({}, value);
 const schemas = (value) => [...value.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
 const count = (value, pattern) => [...value.matchAll(pattern)].length;
 
-test('card H1 stays concise and includes the catalogue number', () => {
-  assert.match(html({ ...card, name: 'Jirachi', number: '9', extension: 'EX Deoxys' }), /<h1>Jirachi 9<\/h1>/);
-  assert.match(html({ ...card, name: 'Pikachu', number: '' }), /<h1>Pikachu<\/h1>/);
+test('card H1 includes card identity, catalogue number and extension', () => {
+  assert.match(html({ ...card, name: 'Jirachi', number: '9', extension: 'EX Deoxys' }), /<h1>Jirachi 9 — EX Deoxys<\/h1>/);
+  assert.match(html({ ...card, name: 'Pikachu', number: '' }), /<h1>Pikachu — Extension test<\/h1>/);
 });
 
 test('real card renderer sends one H1, identifiers and image before JavaScript', () => {
   const output = html();
   assert.equal(count(output, /<h1\b/g), 1);
-  assert.match(output, /<h1>Pikachu 25<\/h1>/);
+  assert.match(output, /<h1>Pikachu 25 — Extension test<\/h1>/);
   assert.match(output, /Extension test/);
   assert.match(output, /data-server-rendered="true"/);
   assert.match(output, /https:\/\/images.example.test\/card.png/);
@@ -205,7 +205,7 @@ test('metadata cleanup preserves verification, styles and explicit noindex', () 
 
 test('OVH mirror template receives the same useful initial card content', () => {
   const output = renderers(path.join(ROOT, 'backend/public')).buildCardSeoHtml({}, card);
-  assert.match(output, /<h1>Pikachu 25<\/h1>/);
+  assert.match(output, /<h1>Pikachu 25 — Extension test<\/h1>/);
   assert.equal(count(output, /rel="canonical"/g), 1);
 });
 
@@ -336,7 +336,7 @@ async function browserCheck({ javascript = true, apiFailure = false, pagePath = 
 
 test('Chromium without JavaScript displays the full initial reference card', browserOptions, async () => {
   await browserCheck({ javascript: false }, async (page) => {
-    assert.equal(await page.locator('#cardPage h1').textContent(), [card.name, card.number].filter(Boolean).join(' '));
+    assert.equal(await page.locator('#cardPage h1').textContent(), [[card.name, card.number].filter(Boolean).join(' '), card.extension].filter(Boolean).join(' — '));
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), SITE + CARD_PATH);
     assert.equal(await page.locator('.engine-price-box strong').allTextContents().then((v) => v.join('|')), Array(4).fill('Non disponible').join('|'));
   });
@@ -345,7 +345,7 @@ test('Chromium without JavaScript displays the full initial reference card', bro
 test('Chromium with JavaScript keeps the card canonical and exactly one Product and breadcrumb', browserOptions, async () => {
   await browserCheck({}, async (page) => {
     await page.locator('#historyPeriods').waitFor(); // Proves carte.js rendered.
-    assert.equal(await page.locator('#cardPage h1').textContent(), [card.name, card.number].filter(Boolean).join(' '));
+    assert.equal(await page.locator('#cardPage h1').textContent(), [[card.name, card.number].filter(Boolean).join(' '), card.extension].filter(Boolean).join(' — '));
     assert.equal(await page.locator('link[rel="canonical"]').count(), 1);
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), SITE + CARD_PATH);
     assert.match(await page.title(), /Pikachu/);
@@ -360,7 +360,7 @@ test('Chromium with JavaScript keeps the card canonical and exactly one Product 
 
 test('Chromium retains useful server HTML when the catalogue API is unavailable', browserOptions, async () => {
   await browserCheck({ apiFailure: true }, async (page) => {
-    assert.equal(await page.locator('#cardPage h1').textContent(), [card.name, card.number].filter(Boolean).join(' '));
+    assert.equal(await page.locator('#cardPage h1').textContent(), [[card.name, card.number].filter(Boolean).join(' '), card.extension].filter(Boolean).join(' — '));
     assert.equal(await page.locator('#cardPage').getAttribute('data-server-rendered'), 'true');
     assert.doesNotMatch(await page.locator('#cardPage').textContent(), /Erreur de chargement/);
   });
