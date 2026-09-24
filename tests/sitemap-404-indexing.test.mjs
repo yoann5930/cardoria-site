@@ -5,6 +5,7 @@ import {
   PUBLIC_LICENSE_SITEMAP_SLUGS,
   extensionSitemapEntry,
   isIndexableExtensionSitemapEntry,
+  isIndexableLicenseSitemapEntry,
   isIndexableLicenseSitemapSlug,
   slugifyExtensionName
 } from "../backend/lib/seo/sitemap-urls.js";
@@ -21,6 +22,13 @@ test("licence sitemap allowlist matches public licence templates", () => {
     .filter((entry) => entry.isDirectory() && fs.existsSync("pages/licences/" + entry.name + "/index.html"))
     .map((entry) => entry.name);
   assert.deepEqual([...PUBLIC_LICENSE_SITEMAP_SLUGS].sort(), dirs.sort());
+});
+
+test("public licence needs at least one active card before entering sitemap", () => {
+  assert.equal(isIndexableLicenseSitemapEntry({ slug: "pokemon", cardCount: 1 }), true);
+  assert.equal(isIndexableLicenseSitemapEntry({ slug: "pokemon", cardCount: 0 }), false);
+  assert.equal(isIndexableLicenseSitemapEntry({ slug: "magic", cardCount: 0 }), false);
+  assert.equal(isIndexableLicenseSitemapEntry({ slug: "starwars", cardCount: 12 }), false);
 });
 
 test("extension names that slugify to nothing cannot enter the sitemap", () => {

@@ -29,6 +29,10 @@ export function isIndexableLicenseSitemapSlug(slug) {
   return PUBLIC_LICENSE_SITEMAP_SLUGS.has(String(slug || ""));
 }
 
+export function isIndexableLicenseSitemapEntry(license = {}) {
+  return isIndexableLicenseSitemapSlug(license.slug) && Number(license.cardCount || 0) > 0;
+}
+
 export function extensionSitemapEntry(row = {}) {
   const extension = row.extension;
   const slug = slugifyExtensionName(extension);

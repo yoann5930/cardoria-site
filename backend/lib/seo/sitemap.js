@@ -6,7 +6,7 @@ import { listBlogPosts } from "./blog.js";
 import { listExtensions, listGeneratedPages, SITE } from "./generator.js";
 import { listLicenses } from "../engine/licenses.js";
 import { getSitemapCards, getCardCount } from "../engine/cards.js";
-import { isIndexableExtensionSitemapEntry, isIndexableLicenseSitemapSlug } from "./sitemap-urls.js";
+import { isIndexableExtensionSitemapEntry, isIndexableLicenseSitemapEntry } from "./sitemap-urls.js";
 
 export const CARD_SITEMAP_PAGE_SIZE = 10000;
 
@@ -108,7 +108,7 @@ export function generateCoreSitemapXml(siteUrl = SITE) {
   });
 
   listLicenses().forEach((license) => {
-    if (!isIndexableLicenseSitemapSlug(license.slug)) return;
+    if (!isIndexableLicenseSitemapEntry(license)) return;
     urls += urlEntry(base, `/pages/licences/${license.slug}/`, {
       changefreq: "weekly",
       priority: license.slug === "pokemon" ? "0.95" : "0.88"
