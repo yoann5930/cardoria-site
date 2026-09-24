@@ -1,0 +1,49 @@
+name: OVH Restart Issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ovh-restart-issue
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'ovh-restart:') &&
+      contains(github.event.issue.labels.*.name, 'ovh-ops:deploy') &&
+      contains(github.event.issue.labels.*.name, 'ovh-branch:main')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Authorized owner-only OVH restart request."
+
+  restart:
+    needs: authorize
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: restart
+      branch: main
+    secrets: inherit
+
+  status:
+    needs: restart
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: status
+      branch: main
+    secrets: inherit
+
+  close:
+    needs: status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close restart request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue close "${{ github.event.issue.number }}" --repo "${GITHUB_REPOSITORY}" --comment "Redémarrage OVH et contrôle de statut terminés."
