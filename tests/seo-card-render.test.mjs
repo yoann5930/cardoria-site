@@ -20,13 +20,14 @@ const SITE = 'https://www.cardoriashop.fr';
 const card = { id: 'seo-fixture', slug: 'pikachu-test', license: 'pokemon', licenseName: 'Pokémon', language: 'fr', name: 'Pikachu', extension: 'Extension test', number: '25', rarity: 'Commune', imageThumb: 'https://images.example.test/card.png', prices: { avg: 0, low: 0, high: 0, recommended: 0 }, salesHistory: [] };
 const CARD_PATH = '/cartes/pokemon/' + card.slug;
 
-function renderers(publicRoot = ROOT) {
+function renderers(publicRoot = ROOT, { licenseCardCount = 1 } = {}) {
+  const hasCards = Number(licenseCardCount || 0) > 0;
   const context = vm.createContext({ fs, path, PUBLIC_ROOT: publicRoot, cleanSeoTemplate, renderCardMain, positivePrice, safeImage, cardExtensionUrl, buildCardSeoMeta,
     getCardBySlug: (_license, slug) => slug === card.slug ? card : null,
-    getLicense: (slug) => slug === 'pokemon' ? { slug, name: 'Pokémon' } : null,
+    getLicense: (slug) => slug === 'pokemon' ? { slug, name: 'Pokémon', cardCount: licenseCardCount } : null,
     getLicenseSeoContent: () => ({ title: 'Catalogue Pokémon | Cardoria', metaDescription: 'Catalogue de cartes Pokémon.', h1: 'Cartes Pokémon', content: { intro: 'Retrouvez les cartes et leurs extensions.' } }),
-    listExtensions: () => [{ slug: 'extension-test', extension: 'Extension test', cardCount: 1 }],
-    searchCards: () => ({ cards: [card] })
+    listExtensions: () => hasCards ? [{ slug: 'extension-test', extension: 'Extension test', cardCount: licenseCardCount }] : [],
+    searchCards: () => ({ cards: hasCards ? [card] : [] })
   });
   vm.runInContext(source.slice(start, end), context, { timeout: 1000 });
   return context;
@@ -210,6 +211,31 @@ test('SSR injector adds a description when the public template has none', () => 
   assert.ok(extension.indexOf('name="description"') < extension.indexOf('</head>'));
   assert.doesNotMatch(extension, /<meta name="description" content="">/);
 });
+
+test('empty licence page is noindex in HTML and HTTP while populated licence stays indexable', () => {
+  const emptyApi = renderers(ROOT, { licenseCardCount: 0 });
+  const emptyHtml = emptyApi.buildLicenseSeoHtml({}, 'pokemon');
+  assert.match(emptyHtml, /<meta name="robots" content="noindex,follow">/);
+  assert.doesNotMatch(emptyHtml, /<meta name="robots" content="index,follow/);
+
+  let status;
+  let headers = {};
+  let body = '';
+  const response = {
+    status(value) { status = value; return this; },
+    set(name, value) { headers[String(name).toLowerCase()] = value; return this; },
+    type() { return this; },
+    send(value) { body = value; return this; }
+  };
+  emptyApi.sendLicenseSeoPage({ params: { license: 'pokemon' } }, response, (error) => { throw error; });
+  assert.equal(status, 200);
+  assert.equal(headers['x-robots-tag'], 'noindex, follow');
+  assert.match(body, /Catalogue en cours de référencement|Catalogue en cours de synchronisation/);
+
+  const populatedHtml = api.buildLicenseSeoHtml({}, 'pokemon');
+  assert.match(populatedHtml, /<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">/);
+});
+
 
 test('missing card stays a real 404 with noindex', () => {
   let status, body;
