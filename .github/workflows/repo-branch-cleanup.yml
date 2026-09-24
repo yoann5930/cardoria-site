@@ -1,0 +1,85 @@
+name: Repository Branch Cleanup
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  pull-requests: read
+  issues: write
+
+concurrency:
+  group: repository-branch-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'repo-cleanup-branches:')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Delete only unchanged branches from merged pull requests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100&sort=updated&direction=desc" \
+            --jq '.[] | select(.merged_at != null) | [.head.ref, .head.sha] | @tsv' \
+            > /tmp/merged-pr-heads.tsv
+
+          awk -F '\t' '!seen[$1]++' /tmp/merged-pr-heads.tsv > /tmp/latest-merged-pr-heads.tsv
+
+          deleted=0
+          moved=0
+          protected=0
+          while IFS=$'\t' read -r branch merged_sha; do
+            [ -n "${branch:-}" ] || continue
+            case "$branch" in
+              main|backup*|migration/*)
+                protected=$((protected + 1))
+                continue
+                ;;
+            esac
+
+            current_sha="$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')"
+            [ -n "$current_sha" ] || continue
+
+            if [ "$current_sha" != "$merged_sha" ]; then
+              echo "KEEP moved branch: $branch"
+              moved=$((moved + 1))
+              continue
+            fi
+
+            echo "DELETE merged unchanged branch: $branch"
+            git push origin --delete "$branch"
+            deleted=$((deleted + 1))
+          done < /tmp/latest-merged-pr-heads.tsv
+
+          {
+            echo "deleted=$deleted"
+            echo "moved=$moved"
+            echo "protected=$protected"
+          } | tee /tmp/branch-cleanup-summary.txt
+
+          echo "### Repository branch cleanup" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deleted merged unchanged branches: $deleted" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Kept branches changed after merge: $moved" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Kept protected backup/migration branches: $protected" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Close cleanup request
+        if: success()
+        shell: bash
+        run: |
+          summary="$(tr '\n' ' ' < /tmp/branch-cleanup-summary.txt)"
+          gh issue close "${{ github.event.issue.number }}" --repo "${GITHUB_REPOSITORY}" \
+            --comment "Nettoyage sécurisé des branches terminé. $summary"
