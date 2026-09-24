@@ -10,6 +10,7 @@ const scanner = fs.readFileSync("scanner.html", "utf8");
 const wishlist = fs.readFileSync("souhaits.html", "utf8");
 const marketplaceCart = fs.readFileSync("panier-marketplace.html", "utf8");
 const marketplaceRoutes = fs.readFileSync("backend/routes/marketplace-v1.js", "utf8");
+const marketplaceSitemap = fs.readFileSync("backend/lib/seo/marketplace-sitemap.js", "utf8");
 const marketplaceListings = fs.readFileSync("backend/lib/marketplace/v1/listings.js", "utf8");
 const marketplaceSearch = fs.readFileSync("backend/lib/marketplace/listings.js", "utf8");
 const marketplaceBrowse = fs.readFileSync("js/marketplace-browse.js", "utf8");
@@ -60,7 +61,8 @@ test("private utility surfaces stay out of the search index", () => {
 });
 
 test("marketplace sitemap always emits the canonical production host", () => {
-  assert.match(marketplaceRoutes, /const base = "https:\/\/www\.cardoriashop\.fr";/);
+  assert.match(marketplaceSitemap, /const SITE = "https:\/\/www\.cardoriashop\.fr";/);
+  assert.match(marketplaceRoutes, /generateMarketplaceSitemapXml\(entries\)/);
   assert.doesNotMatch(marketplaceRoutes, /MARKETPLACE_FRONTEND_URL \|\| process\.env\.FRONTEND_URL/);
 });
 
