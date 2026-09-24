@@ -4,65 +4,13 @@
 import { getDb, normalizeText, slugify, makeCardId, rowToCard, syncFts } from "./database.js";
 import { getLicense } from "./licenses.js";
 import { setPriceSources, recalculateCardPrices, getSalesHistory } from "./pricing.js";
+import { buildCardSeoMeta } from "../seo/card-meta.js";
 
 const CARD_LANGUAGES = new Set(["fr", "en", "ja", "ko"]);
-const LANGUAGE_LABELS = { fr: "française", en: "anglaise", ja: "japonaise", ko: "coréenne" };
-const LANGUAGE_SEO_CODES = { fr: "FR", en: "EN", ja: "JP", ko: "KR" };
-const LICENSE_SEO_NAMES = {
-  pokemon: "Pokémon",
-  yugioh: "Yu-Gi-Oh!",
-  onepiece: "One Piece",
-  lorcana: "Lorcana",
-  magic: "Magic",
-  dragonball: "Dragon Ball",
-  sports: "Sports"
-};
 
 function normalizeLanguage(value, fallback = "fr") {
   const language = String(value || fallback).trim().toLowerCase();
   return CARD_LANGUAGES.has(language) ? language : fallback;
-}
-
-function seoLicenseName(card = {}) {
-  const raw = String(card.licenseName || card.license || card.licenseSlug || "").trim();
-  return LICENSE_SEO_NAMES[raw.toLowerCase()] || raw || "TCG";
-}
-
-function compactSeoTitle(prefix, suffix, maxLength = 95) {
-  const cleanPrefix = String(prefix || "").replace(/\s+/g, " ").trim();
-  const cleanSuffix = String(suffix || "").replace(/\s+/g, " ").trim();
-  const full = cleanPrefix + cleanSuffix;
-  if (full.length <= maxLength) return full;
-  const room = Math.max(12, maxLength - cleanSuffix.length - 2);
-  return cleanPrefix.slice(0, room).trimEnd() + "…" + cleanSuffix;
-}
-
-export function buildCardSeoMeta(card = {}) {
-  const name = String(card.name || "Carte").replace(/\s+/g, " ").trim();
-  const number = String(card.number || "").replace(/\s+/g, " ").trim();
-  const extension = String(card.extension || "").replace(/\s+/g, " ").trim();
-  const rarity = String(card.rarity || card.hitFamily || "").replace(/\s+/g, " ").trim();
-  const language = normalizeLanguage(card.language || "fr");
-  const languageCode = LANGUAGE_SEO_CODES[language] || language.toUpperCase();
-  const languageLabel = LANGUAGE_LABELS[language] || language;
-  const licenseName = seoLicenseName(card);
-  const identity = [name, number].filter(Boolean).join(" ");
-  const titleSuffix = ` – Carte ${licenseName}, prix & cote | Cardoria`;
-  const titleContext = [identity, extension, languageCode].filter(Boolean).join(" ");
-  const title = compactSeoTitle(titleContext, titleSuffix);
-
-  const context = [];
-  if (extension) context.push(`de l'extension ${extension}`);
-  context.push(`version ${languageCode}`);
-  if (rarity) context.push(`rareté ${rarity}`);
-  let description = `${identity}, carte ${licenseName} ${context.join(", ")}. Consultez son visuel, son prix et sa cote sur Cardoria.`;
-  description = description.replace(/\s+/g, " ").trim();
-  if (description.length > 158) {
-    description = `${identity}, carte ${licenseName}${extension ? " – " + extension : ""} (${languageCode}${rarity ? ", " + rarity : ""}). Prix, cote, rareté et visuel sur Cardoria.`;
-  }
-  if (description.length > 158) description = description.slice(0, 157).trimEnd() + "…";
-
-  return { title, description, languageCode, languageLabel, licenseName };
 }
 
 const SEARCH_LANGUAGE_HINTS = new Map([
@@ -200,13 +148,14 @@ export function getCardBySlug(licenseSlug, slug, opts) {
 
 export function createCard(data) {
   const db = getDb();
-  if (!getLicense(data.license || data.licenseSlug)) throw new Error("Licence inconnue : " + (data.license || data.licenseSlug));
   const licenseSlug = data.license || data.licenseSlug;
+  const license = getLicense(licenseSlug);
+  if (!license) throw new Error("Licence inconnue : " + licenseSlug);
   const language = normalizeLanguage(data.language);
   const slug = data.slug || slugify(`${language === "fr" ? "" : language + "-"}${data.name}-${data.extension}-${data.number}`);
   const id = data.id || makeCardId(licenseSlug, slug);
   const now = new Date().toISOString();
-  const previewCard = { name: data.name, number: data.number || "", extension: data.extension || "", rarity: data.rarity || "", hitFamily: data.hitFamily || "", language };
+  const previewCard = { name: data.name, number: data.number || "", extension: data.extension || "", rarity: data.rarity || "", hitFamily: data.hitFamily || "", language, license: licenseSlug, licenseName: license.name };
   const seo = buildCardSeoMeta(previewCard);
   const card = { id, license_slug: licenseSlug, language, slug, name: data.name, name_normalized: normalizeText(data.name), extension: data.extension || "", extension_code: data.extensionCode || "", number: data.number || "", rarity: data.rarity || "", hit_family: data.hitFamily || "", variants_json: JSON.stringify(data.variants || {}), illustration: data.illustration || "", image_hd: data.imageHd || data.image_hd || "", image_thumb: data.imageThumb || data.image_thumb || data.imageHd || "", condition_note: data.condition || "NM", meta_title: data.metaTitle || seo.title, meta_description: data.metaDescription || seo.description, created_at: now, updated_at: now };
   db.prepare(`INSERT INTO cards (id,license_slug,language,slug,name,name_normalized,extension,extension_code,number,rarity,hit_family,variants_json,illustration,image_hd,image_thumb,condition_note,meta_title,meta_description,active,created_at,updated_at) VALUES (@id,@license_slug,@language,@slug,@name,@name_normalized,@extension,@extension_code,@number,@rarity,@hit_family,@variants_json,@illustration,@image_hd,@image_thumb,@condition_note,@meta_title,@meta_description,1,@created_at,@updated_at)`).run(card);
