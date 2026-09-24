@@ -605,16 +605,16 @@ app.get(["/estimation", "/estimation/", "/pages/estimation", "/pages/estimation/
 app.get("/index.html", (req, res) => res.redirect(301, "/"));
 app.get("/cartes/:license/:slug", sendCardSeoPage);
 app.get("/annonces/:slug", sendMarketplaceListingSeoPage);
-app.get("/annonce.html", (req, res, next) => {
+app.get("/annonce.html", (req, res) => {
   if (req.query.slug) return res.redirect(301, `/annonces/${encodeURIComponent(req.query.slug)}`);
   if (req.query.id) {
     const listing = getListingV1(String(req.query.id));
     if (listing?.slug) return res.redirect(301, `/annonces/${encodeURIComponent(listing.slug)}`);
   }
-  return next();
+  return res.redirect(301, "/marketplace.html");
 });
-app.get("/carte.html", (req, res, next) => {
-  if (!req.query.license || !req.query.slug) return next();
+app.get("/carte.html", (req, res) => {
+  if (!req.query.license || !req.query.slug) return res.redirect(301, "/pages/licences/");
   return res.redirect(301, `/cartes/${encodeURIComponent(req.query.license)}/${encodeURIComponent(req.query.slug)}`);
 });
 app.get("/pages/licences/", sendLicenseHubSeoPage);
@@ -625,8 +625,8 @@ app.get("/pages/licences/:license", (req, res, next) => {
 });
 app.get("/pages/licences/:license/", sendLicenseSeoPage);
 app.get("/extensions/:license/:slug", sendExtensionSeoPage);
-app.get(["/pages/extension", "/pages/extension/"], (req, res, next) => {
-  if (!req.query.license || !req.query.ext) return next();
+app.get(["/pages/extension", "/pages/extension/"], (req, res) => {
+  if (!req.query.license || !req.query.ext) return res.redirect(301, "/pages/licences/");
   return res.redirect(301, `/extensions/${encodeURIComponent(req.query.license)}/${encodeURIComponent(req.query.ext)}`);
 });
 app.get("/robots.txt", (req, res) => {
