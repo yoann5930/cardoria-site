@@ -120,6 +120,7 @@ test('real license and extension renderers retain their own metadata and card li
   for (const output of [license, extension]) {
     assert.equal(count(output, /<h1\b/g), 1);
     assert.equal(count(output, /rel="canonical"/g), 1);
+    assert.equal(count(output, /name="description"/g), 1);
     assert.match(output, /href="\/cartes\/pokemon\/pikachu-test"/);
     assert.ok(output.indexOf('cardoria:server-seo') < output.indexOf('/js/seo.js'));
   }
@@ -131,6 +132,13 @@ test('real license and extension renderers retain their own metadata and card li
   assert.match(emptyLicense, /name="robots" content="noindex,follow"/);
   assert.match(html(), /<title>Pikachu 25 Extension test FR – Carte Pokémon, prix &amp; cote \| Cardoria<\/title>/);
   assert.match(html(), /alt="Pikachu — Extension test — 25 — FR"/);
+});
+
+test('SSR injector adds a description when the public template has none', () => {
+  const extension = api.buildExtensionSeoHtml({}, 'pokemon', 'extension-test');
+  assert.equal(count(extension, /name="description"/g), 1);
+  assert.ok(extension.indexOf('name="description"') < extension.indexOf('</head>'));
+  assert.doesNotMatch(extension, /<meta name="description" content="">/);
 });
 
 test('missing card stays a real 404 with noindex', () => {
