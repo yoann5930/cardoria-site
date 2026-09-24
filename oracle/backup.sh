@@ -15,12 +15,28 @@ if [ -f "$ENV_FILE" ]; then
   set +a
 fi
 
-if [ -n "${MARKETPLACE_DATABASE_URL:-}" ]; then
-  pg_dump "$MARKETPLACE_DATABASE_URL" -Fc -f "$BACKUP_DIR/cardoria-postgres-$STAMP.dump"
+POSTGRES_STAGE="$STAGING_DIR/cardoria-postgres-$STAMP.dump"
+DATA_STAGE="$STAGING_DIR/cardoria-data-$STAMP.tar.gz"
+POSTGRES_FINAL="$BACKUP_DIR/cardoria-postgres-$STAMP.dump"
+DATA_FINAL="$BACKUP_DIR/cardoria-data-$STAMP.tar.gz"
+
+if [ -z "${MARKETPLACE_DATABASE_URL:-}" ]; then
+  echo "MARKETPLACE_DATABASE_URL missing"
+  exit 1
 fi
 
-if [ -d "$DATA_DIR" ]; then
-  python3 - "$DATA_DIR" "$STAGING_DIR/data" <<'PY'
+pg_dump "$MARKETPLACE_DATABASE_URL" -Fc -f "$POSTGRES_STAGE"
+if [ ! -s "$POSTGRES_STAGE" ] || ! pg_restore -l "$POSTGRES_STAGE" >/dev/null 2>&1; then
+  echo "PostgreSQL backup validation failed"
+  exit 1
+fi
+
+if [ ! -d "$DATA_DIR" ]; then
+  echo "Data directory missing: $DATA_DIR"
+  exit 1
+fi
+
+python3 - "$DATA_DIR" "$STAGING_DIR/data" <<'PY'
 import os
 import shutil
 import sqlite3
@@ -65,9 +81,19 @@ for current, dirs, files in os.walk(src_root):
         shutil.copy2(src, dst)
 PY
 
-  tar -czf "$BACKUP_DIR/cardoria-data-$STAMP.tar.gz" -C "$STAGING_DIR" data
-  tar -tzf "$BACKUP_DIR/cardoria-data-$STAMP.tar.gz" >/dev/null
+tar -czf "$DATA_STAGE" -C "$STAGING_DIR" data
+if [ ! -s "$DATA_STAGE" ] || ! tar -tzf "$DATA_STAGE" >/dev/null 2>&1; then
+  echo "Data archive validation failed"
+  exit 1
 fi
+
+# Publish only fully validated artifacts. A failed backup never becomes the
+# newest file consumed by backup-check.
+mv "$POSTGRES_STAGE" "$POSTGRES_FINAL"
+mv "$DATA_STAGE" "$DATA_FINAL"
+
+echo "postgres_dump_validated: $(basename "$POSTGRES_FINAL")"
+echo "data_archive_validated: $(basename "$DATA_FINAL")"
 
 find "$BACKUP_DIR" -type f -mtime +14 -delete
 find "$BACKUP_DIR" -type f -printf '%TY-%Tm-%Td %TH:%TM %p\n' | sort

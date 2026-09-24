@@ -186,8 +186,7 @@ cmd_logs() {
 
 cmd_backup() {
   echo "=== BACKUP ==="
-  local stamp before after dump tarfile rc
-  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  local before after dump tarfile rc
   before=$(find "$BACKUP_DIR" -type f 2>/dev/null | wc -l)
   set +e
   bash "$APP_DIR/oracle/backup.sh" >/tmp/cardoria-ops-backup.out 2>&1
@@ -195,18 +194,38 @@ cmd_backup() {
   set -e
   redact < /tmp/cardoria-ops-backup.out
   rm -f /tmp/cardoria-ops-backup.out
-  dump=$(find "$BACKUP_DIR" -name "cardoria-postgres-*.dump" -mmin -10 | tail -n 1)
-  tarfile=$(find "$BACKUP_DIR" -name "cardoria-data-*.tar.gz" -mmin -10 | tail -n 1)
   after=$(find "$BACKUP_DIR" -type f 2>/dev/null | wc -l)
   echo "backup_script_exit: $rc"
   echo "backup_files_before: $before"
   echo "backup_files_after: $after"
-  if [ -n "$dump" ]; then echo "postgres_dump: present $(basename "$dump")"; else echo "postgres_dump: missing"; fi
-  if [ -n "$tarfile" ]; then echo "data_archive: present $(basename "$tarfile")"; else echo "data_archive: missing"; fi
-  if [ -z "$dump" ] || [ -z "$tarfile" ]; then
-    echo "BACKUP INCOMPLETE"
+
+  if [ "$rc" -ne 0 ]; then
+    echo "BACKUP SCRIPT FAILED"
+    return "$rc"
+  fi
+
+  dump=$(find "$BACKUP_DIR" -type f -name 'cardoria-postgres-*.dump' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n 1 | awk '{print $2}')
+  tarfile=$(find "$BACKUP_DIR" -type f -name 'cardoria-data-*.tar.gz' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n 1 | awk '{print $2}')
+
+  if [ -z "$dump" ] || [ ! -s "$dump" ]; then
+    echo "postgres_dump: missing_or_empty"
     return 1
   fi
+  if ! pg_restore -l "$dump" >/dev/null 2>&1; then
+    echo "postgres_dump: unreadable"
+    return 1
+  fi
+  echo "postgres_dump: readable $(basename "$dump")"
+
+  if [ -z "$tarfile" ] || [ ! -s "$tarfile" ]; then
+    echo "data_archive: missing_or_empty"
+    return 1
+  fi
+  if ! tar -tzf "$tarfile" >/dev/null 2>&1; then
+    echo "data_archive: unreadable"
+    return 1
+  fi
+  echo "data_archive: readable $(basename "$tarfile")"
   echo "BACKUP OK"
 }
 
