@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { once } from 'node:events';
-import { cleanSeoTemplate, renderCardMain, positivePrice, safeImage, cardImageAlt } from '../backend/lib/seo/card-render.js';
+import { cleanSeoTemplate, renderCardMain, positivePrice, safeImage, cardImageAlt, cardExtensionUrl } from '../backend/lib/seo/card-render.js';
 import { buildCardSeoMeta } from '../backend/lib/seo/card-meta.js';
 
 // Production functions and templates are executed; only catalogue storage is
@@ -21,7 +21,7 @@ const card = { id: 'seo-fixture', slug: 'pikachu-test', license: 'pokemon', lice
 const CARD_PATH = '/cartes/pokemon/' + card.slug;
 
 function renderers(publicRoot = ROOT) {
-  const context = vm.createContext({ fs, path, PUBLIC_ROOT: publicRoot, cleanSeoTemplate, renderCardMain, positivePrice, safeImage, buildCardSeoMeta,
+  const context = vm.createContext({ fs, path, PUBLIC_ROOT: publicRoot, cleanSeoTemplate, renderCardMain, positivePrice, safeImage, cardExtensionUrl, buildCardSeoMeta,
     getCardBySlug: (_license, slug) => slug === card.slug ? card : null,
     getLicense: (slug) => slug === 'pokemon' ? { slug, name: 'Pokémon' } : null,
     getLicenseSeoContent: () => ({ title: 'Catalogue Pokémon | Cardoria', metaDescription: 'Catalogue de cartes Pokémon.', h1: 'Cartes Pokémon', content: { intro: 'Retrouvez les cartes et leurs extensions.' } }),
@@ -74,6 +74,32 @@ test('canonical, description and robots are unique in the real card response', (
   assert.equal(count(output, /name="robots"/g), 1);
   assert.ok(output.includes(`href="${SITE}${CARD_PATH}"`));
   assert.ok(output.indexOf('name="cardoria:server-seo"') < output.indexOf('src="/js/seo.js"'));
+});
+
+test('card SSR exposes crawlable extension link, visible language and richer breadcrumb', () => {
+  const output = html();
+  assert.match(output, /href="\/extensions\/pokemon\/extension-test"/);
+  assert.match(output, /<label>Langue<\/label><strong>française<\/strong>/);
+  assert.match(output, /Pikachu 25 est une carte Pokémon en version française de l’extension Extension test de rareté Commune\./);
+
+  const breadcrumbs = schemas(output).find((item) => item['@type'] === 'BreadcrumbList');
+  assert.ok(breadcrumbs);
+  assert.deepEqual(
+    breadcrumbs.itemListElement.map((item) => ({ position: item.position, name: item.name, item: item.item })),
+    [
+      { position: 1, name: 'Accueil', item: SITE + '/' },
+      { position: 2, name: 'Pokémon', item: SITE + '/pages/licences/pokemon/' },
+      { position: 3, name: 'Extension test', item: SITE + '/extensions/pokemon/extension-test' },
+      { position: 4, name: 'Pikachu', item: SITE + CARD_PATH }
+    ]
+  );
+});
+
+test('extension URL helper only emits safe canonical extension paths', () => {
+  assert.equal(cardExtensionUrl(card), '/extensions/pokemon/extension-test');
+  assert.equal(cardExtensionUrl({ ...card, extension: 'Écarlate & Violet 151' }), '/extensions/pokemon/ecarlate-violet-151');
+  assert.equal(cardExtensionUrl({ ...card, license: '../admin', extension: 'Test' }), '');
+  assert.equal(cardExtensionUrl({ ...card, extension: '★ ★ ★' }), '');
 });
 
 test('card SSR title and description include identity, extension, language and licence', () => {
