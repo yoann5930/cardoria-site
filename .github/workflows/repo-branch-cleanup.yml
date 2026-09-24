@@ -65,16 +65,52 @@ jobs:
             deleted=$((deleted + 1))
           done < /tmp/latest-merged-pr-heads.tsv
 
+          ancestor_deleted=0
+          open_pr_kept=0
+
+          gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" --paginate \
+            --jq '.[].head.ref' > /tmp/open-pr-heads.txt
+
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+
+          while IFS= read -r ref; do
+            branch="${ref#refs/remotes/origin/}"
+            [ -n "$branch" ] || continue
+            [ "$branch" != "HEAD" ] || continue
+
+            case "$branch" in
+              main|backup*|migration/*|stable/*|release/*|oracle-ready)
+                continue
+                ;;
+            esac
+
+            if grep -Fxq "$branch" /tmp/open-pr-heads.txt; then
+              echo "KEEP open PR branch: $branch"
+              open_pr_kept=$((open_pr_kept + 1))
+              continue
+            fi
+
+            if git merge-base --is-ancestor "$ref" origin/main; then
+              echo "DELETE branch fully contained in main: $branch"
+              git push origin --delete "$branch"
+              ancestor_deleted=$((ancestor_deleted + 1))
+            fi
+          done < <(git for-each-ref --format='%(refname)' refs/remotes/origin/)
+
           {
-            echo "deleted=$deleted"
-            echo "moved=$moved"
+            echo "deleted_from_merged_prs=$deleted"
+            echo "deleted_as_main_ancestor=$ancestor_deleted"
+            echo "moved_after_merge=$moved"
             echo "protected=$protected"
+            echo "open_pr_kept=$open_pr_kept"
           } | tee /tmp/branch-cleanup-summary.txt
 
           echo "### Repository branch cleanup" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Deleted merged unchanged branches: $deleted" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deleted unchanged branches from merged PRs: $deleted" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deleted branches fully contained in main: $ancestor_deleted" >> "$GITHUB_STEP_SUMMARY"
           echo "- Kept branches changed after merge: $moved" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Kept protected backup/migration branches: $protected" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Kept protected backup/migration/stable/release branches: $protected" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Kept open PR branches: $open_pr_kept" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Close cleanup request
         if: success()
