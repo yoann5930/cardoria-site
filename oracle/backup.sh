@@ -118,7 +118,10 @@ for name in os.listdir(root):
     kind, stamp, _ext = match.groups()
     groups[stamp][kind] = os.path.join(root, name)
 
-complete = sorted((stamp for stamp, files in groups.items() if {'postgres', 'data'} <= files.keys()), reverse=True)
+complete = sorted(
+    (stamp for stamp, files in groups.items() if {'postgres', 'data'} <= files.keys()),
+    reverse=True,
+)
 
 keep = set(complete[:12])
 seen_days = set()
