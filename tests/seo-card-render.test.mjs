@@ -26,6 +26,11 @@ function renderers(publicRoot = ROOT, { licenseCardCount = 1 } = {}) {
   const context = vm.createContext({ fs, path, PUBLIC_ROOT: publicRoot, cleanSeoTemplate, renderCardMain, positivePrice, safeImage, cardExtensionUrl, buildCardSeoMeta,
     getCardBySlug: (_license, slug) => slug === card.slug ? card : null,
     getLicense: (slug) => slug === 'pokemon' ? { slug, name: 'Pokémon', cardCount: licenseCardCount } : null,
+    listLicenses: () => [
+      { slug: 'pokemon', name: 'Pokémon', icon: '⚡', cardCount: licenseCardCount },
+      { slug: 'magic', name: 'Magic', icon: '🔮', cardCount: 0 },
+      { slug: 'lorcana', name: 'Lorcana', icon: '✨', cardCount: 0 }
+    ],
     getLicenseSeoContent: () => ({ title: 'Catalogue Pokémon | Cardoria', metaDescription: 'Catalogue de cartes Pokémon.', h1: 'Cartes Pokémon', content: { intro: 'Retrouvez les cartes et leurs extensions.' } }),
     listExtensions: () => hasCards ? [{ slug: 'extension-test', extension: 'Extension test', cardCount: licenseCardCount }] : [],
     searchCards: () => ({ cards: hasCards ? [card] : [] })
@@ -202,6 +207,28 @@ test('OVH mirror template receives the same useful initial card content', () => 
   const output = renderers(path.join(ROOT, 'backend/public')).buildCardSeoHtml({}, card);
   assert.match(output, /<h1>Pikachu 25<\/h1>/);
   assert.equal(count(output, /rel="canonical"/g), 1);
+});
+
+test('licence hub only links licences with real active cards', () => {
+  const output = api.buildLicenseHubSeoHtml({});
+  assert.match(output, /href="\/pages\/licences\/pokemon\//);
+  assert.match(output, />Pokémon<\/strong><small>1 cartes<\/small>/);
+  assert.doesNotMatch(output, /href="\/pages\/licences\/magic\//);
+  assert.doesNotMatch(output, /href="\/pages\/licences\/lorcana\//);
+  assert.match(output, /<link rel="canonical" href="https:\/\/www\.cardoriashop\.fr\/pages\/licences\/">/);
+  assert.equal(count(output, /<h1\b/g), 1);
+});
+
+test('licence hub updates automatically when another licence gains cards', () => {
+  const context = renderers(ROOT, { licenseCardCount: 2 });
+  context.listLicenses = () => [
+    { slug: 'pokemon', name: 'Pokémon', icon: '⚡', cardCount: 2 },
+    { slug: 'magic', name: 'Magic', icon: '🔮', cardCount: 3 }
+  ];
+  const output = context.buildLicenseHubSeoHtml({});
+  assert.match(output, /href="\/pages\/licences\/pokemon\//);
+  assert.match(output, /href="\/pages\/licences\/magic\//);
+  assert.match(output, />3 cartes<\/small>/);
 });
 
 test('real license and extension renderers retain their own metadata and card links', () => {
