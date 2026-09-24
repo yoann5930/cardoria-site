@@ -24,6 +24,13 @@ test("estimation aliases use HTTP redirects to the canonical URL", () => {
   );
 });
 
+test("generic card, listing and extension templates redirect to useful canonical surfaces", () => {
+  assert.match(server, /app\.get\("\/annonce\.html"[\s\S]*?return res\.redirect\(301, "\/marketplace\.html"\);/);
+  assert.match(server, /app\.get\("\/carte\.html"[\s\S]*?return res\.redirect\(301, "\/pages\/licences\/"\);/);
+  assert.match(server, /app\.get\(\["\/pages\/extension", "\/pages\/extension\/"\][\s\S]*?return res\.redirect\(301, "\/pages\/licences\/"\);/);
+});
+
+
 test("homepage does not link to redirect aliases", () => {
   assert.doesNotMatch(home, /href="\/pages\/(?:boutique|estimation)\/?"/);
   assert.match(home, /href="\/boutique\.html"/);
