@@ -1,5 +1,7 @@
 import fs from 'node:fs/promises';
 
+// Diagnostic trigger 2026-09-25: no production behavior change; PR must not be merged.
+
 // Public GET requests only: no credentials, administration endpoints or mutations.
 // These checks do not query Search Console or prove Google indexing.
 const BASE = 'https://www.cardoriashop.fr';
