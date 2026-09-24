@@ -192,6 +192,10 @@ export function generateRobotsTxt(siteUrl = SITE) {
     "Disallow: /favoris.html",
     "Disallow: /souhaits.html",
     "Disallow: /panier-marketplace.html",
+    "Disallow: /live-vendeur.html",
+    "Disallow: /live-camera.html",
+    "Disallow: /marketplace-paiement-succes.html",
+    "Disallow: /marketplace-paiement-echec.html",
     "Disallow: /document-commande.html",
     "",
     "Sitemap: " + base + "/sitemap.xml"

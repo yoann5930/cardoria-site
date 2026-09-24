@@ -123,12 +123,20 @@ test('empty catalogue keeps the core sitemap and no phantom card partitions', as
   ]);
 });
 
-test('robots keeps public cards crawlable and advertises the canonical sitemap', async () => {
+test('robots keeps public cards crawlable and blocks technical live/payment pages', async () => {
   const { api } = await load();
   const robots = api.generateRobotsTxt();
   assert.match(robots, /Allow: \/cartes\//);
   assert.match(robots, /Disallow: \/admin/);
   assert.match(robots, /Disallow: \/panier-marketplace\.html/);
+  for (const path of [
+    '/live-vendeur.html',
+    '/live-camera.html',
+    '/marketplace-paiement-succes.html',
+    '/marketplace-paiement-echec.html'
+  ]) {
+    assert.ok(robots.includes('Disallow: ' + path), path);
+  }
   assert.ok(robots.endsWith(`Sitemap: ${SITE}/sitemap.xml`));
 });
 

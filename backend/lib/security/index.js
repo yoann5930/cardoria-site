@@ -6,11 +6,19 @@ import { LIVE_PERMISSIONS_POLICY } from "../live/camera-media.js";
 
 const PUBLIC_RELEASE = "cardoria-seo-20260902-1";
 
+const PRIVATE_PUBLIC_INDEX_PATHS = new Set([
+  "/live-vendeur.html",
+  "/live-camera.html",
+  "/marketplace-paiement-succes.html",
+  "/marketplace-paiement-echec.html"
+]);
+
 function isPrivateIndexPath(pathname = "") {
   const path = String(pathname || "").toLowerCase();
   if (path === "/robots.txt" || path === "/sitemap.xml" || path === "/sitemap-index.xml" || /^\/api\/seo\/.+\.xml$/.test(path)) {
     return false;
   }
+  if (PRIVATE_PUBLIC_INDEX_PATHS.has(path)) return true;
   return path.startsWith("/admin") ||
     path.startsWith("/mes-commandes") ||
     path.startsWith("/client-orders") ||
