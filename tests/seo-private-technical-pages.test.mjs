@@ -2,6 +2,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { createRequire } from "node:module";
+import { once } from "node:events";
+import { applySecurityMiddleware } from "../backend/lib/security/index.js";
 
 const pages = [
   "live-vendeur.html",
@@ -35,5 +38,28 @@ test("technical pages are disallowed in robots and absent from core sitemap stat
   for (const page of pages) {
     assert.ok(sitemap.includes('"Disallow: /' + page + '"'), page);
     assert.ok(!staticPages.includes('"/' + page + '"'), page);
+  }
+});
+
+test("real security middleware returns noindex header for every technical page", async () => {
+  const require = createRequire(new URL("../backend/package.json", import.meta.url));
+  const express = require("express");
+  const app = express();
+  applySecurityMiddleware(app);
+  app.use((req, res) => res.status(200).send("ok"));
+
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = "http://127.0.0.1:" + server.address().port;
+
+  try {
+    for (const page of pages) {
+      const response = await fetch(base + "/" + page, { method: "HEAD" });
+      assert.equal(response.status, 200, page);
+      assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow, noarchive", page);
+    }
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
   }
 });
