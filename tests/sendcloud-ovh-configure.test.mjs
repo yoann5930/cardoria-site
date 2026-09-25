@@ -17,6 +17,13 @@ test("Sendcloud OVH configuration is owner-only and never creates a shipment", (
   assert.match(ops, /cmd_sendcloud_configure/);
   assert.match(ops, /searchMondialRelayServicePoints/);
   assert.match(ops, /sendcloud_api_test: success/);
+  assert.match(ops, /CARDORIA_SENDER_NAME/);
+  assert.match(ops, /CARDORIA_SENDER_ADDRESS_LINE1/);
+  assert.match(ops, /CARDORIA_SENDER_POSTAL_CODE/);
+  assert.match(ops, /CARDORIA_SENDER_CITY/);
+  assert.match(ops, /CARDORIA_SENDER_PHONE/);
+  assert.match(ops, /CARDORIA_SENDER_EMAIL/);
+  assert.match(ops, /cardoria_sender: configured/);
   assert.match(wrapper, /sendcloud-configure\)[\s\S]*cardoria-ops sendcloud-configure/);
   assert.match(sudoers, /cardoria-ops sendcloud-configure/);
   assert.doesNotMatch(ops, /createSendcloudShipment/);
