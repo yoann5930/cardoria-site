@@ -67,6 +67,11 @@ function relayCarrierId(value) {
 
 async function resolveSendcloudServicePointId(order, searchPoints = searchMondialRelayServicePoints) {
   const pickup = order?.pickupPoint || {};
+  const storedSendcloudId = clean(pickup.sendcloudServicePointId, 40);
+  if (/^\d+$/.test(storedSendcloudId) && Number.isSafeInteger(Number(storedSendcloudId)) && Number(storedSendcloudId) > 0) {
+    return Number(storedSendcloudId);
+  }
+
   const requestedRaw = clean(pickup.carrierServicePointId || pickup.id, 40);
   const requested = relayCarrierId(requestedRaw);
   if (!requestedRaw || !pickup.postalCode || !pickup.city) {
