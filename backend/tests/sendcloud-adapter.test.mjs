@@ -29,10 +29,38 @@ test("search filters a mismatched carrier and country instead of returning it", 
     const result = await sc.searchMondialRelayServicePoints({ postalCode: "59330" }); assert.equal(result.points.length, 1); assert.equal(result.points[0].id, 123);
   });
 });
-test("wrong carrier, return, labelless and home options never act as silent fallbacks", async () => {
-  for (const changed of [{ carrier: { code: "wrong" } }, { functionalities: { last_mile: "home_delivery" } }, { functionalities: { last_mile: "service_point", returns: true } }, { functionalities: { last_mile: "service_point", labelless: true } }]) {
+test("wrong carrier, return and home options never act as silent fallbacks", async () => {
+  for (const changed of [{ carrier: { code: "wrong" } }, { functionalities: { last_mile: "home_delivery", labelless: false } }, { functionalities: { last_mile: "service_point", returns: true, labelless: false } }]) {
     await mocked(async () => json({ data: [{ ...option, ...changed }] }), async () => assert.rejects(sc.resolveShippingOption({ carrierCode: "mondial_relay", weightGrams: 500, servicePointId: 123 }), { code: "SENDCLOUD_SHIPPING_OPTION_UNAVAILABLE" }));
   }
+});
+
+test("print and QR modes select only the matching Mondial Relay option", async () => {
+  const qrOption = { ...option, code: "mondial_relay:test-qr", name: "Mondial Relay Point Relais QR", functionalities: { last_mile: "service_point", returns: false, labelless: true } };
+  await mocked(async () => json({ data: [qrOption, option] }), async () => {
+    const printed = await sc.resolveShippingOption({ carrierCode: "mondial_relay", weightGrams: 500, servicePointId: 123, labelMode: "print" });
+    const qr = await sc.resolveShippingOption({ carrierCode: "mondial_relay", weightGrams: 500, servicePointId: 123, labelMode: "qr" });
+    assert.equal(printed.code, "mondial_relay:test");
+    assert.equal(printed.labelless, false);
+    assert.equal(qr.code, "mondial_relay:test-qr");
+    assert.equal(qr.labelless, true);
+  });
+});
+
+test("capability probe reports print and QR availability without announcing a shipment", async () => {
+  const qrOption = { ...option, code: "mondial_relay:test-qr", name: "Mondial Relay Point Relais QR", functionalities: { last_mile: "service_point", returns: false, labelless: true } };
+  let calls = 0;
+  await mocked(async (_url, init) => {
+    calls++;
+    const body = JSON.parse(init.body);
+    return json({ data: [body.functionalities.labelless ? qrOption : option] });
+  }, async () => {
+    const result = await sc.probeMondialRelayLabelCapabilities({ weightGrams: 500, servicePointId: 123, fromPostalCode: "59330", toPostalCode: "59330" });
+    assert.equal(result.print.available, true);
+    assert.equal(result.qr.available, true);
+    assert.equal(result.qr.code, "mondial_relay:test-qr");
+  });
+  assert.equal(calls, 2);
 });
 test("foreign relay prevents any announcement request", async () => {
   const calls = []; await mocked(async url => { calls.push(url); return json({ data: { ...point, carrier: { code: "other" } } }); }, async () => assert.rejects(sc.createSendcloudShipment(input), { code: "SERVICE_POINT_MISMATCH" })); assert.equal(calls.length, 1);

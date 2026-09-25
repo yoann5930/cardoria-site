@@ -1,49 +1,156 @@
 name: Sendcloud Requested Label Preflight
+
 on:
-  push:
-    branches: [feature/live-shipping-final]
-    paths: ['.github/workflows/sendcloud-label-preflight.yml']
   workflow_dispatch:
+  issues:
+    types: [opened]
+
 permissions:
   contents: read
+  issues: read
+
 jobs:
   protected-account-check:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.issue.title, 'sendcloud-preflight:')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Check protected API access without printing credentials or buying a label
+      - name: Check protected API access and Mondial Relay label modes
         env:
           SENDCLOUD_PUBLIC_KEY: ${{ secrets.SENDCLOUD_PUBLIC_KEY }}
           SENDCLOUD_SECRET_KEY: ${{ secrets.SENDCLOUD_SECRET_KEY }}
         run: |
           python3 - <<'PY'
-          import base64, json, os, pathlib, urllib.request, urllib.error
-          report = {'requestedCarrier':'mondial_relay','physicalParcel':False,'labelCreated':False,'carrierRequestSent':False}
-          pub=os.environ.get('SENDCLOUD_PUBLIC_KEY','').strip()
-          sec=os.environ.get('SENDCLOUD_SECRET_KEY','').strip()
-          report['protectedCredentialsAvailable']=bool(pub and sec)
-          if not pub or not sec:
-              report.update(status='blocked', reason='SENDCLOUD_CREDENTIALS_NOT_AVAILABLE_IN_THIS_RUNNER')
-          else:
-              url='https://panel.sendcloud.sc/api/v3/service-points?country_code=FR&carrier_code=mondial_relay&address_postal_code=59330&limit=3'
-              req=urllib.request.Request(url,headers={'Accept':'application/json','Authorization':'Basic '+base64.b64encode((pub+':'+sec).encode()).decode()})
-              class NoRedirect(urllib.request.HTTPRedirectHandler):
-                  def redirect_request(self,*args,**kwargs): return None
-              report['carrierRequestSent']=True
-              try:
-                  response=urllib.request.build_opener(NoRedirect).open(req,timeout=20)
-                  raw=response.read(1000000)
-                  data=json.loads(raw)
-                  points=data.get('data',{}).get('results',[])
-                  report.update(status='preflight_only',httpStatus=response.status,servicePointCount=len(points),reason='LABEL_NOT_CREATED_UNTIL_OWN_TEST_RECIPIENT_AND_QUOTE_ARE_VALIDATED')
-              except urllib.error.HTTPError as error:
-                  report.update(status='blocked',httpStatus=error.code,reason='SENDCLOUD_AUTH_OR_API_REJECTED')
-              except Exception:
-                  report.update(status='blocked',reason='SENDCLOUD_PREFLIGHT_TRANSPORT_OR_RESPONSE_FAILURE')
-          pathlib.Path('/tmp/sendcloud-preflight.json').write_text(json.dumps(report,indent=2))
-          print(json.dumps(report,indent=2))
-          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f: f.write('## Requested Mondial Relay label test\n\n```json\n'+json.dumps(report,indent=2)+'\n```\nNo label has been purchased by this preflight.\n')
+          import base64
+          import json
+          import os
+          import pathlib
+          import urllib.error
+          import urllib.request
+
+          report = {
+              "requestedCarrier": "mondial_relay",
+              "physicalParcel": False,
+              "labelCreated": False,
+              "carrierAnnouncementSent": False,
+              "printAvailable": False,
+              "qrAvailable": False,
+          }
+
+          pub = os.environ.get("SENDCLOUD_PUBLIC_KEY", "").strip()
+          sec = os.environ.get("SENDCLOUD_SECRET_KEY", "").strip()
+          report["protectedCredentialsAvailable"] = bool(pub and sec)
+          auth = "Basic " + base64.b64encode((pub + ":" + sec).encode()).decode() if pub and sec else ""
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+
+          opener = urllib.request.build_opener(NoRedirect)
+
+          def api_json(url, method="GET", payload=None):
+              data = None if payload is None else json.dumps(payload).encode()
+              headers = {
+                  "Accept": "application/json",
+                  "Authorization": auth,
+                  "Content-Type": "application/json",
+              }
+              request = urllib.request.Request(url, data=data, headers=headers, method=method)
+              response = opener.open(request, timeout=20)
+              raw = response.read(1000000)
+              return response.status, json.loads(raw)
+
+          try:
+              if not pub or not sec:
+                  raise RuntimeError("SENDCLOUD_CREDENTIALS_NOT_AVAILABLE_IN_THIS_RUNNER")
+
+              status, points_payload = api_json(
+                  "https://panel.sendcloud.sc/api/v3/service-points"
+                  "?country_code=FR&carrier_code=mondial_relay"
+                  "&address_postal_code=59330&address_city=Hautmont&limit=5"
+              )
+              points = points_payload.get("data", {}).get("results", [])
+              report["carrierRequestSent"] = True
+              report["servicePointHttpStatus"] = status
+              report["servicePointCount"] = len(points)
+              if not points:
+                  raise RuntimeError("NO_MONDIAL_RELAY_SERVICE_POINT_RETURNED")
+
+              point_id = int(points[0]["id"])
+              report["servicePointResolved"] = True
+
+              for mode, labelless in (("print", False), ("qr", True)):
+                  payload = {
+                      "from_country_code": "FR",
+                      "to_country_code": "FR",
+                      "from_postal_code": "59330",
+                      "to_postal_code": "59330",
+                      "parcels": [{"weight": {"value": "0.500", "unit": "kg"}}],
+                      "carrier_code": "mondial_relay",
+                      "calculate_quotes": False,
+                      "functionalities": {
+                          "returns": False,
+                          "labelless": labelless,
+                          "last_mile": "service_point",
+                      },
+                      "to_service_point": {"id": point_id},
+                  }
+                  option_status, option_payload = api_json(
+                      "https://panel.sendcloud.sc/api/v3/shipping-options",
+                      method="POST",
+                      payload=payload,
+                  )
+                  options = option_payload.get("data", [])
+                  matches = []
+                  for option in options if isinstance(options, list) else []:
+                      functionalities = option.get("functionalities") or {}
+                      carrier = option.get("carrier") or {}
+                      if carrier.get("code") != "mondial_relay":
+                          continue
+                      if functionalities.get("returns") is True:
+                          continue
+                      if bool(functionalities.get("labelless")) != labelless:
+                          continue
+                      if functionalities.get("last_mile") != "service_point":
+                          continue
+                      matches.append({
+                          "code": str(option.get("code") or "")[:240],
+                          "name": str(option.get("name") or (option.get("product") or {}).get("name") or "")[:240],
+                      })
+
+                  report[mode + "HttpStatus"] = option_status
+                  report[mode + "Available"] = bool(matches)
+                  report[mode + "Options"] = matches[:5]
+
+              report["status"] = "preflight_only"
+              report["reason"] = "NO_LABEL_CREATED"
+          except urllib.error.HTTPError as error:
+              report.update(
+                  status="blocked",
+                  httpStatus=error.code,
+                  reason="SENDCLOUD_AUTH_OR_API_REJECTED",
+              )
+          except Exception as error:
+              reason = str(error)
+              if reason not in {
+                  "SENDCLOUD_CREDENTIALS_NOT_AVAILABLE_IN_THIS_RUNNER",
+                  "NO_MONDIAL_RELAY_SERVICE_POINT_RETURNED",
+              }:
+                  reason = "SENDCLOUD_PREFLIGHT_TRANSPORT_OR_RESPONSE_FAILURE"
+              report.update(status="blocked", reason=reason)
+
+          path = pathlib.Path("/tmp/sendcloud-preflight.json")
+          path.write_text(json.dumps(report, indent=2, ensure_ascii=False))
+          print(json.dumps(report, indent=2, ensure_ascii=False))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as handle:
+              handle.write(
+                  "## Sendcloud / Mondial Relay preflight\n\n"
+                  "This run checks PDF and QR/labelless availability only. "
+                  "It does not create, announce, purchase or cancel a shipment.\n\n"
+                  "```json\n" + json.dumps(report, indent=2, ensure_ascii=False) + "\n```\n"
+              )
           PY
+
       - name: Preserve non-sensitive preflight result
         if: always()
         uses: actions/upload-artifact@v4

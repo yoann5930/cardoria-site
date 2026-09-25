@@ -79,17 +79,40 @@ export async function searchMondialRelayServicePoints({ countryCode = "FR", post
   return { points: payload.data.results.map(pointView).filter(p => p.active && p.carrierCode === "mondial_relay" && p.countryCode === requestedCountry), geocoding: payload.data.geocoding || null };
 }
 export async function getServicePoint(id) { const payload = await request("/service-points/" + positiveId(id)); const point = pointView(payload.data); if (point.id !== Number(id)) throw failure("SERVICE_POINT_MISMATCH", "Point Relais incohérent.", 409); return point; }
-export async function resolveShippingOption({ carrierCode, toCountry = "FR", fromCountry = "FR", weightGrams, servicePointId = null, fromPostalCode = "", toPostalCode = "" } = {}) {
-  const carrier = text(carrierCode, 80, true), mr = carrier === "mondial_relay";
-  const body = { from_country_code: country(fromCountry), to_country_code: country(toCountry), parcels: [{ weight: weight(weightGrams) }], carrier_code: carrier, calculate_quotes: false, functionalities: { returns: false, labelless: false } };
+function normalizeLabelMode(value = "print") {
+  const mode = text(value || "print", 20).toLowerCase();
+  if (!["print", "qr"].includes(mode)) throw failure("SENDCLOUD_LABEL_MODE_INVALID", "Mode d'étiquette Sendcloud invalide.", 400);
+  return mode;
+}
+
+export async function resolveShippingOption({ carrierCode, toCountry = "FR", fromCountry = "FR", weightGrams, servicePointId = null, fromPostalCode = "", toPostalCode = "", labelMode = "print" } = {}) {
+  const carrier = text(carrierCode, 80, true), mr = carrier === "mondial_relay", mode = normalizeLabelMode(labelMode);
+  if (mode === "qr" && !mr) throw failure("SENDCLOUD_QR_CARRIER_UNSUPPORTED", "Le mode QR est actuellement activé uniquement pour Mondial Relay.", 409);
+  const wantsLabelless = mode === "qr";
+  const body = { from_country_code: country(fromCountry), to_country_code: country(toCountry), parcels: [{ weight: weight(weightGrams) }], carrier_code: carrier, calculate_quotes: false, functionalities: { returns: false, labelless: wantsLabelless } };
   if (fromPostalCode) body.from_postal_code = text(fromPostalCode, 12);
   if (toPostalCode) body.to_postal_code = text(toPostalCode, 12);
   if (mr) { body.to_service_point = { id: positiveId(servicePointId) }; body.functionalities.last_mile = "service_point"; }
   const payload = await request("/shipping-options", { method: "POST", body });
   const options = Array.isArray(payload.data) ? payload.data : [];
-  const selected = options.find(o => o?.code && o.carrier?.code === carrier && o.functionalities?.returns !== true && o.functionalities?.labelless !== true && (mr ? o.functionalities?.last_mile === "service_point" : o.functionalities?.last_mile !== "service_point" && o.requirements?.is_service_point_required !== true));
-  if (!selected) throw failure("SENDCLOUD_SHIPPING_OPTION_UNAVAILABLE", "Aucune méthode compatible avec le transporteur et la destination demandés.", 409);
-  return { code: text(selected.code, 240, true), name: text(selected.name || selected.product?.name, 240), contractId: selected.contract?.id || null, carrierCode: carrier };
+  const selected = options.find(o => o?.code && o.carrier?.code === carrier && o.functionalities?.returns !== true && Boolean(o.functionalities?.labelless) === wantsLabelless && (mr ? o.functionalities?.last_mile === "service_point" : o.functionalities?.last_mile !== "service_point" && o.requirements?.is_service_point_required !== true));
+  if (!selected) throw failure("SENDCLOUD_SHIPPING_OPTION_UNAVAILABLE", mode === "qr" ? "Aucune méthode QR Mondial Relay compatible avec ce compte, ce poids et cette destination." : "Aucune méthode d'étiquette imprimable compatible avec le transporteur et la destination demandés.", 409);
+  return { code: text(selected.code, 240, true), name: text(selected.name || selected.product?.name, 240), contractId: selected.contract?.id || null, carrierCode: carrier, labelMode: mode, labelless: wantsLabelless };
+}
+
+export async function probeMondialRelayLabelCapabilities({ toCountry = "FR", fromCountry = "FR", weightGrams, servicePointId, fromPostalCode = "", toPostalCode = "" } = {}) {
+  const base = { carrierCode: "mondial_relay", toCountry, fromCountry, weightGrams, servicePointId, fromPostalCode, toPostalCode };
+  const result = { carrierCode: "mondial_relay", print: { available: false }, qr: { available: false } };
+  for (const mode of ["print", "qr"]) {
+    try {
+      const option = await resolveShippingOption({ ...base, labelMode: mode });
+      result[mode] = { available: true, code: option.code, name: option.name };
+    } catch (error) {
+      if (error?.code !== "SENDCLOUD_SHIPPING_OPTION_UNAVAILABLE") throw error;
+      result[mode] = { available: false };
+    }
+  }
+  return result;
 }
 export async function createSendcloudShipment({ orderNumber, reference, toAddress, toEmail, fromAddress, fromEmail, fromCompanyName, weightGrams, totalOrderValue = 0, carrierCode = "mondial_relay", servicePointId = null } = {}) {
   const id = text(orderNumber, 160, true), parcelWeight = weight(weightGrams);
