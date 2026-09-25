@@ -6,7 +6,7 @@ import { updateOrderStatus } from "../lib/marketplace/orders.js";
 import { getMarketplacePersistenceStatus } from "../lib/marketplace/persistence.js";
 import { isMarketplaceDemoMode } from "../lib/marketplace/demo-mode.js";
 import { getMarketplaceUser, assertSellerSession, assertBuyerOwnsOrder } from "../lib/marketplace/v1/security.js";
-import { calculateShipping } from "../lib/marketplace/shipping.js";
+import { calculateShipping, resolveMarketplaceShippingSelection } from "../lib/marketplace/shipping.js";
 import { getDb } from "../lib/engine/database.js";
 import { getPayPalMarketplaceConfig, createSellerOnboarding, syncSellerPayPalStatus, createMarketplacePayPalOrder, captureMarketplacePayPalOrder } from "../lib/marketplace/paypal.js";
 import { handlePayPalWebhook, paypalWebhookConfigured } from "../lib/marketplace/paypal-events.js";
@@ -76,10 +76,24 @@ router.post("/v1/paypal/checkout", async (req, res) => {
       if (!seller?.paypalReady) return res.status(409).json({ ok: false, error: `Le vendeur ${seller?.displayName || sellerId} n'a pas termine son activation PayPal.`, sellerId });
     }
     const carrier = String(body.shippingCarrier || "mondial_relay");
-    const serverShippingCost = calculateShipping(carrier, Math.max(0.05, cart.items.reduce((sum, item) => sum + Number(item.qty || 1) * 0.05, 0)));
+    const selection = resolveMarketplaceShippingSelection({
+      carrierId: carrier,
+      shippingAddress: String(body.shippingAddress || "").trim().slice(0, 500),
+      pickupPoint: body.pickupPoint
+    });
+    const serverShippingCost = calculateShipping(selection.carrierId, Math.max(0.05, cart.items.reduce((sum, item) => sum + Number(item.qty || 1) * 0.05, 0)));
     const serverTotal = cart.items.reduce((sum, item) => sum + Number(item.qty || 1) * Number(item.price || 0), 0) + serverShippingCost;
     assertServerAmount(serverTotal, body.amount ?? body.total);
-    orders = createOrdersFromCart(cartUserId, { buyerEmail: user.email, buyerName: user.name || String(body.buyerName || "").slice(0, 120), buyerId: user.id, shippingCarrier: carrier, shippingCost: serverShippingCost, shippingAddress: String(body.shippingAddress || "").trim().slice(0, 500), clearAfterCreate: false });
+    orders = createOrdersFromCart(cartUserId, {
+      buyerEmail: user.email,
+      buyerName: user.name || String(body.buyerName || "").slice(0, 120),
+      buyerId: user.id,
+      shippingCarrier: selection.carrierId,
+      shippingCost: serverShippingCost,
+      shippingAddress: selection.shippingAddress,
+      shippingPickupPoint: selection.pickupPoint,
+      clearAfterCreate: false
+    });
     const base = (process.env.FRONTEND_URL || process.env.MARKETPLACE_FRONTEND_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
     const successBase = String(body.successUrl || `${base}/marketplace-paiement-succes.html`);
     const cancelUrl = String(body.cancelUrl || `${base}/marketplace-paiement-echec.html`);

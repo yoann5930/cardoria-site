@@ -45,7 +45,11 @@
       senderForm(profile.sender, profile.ready) +
       "<h2>Expéditions Live</h2>" + renderShipments(liveShipping.shipments || []) +
       "<h2>Commandes Marketplace à traiter</h2>" + ((d.orders || []).map(function (o) {
-        return "<div style='border:1px solid rgba(212,175,55,.25);padding:12px;margin:8px 0;border-radius:8px'><strong>" + M.esc(o.id) + "</strong> — " + M.esc(o.listingTitle) + " — " + M.euro(o.total) + " — " + M.esc(o.status) + ((o.status === "paid" || o.status === "preparing") ? "<div style='margin-top:8px'><input placeholder='N° suivi' id='tr-" + M.esc(o.id) + "'><button type='button' data-oid='" + M.esc(o.id) + "'>Marquer expédié</button></div>" : "") + (o.shippingTracking ? "<p>Suivi : " + M.esc(o.shippingTracking) + "</p>" : "") + "</div>";
+        var relay = o.shippingPickupPoint || null;
+        var delivery = relay
+          ? "<p>Point Relais : " + M.esc([relay.name, relay.id ? "n° " + relay.id : "", relay.address, relay.postalCode, relay.city].filter(Boolean).join(" — ")) + "</p>"
+          : "<p>Adresse : " + M.esc(o.shippingAddress || "—") + "</p>";
+        return "<div style='border:1px solid rgba(212,175,55,.25);padding:12px;margin:8px 0;border-radius:8px'><strong>" + M.esc(o.id) + "</strong> — " + M.esc(o.listingTitle) + " — " + M.euro(o.total) + " — " + M.esc(o.status) + delivery + ((o.status === "paid" || o.status === "preparing") ? "<div style='margin-top:8px'><input placeholder='N° suivi' id='tr-" + M.esc(o.id) + "'><button type='button' data-oid='" + M.esc(o.id) + "'>Marquer expédié</button></div>" : "") + (o.shippingTracking ? "<p>Suivi : " + M.esc(o.shippingTracking) + "</p>" : "") + "</div>";
       }).join("") || "<p>Aucune commande.</p>");
 
     root.querySelectorAll("button[data-live-label]").forEach(function(button) {

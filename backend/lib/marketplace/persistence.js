@@ -45,6 +45,7 @@ async function ensureRemoteSchema(client) {
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_runtime_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
   await client.query(`CREATE TABLE IF NOT EXISTS cardoria_engine_snapshot (id TEXT PRIMARY KEY, payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
   await client.query(`ALTER TABLE mk_sellers ADD COLUMN IF NOT EXISTS auth_user_id TEXT DEFAULT ''`);
+  await client.query(`ALTER TABLE mk_orders ADD COLUMN IF NOT EXISTS shipping_pickup_point_json TEXT DEFAULT ''`);
   await client.query(`CREATE INDEX IF NOT EXISTS idx_mk_sellers_auth_user ON mk_sellers(auth_user_id)`);
 }
 function runtimePayload() {

@@ -8,6 +8,47 @@ const CARRIERS = {
   chronopost: { name: "Chronopost", baseCost: 9.9, days: "24-48h" }
 };
 
+const clean = (value, max = 500) => String(value == null ? "" : value).trim().slice(0, max);
+
+export function normalizeMarketplacePickupPoint(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const id = clean(raw.id || raw.carrierServicePointId, 20);
+  const name = clean(raw.name, 160);
+  const address = clean(raw.address || [raw.street, raw.houseNumber].filter(Boolean).join(" "), 200);
+  const postalCode = clean(raw.postalCode, 12);
+  const city = clean(raw.city, 80);
+  if (!/^\d{1,8}$/.test(id) || !name || !address || !postalCode || !city) return null;
+  return {
+    id,
+    carrierServicePointId: clean(raw.carrierServicePointId || id, 20),
+    name,
+    address,
+    postalCode,
+    city,
+    countryCode: clean(raw.countryCode || raw.country || "FR", 2).toUpperCase() || "FR",
+    carrierCode: "mondial_relay"
+  };
+}
+
+export function resolveMarketplaceShippingSelection({ carrierId, shippingAddress, pickupPoint } = {}) {
+  const id = clean(carrierId || "mondial_relay", 40);
+  if (!CARRIERS[id]) throw Object.assign(new Error("Transporteur inconnu"), { status: 400, code: "MARKETPLACE_CARRIER_INVALID" });
+  const address = clean(shippingAddress, 500);
+  if (!address) throw Object.assign(new Error("Adresse de livraison requise."), { status: 400, code: "MARKETPLACE_SHIPPING_ADDRESS_REQUIRED" });
+
+  if (id === "mondial_relay") {
+    const point = normalizeMarketplacePickupPoint(pickupPoint);
+    if (!point) {
+      throw Object.assign(new Error("Sélectionnez un vrai Point Relais Mondial Relay avant le paiement."), {
+        status: 400,
+        code: "MONDIAL_RELAY_PICKUP_REQUIRED"
+      });
+    }
+    return { carrierId: id, shippingAddress: address, pickupPoint: point };
+  }
+  return { carrierId: id, shippingAddress: address, pickupPoint: null };
+}
+
 export function getShippingOptions() {
   return Object.entries(CARRIERS).map(([id, c]) => ({ id, name: c.name, price: c.baseCost, estimatedDays: c.days }));
 }
