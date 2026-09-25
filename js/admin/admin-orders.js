@@ -5,13 +5,9 @@
 
   var orders = [];
   var filter = "all";
-  var colissimo = { configured:false, senderConfigured:false, labelPurchasesEnabled:false, productCode:"DOM" };
-  var colissimoMessage = "";
   var emailConfig = { configured:false, missingReason:"" };
   var CARRIERS = ["Colissimo (La Poste)", "La Poste", "Mondial Relay", "Relais Colis"];
   var STATUSES = ["À préparer", "En préparation", "Prête à expédier", "Expédiée", "Livrée", "Annulée"];
-  var creatingLabels = Object.create(null);
-  var syncingTracking = Object.create(null);
 
   function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; }); }
   function euro(v) { return Number(v || 0).toFixed(2).replace(".", ",") + " €"; }
@@ -70,13 +66,6 @@
     return '<section class="admin-order-section"><h4>'+esc(title)+'</h4>'+body+"</section>";
   }
 
-  function colissimoButtonLabel() {
-    if (!colissimo.configured) return "Clé API Colissimo non configurée";
-    if (!colissimo.senderConfigured) return "Adresse expéditeur Colissimo à renseigner";
-    if (!colissimo.labelPurchasesEnabled) return "Configuration Colissimo en attente";
-    return "Créer l’étiquette";
-  }
-
   function render() {
     var q = (A.qs("#orderSearch")?.value || "").toLowerCase();
     var list = orders.filter(function (o) {
@@ -92,10 +81,6 @@
 
     A.qs("#orderCards").innerHTML = list.map(function (o) {
       var canRefund = o.paymentStatus === "paid" && !!(o.sumupCheckoutId || o.sumupTransactionId);
-      var colissimoReady = !!(colissimo.configured && colissimo.senderConfigured && colissimo.labelPurchasesEnabled);
-      var colissimoAttempt = o.colissimoLabelAttempt && o.colissimoLabelAttempt.status || "";
-      var colissimoBlocked = colissimoAttempt === "reconciliation_required";
-      var colissimoPending = colissimoAttempt === "creation_pending" || creatingLabels[o.id];
       var purchaseMail = o.purchaseEmail || null, trackingMail = o.trackingEmail || null;
       var relay = isRelay(o);
       var tracking = o.tracking||o.colissimoParcelNumber||"";
@@ -105,15 +90,11 @@
       var items = (o.items || []).map(function (i) { return '<tr><td>'+esc(i.name||i.ref)+'</td><td>'+Number(i.qty||1)+'</td><td>'+euro(i.price)+'</td><td>'+euro(Number(i.qty||1)*Number(i.price||0))+'</td></tr>'; }).join("") || '<tr><td colspan="4">Aucun article</td></tr>';
       var legacyCarrier = o.carrier && CARRIERS.indexOf(o.carrier) < 0 ? [o.carrier].concat(CARRIERS) : CARRIERS;
       var review = o.paymentReviewRequired ? '<div class="admin-panel" style="margin:10px 0;border-color:#b44"><strong style="color:#ff8f8f">Remboursement SumUp à confirmer</strong><br><small>Le stock reste bloqué jusqu’à confirmation du remboursement.</small></div>' : "";
-      var createDisabled = !colissimoReady || colissimoBlocked || colissimoPending || !weight.known || o.paymentStatus !== "paid" || relay;
-      var createLabel = colissimoPending ? "Création d’étiquette en cours…" : colissimoButtonLabel();
-      var waitNote = "";
-      if (relay) waitNote = tracking
-        ? '<p class="small">Mondial Relay : suivi Sendcloud récupéré automatiquement.</p>'
-        : '<p class="small">Mondial Relay : Cardoria vérifie automatiquement Sendcloud. Vous pouvez aussi lancer une synchronisation manuelle.</p>';
-      else if (colissimoBlocked) waitNote = '<p class="small" style="color:#ffb36b">Colissimo : rapprochement requis dans la Cbox avant tout nouvel essai.</p>';
-      else if (!colissimoReady && o.paymentStatus==="paid" && !o.colissimoParcelNumber) waitNote = '<p class="small">'+esc(colissimoMessage || colissimoButtonLabel())+'</p>';
-      else if (!weight.known && o.paymentStatus==="paid" && !relay) waitNote = '<p class="small">Poids du colis inconnu : renseignez-le avant de créer une étiquette.</p>';
+      var waitNote = relay
+        ? (tracking
+          ? '<p class="small">Mondial Relay : suivi enregistré par le parcours d’expédition.</p>'
+          : '<p class="small">Mondial Relay : l’Admin ne crée pas d’étiquette et ne contacte pas Sendcloud. Le suivi apparaîtra ici lorsqu’il aura été enregistré par le parcours d’expédition.</p>')
+        : '<p class="small">Expédition : l’Admin ne crée pas d’étiquette et ne récupère pas le suivi auprès du transporteur. Il affiche uniquement les données déjà enregistrées.</p>';
 
       var clientBox = section("Client",
         '<p><strong>'+esc(o.client||"Client")+'</strong><br>'+esc(o.email||"")+(o.phone?'<br>'+esc(o.phone):"")+'</p>');
@@ -130,7 +111,7 @@
         '<div class="admin-form-grid">'+
           '<label>Statut de préparation<select data-field="status">'+options(STATUSES.indexOf(o.status)<0 && o.status ? [o.status].concat(STATUSES) : STATUSES,o.status)+'</select></label>'+
           '<label>Transporteur<select data-field="carrier">'+options(legacyCarrier,o.carrier||"","Choisir")+'</select></label>'+
-          '<label>Numéro de suivi<input data-field="tracking" value="'+esc(tracking)+'" placeholder="Rempli automatiquement par Colissimo / Sendcloud"></label>'+
+          '<label>Numéro de suivi<input data-field="tracking" value="'+esc(tracking)+'" readonly placeholder="Enregistré par le parcours d’expédition"></label>'+
           '<label>Poids du colis (g)<input data-field="shippingWeightGrams" type="number" min="1" max="30000" step="1" value="'+esc(o.shippingWeightGrams||(weight.known?weight.grams:""))+'" placeholder="'+(weight.known?"Calculé : "+weight.grams:"Ex. 250")+'"></label>'+
           '<label>Téléphone<input data-field="phone" value="'+esc(o.phone||"")+'"></label>'+
           '<label class="admin-form-wide">Adresse de livraison<textarea data-field="address" rows="3">'+esc(o.address||"")+'</textarea></label>'+
@@ -150,11 +131,10 @@
         (o.sumupCheckoutId?'<button type="button" class="btn btn-secondary" data-sync="'+esc(o.id)+'">Synchroniser SumUp</button> ':'')+
         (canRefund?'<button type="button" class="btn btn-secondary" data-refund="'+esc(o.id)+'">Rembourser SumUp</button> ':'')+
         (o.paymentStatus==="paid"?'<button type="button" class="btn btn-secondary" data-mail-purchase="'+esc(o.id)+'">Renvoyer mail achat</button> ':'')+
-        (relay?'<button type="button" class="btn btn-secondary" data-sync-shipping="'+esc(o.id)+'">Synchroniser suivi Sendcloud</button> ':'')+
         (o.status==="Expédiée"&&o.carrier&&o.tracking?'<button type="button" class="btn btn-secondary" data-mail-tracking="'+esc(o.id)+'">Renvoyer mail suivi</button> ':'')+
         (o.colissimoParcelNumber
-          ? '<button type="button" class="btn btn-secondary" data-colissimo-download="'+esc(o.id)+'">Télécharger l’étiquette</button> <button type="button" class="btn btn-secondary" data-colissimo-print="'+esc(o.id)+'">Imprimer</button> '
-          : (!relay && o.paymentStatus==="paid"?'<button type="button" class="btn btn-secondary" data-colissimo-create="'+esc(o.id)+'" '+(createDisabled?"disabled":"")+'>'+esc(createLabel)+'</button> ':""))+
+          ? '<button type="button" class="btn btn-secondary" data-colissimo-download="'+esc(o.id)+'">Télécharger l’étiquette existante</button> <button type="button" class="btn btn-secondary" data-colissimo-print="'+esc(o.id)+'">Imprimer</button> '
+          : "")+
         '<button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="bon">Bon commande</button> <button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="facture">Facture</button>'+
       "</div>";
 
@@ -168,7 +148,7 @@
   }
 
   function card(id) { return A.qs('[data-order-card="'+CSS.escape(String(id))+'"]'); }
-  function payload(c) { function v(n){ return c.querySelector('[data-field="'+n+'"]')?.value || ""; } return { status:v("status"), carrier:v("carrier"), tracking:v("tracking"), phone:v("phone"), address:v("address"), internalNote:v("internalNote"), shipping:v("shipping")||"Standard", shippingMethod:v("shippingMethod"), shippingWeightGrams:v("shippingWeightGrams") }; }
+  function payload(c) { function v(n){ return c.querySelector('[data-field="'+n+'"]')?.value || ""; } return { status:v("status"), carrier:v("carrier"), phone:v("phone"), address:v("address"), internalNote:v("internalNote"), shipping:v("shipping")||"Standard", shippingMethod:v("shippingMethod"), shippingWeightGrams:v("shippingWeightGrams") }; }
 
   async function saveOrder(id, btn) {
     var c=card(id),m=c?.querySelector("[data-status-message]");
@@ -176,27 +156,10 @@
     var data=payload(c);
     btn.disabled=true;
     try {
-      if(data.status==="Expédiée" && data.carrier==="Colissimo (La Poste)" && !String(data.tracking||"").trim()) {
-        if(!(colissimo.configured && colissimo.senderConfigured && colissimo.labelPurchasesEnabled)) {
-          throw new Error("Colissimo n’est pas encore prêt pour créer une étiquette réelle.");
-        }
-        var weight=Number(c.querySelector('[data-field="shippingWeightGrams"]')?.value||0);
-        if(!Number.isFinite(weight)||weight<1||weight>30000) throw new Error("Saisissez le poids réel du colis entre 1 g et 30 000 g.");
-        if(m)m.textContent="Création de l’étiquette Colissimo...";
-        var label=await A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/colissimo-label",{method:"POST",body:JSON.stringify({weightGrams:Math.trunc(weight)})});
-        if(!label.ok)throw new Error(label.error||"Création Colissimo impossible");
-        data.tracking=String(label.trackingNumber||label.parcelNumber||"").trim();
-        if(!data.tracking)throw new Error("Colissimo n’a pas retourné de numéro de suivi.");
-        var trackingInput=c.querySelector('[data-field="tracking"]');
-        if(trackingInput)trackingInput.value=data.tracking;
-        if(m)m.textContent="Étiquette créée · suivi "+data.tracking+" · enregistrement de l’expédition...";
-      } else if(m) {
-        m.textContent="Enregistrement...";
-      }
-
+      if(m)m.textContent="Enregistrement...";
       var d=await A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id),{method:"PUT",body:JSON.stringify(data)});
       if(!d.ok)throw new Error(d.error||"Mise à jour impossible");
-      var savedTracking=String(d.order?.tracking||data.tracking||"").trim();
+      var savedTracking=String(d.order?.tracking||"").trim();
       var msg=data.status==="Expédiée"?(savedTracking?"Commande expédiée · suivi "+savedTracking+".":"Commande expédiée."):"Commande mise à jour.";
       if(d.emailNotification){
         msg+=d.emailNotification.sent?" Mail de suivi envoyé.":" Mail de suivi non envoyé"+(d.emailNotification.error?": "+d.emailNotification.error:"");
@@ -229,32 +192,15 @@
     });
   }
 
-  function autoSyncRelayTracking() {
-    var target = orders.find(function (o) {
-      return isRelay(o) && o.paymentStatus === "paid" && !String(o.tracking || o.colissimoParcelNumber || "").trim() && !syncingTracking[o.id];
-    });
-    if (!target) return;
-    syncingTracking[target.id] = true;
-    A.adminFetch("/api/admin/payments/boutique-orders/" + encodeURIComponent(target.id) + "/sync-shipping", { method:"POST", body:"{}" })
-      .then(function (d) {
-        if (d && d.synced) return reload(target.id, "Suivi Sendcloud récupéré automatiquement : " + (d.order?.tracking || ""));
-      })
-      .catch(function () {})
-      .finally(function () { delete syncingTracking[target.id]; });
-  }
-
   function reload(id, message) {
     return A.adminFetch("/api/admin/payments/boutique-orders", { cache:"no-store" }).then(function (d) {
       if (!d.ok) throw new Error(d.error || "Chargement impossible");
       orders = d.orders || [];
       if (Array.isArray(d.carriers) && d.carriers.length) CARRIERS = d.carriers;
       if (Array.isArray(d.statuses) && d.statuses.length) STATUSES = d.statuses;
-      if (d.colissimo) colissimo = d.colissimo;
-      colissimoMessage = d.colissimoMessage || "";
       if (d.email) emailConfig = d.email;
       render();
       var c = id && card(id), box = c && c.querySelector("[data-status-message]"); if (box) box.textContent = message || "Mis à jour.";
-      autoSyncRelayTracking();
     });
   }
 
@@ -267,23 +213,6 @@
       return saveOrder(btn.dataset.markShipped, btn);
     }; });
     A.qs("#orderCards").querySelectorAll("button[data-sync]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.sync,c=card(id),m=c?.querySelector("[data-status-message]"); btn.disabled=true; if(m)m.textContent="Synchronisation SumUp..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/sync-sumup",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Synchronisation impossible");return reload(id,"SumUp synchronisé : "+(d.status||"OK"));}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
-    A.qs("#orderCards").querySelectorAll("button[data-sync-shipping]").forEach(function (btn) { btn.onclick = function () {
-      var id=btn.dataset.syncShipping,c=card(id),m=c?.querySelector("[data-status-message]");
-      if(syncingTracking[id])return;
-      syncingTracking[id]=true;btn.disabled=true;if(m)m.textContent="Synchronisation Sendcloud...";
-      A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/sync-shipping",{method:"POST",body:"{}"})
-        .then(function(d){
-          if(!d.ok)throw new Error(d.error||"Synchronisation Sendcloud impossible");
-          if(!d.synced){
-            var reason=d.reason==="tracking_not_ready"?"expédition trouvée, suivi pas encore disponible":"aucune expédition Sendcloud liée à cette commande";
-            if(m)m.textContent="Sendcloud : "+reason+".";
-            return;
-          }
-          return reload(id,"Suivi Sendcloud récupéré : "+(d.order?.tracking||"OK"));
-        })
-        .catch(function(e){if(m)m.textContent=e.message;})
-        .finally(function(){delete syncingTracking[id];btn.disabled=false;});
-    }; });
     A.qs("#orderCards").querySelectorAll("button[data-refund]").forEach(function (btn) { btn.onclick = function () { var id=btn.dataset.refund,c=card(id),m=c?.querySelector("[data-status-message]"); if(!confirm("Confirmer le remboursement intégral SumUp de cette commande ?"))return; btn.disabled=true; if(m)m.textContent="Remboursement SumUp..."; A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/refund",{method:"POST",body:"{}"}).then(function(d){if(!d.ok)throw new Error(d.error||"Remboursement impossible");return reload(id,d.status==="refunded"?"Remboursement confirmé. Stock libéré.":"Remboursement demandé. Synchronise SumUp pour confirmer.");}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;}); }; });
     A.qs("#orderCards").querySelectorAll("button[data-mail-purchase]").forEach(function (btn) { btn.onclick = function () {
       var id=btn.dataset.mailPurchase,c=card(id),m=c?.querySelector("[data-status-message]");btn.disabled=true;if(m)m.textContent="Envoi du mail d’achat...";
@@ -296,17 +225,6 @@
       A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/emails/tracking",{method:"POST",body:"{}"})
         .then(function(d){if(!d.ok)throw new Error(d.error||"Envoi impossible");return reload(id,"Mail de suivi envoyé.");})
         .catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;});
-    }; });
-    A.qs("#orderCards").querySelectorAll("button[data-colissimo-create]").forEach(function (btn) { btn.onclick = function () {
-      var id=btn.dataset.colissimoCreate,c=card(id),m=c?.querySelector("[data-status-message]"),weight=Number(c?.querySelector('[data-field="shippingWeightGrams"]')?.value||0);
-      if(!Number.isFinite(weight)||weight<1||weight>30000){if(m)m.textContent="Saisissez le poids réel du colis entre 1 g et 30 000 g.";return;}
-      if(!(colissimo.configured && colissimo.senderConfigured && colissimo.labelPurchasesEnabled)){if(m)m.textContent=colissimoMessage||colissimoButtonLabel();return;}
-      if(creatingLabels[id]){if(m)m.textContent="Création d’étiquette déjà en cours.";return;}
-      if(!confirm("Créer une étiquette Colissimo réelle pour cette commande ?"))return;
-      creatingLabels[id]=true;btn.disabled=true;if(m)m.textContent="Création Colissimo...";
-      A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/colissimo-label",{method:"POST",body:JSON.stringify({weightGrams:Math.trunc(weight)})})
-        .then(function(d){if(!d.ok)throw new Error(d.error||"Création Colissimo impossible");return reload(id,"Étiquette Colissimo créée : "+(d.parcelNumber||"OK"));})
-        .catch(function(e){if(m)m.textContent=e.message;}).finally(function(){delete creatingLabels[id];btn.disabled=false;});
     }; });
     A.qs("#orderCards").querySelectorAll("button[data-colissimo-download]").forEach(function (btn) { btn.onclick = function () {
       var id=btn.dataset.colissimoDownload,c=card(id),m=c?.querySelector("[data-status-message]");btn.disabled=true;if(m)m.textContent="Téléchargement Colissimo...";
