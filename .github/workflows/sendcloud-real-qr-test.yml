@@ -1,0 +1,337 @@
+name: Sendcloud Real Mondial Relay QR Test
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: sendcloud-real-qr-test
+  cancel-in-progress: false
+
+jobs:
+  real-qr-test:
+    if: startsWith(github.event.issue.title, 'sendcloud-real-qr-test:') && contains(github.event.issue.body, 'CONFIRM_ONE_REAL_LABEL_AND_CANCEL')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SENDCLOUD_PUBLIC_KEY: ${{ secrets.SENDCLOUD_PUBLIC_KEY }}
+      SENDCLOUD_SECRET_KEY: ${{ secrets.SENDCLOUD_SECRET_KEY }}
+      TEST_ISSUE_NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: Create exactly one QR shipment, inspect it, then cancel it
+        run: |
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          BASE = "https://panel.sendcloud.sc/api/v3"
+          MAX_QUOTE_EUR = 15.00
+          WEIGHT_KG = "0.500"
+
+          report = {
+              "mode": "real_qr_test",
+              "carrier": "mondial_relay",
+              "labellessRequested": True,
+              "weightKg": WEIGHT_KG,
+              "maxQuoteEur": MAX_QUOTE_EUR,
+              "shipmentCreated": False,
+              "documentFetched": False,
+              "cancellationRequested": False,
+              "cancellationConfirmed": False,
+          }
+
+          pub = os.environ.get("SENDCLOUD_PUBLIC_KEY", "").strip()
+          sec = os.environ.get("SENDCLOUD_SECRET_KEY", "").strip()
+          if not pub or not sec:
+              raise RuntimeError("SENDCLOUD_CREDENTIALS_MISSING")
+          auth = "Basic " + base64.b64encode((pub + ":" + sec).encode()).decode()
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+
+          opener = urllib.request.build_opener(NoRedirect)
+
+          def request(path, method="GET", payload=None, accept="application/json", max_bytes=2_000_000):
+              data = None if payload is None else json.dumps(payload).encode()
+              headers = {
+                  "Authorization": auth,
+                  "Accept": accept,
+                  "Content-Type": "application/json",
+              }
+              req = urllib.request.Request(BASE + path, data=data, headers=headers, method=method)
+              try:
+                  resp = opener.open(req, timeout=25)
+                  raw = resp.read(max_bytes + 1)
+                  if len(raw) > max_bytes:
+                      raise RuntimeError("SENDCLOUD_RESPONSE_TOO_LARGE")
+                  return resp.status, dict(resp.headers.items()), raw
+              except urllib.error.HTTPError as e:
+                  raw = e.read(200000)
+                  safe = ""
+                  try:
+                      parsed = json.loads(raw)
+                      if isinstance(parsed, dict):
+                          safe = str(parsed.get("message") or parsed.get("error") or parsed.get("detail") or "")[:300]
+                  except Exception:
+                      pass
+                  raise RuntimeError(f"SENDCLOUD_HTTP_{e.code}:{safe}")
+
+          def request_json(path, method="GET", payload=None):
+              status, headers, raw = request(path, method, payload)
+              if not raw:
+                  return status, {}
+              try:
+                  body = json.loads(raw.decode())
+              except Exception:
+                  raise RuntimeError("SENDCLOUD_JSON_INVALID")
+              if not isinstance(body, dict):
+                  raise RuntimeError("SENDCLOUD_JSON_SHAPE_INVALID")
+              return status, body
+
+          def money_values(node):
+              values = []
+              if isinstance(node, dict):
+                  if "currency" in node and "value" in node:
+                      try:
+                          values.append((float(node["value"]), str(node["currency"])))
+                      except Exception:
+                          pass
+                  for value in node.values():
+                      values.extend(money_values(value))
+              elif isinstance(node, list):
+                  for value in node:
+                      values.extend(money_values(value))
+              return values
+
+          shipment_id = None
+          try:
+              query = urllib.parse.urlencode({
+                  "country_code": "FR",
+                  "carrier_code": "mondial_relay",
+                  "address_postal_code": "59530",
+                  "address_city": "Le Quesnoy",
+                  "limit": "10",
+                  "radius": "15000",
+              })
+              sp_status, sp_body = request_json("/service-points?" + query)
+              points = (sp_body.get("data") or {}).get("results") or []
+              points = [
+                  p for p in points
+                  if isinstance(p, dict)
+                  and p.get("id")
+                  and (p.get("carrier") or {}).get("code") == "mondial_relay"
+                  and (p.get("address") or {}).get("country_code") == "FR"
+                  and p.get("is_active", True) is not False
+              ]
+              if not points:
+                  raise RuntimeError("NO_SERVICE_POINT")
+              point = points[0]
+              point_id = int(point["id"])
+              report["servicePointResolved"] = True
+              report["servicePointCity"] = str((point.get("address") or {}).get("city") or "")[:80]
+              report["servicePointPostalCode"] = str((point.get("address") or {}).get("postal_code") or "")[:20]
+
+              quote_payload = {
+                  "from_address": {
+                      "country_code": "FR",
+                      "postal_code": "59330",
+                      "city": "Hautmont",
+                      "address_line_1": "17 avenue Marcel Aime",
+                  },
+                  "to_address": {
+                      "country_code": "FR",
+                      "postal_code": "59530",
+                      "city": "Le Quesnoy",
+                      "address_line_1": "10 rue Leon Gambetta",
+                  },
+                  "parcels": [{"weight": {"value": WEIGHT_KG, "unit": "kg"}}],
+                  "carrier_code": "mondial_relay",
+                  "calculate_quotes": True,
+                  "functionalities": {
+                      "returns": False,
+                      "labelless": True,
+                      "last_mile": "service_point",
+                  },
+                  "to_service_point": {"id": point_id},
+              }
+              quote_status, quote_body = request_json("/shipping-options", "POST", quote_payload)
+              options = quote_body.get("data") or []
+              qr_options = []
+              for option in options if isinstance(options, list) else []:
+                  if not isinstance(option, dict):
+                      continue
+                  fn = option.get("functionalities") or {}
+                  carrier = option.get("carrier") or {}
+                  if carrier.get("code") != "mondial_relay":
+                      continue
+                  if fn.get("returns") is True:
+                      continue
+                  if bool(fn.get("labelless")) is not True:
+                      continue
+                  if fn.get("last_mile") != "service_point":
+                      continue
+                  if not option.get("code"):
+                      continue
+                  qr_options.append(option)
+              if not qr_options:
+                  raise RuntimeError("QR_OPTION_NOT_AVAILABLE")
+
+              option = qr_options[0]
+              quotes = option.get("quotes")
+              monies = [(v, c) for (v, c) in money_values(quotes) if c == "EUR" and v >= 0]
+              if not monies:
+                  raise RuntimeError("QUOTE_NOT_AVAILABLE")
+              quote_max = max(v for v, _ in monies)
+              report["quoteAvailable"] = True
+              report["quoteMaxEur"] = round(quote_max, 2)
+              report["shippingOptionCode"] = str(option.get("code") or "")[:240]
+              report["shippingOptionName"] = str(option.get("name") or (option.get("product") or {}).get("name") or "")[:240]
+              if quote_max > MAX_QUOTE_EUR:
+                  raise RuntimeError("QUOTE_ABOVE_SAFETY_CAP")
+
+              ship_props = {"shipping_option_code": option["code"]}
+              contract = option.get("contract") or {}
+              if contract.get("id") is not None:
+                  ship_props["contract_id"] = contract["id"]
+
+              issue_no = os.environ.get("TEST_ISSUE_NUMBER", "0")
+              order_no = f"CARDORIA-QR-TEST-{issue_no}"
+              shipment_payload = {
+                  "label_details": {"mime_type": "application/pdf", "dpi": 72},
+                  "to_address": {
+                      "name": "Cardoria Test",
+                      "company_name": "All Vaps Le Quesnoy",
+                      "address_line_1": "10 rue Leon Gambetta",
+                      "house_number": "10",
+                      "postal_code": "59530",
+                      "city": "Le Quesnoy",
+                      "country_code": "FR",
+                      "phone_number": "+33950128045",
+                      "email": "contact@allvaps.fr",
+                  },
+                  "from_address": {
+                      "name": "Cardoria Test",
+                      "company_name": "All Vaps Hautmont",
+                      "address_line_1": "17 avenue Marcel Aime",
+                      "house_number": "17",
+                      "postal_code": "59330",
+                      "city": "Hautmont",
+                      "country_code": "FR",
+                      "phone_number": "+33955807522",
+                      "email": "contact@allvaps.fr",
+                  },
+                  "to_service_point": {"id": point_id},
+                  "ship_with": {
+                      "type": "shipping_option_code",
+                      "properties": ship_props,
+                  },
+                  "order_number": order_no,
+                  "external_reference_id": order_no,
+                  "reference": order_no,
+                  "total_order_price": {"currency": "EUR", "value": "1.00"},
+                  "parcels": [{"weight": {"value": WEIGHT_KG, "unit": "kg"}}],
+              }
+
+              create_status, create_body = request_json("/shipments/announce", "POST", shipment_payload)
+              data = create_body.get("data") or {}
+              parcels = data.get("parcels") or []
+              parcel = parcels[0] if parcels and isinstance(parcels[0], dict) else {}
+              errors = (create_body.get("errors") or []) + (data.get("errors") or []) + (parcel.get("errors") or [])
+              status_code = str((parcel.get("status") or {}).get("code") or (data.get("status") or {}).get("code") or "")
+              if errors or not data.get("id") or not parcel.get("id") or any(x in status_code.upper() for x in ("FAIL", "ERROR", "REJECT")):
+                  report["carrierAnnouncementStatus"] = status_code or "FAILED"
+                  raise RuntimeError("SHIPMENT_ANNOUNCEMENT_FAILED")
+
+              shipment_id = str(data["id"])
+              parcel_id = int(parcel["id"])
+              report["shipmentCreated"] = True
+              report["carrierAnnouncementStatus"] = status_code or "READY_TO_SEND"
+              report["parcelIdSuffix"] = str(parcel_id)[-4:]
+              tracking = str(parcel.get("tracking_number") or "")
+              report["trackingPresent"] = bool(tracking)
+              report["trackingSuffix"] = tracking[-4:] if tracking else ""
+              docs = parcel.get("documents") or []
+              report["documentTypes"] = [str(d.get("type") or "")[:40] for d in docs if isinstance(d, dict)][:10]
+
+              try:
+                  doc_status, doc_headers, doc_raw = request(
+                      f"/parcels/{parcel_id}/documents/label?dpi=72",
+                      accept="application/pdf",
+                      max_bytes=10_000_000,
+                  )
+                  ctype = str(doc_headers.get("Content-Type") or doc_headers.get("content-type") or "")
+                  report["documentFetched"] = doc_status == 200 and len(doc_raw) > 0
+                  report["documentContentType"] = ctype[:120]
+                  report["documentBytes"] = len(doc_raw)
+                  report["documentSha256Prefix"] = hashlib.sha256(doc_raw).hexdigest()[:16]
+                  report["documentIsPdf"] = doc_raw.startswith(b"%PDF-")
+              except Exception as doc_error:
+                  report["documentFetchError"] = str(doc_error)[:180]
+
+          except Exception as error:
+              report["testError"] = str(error)[:240]
+          finally:
+              if shipment_id:
+                  try:
+                      cancel_status, cancel_body = request_json(f"/shipments/{urllib.parse.quote(shipment_id, safe='')}/cancel", "POST")
+                      report["cancellationRequested"] = cancel_status in (200, 201, 202)
+                      cancel_state = str((cancel_body.get("data") or {}).get("status") or cancel_body.get("status") or "")
+                      report["cancellationResponseStatus"] = cancel_state[:80]
+                  except Exception as cancel_error:
+                      report["cancellationError"] = str(cancel_error)[:200]
+
+                  for _ in range(4):
+                      if report["cancellationConfirmed"]:
+                          break
+                      try:
+                          _, check_body = request_json(f"/shipments/{urllib.parse.quote(shipment_id, safe='')}")
+                          shipment = check_body.get("data") or check_body
+                          state = shipment.get("status") or {}
+                          state_code = state.get("code") if isinstance(state, dict) else state
+                          state_text = str(state_code or "")
+                          report["postCancelShipmentStatus"] = state_text[:100]
+                          if "CANCEL" in state_text.upper():
+                              report["cancellationConfirmed"] = True
+                              break
+                      except Exception:
+                          break
+                      time.sleep(1)
+
+          pathlib.Path("/tmp/sendcloud-real-qr-test.json").write_text(
+              json.dumps(report, indent=2, ensure_ascii=False)
+          )
+          print(json.dumps(report, indent=2, ensure_ascii=False))
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as handle:
+              handle.write(
+                  "## Sendcloud real Mondial Relay QR test\n\n"
+                  "Exactly one shipment may be announced. If created, cancellation is requested in the same job.\n\n"
+                  "~~~json\n" + json.dumps(report, indent=2, ensure_ascii=False) + "\n~~~\n"
+              )
+
+          if report.get("shipmentCreated") and not report.get("cancellationRequested"):
+              raise SystemExit("A shipment was created but cancellation request was not accepted.")
+          if report.get("testError"):
+              raise SystemExit(report["testError"])
+          PY
+
+      - name: Preserve sanitized result only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sendcloud-real-qr-test-${{ github.run_id }}
+          path: /tmp/sendcloud-real-qr-test.json
+          retention-days: 3
+          if-no-files-found: warn
