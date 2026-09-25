@@ -222,15 +222,14 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, async (req, res) => {
     if (nextCarrier && !BOUTIQUE_CARRIERS.includes(nextCarrier) && nextCarrier !== clean(current.carrier, 120)) {
       return { error: "Transporteur non autorisé. Choisissez Colissimo (La Poste), La Poste, Mondial Relay ou Relais Colis.", status: 400 };
     }
-    if (nextStatus === "Expédiée" && (!nextCarrier || !clean(body.tracking, 180))) {
-      return { error: "Transporteur et numéro de suivi obligatoires pour expédier la commande.", status: 400 };
+    if (nextStatus === "Expédiée" && (!nextCarrier || !clean(current.tracking, 180))) {
+      return { error: "Le parcours d’expédition doit avoir enregistré un transporteur et un numéro de suivi avant de marquer la commande comme expédiée.", status: 400 };
     }
 
     const now = new Date().toISOString();
     const previousStatus = current.status;
     current.status = nextStatus;
     current.carrier = nextCarrier;
-    current.tracking = clean(body.tracking, 180);
     current.address = clean(body.address, 600);
     current.phone = clean(body.phone, 40) || current.phone || "";
     current.internalNote = clean(body.internalNote, 2000);
