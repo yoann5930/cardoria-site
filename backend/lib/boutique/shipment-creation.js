@@ -67,23 +67,21 @@ function relayCarrierId(value) {
 
 async function resolveSendcloudServicePointId(order, searchPoints = searchMondialRelayServicePoints) {
   const pickup = order?.pickupPoint || {};
-  const requested = relayCarrierId(pickup.carrierServicePointId || pickup.id);
-  if (!requested || !pickup.postalCode || !pickup.city) {
+  const requestedRaw = clean(pickup.carrierServicePointId || pickup.id, 40);
+  const requested = relayCarrierId(requestedRaw);
+  if (!requestedRaw || !pickup.postalCode || !pickup.city) {
     throw fail("SERVICE_POINT_REQUIRED", "Point Relais Mondial Relay incomplet.", 409);
   }
 
   const searches = [
+    { carrierServicePointId: requestedRaw, limit: 10 },
     { postalCode: pickup.postalCode, city: pickup.city, limit: 30, radius: 15000 },
     { address: [pickup.address, pickup.postalCode, pickup.city].filter(Boolean).join(", "), limit: 30, radius: 50000 }
   ];
 
   for (const query of searches) {
-    if (!query.address && (!query.postalCode || !query.city)) continue;
     const result = await searchPoints({ countryCode: normalizeCountryCode(pickup.countryCode || "FR"), ...query });
-    const point = (result.points || []).find((item) => {
-      const carrierId = relayCarrierId(item.carrierServicePointId);
-      return carrierId === requested;
-    });
+    const point = (result.points || []).find((item) => relayCarrierId(item.carrierServicePointId) === requested);
     if (point?.id) return Number(point.id);
   }
   throw fail("SERVICE_POINT_NOT_FOUND", "Le Point Relais sélectionné n'a pas pu être rapproché chez Sendcloud.", 409);
