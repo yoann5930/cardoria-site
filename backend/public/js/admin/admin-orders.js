@@ -90,11 +90,12 @@
       var items = (o.items || []).map(function (i) { return '<tr><td>'+esc(i.name||i.ref)+'</td><td>'+Number(i.qty||1)+'</td><td>'+euro(i.price)+'</td><td>'+euro(Number(i.qty||1)*Number(i.price||0))+'</td></tr>'; }).join("") || '<tr><td colspan="4">Aucun article</td></tr>';
       var legacyCarrier = o.carrier && CARRIERS.indexOf(o.carrier) < 0 ? [o.carrier].concat(CARRIERS) : CARRIERS;
       var review = o.paymentReviewRequired ? '<div class="admin-panel" style="margin:10px 0;border-color:#b44"><strong style="color:#ff8f8f">Remboursement SumUp à confirmer</strong><br><small>Le stock reste bloqué jusqu’à confirmation du remboursement.</small></div>' : "";
-      var waitNote = relay
-        ? (tracking
-          ? '<p class="small">Mondial Relay : suivi enregistré par le parcours d’expédition.</p>'
-          : '<p class="small">Mondial Relay : l’Admin ne crée pas d’étiquette et ne contacte pas Sendcloud. Le suivi apparaîtra ici lorsqu’il aura été enregistré par le parcours d’expédition.</p>')
-        : '<p class="small">Expédition : l’Admin ne crée pas d’étiquette et ne récupère pas le suivi auprès du transporteur. Il affiche uniquement les données déjà enregistrées.</p>';
+      var creationState = o.shipmentCreation && o.shipmentCreation.status || "";
+      var waitNote = tracking
+        ? '<p class="small">Étiquette créée · numéro de suivi intégré à Cardoria.</p>'
+        : creationState === "reconciliation_required"
+          ? '<p class="small" style="color:#ffb36b">Expédition à rapprocher chez le transporteur avant tout nouvel essai.</p>'
+          : '<p class="small">Le passage à <strong>En préparation</strong> crée automatiquement l’étiquette réelle et enregistre le numéro de suivi.</p>';
 
       var clientBox = section("Client",
         '<p><strong>'+esc(o.client||"Client")+'</strong><br>'+esc(o.email||"")+(o.phone?'<br>'+esc(o.phone):"")+'</p>');
@@ -132,8 +133,8 @@
         (canRefund?'<button type="button" class="btn btn-secondary" data-refund="'+esc(o.id)+'">Rembourser SumUp</button> ':'')+
         (o.paymentStatus==="paid"?'<button type="button" class="btn btn-secondary" data-mail-purchase="'+esc(o.id)+'">Renvoyer mail achat</button> ':'')+
         (o.status==="Expédiée"&&o.carrier&&o.tracking?'<button type="button" class="btn btn-secondary" data-mail-tracking="'+esc(o.id)+'">Renvoyer mail suivi</button> ':'')+
-        (o.colissimoParcelNumber
-          ? '<button type="button" class="btn btn-secondary" data-colissimo-download="'+esc(o.id)+'">Télécharger l’étiquette existante</button> <button type="button" class="btn btn-secondary" data-colissimo-print="'+esc(o.id)+'">Imprimer</button> '
+        ((o.colissimoParcelNumber||o.sendcloudParcelId)
+          ? '<button type="button" class="btn btn-secondary" data-shipping-label="'+esc(o.id)+'">Télécharger l’étiquette</button> <button type="button" class="btn btn-secondary" data-shipping-print="'+esc(o.id)+'">Imprimer</button> '
           : "")+
         '<button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="bon">Bon commande</button> <button type="button" class="btn btn-secondary" data-doc="'+esc(o.id)+'" data-type="facture">Facture</button>'+
       "</div>";
@@ -160,7 +161,11 @@
       var d=await A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id),{method:"PUT",body:JSON.stringify(data)});
       if(!d.ok)throw new Error(d.error||"Mise à jour impossible");
       var savedTracking=String(d.order?.tracking||"").trim();
-      var msg=data.status==="Expédiée"?(savedTracking?"Commande expédiée · suivi "+savedTracking+".":"Commande expédiée."):"Commande mise à jour.";
+      var msg=d.shipmentCreated
+        ? "Commande en préparation · étiquette créée · suivi "+(savedTracking||"en attente")+"."
+        : data.status==="Expédiée"
+          ? (savedTracking?"Commande expédiée · suivi "+savedTracking+".":"Commande expédiée.")
+          : "Commande mise à jour.";
       if(d.emailNotification){
         msg+=d.emailNotification.sent?" Mail de suivi envoyé.":" Mail de suivi non envoyé"+(d.emailNotification.error?": "+d.emailNotification.error:"");
       }
@@ -226,14 +231,14 @@
         .then(function(d){if(!d.ok)throw new Error(d.error||"Envoi impossible");return reload(id,"Mail de suivi envoyé.");})
         .catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;});
     }; });
-    A.qs("#orderCards").querySelectorAll("button[data-colissimo-download]").forEach(function (btn) { btn.onclick = function () {
-      var id=btn.dataset.colissimoDownload,c=card(id),m=c?.querySelector("[data-status-message]");btn.disabled=true;if(m)m.textContent="Téléchargement Colissimo...";
-      downloadAdminPdf("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/colissimo-label","colissimo-"+id+".pdf")
+    A.qs("#orderCards").querySelectorAll("button[data-shipping-label]").forEach(function (btn) { btn.onclick = function () {
+      var id=btn.dataset.shippingLabel,c=card(id),m=c?.querySelector("[data-status-message]");btn.disabled=true;if(m)m.textContent="Téléchargement de l’étiquette...";
+      downloadAdminPdf("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/shipping-label","etiquette-"+id+".pdf")
         .then(function(){if(m)m.textContent="Étiquette téléchargée.";}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;});
     }; });
-    A.qs("#orderCards").querySelectorAll("button[data-colissimo-print]").forEach(function (btn) { btn.onclick = function () {
-      var id=btn.dataset.colissimoPrint,c=card(id),m=c?.querySelector("[data-status-message]");btn.disabled=true;if(m)m.textContent="Impression Colissimo...";
-      downloadAdminPdf("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/colissimo-label","colissimo-"+id+".pdf",true)
+    A.qs("#orderCards").querySelectorAll("button[data-shipping-print]").forEach(function (btn) { btn.onclick = function () {
+      var id=btn.dataset.shippingPrint,c=card(id),m=c?.querySelector("[data-status-message]");btn.disabled=true;if(m)m.textContent="Impression de l’étiquette...";
+      downloadAdminPdf("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/shipping-label","etiquette-"+id+".pdf",true)
         .then(function(){if(m)m.textContent="Impression envoyée.";}).catch(function(e){if(m)m.textContent=e.message;}).finally(function(){btn.disabled=false;});
     }; });
     A.qs("#orderCards").querySelectorAll("button[data-doc]").forEach(function (btn) { btn.onclick=function(){window.open("document-commande.html?id="+encodeURIComponent(btn.dataset.doc)+"&type="+encodeURIComponent(btn.dataset.type),"_blank");}; });
