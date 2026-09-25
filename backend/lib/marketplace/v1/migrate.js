@@ -105,6 +105,7 @@ function migrateOrderColumns(db) {
   addColumnIfMissing(db, "mk_orders", cols, "paypal_capture_id", "TEXT DEFAULT ''");
   addColumnIfMissing(db, "mk_orders", cols, "platform_fee", "REAL DEFAULT 0");
   addColumnIfMissing(db, "mk_orders", cols, "seller_amount_after_platform_fee", "REAL DEFAULT 0");
+  addColumnIfMissing(db, "mk_orders", cols, "shipping_pickup_point_json", "TEXT DEFAULT ''");
 }
 
 function migrateDisputeColumns(db) {
