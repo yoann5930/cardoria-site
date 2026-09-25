@@ -91,6 +91,7 @@
       var legacyCarrier = o.carrier && CARRIERS.indexOf(o.carrier) < 0 ? [o.carrier].concat(CARRIERS) : CARRIERS;
       var review = o.paymentReviewRequired ? '<div class="admin-panel" style="margin:10px 0;border-color:#b44"><strong style="color:#ff8f8f">Remboursement SumUp à confirmer</strong><br><small>Le stock reste bloqué jusqu’à confirmation du remboursement.</small></div>' : "";
       var creationState = o.shipmentCreation && o.shipmentCreation.status || "";
+      var creationCode = o.shipmentCreation && o.shipmentCreation.code || "";
       var waitNote = tracking
         ? '<p class="small">Étiquette créée · numéro de suivi intégré à Cardoria.</p>'
         : creationState === "reconciliation_required"
@@ -103,10 +104,13 @@
         '<p><span class="admin-badge '+paymentClass(o)+'">'+esc(paymentLabel(o))+'</span><br><small>Montant : '+euro(total(o))+'</small><br><small>Stock : '+esc((o.stockImpact && o.stockImpact.label) || "—")+'</small></p>');
       var itemsBox = section("Articles",
         '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Article</th><th>Qté</th><th>PU</th><th>Total</th></tr></thead><tbody>'+items+'</tbody></table></div>');
-      var relayRepair = relay && !pickup
+      var relayUnavailable = creationCode === "SERVICE_POINT_NOT_FOUND" || creationCode === "SERVICE_POINT_MISMATCH";
+      var relayRepair = relay && (!pickup || relayUnavailable)
         ? '<div class="admin-relay-repair" data-relay-repair="'+esc(o.id)+'">'+
-            '<p class="small" style="color:#ffb36b">Point Relais manquant. Choisissez un relais avant de passer la commande en préparation.</p>'+
-            '<button type="button" class="btn btn-secondary" data-relay-options="'+esc(o.id)+'">Choisir un Point Relais</button> '+
+            '<p class="small" style="color:#ffb36b">'+(relayUnavailable
+              ? "Ce Point Relais n’est pas disponible pour l’étiquette Sendcloud. Choisissez un Point Relais compatible."
+              : "Point Relais manquant. Choisissez un relais avant de passer la commande en préparation.")+'</p>'+
+            '<button type="button" class="btn btn-secondary" data-relay-options="'+esc(o.id)+'">'+(relayUnavailable?"Changer de Point Relais":"Choisir un Point Relais")+'</button> '+
             '<select data-relay-select="'+esc(o.id)+'" hidden><option value="">Choisir...</option></select> '+
             '<button type="button" class="btn btn-primary" data-relay-save="'+esc(o.id)+'" hidden>Enregistrer le relais</button>'+
           '</div>'
@@ -167,7 +171,7 @@
     try {
       if(m)m.textContent="Enregistrement...";
       var d=await A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id),{method:"PUT",body:JSON.stringify(data)});
-      if(!d.ok)throw new Error(d.error||"Mise à jour impossible");
+      if(!d.ok){var err=new Error(d.error||"Mise à jour impossible");err.code=d.code||"";throw err;}
       var savedTracking=String(d.order?.tracking||"").trim();
       var msg=d.shipmentCreated
         ? "Commande en préparation · étiquette créée · suivi "+(savedTracking||"en attente")+"."
@@ -179,6 +183,7 @@
       }
       return reload(id,msg);
     } catch(e) {
+      if(e.code==="SERVICE_POINT_NOT_FOUND"||e.code==="SERVICE_POINT_MISMATCH") return reload(id,e.message);
       if(m)m.textContent=e.message;
     } finally {
       btn.disabled=false;
@@ -227,7 +232,7 @@
           if(!select)return;
           select.innerHTML='<option value="">Choisir...</option>'+(d.points||[]).map(function(p){
             var label=[p.name,p.id?"n° "+p.id:"",p.address,[p.postalCode,p.city].filter(Boolean).join(" ")].filter(Boolean).join(" — ");
-            return '<option value="'+esc(p.id)+'">'+esc(label)+'</option>';
+            return '<option value="'+esc(p.sendcloudServicePointId||"")+'">'+esc(label)+'</option>';
           }).join("");
           select.hidden=false;if(save)save.hidden=false;
           if(m)m.textContent=(d.points||[]).length+" Point(s) Relais trouvé(s).";
@@ -239,7 +244,7 @@
       var id=btn.dataset.relaySave,c=card(id),m=c?.querySelector("[data-status-message]"),select=c?.querySelector('[data-relay-select="'+CSS.escape(String(id))+'"]'),relayId=String(select?.value||"").trim();
       if(!relayId){if(m)m.textContent="Choisissez un Point Relais.";return;}
       btn.disabled=true;if(m)m.textContent="Enregistrement du Point Relais...";
-      A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/pickup-point",{method:"PUT",body:JSON.stringify({relayId:relayId})})
+      A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/pickup-point",{method:"PUT",body:JSON.stringify({servicePointId:relayId})})
         .then(function(d){if(!d.ok)throw new Error(d.error||"Enregistrement du Point Relais impossible");return reload(id,"Point Relais enregistré. Vous pouvez maintenant passer la commande en préparation.");})
         .catch(function(e){if(m)m.textContent=e.message;})
         .finally(function(){btn.disabled=false;});
