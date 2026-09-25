@@ -40,7 +40,7 @@ router.get("/orders", (req, res) => res.json({ ok: true, orders: getAllOrders() 
 router.put("/orders/:id/status", WRITE_ADMIN, (req, res) => {
   try {
     const status = assertManualStatus(req.body.status);
-    const order = updateOrderStatus(req.params.id, status, req.body);
+    const order = updateOrderStatus(req.params.id, status, {});
     logAudit({ type: "marketplace", action: "order_status", user: req.authUser?.email || "admin", detail: `${req.params.id} → ${status}` });
     res.json({ ok: true, order });
   } catch (e) { res.status(e.status || 400).json({ ok: false, error: e.message }); }
