@@ -47,6 +47,8 @@ jobs:
           MR_API_V2_PASSWORD: ${{ secrets.OVH_MONDIAL_RELAY_API_V2_PASSWORD }}
           MR_API_V2_CUSTOMER_ID: ${{ secrets.OVH_MONDIAL_RELAY_API_V2_CUSTOMER_ID }}
           COLISSIMO_API_KEY: ${{ secrets.OVH_COLISSIMO_API_KEY }}
+          SENDCLOUD_PUBLIC_KEY: ${{ secrets.SENDCLOUD_PUBLIC_KEY }}
+          SENDCLOUD_SECRET_KEY: ${{ secrets.SENDCLOUD_SECRET_KEY }}
           OP: ${{ inputs.action }}
           BRANCH: ${{ inputs.branch }}
         run: |
@@ -58,7 +60,7 @@ jobs:
           test -n "${OVH_VPS_HOST_FINGERPRINT:-}"
 
           case "$OP" in
-            status|healthcheck|deploy|restart|backup|backup-prune|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check|sumup-configure|colissimo-configure|mondial-relay-configure) ;;
+            status|healthcheck|deploy|restart|backup|backup-prune|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check|sumup-configure|colissimo-configure|mondial-relay-configure|sendcloud-configure) ;;
             *) echo "FORBIDDEN action"; exit 1 ;;
           esac
           case "$BRANCH" in
@@ -122,6 +124,11 @@ jobs:
             test -n "${COLISSIMO_API_KEY:-}"
             printf '%s' "$COLISSIMO_API_KEY" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
             unset SMTP_PASS DOMAIN_SMTP_HOST DOMAIN_SMTP_PORT DOMAIN_SMTP_SECURE DOMAIN_SMTP_USER DOMAIN_SMTP_PASS DOMAIN_MAIL_FROM DOMAIN_MAIL_FROM_NAME DOMAIN_MAIL_REPLY_TO DOMAIN_DKIM_SELECTOR SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID COLISSIMO_API_KEY
+          elif [ "$OP" = sendcloud-configure ]; then
+            test -n "${SENDCLOUD_PUBLIC_KEY:-}"
+            test -n "${SENDCLOUD_SECRET_KEY:-}"
+            printf '%s\n%s\n' "$SENDCLOUD_PUBLIC_KEY" "$SENDCLOUD_SECRET_KEY" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
+            unset SENDCLOUD_PUBLIC_KEY SENDCLOUD_SECRET_KEY
           else
             unset SMTP_PASS DOMAIN_SMTP_HOST DOMAIN_SMTP_PORT DOMAIN_SMTP_SECURE DOMAIN_SMTP_USER DOMAIN_SMTP_PASS DOMAIN_MAIL_FROM DOMAIN_MAIL_FROM_NAME DOMAIN_MAIL_REPLY_TO DOMAIN_DKIM_SELECTOR SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID COLISSIMO_API_KEY
             ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
