@@ -680,10 +680,18 @@ cmd_sendcloud_configure() {
   chmod 0600 "$backup"
 
   tmp=$(mktemp)
-  awk -F= '$1 != "SENDCLOUD_PUBLIC_KEY" && $1 != "SENDCLOUD_SECRET_KEY"' "$ENV_FILE" > "$tmp"
+  awk -F= '$1 != "SENDCLOUD_PUBLIC_KEY" && $1 != "SENDCLOUD_SECRET_KEY" && $1 != "CARDORIA_SENDER_NAME" && $1 != "CARDORIA_SENDER_ADDRESS_LINE1" && $1 != "CARDORIA_SENDER_ADDRESS_LINE2" && $1 != "CARDORIA_SENDER_POSTAL_CODE" && $1 != "CARDORIA_SENDER_CITY" && $1 != "CARDORIA_SENDER_COUNTRY" && $1 != "CARDORIA_SENDER_PHONE" && $1 != "CARDORIA_SENDER_EMAIL"' "$ENV_FILE" > "$tmp"
   {
     printf '%s=%s\n' 'SENDCLOUD_PUBLIC_KEY' "$public_key"
     printf '%s=%s\n' 'SENDCLOUD_SECRET_KEY' "$secret_key"
+    printf '%s=%s\n' 'CARDORIA_SENDER_NAME' 'Cardoria'
+    printf '%s=%s\n' 'CARDORIA_SENDER_ADDRESS_LINE1' '17 avenue Marcel Aime'
+    printf '%s=%s\n' 'CARDORIA_SENDER_ADDRESS_LINE2' ''
+    printf '%s=%s\n' 'CARDORIA_SENDER_POSTAL_CODE' '59330'
+    printf '%s=%s\n' 'CARDORIA_SENDER_CITY' 'Hautmont'
+    printf '%s=%s\n' 'CARDORIA_SENDER_COUNTRY' 'FR'
+    printf '%s=%s\n' 'CARDORIA_SENDER_PHONE' '+33955807522'
+    printf '%s=%s\n' 'CARDORIA_SENDER_EMAIL' 'contact@allvaps.fr'
   } >> "$tmp"
   install -m 0600 -o root -g root "$tmp" "$ENV_FILE"
   rm -f "$tmp"
@@ -706,6 +714,16 @@ cmd_sendcloud_configure() {
     node --input-type=module <<'NODE'
 import { isSendcloudConfigured, searchMondialRelayServicePoints } from "./lib/sendcloud.js";
 if (!isSendcloudConfigured()) process.exit(2);
+const senderRequired = [
+  process.env.CARDORIA_SENDER_NAME,
+  process.env.CARDORIA_SENDER_ADDRESS_LINE1,
+  process.env.CARDORIA_SENDER_POSTAL_CODE,
+  process.env.CARDORIA_SENDER_CITY,
+  process.env.CARDORIA_SENDER_COUNTRY,
+  process.env.CARDORIA_SENDER_PHONE,
+  process.env.CARDORIA_SENDER_EMAIL
+];
+if (senderRequired.some((value) => !String(value || "").trim())) process.exit(4);
 const result = await searchMondialRelayServicePoints({
   countryCode: "FR",
   postalCode: "59330",
@@ -715,6 +733,7 @@ const result = await searchMondialRelayServicePoints({
 });
 if (!Array.isArray(result.points) || result.points.length < 1) process.exit(3);
 console.log("sendcloud_credentials: configured");
+console.log("cardoria_sender: configured");
 console.log("sendcloud_service_points: available");
 NODE
   ) >/tmp/cardoria-ops-sendcloud.out 2>&1
