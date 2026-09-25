@@ -684,14 +684,14 @@ cmd_sendcloud_configure() {
   {
     printf '%s=%s\n' 'SENDCLOUD_PUBLIC_KEY' "$public_key"
     printf '%s=%s\n' 'SENDCLOUD_SECRET_KEY' "$secret_key"
-    printf '%s=%s\n' 'CARDORIA_SENDER_NAME' 'Cardoria'
-    printf '%s=%s\n' 'CARDORIA_SENDER_ADDRESS_LINE1' '17 avenue Marcel Aime'
-    printf '%s=%s\n' 'CARDORIA_SENDER_ADDRESS_LINE2' ''
-    printf '%s=%s\n' 'CARDORIA_SENDER_POSTAL_CODE' '59330'
-    printf '%s=%s\n' 'CARDORIA_SENDER_CITY' 'Hautmont'
-    printf '%s=%s\n' 'CARDORIA_SENDER_COUNTRY' 'FR'
-    printf '%s=%s\n' 'CARDORIA_SENDER_PHONE' '+33955807522'
-    printf '%s=%s\n' 'CARDORIA_SENDER_EMAIL' 'contact@allvaps.fr'
+    printf "%s='%s'\n" 'CARDORIA_SENDER_NAME' 'Cardoria'
+    printf "%s='%s'\n" 'CARDORIA_SENDER_ADDRESS_LINE1' '17 avenue Marcel Aime'
+    printf "%s='%s'\n" 'CARDORIA_SENDER_ADDRESS_LINE2' ''
+    printf "%s='%s'\n" 'CARDORIA_SENDER_POSTAL_CODE' '59330'
+    printf "%s='%s'\n" 'CARDORIA_SENDER_CITY' 'Hautmont'
+    printf "%s='%s'\n" 'CARDORIA_SENDER_COUNTRY' 'FR'
+    printf "%s='%s'\n" 'CARDORIA_SENDER_PHONE' '+33955807522'
+    printf "%s='%s'\n" 'CARDORIA_SENDER_EMAIL' 'contact@allvaps.fr'
   } >> "$tmp"
   install -m 0600 -o root -g root "$tmp" "$ENV_FILE"
   rm -f "$tmp"
