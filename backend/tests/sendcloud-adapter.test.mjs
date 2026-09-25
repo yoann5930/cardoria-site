@@ -29,6 +29,22 @@ test("search filters a mismatched carrier and country instead of returning it", 
     const result = await sc.searchMondialRelayServicePoints({ postalCode: "59330" }); assert.equal(result.points.length, 1); assert.equal(result.points[0].id, 123);
   });
 });
+
+test("search can resolve an exact Mondial Relay carrier point id without dropping leading zeros", async () => {
+  await mocked(async (url) => {
+    const parsed = new URL(url);
+    assert.equal(parsed.pathname, "/api/v3/service-points");
+    assert.equal(parsed.searchParams.get("carrier_service_point_id"), "024688");
+    assert.equal(parsed.searchParams.get("carrier_code"), "mondial_relay");
+    assert.equal(parsed.searchParams.get("country_code"), "FR");
+    assert.equal(parsed.searchParams.has("radius"), false);
+    return json({ data: { results: [{ ...point, carrier_service_point_id: "024688" }] } });
+  }, async () => {
+    const result = await sc.searchMondialRelayServicePoints({ carrierServicePointId: "024688" });
+    assert.equal(result.points.length, 1);
+    assert.equal(result.points[0].carrierServicePointId, "024688");
+  });
+});
 test("wrong carrier, return and home options never act as silent fallbacks", async () => {
   for (const changed of [{ carrier: { code: "wrong" } }, { functionalities: { last_mile: "home_delivery", labelless: false } }, { functionalities: { last_mile: "service_point", returns: true, labelless: false } }]) {
     await mocked(async () => json({ data: [{ ...option, ...changed }] }), async () => assert.rejects(sc.resolveShippingOption({ carrierCode: "mondial_relay", weightGrams: 500, servicePointId: 123 }), { code: "SENDCLOUD_SHIPPING_OPTION_UNAVAILABLE" }));
