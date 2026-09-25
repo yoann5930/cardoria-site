@@ -122,6 +122,7 @@ test("checkout persists Point Relais and preparation triggers one real shipment 
   assert.match(creation, /creation_pending/);
   assert.match(creation, /reconciliation_required/);
   assert.match(creation, /findSendcloudShipmentByOrderNumber/);
+  assert.match(creation, /pickup\.sendcloudServicePointId/);
   const sumup = fs.readFileSync("backend/lib/payments/sumup.js", "utf8");
   assert.match(sumup, /o\.shipmentStatus\s*=\s*shipmentStatusOf\(o\)/);
 });
