@@ -41,6 +41,24 @@
       if (body) body.innerHTML = "<tr><td colspan='7'>" + esc(e.message) + "</td></tr>";
     });
   }
+  function renderShipments(shipments) {
+    var body = A.qs("#liveShipmentsBody");
+    if (!body) return;
+    body.innerHTML = (shipments || []).map(function (s) {
+      var point = s.servicePoint ? [s.servicePoint.name, s.servicePoint.postalCode, s.servicePoint.city].filter(Boolean).join(" · ") : "—";
+      var tracking = s.trackingNumber || "—";
+      var follow = s.trackingUrl ? '<a href="' + esc(s.trackingUrl) + '" target="_blank" rel="noopener noreferrer">Ouvrir le suivi</a>' : "—";
+      return "<tr><td>" + esc(s.buyerName || s.buyerEmail || "Client") + "</td><td>" + esc(s.carrier || s.carrierCode || "—") + "</td><td><strong>" + esc(tracking) + "</strong></td><td>" + esc(s.status || "—") + "</td><td>" + esc(point) + "</td><td>" + follow + "</td></tr>";
+    }).join("") || "<tr><td colspan='6'>Aucune expédition pour ce Live.</td></tr>";
+  }
+  function refreshShipments(liveId) {
+    var id = String(liveId || selectedLiveId || "");
+    var body = A.qs("#liveShipmentsBody");
+    if (!id) { if (body) body.innerHTML = "<tr><td colspan='6'>Sélectionnez un Live.</td></tr>"; return Promise.resolve(); }
+    return A.adminFetch("/api/admin/live/shipments?liveId=" + encodeURIComponent(id))
+      .then(function (d) { renderShipments(d.shipments || []); })
+      .catch(function (e) { if (body) body.innerHTML = "<tr><td colspan='6'>" + esc(e.message) + "</td></tr>"; });
+  }
   function startPaymentPolling() {
     if (paymentTimer) clearInterval(paymentTimer);
     refreshPayments();
@@ -96,6 +114,7 @@
     });
     window.CardoriaLiveSelectedId = selectedLiveId;
     window.dispatchEvent(new CustomEvent("cardoria-live-selected", { detail: { id: selectedLiveId, session: session } }));
+    refreshShipments(selectedLiveId);
   }
   function fillOneSelect(select, items, placeholder, preferred) {
     if (!select) return;
@@ -373,7 +392,7 @@
       '</div><details class="live-studio-cam-settings"><summary>Réglages caméra</summary><p><strong>Paiement :</strong> Cardoria/Admin = SumUp uniquement lors d’une vente. Vendeur tiers = PayPal + commission.</p><p>2 sources maximum. Caméra 2 / téléphone remplace Caméra 2 PC pour rester à 2 flux.</p><div class="admin-filters"><select id="liveCameraSelect1"><option value="">Webcam automatique (PC)</option></select><select id="liveMicSelect1"><option value="">Micro automatique</option></select></div><div class="admin-filters"><select id="liveCameraSelect2"><option value="">Autre webcam (PC)</option></select><select id="liveMicSelect2"><option value="">Micro automatique</option></select></div><label class="admin-live-cam-mute"><input id="liveCam2NoMic" type="checkbox"> Caméra 2 sans micro</label><p id="liveCam2PhoneState">État : inactive</p><button class="live-studio-btn" type="button" id="liveCam2Phone">Caméra 2 / téléphone</button> <button class="live-studio-btn" type="button" id="liveCam2PhoneStop">Arrêter Caméra 2</button><p id="cameraPair"></p></details></section>',
       '<section id="liveActionStudio" class="live-studio-stage"></section></div>',
       '<section class="live-studio-activity"><article><h3>Spectateurs</h3><p id="liveStudioViewers">0</p></article><article><h3>Chat</h3><div id="liveStudioChat">Aucun message</div></article><article><h3>Dernière vente</h3><p id="liveStudioLastSale">—</p></article><article><h3>Paiements</h3><p id="livePaymentsSummary">Payés: 0 · En attente: 0 · Refusés: 0</p></article></section>',
-      '<details class="live-studio-prepare admin-panel"><summary>Préparer le Live / historique</summary><h2>Nouveau Live</h2><div class="admin-filters"><input id="liveTitle" placeholder="Titre du Live" value="Live Cardoria"><select id="liveCategory"><option value="pokemon">Pokémon</option><option value="yugioh">Yu-Gi-Oh!</option><option value="onepiece">One Piece</option><option value="lorcana">Lorcana</option><option value="magic">Magic</option><option value="other" selected>Autre</option></select><button class="btn btn-primary" id="liveCreate">Créer le Live</button></div><p>Salle d’abord, ventes ensuite. Aucun prix n’est demandé pour créer la salle.</p><h2>Paiements du Live</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Statut</th><th>Acheteur</th><th>Produit / lot</th><th>Montant</th><th>Fournisseur</th><th>Mise à jour</th><th>ID paiement</th></tr></thead><tbody id="livePaymentsBody"><tr><td colspan="7">Chargement…</td></tr></tbody></table></div><h2>Mes Lives</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Titre</th><th>Statut</th><th>Paiement ventes</th><th>Actions/produits</th><th>Contrôles</th></tr></thead><tbody id="liveBody"></tbody></table></div><button type="button" id="liveGoCancel" class="live-studio-btn" data-cancel="" hidden>Annuler</button></details></div>'
+      '<details class="live-studio-prepare admin-panel"><summary>Préparer le Live / historique</summary><h2>Nouveau Live</h2><div class="admin-filters"><input id="liveTitle" placeholder="Titre du Live" value="Live Cardoria"><select id="liveCategory"><option value="pokemon">Pokémon</option><option value="yugioh">Yu-Gi-Oh!</option><option value="onepiece">One Piece</option><option value="lorcana">Lorcana</option><option value="magic">Magic</option><option value="other" selected>Autre</option></select><button class="btn btn-primary" id="liveCreate">Créer le Live</button></div><p>Salle d’abord, ventes ensuite. Aucun prix n’est demandé pour créer la salle.</p><h2>Paiements du Live</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Statut</th><th>Acheteur</th><th>Produit / lot</th><th>Montant</th><th>Fournisseur</th><th>Mise à jour</th><th>ID paiement</th></tr></thead><tbody id="livePaymentsBody"><tr><td colspan="7">Chargement…</td></tr></tbody></table></div><h2>Expéditions du Live</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Acheteur</th><th>Transporteur</th><th>N° suivi</th><th>Statut</th><th>Point Relais</th><th>Suivi</th></tr></thead><tbody id="liveShipmentsBody"><tr><td colspan="6">Sélectionnez un Live.</td></tr></tbody></table></div><h2>Mes Lives</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Titre</th><th>Statut</th><th>Paiement ventes</th><th>Actions/produits</th><th>Contrôles</th></tr></thead><tbody id="liveBody"></tbody></table></div><button type="button" id="liveGoCancel" class="live-studio-btn" data-cancel="" hidden>Annuler</button></details></div>'
     ].join(""));
   A.qs("#liveGoStart").onclick = function () {
     var id = requireSelectedLive();
