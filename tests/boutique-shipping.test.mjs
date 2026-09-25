@@ -98,24 +98,28 @@ test("client order payload never leaks internals and keeps pickup + tracking URL
   assert.equal("sumupCheckoutId" in exposed, false);
 });
 
-test("checkout persists Point Relais while admin shipping stays read-only", () => {
+test("checkout persists Point Relais and preparation triggers one real shipment flow", () => {
   const checkout = fs.readFileSync("backend/lib/boutique/checkout.js", "utf8");
   const boutique = fs.readFileSync("js/boutique.js", "utf8");
   const admin = fs.readFileSync("js/admin/admin-orders.js", "utf8");
   const client = fs.readFileSync("js/client-orders.js", "utf8");
   const routes = fs.readFileSync("backend/routes/payments-admin.js", "utf8");
+  const creation = fs.readFileSync("backend/lib/boutique/shipment-creation.js", "utf8");
+
   assert.match(checkout, /pickupPoint: selection\.pickupPoint/);
   assert.match(boutique, /shippingMethod: shippingMethod\(\)/);
   assert.match(boutique, /\/api\/mondial-relay\/service-points/);
-  assert.match(admin, /data-colissimo-print/);
-  assert.match(admin, /Télécharger l’étiquette existante/);
+  assert.match(admin, /data-shipping-label/);
   assert.match(admin, /Marquer comme expédiée/);
   assert.match(admin, /readonly placeholder="Enregistré par le parcours d’expédition"/);
   assert.doesNotMatch(admin, /data-colissimo-create|Synchroniser suivi Sendcloud|autoSyncRelayTracking/);
   assert.match(client, /Commande expédiée/);
   assert.match(client, /POINT RELAIS MONDIAL RELAY/);
+  assert.match(routes, /createBoutiqueShipmentForPreparation/);
   assert.match(routes, /ADMIN_SHIPPING_READ_ONLY/);
-  assert.doesNotMatch(routes, /createColissimoLabel|findSendcloudShipmentByOrderNumber|withColissimoLabelLock/);
+  assert.match(creation, /creation_pending/);
+  assert.match(creation, /reconciliation_required/);
+  assert.match(creation, /findSendcloudShipmentByOrderNumber/);
   const sumup = fs.readFileSync("backend/lib/payments/sumup.js", "utf8");
   assert.match(sumup, /o\.shipmentStatus\s*=\s*shipmentStatusOf\(o\)/);
 });
