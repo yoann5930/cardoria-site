@@ -27,12 +27,17 @@ test("Boutique missing relay can be repaired explicitly before preparation", () 
 
   assert.match(route, /boutique-orders\/:id\/relay-options/);
   assert.match(route, /boutique-orders\/:id\/pickup-point/);
-  assert.match(route, /searchMondialRelayServicePoints/);
+  assert.match(route, /searchSendcloudMondialRelayServicePoints/);
+  assert.match(route, /getSendcloudServicePoint/);
+  assert.match(route, /sendcloudServicePointId/);
   assert.match(route, /normalizePickupPoint/);
   assert.match(route, /Choisissez un Point Relais Mondial Relay avant de passer la commande en préparation/);
   assert.match(ui, /data-relay-options/);
   assert.match(ui, /data-relay-select/);
   assert.match(ui, /data-relay-save/);
+  assert.match(ui, /SERVICE_POINT_NOT_FOUND/);
+  assert.match(ui, /Changer de Point Relais/);
+  assert.match(ui, /servicePointId/);
   assert.match(ui, /Point Relais enregistré\. Vous pouvez maintenant passer la commande en préparation/);
 });
 
