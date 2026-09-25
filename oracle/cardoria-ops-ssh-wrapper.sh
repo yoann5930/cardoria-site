@@ -65,6 +65,9 @@ case "$cmd" in
   colissimo-configure)
     exec sudo -n /usr/local/bin/cardoria-colissimo-configure
     ;;
+  sendcloud-configure)
+    exec sudo -n /usr/local/bin/cardoria-ops sendcloud-configure
+    ;;
   deploy)
     exec sudo -n /usr/local/bin/cardoria-ops deploy
     ;;
