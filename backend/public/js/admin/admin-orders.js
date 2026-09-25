@@ -5,12 +5,9 @@
 
   var orders = [];
   var filter = "all";
-  var colissimo = { configured:false, senderConfigured:false, labelPurchasesEnabled:false, productCode:"DOM" };
-  var colissimoMessage = "";
   var emailConfig = { configured:false, missingReason:"" };
   var CARRIERS = ["Colissimo (La Poste)", "La Poste", "Mondial Relay", "Relais Colis"];
   var STATUSES = ["À préparer", "En préparation", "Prête à expédier", "Expédiée", "Livrée", "Annulée"];
-  var creatingLabels = Object.create(null);
 
   function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; }); }
   function euro(v) { return Number(v || 0).toFixed(2).replace(".", ",") + " €"; }
@@ -69,13 +66,6 @@
     return '<section class="admin-order-section"><h4>'+esc(title)+'</h4>'+body+"</section>";
   }
 
-  function colissimoButtonLabel() {
-    if (!colissimo.configured) return "Clé API Colissimo non configurée";
-    if (!colissimo.senderConfigured) return "Adresse expéditeur Colissimo à renseigner";
-    if (!colissimo.labelPurchasesEnabled) return "Configuration Colissimo en attente";
-    return "Créer l’étiquette";
-  }
-
   function render() {
     var q = (A.qs("#orderSearch")?.value || "").toLowerCase();
     var list = orders.filter(function (o) {
@@ -91,10 +81,6 @@
 
     A.qs("#orderCards").innerHTML = list.map(function (o) {
       var canRefund = o.paymentStatus === "paid" && !!(o.sumupCheckoutId || o.sumupTransactionId);
-      var colissimoReady = !!(colissimo.configured && colissimo.senderConfigured && colissimo.labelPurchasesEnabled);
-      var colissimoAttempt = o.colissimoLabelAttempt && o.colissimoLabelAttempt.status || "";
-      var colissimoBlocked = colissimoAttempt === "reconciliation_required";
-      var colissimoPending = colissimoAttempt === "creation_pending" || creatingLabels[o.id];
       var purchaseMail = o.purchaseEmail || null, trackingMail = o.trackingEmail || null;
       var relay = isRelay(o);
       var tracking = o.tracking||o.colissimoParcelNumber||"";
@@ -104,15 +90,11 @@
       var items = (o.items || []).map(function (i) { return '<tr><td>'+esc(i.name||i.ref)+'</td><td>'+Number(i.qty||1)+'</td><td>'+euro(i.price)+'</td><td>'+euro(Number(i.qty||1)*Number(i.price||0))+'</td></tr>'; }).join("") || '<tr><td colspan="4">Aucun article</td></tr>';
       var legacyCarrier = o.carrier && CARRIERS.indexOf(o.carrier) < 0 ? [o.carrier].concat(CARRIERS) : CARRIERS;
       var review = o.paymentReviewRequired ? '<div class="admin-panel" style="margin:10px 0;border-color:#b44"><strong style="color:#ff8f8f">Remboursement SumUp à confirmer</strong><br><small>Le stock reste bloqué jusqu’à confirmation du remboursement.</small></div>' : "";
-      var createDisabled = !colissimoReady || colissimoBlocked || colissimoPending || !weight.known || o.paymentStatus !== "paid" || relay;
-      var createLabel = colissimoPending ? "Création d’étiquette en cours…" : colissimoButtonLabel();
-      var waitNote = "";
-      if (relay) waitNote = tracking
-        ? '<p class="small">Mondial Relay : suivi enregistré par le parcours d’expédition.</p>'
-        : '<p class="small">Mondial Relay : l’Admin ne crée pas d’étiquette et ne contacte pas Sendcloud. Le suivi apparaîtra ici lorsqu’il aura été enregistré par le parcours d’expédition.</p>';
-      else if (colissimoBlocked) waitNote = '<p class="small" style="color:#ffb36b">Colissimo : rapprochement requis dans la Cbox avant tout nouvel essai.</p>';
-      else if (!colissimoReady && o.paymentStatus==="paid" && !o.colissimoParcelNumber) waitNote = '<p class="small">'+esc(colissimoMessage || colissimoButtonLabel())+'</p>';
-      else if (!weight.known && o.paymentStatus==="paid" && !relay) waitNote = '<p class="small">Poids du colis inconnu : renseignez-le avant de créer une étiquette.</p>';
+      var waitNote = relay
+        ? (tracking
+          ? '<p class="small">Mondial Relay : suivi enregistré par le parcours d’expédition.</p>'
+          : '<p class="small">Mondial Relay : l’Admin ne crée pas d’étiquette et ne contacte pas Sendcloud. Le suivi apparaîtra ici lorsqu’il aura été enregistré par le parcours d’expédition.</p>')
+        : '<p class="small">Expédition : l’Admin ne crée pas d’étiquette et ne récupère pas le suivi auprès du transporteur. Il affiche uniquement les données déjà enregistrées.</p>';
 
       var clientBox = section("Client",
         '<p><strong>'+esc(o.client||"Client")+'</strong><br>'+esc(o.email||"")+(o.phone?'<br>'+esc(o.phone):"")+'</p>');
@@ -166,7 +148,7 @@
   }
 
   function card(id) { return A.qs('[data-order-card="'+CSS.escape(String(id))+'"]'); }
-  function payload(c) { function v(n){ return c.querySelector('[data-field="'+n+'"]')?.value || ""; } return { status:v("status"), carrier:v("carrier"), tracking:v("tracking"), phone:v("phone"), address:v("address"), internalNote:v("internalNote"), shipping:v("shipping")||"Standard", shippingMethod:v("shippingMethod"), shippingWeightGrams:v("shippingWeightGrams") }; }
+  function payload(c) { function v(n){ return c.querySelector('[data-field="'+n+'"]')?.value || ""; } return { status:v("status"), carrier:v("carrier"), phone:v("phone"), address:v("address"), internalNote:v("internalNote"), shipping:v("shipping")||"Standard", shippingMethod:v("shippingMethod"), shippingWeightGrams:v("shippingWeightGrams") }; }
 
   async function saveOrder(id, btn) {
     var c=card(id),m=c?.querySelector("[data-status-message]");
@@ -177,7 +159,7 @@
       if(m)m.textContent="Enregistrement...";
       var d=await A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id),{method:"PUT",body:JSON.stringify(data)});
       if(!d.ok)throw new Error(d.error||"Mise à jour impossible");
-      var savedTracking=String(d.order?.tracking||data.tracking||"").trim();
+      var savedTracking=String(d.order?.tracking||"").trim();
       var msg=data.status==="Expédiée"?(savedTracking?"Commande expédiée · suivi "+savedTracking+".":"Commande expédiée."):"Commande mise à jour.";
       if(d.emailNotification){
         msg+=d.emailNotification.sent?" Mail de suivi envoyé.":" Mail de suivi non envoyé"+(d.emailNotification.error?": "+d.emailNotification.error:"");
@@ -216,8 +198,6 @@
       orders = d.orders || [];
       if (Array.isArray(d.carriers) && d.carriers.length) CARRIERS = d.carriers;
       if (Array.isArray(d.statuses) && d.statuses.length) STATUSES = d.statuses;
-      if (d.colissimo) colissimo = d.colissimo;
-      colissimoMessage = d.colissimoMessage || "";
       if (d.email) emailConfig = d.email;
       render();
       var c = id && card(id), box = c && c.querySelector("[data-status-message]"); if (box) box.textContent = message || "Mis à jour.";
