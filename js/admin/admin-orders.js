@@ -103,10 +103,18 @@
         '<p><span class="admin-badge '+paymentClass(o)+'">'+esc(paymentLabel(o))+'</span><br><small>Montant : '+euro(total(o))+'</small><br><small>Stock : '+esc((o.stockImpact && o.stockImpact.label) || "—")+'</small></p>');
       var itemsBox = section("Articles",
         '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Article</th><th>Qté</th><th>PU</th><th>Total</th></tr></thead><tbody>'+items+'</tbody></table></div>');
+      var relayRepair = relay && !pickup
+        ? '<div class="admin-relay-repair" data-relay-repair="'+esc(o.id)+'">'+
+            '<p class="small" style="color:#ffb36b">Point Relais manquant. Choisissez un relais avant de passer la commande en préparation.</p>'+
+            '<button type="button" class="btn btn-secondary" data-relay-options="'+esc(o.id)+'">Choisir un Point Relais</button> '+
+            '<select data-relay-select="'+esc(o.id)+'" hidden><option value="">Choisir...</option></select> '+
+            '<button type="button" class="btn btn-primary" data-relay-save="'+esc(o.id)+'" hidden>Enregistrer le relais</button>'+
+          '</div>'
+        : "";
       var deliveryBox = section("Livraison",
         '<p><small>Méthode</small><br><strong>'+esc(shippingMethodLabel(o))+'</strong></p>'+
         (relay
-          ? '<p><small>Point Relais</small><br>'+esc(pickup || "Point Relais manquant")+'</p>'
+          ? '<p><small>Point Relais</small><br>'+esc(pickup || "Point Relais manquant")+'</p>'+relayRepair
           : '<p><small>Adresse</small><br>'+esc(o.address||"—")+'</p>'));
       var expeditionBox = section("Expédition",
         '<div class="admin-form-grid">'+
@@ -210,6 +218,32 @@
   }
 
   function bind() {
+    A.qs("#orderCards").querySelectorAll("button[data-relay-options]").forEach(function (btn) { btn.onclick = function () {
+      var id=btn.dataset.relayOptions,c=card(id),m=c?.querySelector("[data-status-message]"),select=c?.querySelector('[data-relay-select="'+CSS.escape(String(id))+'"]'),save=c?.querySelector('[data-relay-save="'+CSS.escape(String(id))+'"]');
+      btn.disabled=true;if(m)m.textContent="Recherche des Points Relais Mondial Relay...";
+      A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/relay-options",{cache:"no-store"})
+        .then(function(d){
+          if(!d.ok)throw new Error(d.error||"Recherche Point Relais impossible");
+          if(!select)return;
+          select.innerHTML='<option value="">Choisir...</option>'+(d.points||[]).map(function(p){
+            var label=[p.name,p.id?"n° "+p.id:"",p.address,[p.postalCode,p.city].filter(Boolean).join(" ")].filter(Boolean).join(" — ");
+            return '<option value="'+esc(p.id)+'">'+esc(label)+'</option>';
+          }).join("");
+          select.hidden=false;if(save)save.hidden=false;
+          if(m)m.textContent=(d.points||[]).length+" Point(s) Relais trouvé(s).";
+        })
+        .catch(function(e){if(m)m.textContent=e.message;})
+        .finally(function(){btn.disabled=false;});
+    }; });
+    A.qs("#orderCards").querySelectorAll("button[data-relay-save]").forEach(function (btn) { btn.onclick = function () {
+      var id=btn.dataset.relaySave,c=card(id),m=c?.querySelector("[data-status-message]"),select=c?.querySelector('[data-relay-select="'+CSS.escape(String(id))+'"]'),relayId=String(select?.value||"").trim();
+      if(!relayId){if(m)m.textContent="Choisissez un Point Relais.";return;}
+      btn.disabled=true;if(m)m.textContent="Enregistrement du Point Relais...";
+      A.adminFetch("/api/admin/payments/boutique-orders/"+encodeURIComponent(id)+"/pickup-point",{method:"PUT",body:JSON.stringify({relayId:relayId})})
+        .then(function(d){if(!d.ok)throw new Error(d.error||"Enregistrement du Point Relais impossible");return reload(id,"Point Relais enregistré. Vous pouvez maintenant passer la commande en préparation.");})
+        .catch(function(e){if(m)m.textContent=e.message;})
+        .finally(function(){btn.disabled=false;});
+    }; });
     A.qs("#orderCards").querySelectorAll("button[data-save]").forEach(function (btn) { btn.onclick = function () { return saveOrder(btn.dataset.save,btn); }; });
     A.qs("#orderCards").querySelectorAll("button[data-mark-shipped]").forEach(function (btn) { btn.onclick = function () {
       var c=card(btn.dataset.markShipped), status=c?.querySelector('[data-field="status"]'), carrier=c?.querySelector('[data-field="carrier"]'), tracking=c?.querySelector('[data-field="tracking"]'), m=c?.querySelector("[data-status-message]");

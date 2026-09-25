@@ -21,6 +21,21 @@ test("Boutique preparation status is the only admin trigger for real label creat
   assert.match(ui, /Le passage à <strong>En préparation<\/strong> crée automatiquement l’étiquette réelle/);
 });
 
+test("Boutique missing relay can be repaired explicitly before preparation", () => {
+  const route = read("backend/routes/payments-admin.js");
+  const ui = read("js/admin/admin-orders.js");
+
+  assert.match(route, /boutique-orders\/:id\/relay-options/);
+  assert.match(route, /boutique-orders\/:id\/pickup-point/);
+  assert.match(route, /searchMondialRelayServicePoints/);
+  assert.match(route, /normalizePickupPoint/);
+  assert.match(route, /Choisissez un Point Relais Mondial Relay avant de passer la commande en préparation/);
+  assert.match(ui, /data-relay-options/);
+  assert.match(ui, /data-relay-select/);
+  assert.match(ui, /data-relay-save/);
+  assert.match(ui, /Point Relais enregistré\. Vous pouvez maintenant passer la commande en préparation/);
+});
+
 test("Boutique label creation persists tracking and exposes only download/print afterwards", () => {
   const route = read("backend/routes/payments-admin.js");
   const flow = read("backend/lib/boutique/shipment-creation.js");

@@ -12,9 +12,11 @@ import { readJson, writeJson } from "../lib/storage.js";
 import { downloadColissimoLabel, getColissimoStatus } from "../lib/colissimo.js";
 import { downloadSendcloudLabel } from "../lib/sendcloud.js";
 import { createBoutiqueShipmentForPreparation } from "../lib/boutique/shipment-creation.js";
+import { searchMondialRelayServicePoints } from "../lib/mondial-relay.js";
 import { getBoutiqueEmailConfiguration, sendBoutiquePurchaseEmail, sendBoutiqueTrackingEmail } from "../lib/boutique/customer-emails.js";
 import {
   colissimoAdminMessage,
+  normalizePickupPoint,
   parseWeightGrams,
   shipmentStatusOf
 } from "../lib/boutique/shipping.js";
@@ -192,6 +194,73 @@ router.get("/boutique-orders/:id", (req, res) => {
   res.json({ ok: true, order });
 });
 
+router.get("/boutique-orders/:id/relay-options", async (req, res) => {
+  const order = findBoutiqueOrder(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  const shipping = order.shippingAddress && typeof order.shippingAddress === "object" ? order.shippingAddress : {};
+  const postalCode = clean(shipping.postalCode, 12);
+  const city = clean(shipping.city, 80);
+  if (!postalCode && !city) {
+    return res.status(400).json({ ok: false, code: "RELAY_SEARCH_ADDRESS_REQUIRED", error: "Code postal ou ville de livraison requis pour rechercher un Point Relais." });
+  }
+  try {
+    const result = await searchMondialRelayServicePoints({
+      countryCode: clean(shipping.countryCode || shipping.country || "FR", 2) || "FR",
+      postalCode,
+      city,
+      radius: 15000,
+      limit: 15
+    });
+    const points = (result.points || []).map((point) => normalizePickupPoint(point)).filter(Boolean);
+    res.json({ ok: true, points, count: points.length });
+  } catch (error) {
+    res.status(error?.status || 502).json({ ok: false, code: error?.code || "MONDIAL_RELAY_SEARCH_FAILED", error: error?.message || "Recherche Point Relais indisponible." });
+  }
+});
+
+router.put("/boutique-orders/:id/pickup-point", WRITE_ADMIN, async (req, res) => {
+  const order = findBoutiqueOrder(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  if (order.status === "Expédiée" || order.status === "Livrée" || order.tracking) {
+    return res.status(409).json({ ok: false, code: "ORDER_ALREADY_SHIPPED", error: "Le Point Relais ne peut plus être modifié après création de l'expédition." });
+  }
+  const relayId = clean(req.body?.relayId, 20);
+  if (!/^\d{1,8}$/.test(relayId)) {
+    return res.status(400).json({ ok: false, code: "SERVICE_POINT_INVALID", error: "Point Relais invalide." });
+  }
+  try {
+    const result = await searchMondialRelayServicePoints({
+      countryCode: "FR",
+      relayId,
+      limit: 10,
+      radius: 15000
+    });
+    const point = (result.points || []).map((item) => normalizePickupPoint(item)).find((item) => item && String(item.id) === relayId);
+    if (!point) {
+      return res.status(404).json({ ok: false, code: "SERVICE_POINT_NOT_FOUND", error: "Point Relais Mondial Relay introuvable." });
+    }
+    const updated = await withBoutiqueOrderLock(() => {
+      const orders = readJson("orders", []);
+      const index = orders.findIndex((row) => String(row.id) === String(order.id));
+      if (index < 0) return null;
+      const current = orders[index];
+      current.pickupPoint = point;
+      current.carrier = "Mondial Relay";
+      current.shippingMethod = "mondial_relay";
+      current.shipping = "Mondial Relay Point Relais";
+      current.updatedAt = new Date().toISOString();
+      orders[index] = current;
+      writeJson("orders", orders);
+      return current;
+    });
+    if (!updated) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+    logAudit({ type: "shipping", action: "pickup_point_repaired", user: req.authUser?.email || "admin", detail: `${order.id} — ${point.id} — ${point.name}` });
+    res.json({ ok: true, order: findBoutiqueOrder(order.id) || updated, pickupPoint: point });
+  } catch (error) {
+    res.status(error?.status || 502).json({ ok: false, code: error?.code || "MONDIAL_RELAY_SEARCH_FAILED", error: error?.message || "Sélection du Point Relais impossible." });
+  }
+});
+
 router.get("/boutique-inventory", (req, res) => {
   const inventory = listBoutiqueInventory({ includeDisabled: true });
   const totals = summarizeBoutiqueInventory(inventory);
@@ -223,6 +292,11 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, async (req, res) => {
     }
     if (nextCarrier && !BOUTIQUE_CARRIERS.includes(nextCarrier) && nextCarrier !== clean(current.carrier, 120)) {
       return { error: "Transporteur non autorisé. Choisissez Colissimo (La Poste), La Poste, Mondial Relay ou Relais Colis.", status: 400 };
+    }
+    const requestedShippingMethod = clean(body.shippingMethod || current.shippingMethod || current.shipping, 80);
+    const wantsRelay = /mondial/i.test(nextCarrier || current.carrier || "") || /mondial/i.test(requestedShippingMethod);
+    if (nextStatus === "En préparation" && wantsRelay && !normalizePickupPoint(current.pickupPoint)) {
+      return { error: "Choisissez un Point Relais Mondial Relay avant de passer la commande en préparation.", status: 409, code: "MONDIAL_RELAY_PICKUP_REQUIRED" };
     }
     if (nextStatus === "Expédiée" && (!nextCarrier || !clean(current.tracking, 180))) {
       return { error: "Une étiquette et un numéro de suivi doivent exister avant de marquer la commande comme expédiée.", status: 400 };
