@@ -2,11 +2,12 @@
 import { Router } from "express";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logAudit } from "../lib/audit.js";
-import { getAllOrders, updateOrderStatus } from "../lib/marketplace/orders.js";
+import { getAllOrders, getOrder, updateOrderStatus } from "../lib/marketplace/orders.js";
 import { searchListings } from "../lib/marketplace/listings.js";
 import { listSellers, setSellerVerified } from "../lib/marketplace/sellers.js";
 import { generateShippingLabel } from "../lib/marketplace/shipping.js";
 import { isSumUpConfigured } from "../lib/payments/sumup.js";
+import { findSendcloudShipmentByOrderNumber, isSendcloudConfigured } from "../lib/sendcloud.js";
 import { getPayPalMarketplaceConfig } from "../lib/marketplace/paypal.js";
 import { refundPayPalOrder, paypalWebhookConfigured } from "../lib/marketplace/paypal-events.js";
 import { processPriceAlerts } from "../lib/marketplace/social.js";
@@ -38,6 +39,21 @@ const router = Router();
 router.use(requireAdmin);
 
 router.get("/orders", (req, res) => res.json({ ok: true, orders: getAllOrders() }));
+router.post("/orders/:id/sync-shipping", WRITE_ADMIN, async (req, res) => {
+  const order = getOrder(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: "Commande Marketplace introuvable." });
+  if (!isSendcloudConfigured()) return res.status(503).json({ ok: false, code: "SENDCLOUD_NOT_CONFIGURED", error: "Sendcloud non configuré côté serveur." });
+  try {
+    const remote = await findSendcloudShipmentByOrderNumber(order.id);
+    if (!remote) return res.json({ ok: true, synced: false, reason: "shipment_not_found", order });
+    if (!remote.trackingNumber) return res.json({ ok: true, synced: false, reason: "tracking_not_ready", providerStatus: remote.status || "", order });
+    const updated = updateOrderStatus(order.id, order.status, { tracking: remote.trackingNumber });
+    logAudit({ type: "marketplace", action: "sendcloud_tracking_synced", user: req.authUser?.email || "admin", detail: order.id });
+    res.json({ ok: true, synced: true, provider: "sendcloud", providerStatus: remote.status || "", trackingUrl: remote.trackingUrl || "", order: updated });
+  } catch (error) {
+    res.status(error?.status || 502).json({ ok: false, code: error?.code || "SENDCLOUD_SYNC_FAILED", error: error?.message || "Synchronisation Sendcloud impossible." });
+  }
+});
 router.put("/orders/:id/status", WRITE_ADMIN, (req, res) => {
   try {
     const status = assertManualStatus(req.body.status);

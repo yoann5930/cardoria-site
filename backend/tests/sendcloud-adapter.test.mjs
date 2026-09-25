@@ -91,6 +91,34 @@ test("malformed JSON, oversized responses and provider errors fail without expos
 test("network failures are not automatically retried", async () => {
   let calls = 0; await mocked(async () => { calls++; throw new Error("secret internal response"); }, async () => assert.rejects(sc.searchMondialRelayServicePoints({ postalCode: "59330" }), { code: "SENDCLOUD_NETWORK_ERROR" })); assert.equal(calls, 1);
 });
+test("read-only shipment lookup retrieves tracking by exact Cardoria order number", async () => {
+  await mocked(async (url, init) => {
+    assert.match(url, /\/shipments\?/);
+    assert.match(url, /order_number=CMD-123/);
+    assert.equal(init.method, "GET");
+    return json({ data: [
+      { id: "SHIP-WRONG", order_number: "CMD-12", carrier: { code: "mondial_relay" }, parcels: [{ id: 776, tracking_number: "WRONG" }] },
+      { id: "SHIP-OK", order_number: "CMD-123", carrier: { code: "mondial_relay" }, parcels: [{ id: 777, tracking_number: "MR123456", tracking_url: "https://tracking.example.test/MR123456", status: { code: "READY_TO_SEND" } }] }
+    ] });
+  }, async () => {
+    const found = await sc.findSendcloudShipmentByOrderNumber("CMD-123");
+    assert.equal(found.shipmentId, "SHIP-OK");
+    assert.equal(found.parcelId, "777");
+    assert.equal(found.trackingNumber, "MR123456");
+    assert.equal(found.trackingUrl, "https://tracking.example.test/MR123456");
+    assert.equal(found.status, "READY_TO_SEND");
+    assert.equal(found.carrierCode, "mondial_relay");
+  });
+});
+
+test("read-only shipment lookup never falls back to a partial order number", async () => {
+  await mocked(async () => json({ data: [
+    { id: "SHIP-OTHER", order_number: "CMD-1234", carrier: { code: "mondial_relay" }, parcels: [{ id: 778, tracking_number: "OTHER" }] }
+  ] }), async () => {
+    assert.equal(await sc.findSendcloudShipmentByOrderNumber("CMD-123"), null);
+  });
+});
+
 test("label download uses canonical protected endpoint and rejects HTML pretending to be PDF", async () => {
   await mocked(async (url, init) => { assert.equal(url, "https://panel.sendcloud.sc/api/v3/parcels/999/documents/label?dpi=72"); assert.equal(init.headers.Accept, "application/pdf"); return new Response("%PDF-1.4\nTEST FIXTURE ONLY", { headers: { "Content-Type": "application/pdf" } }); }, async () => assert.ok(Buffer.isBuffer(await sc.downloadSendcloudLabel(999))));
   await mocked(async () => new Response("<html>login</html>", { headers: { "Content-Type": "application/pdf" } }), async () => assert.rejects(sc.downloadSendcloudLabel(999), { code: "SENDCLOUD_LABEL_INVALID" }));

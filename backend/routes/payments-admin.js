@@ -10,6 +10,7 @@ import { withBoutiqueOrderLock } from "../lib/boutique/order-lock.js";
 import { getOrder as getMarketplaceOrder } from "../lib/marketplace/orders.js";
 import { readJson, writeJson } from "../lib/storage.js";
 import { createColissimoLabel, downloadColissimoLabel, getColissimoStatus } from "../lib/colissimo.js";
+import { findSendcloudShipmentByOrderNumber, isSendcloudConfigured } from "../lib/sendcloud.js";
 import { getBoutiqueEmailConfiguration, sendBoutiquePurchaseEmail, sendBoutiqueTrackingEmail } from "../lib/boutique/customer-emails.js";
 import {
   colissimoAdminMessage,
@@ -201,6 +202,41 @@ router.get("/boutique-orders/:id", (req, res) => {
   const order = findBoutiqueOrder(req.params.id);
   if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
   res.json({ ok: true, order });
+});
+
+router.post("/boutique-orders/:id/sync-shipping", WRITE_ADMIN, async (req, res) => {
+  const order = findBoutiqueOrder(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  if (!isSendcloudConfigured()) return res.status(503).json({ ok: false, code: "SENDCLOUD_NOT_CONFIGURED", error: "Sendcloud non configuré côté serveur." });
+
+  try {
+    const remote = await findSendcloudShipmentByOrderNumber(order.id);
+    if (!remote) return res.json({ ok: true, synced: false, reason: "shipment_not_found", order });
+    if (!remote.trackingNumber) return res.json({ ok: true, synced: false, reason: "tracking_not_ready", providerStatus: remote.status || "", order });
+
+    const updated = await withBoutiqueOrderLock(() => {
+      const orders = readJson("orders", []);
+      const index = orders.findIndex((row) => String(row.id) === String(order.id));
+      if (index < 0) return null;
+      const current = orders[index];
+      current.tracking = clean(remote.trackingNumber, 180);
+      current.trackingUrl = clean(remote.trackingUrl, 1000);
+      current.sendcloudShipmentId = clean(remote.shipmentId, 180);
+      current.sendcloudParcelId = clean(remote.parcelId, 80);
+      current.sendcloudStatus = clean(remote.status, 80);
+      if (remote.carrierCode === "mondial_relay") current.carrier = "Mondial Relay";
+      current.updatedAt = new Date().toISOString();
+      orders[index] = current;
+      writeJson("orders", orders);
+      return current;
+    });
+    if (!updated) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+
+    logAudit({ type: "shipping", action: "sendcloud_tracking_synced", user: req.authUser?.email || "admin", detail: order.id });
+    res.json({ ok: true, synced: true, provider: "sendcloud", providerStatus: remote.status || "", order: findBoutiqueOrder(order.id) || updated });
+  } catch (error) {
+    res.status(error?.status || 502).json({ ok: false, code: error?.code || "SENDCLOUD_SYNC_FAILED", error: error?.message || "Synchronisation Sendcloud impossible." });
+  }
 });
 
 router.get("/boutique-inventory", (req, res) => {

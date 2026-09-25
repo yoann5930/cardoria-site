@@ -137,5 +137,43 @@ export async function createSendcloudShipment({ orderNumber, reference, toAddres
   try { const url = new URL(tracking); if (url.protocol === "https:" && !url.username && !url.password) trackingUrl = url.href; } catch {}
   return { shipmentId: String(data.id), parcelId, trackingNumber: text(parcel.tracking_number, 160), trackingUrl, labelUrl: BASE_URL + "/parcels/" + parcelId + "/documents/label", status: text(parcel.status?.code || "READY_TO_SEND", 80), carrierCode, shippingOptionCode: option.code };
 }
+export async function findSendcloudShipmentByOrderNumber(orderNumber) {
+  const id = text(orderNumber, 160, true);
+  const params = new URLSearchParams({ order_number: id, page_size: "10" });
+  const payload = await request("/shipments?" + params);
+  const rows = Array.isArray(payload.data) ? payload.data : [];
+  const shipment = rows.find(row => {
+    const orderId = String(row?.order_number || "").trim();
+    const externalId = String(row?.external_reference_id || "").trim();
+    return orderId === id || externalId === id;
+  });
+  if (!shipment) return null;
+
+  const parcels = Array.isArray(shipment.parcels) ? shipment.parcels : [];
+  const parcel = parcels.find(item => item?.tracking_number) || parcels[0] || null;
+  if (!parcel) return {
+    shipmentId: text(shipment.id, 160),
+    parcelId: "",
+    trackingNumber: "",
+    trackingUrl: "",
+    status: text(shipment.status?.code || shipment.status, 80),
+    carrierCode: text(shipment.carrier?.code, 80)
+  };
+
+  let trackingUrl = "";
+  try {
+    const url = new URL(String(parcel.tracking_url || ""));
+    if (url.protocol === "https:" && !url.username && !url.password) trackingUrl = url.href;
+  } catch {}
+
+  return {
+    shipmentId: text(shipment.id, 160),
+    parcelId: parcel.id == null ? "" : String(positiveId(parcel.id)),
+    trackingNumber: text(parcel.tracking_number, 160),
+    trackingUrl,
+    status: text(parcel.status?.code || shipment.status?.code || shipment.status, 80),
+    carrierCode: text(shipment.carrier?.code || parcel.carrier?.code, 80)
+  };
+}
 export async function downloadSendcloudLabel(parcelId) { return request("/parcels/" + positiveId(parcelId) + "/documents/label?dpi=72", { pdf: true }); }
 export async function cancelSendcloudShipment(shipmentId) { const id = text(shipmentId, 160, true); const payload = await request("/shipments/" + encodeURIComponent(id) + "/cancel", { method: "POST" }); return { status: text(payload.data?.status, 80, true), confirmed: payload.data?.status === "cancelled" }; }
