@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS mk_orders (
   shipping_tracking TEXT DEFAULT '',
   shipping_label_url TEXT DEFAULT '',
   shipping_address TEXT DEFAULT '',
+  shipping_pickup_point_json TEXT DEFAULT '',
   invoice_number TEXT DEFAULT '',
   vat_rate DOUBLE PRECISION DEFAULT 20,
   vat_amount DOUBLE PRECISION DEFAULT 0,
