@@ -59,7 +59,7 @@ export function consumePaidCartItems(userId, items = []) {
   });
   consume(items); return getCart(userId);
 }
-export function createOrdersFromCart(userId, { buyerEmail, buyerName, buyerId, shippingCarrier, shippingCost, shippingAddress, clearAfterCreate = true }) {
+export function createOrdersFromCart(userId, { buyerEmail, buyerName, buyerId, shippingCarrier, shippingCost, shippingAddress, shippingPickupPoint = null, clearAfterCreate = true }) {
   const cart = getCart(userId);
   if (!cart.items.length) throw Object.assign(new Error("Panier vide"), { status: 400 });
   const bySeller = {};
@@ -75,7 +75,7 @@ export function createOrdersFromCart(userId, { buyerEmail, buyerName, buyerId, s
       lines.forEach((line) => validateServerSidePrice(line.listingId, line.unitPrice, line.qty));
       const shippingForOrder = Math.round((baseShip + (remainingCents > 0 ? 0.01 : 0)) * 100) / 100;
       if (remainingCents > 0) remainingCents -= 1;
-      const order = createOrder({ listingId: lines[0].listingId, items: lines.map((line) => ({ listingId: line.listingId, qty: line.qty })), buyerEmail, buyerName, buyerId: buyerId || userId, shippingCarrier, shippingCost: shippingForOrder, shippingAddress });
+      const order = createOrder({ listingId: lines[0].listingId, items: lines.map((line) => ({ listingId: line.listingId, qty: line.qty })), buyerEmail, buyerName, buyerId: buyerId || userId, shippingCarrier, shippingCost: shippingForOrder, shippingAddress, shippingPickupPoint });
       createdIds.push(order.id); orders.push(order);
     });
   } catch (error) {
