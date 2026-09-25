@@ -591,7 +591,8 @@ function sendPublicFile(req, res, next) {
   if (!PUBLIC_EXTENSIONS.has(extension)) return next();
   const absolutePath = path.resolve(PUBLIC_ROOT, relativePath);
   if (absolutePath !== PUBLIC_ROOT && !absolutePath.startsWith(PUBLIC_ROOT + path.sep)) return res.status(403).send("Forbidden");
-  if (ALWAYS_REVALIDATE_PUBLIC_PATHS.has(requestPath)) {
+  const isAdminSurface = requestPath.startsWith("/admin-") || requestPath.startsWith("/js/admin/") || requestPath.startsWith("/css/admin");
+  if (ALWAYS_REVALIDATE_PUBLIC_PATHS.has(requestPath) || isAdminSurface) {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
