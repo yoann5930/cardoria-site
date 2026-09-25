@@ -27,7 +27,7 @@ redact() {
 
 require_action() {
   case "$1" in
-    status|healthcheck|deploy|restart|backup|backup-prune|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check) return 0 ;;
+    status|healthcheck|deploy|restart|backup|backup-prune|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check|sendcloud-configure) return 0 ;;
     *) echo "FORBIDDEN action"; exit 1 ;;
   esac
 }
@@ -656,6 +656,84 @@ NODE
   )
 }
 
+cmd_sendcloud_configure() {
+  echo "=== SENDCLOUD CONFIGURE ==="
+  local public_key secret_key tmp backup rc
+  IFS= read -r public_key || true
+  IFS= read -r secret_key || true
+
+  if [ -z "$public_key" ] || [ "${#public_key}" -lt 8 ] || [ "${#public_key}" -gt 512 ] || [[ "$public_key" =~ [[:space:]] ]]; then
+    echo "sendcloud_public_key: invalid"
+    return 1
+  fi
+  if [ -z "$secret_key" ] || [ "${#secret_key}" -lt 8 ] || [ "${#secret_key}" -gt 512 ] || [[ "$secret_key" =~ [[:space:]] ]]; then
+    echo "sendcloud_secret_key: invalid"
+    return 1
+  fi
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "env_file: missing"
+    return 1
+  fi
+
+  backup="${ENV_FILE}.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+  cp "$ENV_FILE" "$backup"
+  chmod 0600 "$backup"
+
+  tmp=$(mktemp)
+  awk -F= '$1 != "SENDCLOUD_PUBLIC_KEY" && $1 != "SENDCLOUD_SECRET_KEY"' "$ENV_FILE" > "$tmp"
+  {
+    printf '%s=%s\n' 'SENDCLOUD_PUBLIC_KEY' "$public_key"
+    printf '%s=%s\n' 'SENDCLOUD_SECRET_KEY' "$secret_key"
+  } >> "$tmp"
+  install -m 0600 -o root -g root "$tmp" "$ENV_FILE"
+  rm -f "$tmp"
+  unset public_key secret_key
+
+  systemctl restart cardoria
+  if ! wait_health; then
+    echo "sendcloud_restart_health: fail"
+    cp "$backup" "$ENV_FILE"
+    systemctl restart cardoria || true
+    return 1
+  fi
+
+  set +e
+  (
+    set -a
+    . "$ENV_FILE"
+    set +a
+    cd "$APP_DIR/backend"
+    node --input-type=module <<'NODE'
+import { isSendcloudConfigured, searchMondialRelayServicePoints } from "./lib/sendcloud.js";
+if (!isSendcloudConfigured()) process.exit(2);
+const result = await searchMondialRelayServicePoints({
+  countryCode: "FR",
+  postalCode: "59330",
+  city: "Hautmont",
+  limit: 3,
+  radius: 15000
+});
+if (!Array.isArray(result.points) || result.points.length < 1) process.exit(3);
+console.log("sendcloud_credentials: configured");
+console.log("sendcloud_service_points: available");
+NODE
+  ) >/tmp/cardoria-ops-sendcloud.out 2>&1
+  rc=$?
+  set -e
+  redact < /tmp/cardoria-ops-sendcloud.out
+  rm -f /tmp/cardoria-ops-sendcloud.out
+
+  if [ "$rc" -ne 0 ]; then
+    echo "sendcloud_api_test: fail"
+    cp "$backup" "$ENV_FILE"
+    systemctl restart cardoria || true
+    return 1
+  fi
+  echo "sendcloud_config: installed"
+  echo "sendcloud_api_test: success"
+  echo "SENDCLOUD CONFIGURE OK"
+}
+
 cmd_deploy() {
   local branch=$1
   validate_branch "$branch"
@@ -719,4 +797,5 @@ case "$ACTION" in
   mail-dns-check) cmd_mail_dns_check ;;
   admin-password-reset-request) cmd_admin_password_reset_request ;;
   estimation-capture-check) cmd_estimation_capture_check ;;
+  sendcloud-configure) cmd_sendcloud_configure ;;
 esac
