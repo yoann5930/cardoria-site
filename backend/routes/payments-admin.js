@@ -10,6 +10,8 @@ import { withBoutiqueOrderLock } from "../lib/boutique/order-lock.js";
 import { getOrder as getMarketplaceOrder } from "../lib/marketplace/orders.js";
 import { readJson, writeJson } from "../lib/storage.js";
 import { downloadColissimoLabel, getColissimoStatus } from "../lib/colissimo.js";
+import { downloadSendcloudLabel } from "../lib/sendcloud.js";
+import { createBoutiqueShipmentForPreparation } from "../lib/boutique/shipment-creation.js";
 import { getBoutiqueEmailConfiguration, sendBoutiquePurchaseEmail, sendBoutiqueTrackingEmail } from "../lib/boutique/customer-emails.js";
 import {
   colissimoAdminMessage,
@@ -223,13 +225,12 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, async (req, res) => {
       return { error: "Transporteur non autorisé. Choisissez Colissimo (La Poste), La Poste, Mondial Relay ou Relais Colis.", status: 400 };
     }
     if (nextStatus === "Expédiée" && (!nextCarrier || !clean(current.tracking, 180))) {
-      return { error: "Le parcours d’expédition doit avoir enregistré un transporteur et un numéro de suivi avant de marquer la commande comme expédiée.", status: 400 };
+      return { error: "Une étiquette et un numéro de suivi doivent exister avant de marquer la commande comme expédiée.", status: 400 };
     }
 
     const now = new Date().toISOString();
     const previousStatus = current.status;
-    current.status = nextStatus;
-    current.carrier = nextCarrier;
+    current.carrier = nextCarrier || current.carrier;
     current.address = clean(body.address, 600);
     current.phone = clean(body.phone, 40) || current.phone || "";
     current.internalNote = clean(body.internalNote, 2000);
@@ -247,27 +248,62 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, async (req, res) => {
     }
     if (current.pickupPoint && !current.pickupPoint.id) current.pickupPoint = null;
 
-    if (previousStatus !== nextStatus) {
-      current.statusChangedAt = now;
-      if (nextStatus === "En préparation" && !current.preparingAt) current.preparingAt = now;
-      if (nextStatus === "Prête à expédier" && !current.readyToShipAt) current.readyToShipAt = now;
-      if (nextStatus === "Expédiée" && !current.shippedAt) current.shippedAt = now;
-      if (nextStatus === "Livrée" && !current.deliveredAt) current.deliveredAt = now;
-      if (nextStatus === "Annulée" && !current.cancelledAt) current.cancelledAt = now;
-    }
-    if (nextStatus === "Annulée" && current.paymentStatus === "pending") current.paymentStatus = "cancelled";
-    current.shipmentStatus = shipmentStatusOf(current);
+    // "En préparation" is the single shipping trigger. Persist the latest
+    // address/phone/weight first, but let the shipping orchestrator create
+    // exactly one real label and only then finalize the status.
+    const prepareShipment = nextStatus === "En préparation";
 
-    current.paymentReviewRequired = nextStatus === "Annulée" && current.paymentStatus === "paid";
+    if (!prepareShipment) {
+      current.status = nextStatus;
+      if (previousStatus !== nextStatus) {
+        current.statusChangedAt = now;
+        if (nextStatus === "Prête à expédier" && !current.readyToShipAt) current.readyToShipAt = now;
+        if (nextStatus === "Expédiée" && !current.shippedAt) current.shippedAt = now;
+        if (nextStatus === "Livrée" && !current.deliveredAt) current.deliveredAt = now;
+        if (nextStatus === "Annulée" && !current.cancelledAt) current.cancelledAt = now;
+      }
+      if (nextStatus === "Annulée" && current.paymentStatus === "pending") current.paymentStatus = "cancelled";
+      current.shipmentStatus = shipmentStatusOf(current);
+      current.paymentReviewRequired = nextStatus === "Annulée" && current.paymentStatus === "paid";
+    }
+
     orders[index] = current;
     writeJson("orders", orders);
-    return { previousStatus, current };
+    return { previousStatus, current: { ...current }, prepareShipment };
   });
+
   if (updated?.missing) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
   if (updated?.error) return res.status(updated.status || 400).json({ ok: false, error: updated.error });
-  const { previousStatus, current } = updated;
 
-  logAudit({ type: "boutique_order", action: "update", user: req.authUser?.email || "admin", detail: `${current.id} — ${previousStatus || "—"} -> ${current.status}` });
+  let current = updated.current;
+  let shipmentCreated = false;
+  if (updated.prepareShipment) {
+    try {
+      const beforeTracking = clean(current.tracking, 180);
+      current = await createBoutiqueShipmentForPreparation(current.id, { actor: req.authUser?.email || "admin" });
+      shipmentCreated = !beforeTracking && Boolean(clean(current.tracking, 180));
+      logAudit({
+        type: "shipping",
+        action: shipmentCreated ? "label_created_on_preparing" : "label_reused_on_preparing",
+        user: req.authUser?.email || "admin",
+        detail: `${current.id} — ${current.shippingLabelProvider || current.carrier || "shipping"} — ${current.tracking || "tracking_pending"}`
+      });
+    } catch (error) {
+      return res.status(error?.status || 502).json({
+        ok: false,
+        code: error?.code || "SHIPMENT_CREATION_FAILED",
+        error: error?.message || "Création de l'étiquette impossible.",
+        order: findBoutiqueOrder(req.params.id)
+      });
+    }
+  }
+
+  logAudit({
+    type: "boutique_order",
+    action: "update",
+    user: req.authUser?.email || "admin",
+    detail: `${current.id} — ${updated.previousStatus || "—"} -> ${current.status}`
+  });
 
   let emailNotification = null;
   if (current.status === "Expédiée" && current.carrier && current.tracking) {
@@ -278,7 +314,12 @@ router.put("/boutique-orders/:id", WRITE_ADMIN, async (req, res) => {
     }
   }
 
-  res.json({ ok: true, order: findBoutiqueOrder(current.id) || current, emailNotification });
+  res.json({
+    ok: true,
+    order: findBoutiqueOrder(current.id) || current,
+    shipmentCreated,
+    emailNotification
+  });
 });
 
 router.post("/boutique-orders/:id/emails/purchase", WRITE_ADMIN, async (req, res) => {
@@ -317,6 +358,37 @@ router.post("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, (req, res) => {
     code: "ADMIN_SHIPPING_READ_ONLY",
     error: "La création d’étiquette est désactivée dans l’Admin Cardoria. L’expédition doit être créée par le parcours de commande prévu."
   });
+});
+
+router.get("/boutique-orders/:id/shipping-label", WRITE_ADMIN, async (req, res) => {
+  const order = findBoutiqueOrder(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: "Commande Boutique introuvable." });
+  try {
+    let bytes;
+    let filename;
+    if (order.sendcloudParcelId) {
+      bytes = await downloadSendcloudLabel(order.sendcloudParcelId);
+      filename = "mondial-relay-" + String(order.id).replace(/[^A-Za-z0-9_-]/g, "") + ".pdf";
+    } else if (order.colissimoParcelNumber) {
+      bytes = await downloadColissimoLabel(order.colissimoParcelNumber, order.colissimoPdfUrl || "");
+      filename = "colissimo-" + String(order.colissimoParcelNumber).replace(/[^A-Za-z0-9_-]/g, "") + ".pdf";
+    } else {
+      return res.status(404).json({ ok: false, error: "Aucune étiquette existante pour cette commande." });
+    }
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'attachment; filename="' + filename + '"');
+    res.setHeader("Content-Length", String(bytes.length));
+    res.send(bytes);
+  } catch (error) {
+    const status = Number(error?.status);
+    res.status(Number.isInteger(status) && status >= 400 && status <= 599 ? status : 502).json({
+      ok: false,
+      code: error?.code || "SHIPPING_LABEL_UNAVAILABLE",
+      error: error?.message || "Téléchargement de l'étiquette impossible."
+    });
+  }
 });
 
 router.get("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, async (req, res) => {
