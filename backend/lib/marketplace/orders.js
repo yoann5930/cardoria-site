@@ -11,7 +11,7 @@ export function setOrderNotificationHook(fn) { _notifyHook = fn; }
 const STATUS_FLOW = ["pending", "paid", "preparing", "shipped", "delivered", "cancelled", "refunded"];
 const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"];
 
-export function createOrder({ listingId, items = null, buyerEmail, buyerName, buyerId, qty, shippingCarrier, shippingCost, shippingAddress }) {
+export function createOrder({ listingId, items = null, buyerEmail, buyerName, buyerId, qty, shippingCarrier, shippingCost, shippingAddress, shippingPickupPoint = null }) {
   const db = getDb();
   const id = makeMarketId("MKT");
   const now = new Date().toISOString();
@@ -35,7 +35,8 @@ export function createOrder({ listingId, items = null, buyerEmail, buyerName, bu
     const ship = Math.max(0, Number(shippingCost) || 0);
     const productsTotal = prepared.reduce((sum, line) => sum + line.lineTotal, 0);
     const total = Math.round((productsTotal + ship) * 100) / 100;
-    db.prepare(`INSERT INTO mk_orders (id,buyer_email,buyer_name,buyer_id,seller_id,listing_id,listing_title,items_json,qty,unit_price,shipping_cost,shipping_carrier,total,status,payment_status,shipping_address,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','pending',?,?,?)`).run(id, String(buyerEmail || "").toLowerCase(), buyerName || "", String(buyerId || ""), sellerId, primary.listingId, primary.title, JSON.stringify(prepared), primary.qty, primary.unitPrice, ship, shippingCarrier || "", total, shippingAddress || "", now, now);
+    const pickupJson = shippingPickupPoint ? JSON.stringify(shippingPickupPoint) : "";
+    db.prepare(`INSERT INTO mk_orders (id,buyer_email,buyer_name,buyer_id,seller_id,listing_id,listing_title,items_json,qty,unit_price,shipping_cost,shipping_carrier,total,status,payment_status,shipping_address,shipping_pickup_point_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','pending',?,?,?,?)`).run(id, String(buyerEmail || "").toLowerCase(), buyerName || "", String(buyerId || ""), sellerId, primary.listingId, primary.title, JSON.stringify(prepared), primary.qty, primary.unitPrice, ship, shippingCarrier || "", total, shippingAddress || "", pickupJson, now, now);
   });
   transaction();
   const order = getOrder(id);
@@ -102,8 +103,9 @@ export function getOrdersBySeller(sellerId) { return getDb().prepare("SELECT * F
 export function getAllOrders(limit = 200) { return getDb().prepare("SELECT * FROM mk_orders ORDER BY created_at DESC LIMIT ?").all(limit).map(toOrder); }
 export function getInvoiceHtml(orderId) { const order = getOrder(orderId); return order ? generateInvoiceHtml(order) : null; }
 function parseItems(raw) { try { return JSON.parse(raw || "[]"); } catch { return []; } }
+function parsePickupPoint(raw) { try { const value = JSON.parse(raw || "null"); return value && typeof value === "object" && !Array.isArray(value) ? value : null; } catch { return null; } }
 function toOrder(row) {
   const paymentRef = row.paypal_order_id || row.sumup_checkout_id || row.stripe_session_id || "";
-  return { id: row.id, buyerEmail: row.buyer_email, buyerName: row.buyer_name, buyerId: row.buyer_id, sellerId: row.seller_id, listingId: row.listing_id, listingTitle: row.listing_title, items: parseItems(row.items_json), qty: row.qty, unitPrice: row.unit_price, shippingCost: row.shipping_cost, shippingCarrier: row.shipping_carrier, total: row.total, status: row.status, paymentStatus: row.payment_status || (row.status === "paid" ? "paid" : "pending"), paymentMethod: row.payment_method, paymentProvider: row.payment_provider || "", platformFee: Number(row.platform_fee || 0), sellerAmountAfterPlatformFee: Number(row.seller_amount_after_platform_fee || 0), paypalOrderId: row.paypal_order_id || "", paypalCaptureId: row.paypal_capture_id || "", sumupCheckoutId: row.sumup_checkout_id || "", sumupTransactionId: row.sumup_transaction_id || "", paymentReference: paymentRef, stripeSessionId: row.stripe_session_id, shippingTracking: row.shipping_tracking, shippingLabelUrl: row.shipping_label_url, shippingAddress: row.shipping_address, createdAt: row.created_at, updatedAt: row.updated_at };
+  return { id: row.id, buyerEmail: row.buyer_email, buyerName: row.buyer_name, buyerId: row.buyer_id, sellerId: row.seller_id, listingId: row.listing_id, listingTitle: row.listing_title, items: parseItems(row.items_json), qty: row.qty, unitPrice: row.unit_price, shippingCost: row.shipping_cost, shippingCarrier: row.shipping_carrier, total: row.total, status: row.status, paymentStatus: row.payment_status || (row.status === "paid" ? "paid" : "pending"), paymentMethod: row.payment_method, paymentProvider: row.payment_provider || "", platformFee: Number(row.platform_fee || 0), sellerAmountAfterPlatformFee: Number(row.seller_amount_after_platform_fee || 0), paypalOrderId: row.paypal_order_id || "", paypalCaptureId: row.paypal_capture_id || "", sumupCheckoutId: row.sumup_checkout_id || "", sumupTransactionId: row.sumup_transaction_id || "", paymentReference: paymentRef, stripeSessionId: row.stripe_session_id, shippingTracking: row.shipping_tracking, shippingLabelUrl: row.shipping_label_url, shippingAddress: row.shipping_address, shippingPickupPoint: parsePickupPoint(row.shipping_pickup_point_json), createdAt: row.created_at, updatedAt: row.updated_at };
 }
 export { STATUS_FLOW, PAYMENT_STATUSES };
