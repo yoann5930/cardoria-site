@@ -16,7 +16,6 @@ import { searchMondialRelayServicePoints } from "../lib/mondial-relay.js";
 import { getBoutiqueEmailConfiguration, sendBoutiquePurchaseEmail, sendBoutiqueTrackingEmail } from "../lib/boutique/customer-emails.js";
 import {
   colissimoAdminMessage,
-  isMondialRelayOrder,
   normalizePickupPoint,
   parseWeightGrams,
   shipmentStatusOf
