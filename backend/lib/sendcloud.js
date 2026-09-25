@@ -68,12 +68,16 @@ function pointView(point) {
   const a = point.address;
   return { id: positiveId(point.id), carrierServicePointId: text(point.carrier_service_point_id, 120), name: text(point.name, 160, true), carrierCode: text(point.carrier?.code, 80, true), carrierName: text(point.carrier?.name, 120), shopType: text(point.general_shop_type, 60), street: text(a.street, 160), houseNumber: text(a.house_number, 30), postalCode: text(a.postal_code, 24), city: text(a.city, 120), countryCode: country(a.country_code), distance: Number(point.distance) || 0, openingTimes: point.opening_times || null, active: point.is_active !== false };
 }
-export async function searchMondialRelayServicePoints({ countryCode = "FR", postalCode = "", city = "", address = "", limit = 10, radius = 10000 } = {}) {
+export async function searchMondialRelayServicePoints({ countryCode = "FR", postalCode = "", city = "", address = "", carrierServicePointId = "", limit = 10, radius = 10000 } = {}) {
   const requestedCountry = country(countryCode), params = new URLSearchParams({ country_code: requestedCountry, carrier_code: "mondial_relay" });
-  if (text(address, 240)) params.set("address", text(address, 240));
+  const requestedCarrierPointId = text(carrierServicePointId, 120);
+  const requestedAddress = text(address, 240);
+  if (requestedCarrierPointId) params.set("carrier_service_point_id", requestedCarrierPointId);
+  if (requestedAddress) params.set("address", requestedAddress);
   else { if (postalCode) params.set("address_postal_code", text(postalCode, 24)); if (city) params.set("address_city", text(city, 120)); }
-  if (!address && !postalCode && !city) throw failure("SENDCLOUD_INPUT_INVALID", "Adresse de recherche requise.", 400);
-  params.set("limit", String(Math.max(1, Math.min(30, Number(limit) || 10)))); params.set("radius", String(Math.max(100, Math.min(50000, Number(radius) || 10000))));
+  if (!requestedCarrierPointId && !requestedAddress && !postalCode && !city) throw failure("SENDCLOUD_INPUT_INVALID", "Adresse de recherche ou identifiant Point Relais requis.", 400);
+  params.set("limit", String(Math.max(1, Math.min(30, Number(limit) || 10))));
+  if (requestedAddress || postalCode || city) params.set("radius", String(Math.max(100, Math.min(50000, Number(radius) || 10000))));
   const payload = await request("/service-points?" + params);
   if (!Array.isArray(payload.data?.results)) throw failure("SENDCLOUD_RESPONSE_INVALID", "Liste des relais absente.");
   return { points: payload.data.results.map(pointView).filter(p => p.active && p.carrierCode === "mondial_relay" && p.countryCode === requestedCountry), geocoding: payload.data.geocoding || null };
