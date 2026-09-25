@@ -23,7 +23,7 @@
 
   const WAITING_TITLE = "Live en cours — en attente de diffusion";
   const WAITING_COPY = "La salle est ouverte. La vidéo apparaîtra dès qu'une caméra diffuse.";
-  const ICE = { iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }, { urls: "stun:stun.l.google.com:19302" }], bundlePolicy: "max-bundle" };
+  const ICE = { iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }, { urls: "stun:stun.l.google.com:19302" }], bundlePolicy: "max-bundle", iceCandidatePoolSize: 4 };
 
   const paymentLabel = (session) => (session?.paymentProvider === "paypal" || session?.ownerRole === "seller" ? "PayPal" : "SumUp");
   void paymentLabel;
@@ -118,6 +118,11 @@
     layoutStage();
   };
 
+  const tuneReceiverForLowLatency = (receiver) => {
+    if (!receiver) return;
+    try { if ("jitterBufferTarget" in receiver) receiver.jitterBufferTarget = 50; } catch {}
+  };
+
   const waitForAnswers = (pending, sessionId) => new Promise((resolve, reject) => {
     let attempts = 0;
     if (answerTimer) clearInterval(answerTimer);
@@ -137,13 +142,14 @@
       } catch (error) {
         if (attempts > 30) { clearInterval(answerTimer); answerTimer = null; reject(error); }
       }
-    }, 500);
+    }, 250);
   });
 
   const attachRemote = (sessionId, sourceId, pc, index) => {
     const remoteStream = new MediaStream();
     pc.addEventListener("track", (event) => {
       if (activeSessionId !== sessionId) return;
+      tuneReceiverForLowLatency(event.receiver);
       remoteStream.addTrack(event.track);
       let target = video;
       const useMain = index === 0 || (sourceId === "primary" && !stageNode.querySelector("[data-live-source-video]"));
@@ -244,7 +250,7 @@
     setTimeout(() => location.assign("/live.html"), 1200);
   };
 
-  const startHeartbeat = (sessionId) => {
+  const startHeartbeat = (sessionId, intervalMs = 3000) => {
     heartbeatTimer = setInterval(async () => {
       if (!viewerId || activeSessionId !== sessionId) return;
       try {
@@ -263,13 +269,13 @@
           setStatus(WAITING_TITLE, false, true);
         }
       } catch {}
-    }, 5000);
+    }, intervalMs);
   };
 
   const connectP2P = async (sessionId, start) => {
     viewerId = start.viewerId;
     const sources = Array.isArray(start.sources) ? start.sources : [];
-    startHeartbeat(sessionId);
+    startHeartbeat(sessionId, 1000);
     if (!sources.length || start.waiting) {
       liveActive = false;
       setStatus(WAITING_TITLE, false, true);
@@ -296,7 +302,7 @@
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     await apiPost("/api/live/webrtc/viewer/answer", { viewerId, answer: { type: "answer", sdp: answer.sdp || "" } });
-    startHeartbeat(sessionId);
+    startHeartbeat(sessionId, 3000);
   };
 
   const connectRealtime = async (sessionId) => {
