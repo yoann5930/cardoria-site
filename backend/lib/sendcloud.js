@@ -79,14 +79,14 @@ export async function searchMondialRelayServicePoints({ countryCode = "FR", post
   return { points: payload.data.results.map(pointView).filter(p => p.active && p.carrierCode === "mondial_relay" && p.countryCode === requestedCountry), geocoding: payload.data.geocoding || null };
 }
 export async function getServicePoint(id) { const payload = await request("/service-points/" + positiveId(id)); const point = pointView(payload.data); if (point.id !== Number(id)) throw failure("SERVICE_POINT_MISMATCH", "Point Relais incohérent.", 409); return point; }
-function labelMode(value = "print") {
+function normalizeLabelMode(value = "print") {
   const mode = text(value || "print", 20).toLowerCase();
   if (!["print", "qr"].includes(mode)) throw failure("SENDCLOUD_LABEL_MODE_INVALID", "Mode d'étiquette Sendcloud invalide.", 400);
   return mode;
 }
 
 export async function resolveShippingOption({ carrierCode, toCountry = "FR", fromCountry = "FR", weightGrams, servicePointId = null, fromPostalCode = "", toPostalCode = "", labelMode = "print" } = {}) {
-  const carrier = text(carrierCode, 80, true), mr = carrier === "mondial_relay", mode = labelMode === "qr" ? "qr" : (labelMode === "print" ? "print" : (() => { throw failure("SENDCLOUD_LABEL_MODE_INVALID", "Mode d'étiquette Sendcloud invalide.", 400); })());
+  const carrier = text(carrierCode, 80, true), mr = carrier === "mondial_relay", mode = normalizeLabelMode(labelMode);
   if (mode === "qr" && !mr) throw failure("SENDCLOUD_QR_CARRIER_UNSUPPORTED", "Le mode QR est actuellement activé uniquement pour Mondial Relay.", 409);
   const wantsLabelless = mode === "qr";
   const body = { from_country_code: country(fromCountry), to_country_code: country(toCountry), parcels: [{ weight: weight(weightGrams) }], carrier_code: carrier, calculate_quotes: false, functionalities: { returns: false, labelless: wantsLabelless } };
