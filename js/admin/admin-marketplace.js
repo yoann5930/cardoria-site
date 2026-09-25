@@ -3,6 +3,7 @@
   var A = window.CardoriaAdmin;
   if (!A.protectAdmin()) return;
 
+  var syncingTracking = Object.create(null);
   function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]; }); }
   function tokenHeaders() { var t = sessionStorage.getItem("cardoria_session_token") || ""; return t ? { Authorization: "Bearer " + t } : {}; }
 
@@ -20,9 +21,11 @@
   function renderOrders(orders) {
     A.qs("#mkOrdersBody").innerHTML = (orders || []).map(function (o) {
       var canRefund = o.paymentProvider === "paypal" && ["paid", "preparing", "shipped", "delivered"].includes(o.status) && o.paymentStatus === "paid";
+      var relay = String(o.shippingCarrier || "").toLowerCase().indexOf("mondial") >= 0;
       return "<tr><td>" + esc(o.id) + "</td><td>" + esc(o.listingTitle) + "</td><td>" + esc(o.buyerEmail) + "</td><td>" + A.euro(o.total) + "</td><td>" + esc(o.status) + " / " + esc(o.paymentStatus || "—") + "</td><td>" +
-        '<input placeholder="Suivi" id="trk-' + esc(o.id) + '" value="' + esc(o.shippingTracking || "") + '" style="width:100px">' +
+        '<input placeholder="Suivi" id="trk-' + esc(o.id) + '" value="' + esc(o.shippingTracking || "") + '" style="width:120px">' +
         '<select data-order="' + esc(o.id) + '"><option value="preparing">Préparation</option><option value="shipped">Expédié</option><option value="delivered">Livré</option><option value="cancelled">Annulé</option></select>' +
+        (relay ? '<button type="button" class="btn btn-secondary" data-sync-shipping="' + esc(o.id) + '">Synchroniser Sendcloud</button>' : "") +
         '<button type="button" data-inv="' + esc(o.id) + '">Facture</button>' +
         (canRefund ? '<button type="button" class="btn btn-secondary" data-refund="' + esc(o.id) + '">Rembourser PayPal</button>' : "") + "</td></tr>";
     }).join("") || "<tr><td colspan='6'>Aucune commande</td></tr>";
@@ -34,8 +37,27 @@
         A.adminFetch("/api/admin/marketplace/orders/" + encodeURIComponent(sel.dataset.order) + "/tracking", { method: "PUT", body: JSON.stringify({ status: sel.value, tracking: tracking }) }).then(function () { location.reload(); }).catch(function (e) { alert(e.message || "Mise à jour impossible"); });
       };
     });
+    A.qs("#mkOrdersBody").querySelectorAll("button[data-sync-shipping]").forEach(function (btn) { btn.onclick = function () {
+      var id=btn.dataset.syncShipping;if(syncingTracking[id])return;syncingTracking[id]=true;btn.disabled=true;
+      A.adminFetch("/api/admin/marketplace/orders/"+encodeURIComponent(id)+"/sync-shipping",{method:"POST",body:"{}"})
+        .then(function(d){
+          if(!d.ok)throw new Error(d.error||"Synchronisation Sendcloud impossible");
+          if(!d.synced){alert(d.reason==="tracking_not_ready"?"Expédition trouvée, suivi pas encore disponible.":"Aucune expédition Sendcloud liée à cette commande.");return;}
+          var input=document.getElementById("trk-"+id);if(input)input.value=d.order?.shippingTracking||"";
+        })
+        .catch(function(e){alert(e.message||"Synchronisation Sendcloud impossible");})
+        .finally(function(){delete syncingTracking[id];btn.disabled=false;});
+    }; });
     A.qs("#mkOrdersBody").querySelectorAll("button[data-inv]").forEach(function (btn) { btn.onclick = function () { openProtected("/api/admin/marketplace/orders/" + encodeURIComponent(btn.dataset.inv) + "/invoice", "", true).catch(function (e) { alert(e.message); }); }; });
     A.qs("#mkOrdersBody").querySelectorAll("button[data-refund]").forEach(function (btn) { btn.onclick = function () { if (!confirm("Confirmer le remboursement PayPal de cette commande ?")) return; A.adminFetch("/api/admin/marketplace/orders/" + encodeURIComponent(btn.dataset.refund) + "/refund", { method: "POST", body: "{}" }).then(function () { location.reload(); }).catch(function (e) { alert(e.message || "Remboursement impossible"); }); }; });
+    var target=(orders||[]).find(function(o){return String(o.shippingCarrier||"").toLowerCase().indexOf("mondial")>=0&&!String(o.shippingTracking||"").trim()&&o.paymentStatus==="paid"&&!syncingTracking[o.id];});
+    if(target){
+      syncingTracking[target.id]=true;
+      A.adminFetch("/api/admin/marketplace/orders/"+encodeURIComponent(target.id)+"/sync-shipping",{method:"POST",body:"{}"})
+        .then(function(d){if(d&&d.synced){var input=document.getElementById("trk-"+target.id);if(input)input.value=d.order?.shippingTracking||"";}})
+        .catch(function(){})
+        .finally(function(){delete syncingTracking[target.id];});
+    }
   }
 
   function moderateListing(id, status) {
