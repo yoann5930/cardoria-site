@@ -19,12 +19,15 @@ jobs:
         env:
           SENDCLOUD_PUBLIC_KEY: ${{ secrets.SENDCLOUD_PUBLIC_KEY }}
           SENDCLOUD_SECRET_KEY: ${{ secrets.SENDCLOUD_SECRET_KEY }}
+          ISSUE_TITLE: ${{ github.event.issue.title || '' }}
         run: |
           python3 - <<'PY'
           import base64
           import json
           import os
           import pathlib
+          import re
+          import urllib.parse
           import urllib.error
           import urllib.request
 
@@ -78,6 +81,32 @@ jobs:
 
               point_id = int(points[0]["id"])
               report["servicePointResolved"] = True
+
+              issue_title = os.environ.get("ISSUE_TITLE", "")
+              relay_match = re.search(r"\brelay\s+([A-Za-z0-9_-]{1,40})\b", issue_title, re.I)
+              if relay_match:
+                  requested_relay = relay_match.group(1)
+                  exact_url = (
+                      "https://panel.sendcloud.sc/api/v3/service-points"
+                      "?country_code=FR&carrier_code=mondial_relay&limit=10&carrier_service_point_id="
+                      + urllib.parse.quote(requested_relay, safe="")
+                  )
+                  exact_status, exact_payload = api_json(exact_url)
+                  exact_points = exact_payload.get("data", {}).get("results", [])
+                  report["exactRelayRequested"] = requested_relay
+                  report["exactRelayHttpStatus"] = exact_status
+                  report["exactRelayCount"] = len(exact_points)
+                  report["exactRelayResults"] = [
+                      {
+                          "id": str(item.get("id") or ""),
+                          "carrierServicePointId": str(item.get("carrier_service_point_id") or ""),
+                          "name": str(item.get("name") or "")[:120],
+                          "postalCode": str((item.get("address") or {}).get("postal_code") or ""),
+                          "city": str((item.get("address") or {}).get("city") or "")[:120],
+                          "carrierCode": str((item.get("carrier") or {}).get("code") or ""),
+                      }
+                      for item in exact_points[:10]
+                  ]
 
               for mode, labelless in (("print", False), ("qr", True)):
                   payload = {
