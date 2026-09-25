@@ -1,0 +1,78 @@
+name: Sendcloud Cancellation Status Check
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  cancellation-status:
+    if: startsWith(github.event.issue.title, 'sendcloud-cancel-status:') && contains(github.event.issue.body, 'READ_ONLY_CARDORIA_QR_TEST_395')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      SENDCLOUD_PUBLIC_KEY: ${{ secrets.SENDCLOUD_PUBLIC_KEY }}
+      SENDCLOUD_SECRET_KEY: ${{ secrets.SENDCLOUD_SECRET_KEY }}
+    steps:
+      - name: Read shipment cancellation status only
+        run: |
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          order_number = "CARDORIA-QR-TEST-395"
+          pub = os.environ.get("SENDCLOUD_PUBLIC_KEY", "").strip()
+          sec = os.environ.get("SENDCLOUD_SECRET_KEY", "").strip()
+          if not pub or not sec:
+              raise SystemExit("SENDCLOUD_CREDENTIALS_MISSING")
+
+          auth = "Basic " + base64.b64encode((pub + ":" + sec).encode()).decode()
+          query = urllib.parse.urlencode({"order_number": order_number, "page_size": 10})
+          req = urllib.request.Request(
+              "https://panel.sendcloud.sc/api/v3/shipments?" + query,
+              headers={"Authorization": auth, "Accept": "application/json"},
+              method="GET",
+          )
+          with urllib.request.urlopen(req, timeout=20) as response:
+              payload = json.loads(response.read(2_000_000))
+
+          rows = payload.get("data") or []
+          matches = [row for row in rows if str(row.get("order_number") or "") == order_number]
+          if not matches:
+              raise SystemExit("TEST_SHIPMENT_NOT_FOUND")
+
+          parcel_statuses = []
+          tracking_suffixes = []
+          for row in matches:
+              for parcel in row.get("parcels") or []:
+                  status = parcel.get("status") or {}
+                  code = str(status.get("code") or "")
+                  parcel_statuses.append(code)
+                  tracking = str(parcel.get("tracking_number") or "")
+                  if tracking:
+                      tracking_suffixes.append(tracking[-4:])
+
+          cancelled = bool(parcel_statuses) and all("CANCEL" in s.upper() for s in parcel_statuses)
+          report = {
+              "orderNumber": order_number,
+              "shipmentMatches": len(matches),
+              "parcelStatuses": parcel_statuses,
+              "trackingSuffixes": tracking_suffixes,
+              "cancellationConfirmed": cancelled,
+              "readOnly": True,
+              "newShipmentCreated": False,
+          }
+          print(json.dumps(report, indent=2, ensure_ascii=False))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write("## Sendcloud cancellation status\n\n~~~json\n")
+              f.write(json.dumps(report, indent=2, ensure_ascii=False))
+              f.write("\n~~~\n")
+          if not cancelled:
+              raise SystemExit("CANCELLATION_NOT_FINAL_YET")
+          PY
