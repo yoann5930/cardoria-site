@@ -4,19 +4,40 @@ import { readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(path, "utf8");
 
-test("Boutique admin never contacts Sendcloud or creates a label", () => {
+test("Boutique preparation status is the only admin trigger for real label creation", () => {
   const route = read("backend/routes/payments-admin.js");
+  const flow = read("backend/lib/boutique/shipment-creation.js");
   const ui = read("js/admin/admin-orders.js");
-  assert.doesNotMatch(route, /boutique-orders\/:id\/sync-shipping/);
-  assert.doesNotMatch(route, /findSendcloudShipmentByOrderNumber/);
-  assert.doesNotMatch(route, /createColissimoLabel/);
-  assert.match(route, /ADMIN_SHIPPING_READ_ONLY/);
-  assert.doesNotMatch(ui, /Synchroniser suivi Sendcloud|autoSyncRelayTracking|data-colissimo-create/);
+
+  assert.match(route, /nextStatus === "En préparation"/);
+  assert.match(route, /createBoutiqueShipmentForPreparation\(current\.id/);
+  assert.match(route, /shipmentCreated/);
+  assert.match(flow, /createSendcloudShipment/);
+  assert.match(flow, /createColissimoLabel/);
+  assert.match(flow, /shipmentCreation = \{[\s\S]*status: "creation_pending"/);
+  assert.match(flow, /reconciliation_required/);
+  assert.doesNotMatch(ui, /data-colissimo-create|Synchroniser suivi Sendcloud|autoSyncRelayTracking/);
   assert.match(ui, /readonly placeholder="Enregistré par le parcours d’expédition"/);
-  assert.match(ui, /l’Admin ne crée pas d’étiquette et ne récupère pas le suivi/);
+  assert.match(ui, /Le passage à <strong>En préparation<\/strong> crée automatiquement l’étiquette réelle/);
 });
 
-test("Marketplace admin never contacts Sendcloud, creates a label or writes tracking", () => {
+test("Boutique label creation persists tracking and exposes only download/print afterwards", () => {
+  const route = read("backend/routes/payments-admin.js");
+  const flow = read("backend/lib/boutique/shipment-creation.js");
+  const ui = read("js/admin/admin-orders.js");
+
+  assert.match(flow, /current\.tracking = clean\(shipment\.trackingNumber/);
+  assert.match(flow, /current\.sendcloudParcelId/);
+  assert.match(flow, /current\.colissimoParcelNumber/);
+  assert.match(flow, /current\.status = "En préparation"/);
+  assert.match(route, /boutique-orders\/:id\/shipping-label/);
+  assert.match(ui, /data-shipping-label/);
+  assert.match(ui, /data-shipping-print/);
+  assert.match(ui, /\/shipping-label/);
+  assert.match(route, /ADMIN_SHIPPING_READ_ONLY/);
+});
+
+test("Marketplace admin remains read-only for carrier creation and tracking", () => {
   const route = read("backend/routes/marketplace-admin.js");
   const ui = read("js/admin/admin-marketplace.js");
   assert.doesNotMatch(route, /orders\/:id\/sync-shipping/);
