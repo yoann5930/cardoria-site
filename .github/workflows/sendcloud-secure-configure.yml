@@ -1,0 +1,24 @@
+name: Sendcloud Secure Configure
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: sendcloud-secure-configure
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'sendcloud-configure:')
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: sendcloud-configure
+      branch: main
+    secrets: inherit
