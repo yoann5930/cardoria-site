@@ -9,6 +9,7 @@ const PLAN_DEFINITIONS = Object.freeze({
     marketplaceIntroCommissionRate: 0.05,
     marketplaceIntroCapturedSalesPerMonth: 0,
     marketplaceFreeCapturedSalesPerMonth: 0,
+    marketplaceBenefitWindow: "none",
     livePriority: false,
     badge: false,
     paypalFeesPaidBySeller: true
@@ -23,6 +24,7 @@ const PLAN_DEFINITIONS = Object.freeze({
     marketplaceIntroCommissionRate: 0.03,
     marketplaceIntroCapturedSalesPerMonth: 5,
     marketplaceFreeCapturedSalesPerMonth: 0,
+    marketplaceBenefitWindow: "lifetime",
     livePriority: false,
     badge: false,
     paypalFeesPaidBySeller: true
@@ -37,6 +39,7 @@ const PLAN_DEFINITIONS = Object.freeze({
     marketplaceIntroCommissionRate: 0.03,
     marketplaceIntroCapturedSalesPerMonth: 0,
     marketplaceFreeCapturedSalesPerMonth: 15,
+    marketplaceBenefitWindow: "calendar_month",
     livePriority: true,
     badge: true,
     paypalFeesPaidBySeller: true
@@ -159,6 +162,7 @@ export function getSellerPlanEntitlements(planId) {
       introCommissionRate: plan.marketplaceIntroCommissionRate,
       introCapturedSalesPerCalendarMonth: plan.marketplaceIntroCapturedSalesPerMonth,
       freeCapturedSalesPerCalendarMonth: plan.marketplaceFreeCapturedSalesPerMonth,
+      benefitWindow: plan.marketplaceBenefitWindow,
       groupingKey: "buyer + seller + open_shipment",
       closesAtShipmentDeparture: true,
       sellerChangeCreatesSeparateParcel: true
