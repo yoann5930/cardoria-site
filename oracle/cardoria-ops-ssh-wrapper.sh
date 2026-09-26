@@ -26,6 +26,12 @@ case "$cmd" in
   logs)
     exec sudo -n /usr/local/bin/cardoria-ops logs
     ;;
+  live-test-audit)
+    exec sudo -n /usr/local/bin/cardoria-ops live-test-audit
+    ;;
+  live-test-cleanup)
+    exec sudo -n /usr/local/bin/cardoria-ops live-test-cleanup
+    ;;
   rollback)
     exec sudo -n /usr/local/bin/cardoria-ops rollback
     ;;

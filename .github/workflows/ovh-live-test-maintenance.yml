@@ -1,0 +1,78 @@
+name: OVH Live Test Maintenance
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: ovh-live-test-maintenance
+  cancel-in-progress: false
+
+jobs:
+  authorize-audit:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'ovh-live-test-audit:')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Authorized owner-only Live test audit."
+
+  audit:
+    needs: authorize-audit
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: live-test-audit
+      branch: main
+    secrets: inherit
+
+  authorize-cleanup:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'ovh-live-test-cleanup:')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Authorized owner-only Live test cleanup."
+
+  backup:
+    needs: authorize-cleanup
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: backup
+      branch: main
+    secrets: inherit
+
+  backup-check:
+    needs: backup
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: backup-check
+      branch: main
+    secrets: inherit
+
+  cleanup:
+    needs: backup-check
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: live-test-cleanup
+      branch: main
+    secrets: inherit
+
+  healthcheck:
+    needs: cleanup
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: healthcheck
+      branch: main
+    secrets: inherit
+
+  report:
+    needs: healthcheck
+    uses: ./.github/workflows/ovh-ops-run.yml
+    with:
+      action: report
+      branch: main
+    secrets: inherit

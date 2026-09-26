@@ -27,7 +27,7 @@ redact() {
 
 require_action() {
   case "$1" in
-    status|healthcheck|deploy|restart|backup|backup-prune|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check|sendcloud-configure) return 0 ;;
+    status|healthcheck|deploy|restart|backup|backup-prune|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check|sendcloud-configure|live-test-audit|live-test-cleanup) return 0 ;;
     *) echo "FORBIDDEN action"; exit 1 ;;
   esac
 }
@@ -187,6 +187,44 @@ cmd_logs() {
   echo "=== CARDORIA LOGS (max 200) ==="
   journalctl -u cardoria -n 200 --no-pager --output=short-iso | redact
 }
+
+cmd_live_test_audit() {
+  echo "=== LIVE TEST AUDIT ==="
+  (
+    set -a
+    [ -f "$ENV_FILE" ] && . "$ENV_FILE"
+    set +a
+    cd "$APP_DIR/backend"
+    node scripts/live-test-maintenance.mjs audit
+  ) | redact
+}
+
+cmd_live_test_cleanup() {
+  echo "=== LIVE TEST CLEANUP ==="
+  local rc=0
+  systemctl stop cardoria
+  set +e
+  (
+    set -a
+    [ -f "$ENV_FILE" ] && . "$ENV_FILE"
+    set +a
+    cd "$APP_DIR/backend"
+    node scripts/live-test-maintenance.mjs cleanup
+  ) | redact
+  rc=${PIPESTATUS[0]}
+  set -e
+  systemctl start cardoria
+  if ! wait_health; then
+    echo "Cardoria failed to recover after Live test cleanup"
+    return 1
+  fi
+  if [ "$rc" -ne 0 ]; then
+    echo "Live test cleanup script failed"
+    return "$rc"
+  fi
+  echo "LIVE TEST CLEANUP OK"
+}
+
 
 cmd_backup() {
   echo "=== BACKUP ==="
@@ -796,6 +834,8 @@ case "$ACTION" in
   healthcheck) cmd_healthcheck ;;
   nginx-test) cmd_nginx_test ;;
   logs) cmd_logs ;;
+  live-test-audit) cmd_live_test_audit ;;
+  live-test-cleanup) cmd_live_test_cleanup ;;
   backup) cmd_backup ;;
   backup-prune) cmd_backup_prune ;;
   restart) cmd_restart ;;
