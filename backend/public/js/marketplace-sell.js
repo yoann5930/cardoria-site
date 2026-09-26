@@ -9,8 +9,11 @@
   function commissionText() { return config && config.commissionConfigured ? "Commission Cardoria standard : " + Number(config.commissionPercent).toLocaleString("fr-FR") + " % par transaction." : "La commission Cardoria doit être configurée avant toute transaction."; }
   function offerText(seller) {
     if (seller && seller.marketplaceOfferLinked) {
-      var free = Number(seller.marketplaceOffer && seller.marketplaceOffer.freeCapturedSalesPerCalendarMonth || 0);
-      return "Offre Market liée au pack " + String(seller.marketplaceOfferPlanId || seller.planId || "").toUpperCase() + (free > 0 ? " · " + free + " ventes capturées sans commission par mois." : " · avantages Market appliqués automatiquement.");
+      var plan = String(seller.marketplaceOfferPlanId || seller.planId || "").toLowerCase();
+      if (plan === "starter") return "Pack Starter lié · aucun avantage Market · commission standard 5 %.";
+      if (plan === "pro") return "Pack Pro lié · 5 premières ventes à 3 %, puis 5 %.";
+      if (plan === "elite") return "Pack Elite lié · 15 premières ventes du mois sans commission, puis 3 %.";
+      return "Offre Market liée au pack professionnel.";
     }
     return seller && seller.sellerType === "professional" ? "Professionnel sans pack Market lié : conditions Market standard." : "Particulier : conditions Market standard, aucun pack professionnel requis.";
   }
