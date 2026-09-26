@@ -218,7 +218,6 @@ function platformFeeFor(order, additionalCapturedSales = 0) {
 function ensureSellerCanReceive(order) {
   const seller = getSeller(order.sellerId);
   if (!seller) throw new Error(`Vendeur ${order.sellerId} introuvable.`);
-  if (!seller.subscriptionActive) throw new Error(`Le vendeur ${seller.displayName || seller.id} doit avoir un abonnement Cardoria actif avant la vente.`);
   if (!seller.paypalMerchantId || !seller.paypalPaymentsReceivable || seller.paypalOnboardingStatus !== "ready") {
     throw new Error(`Le vendeur ${seller.displayName || seller.id} doit terminer l'activation PayPal avant la vente.`);
   }
