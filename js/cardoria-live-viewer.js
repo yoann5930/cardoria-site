@@ -521,6 +521,17 @@
         await markLiveEnded("Ce Live n'est plus disponible. Retour à l'annuaire.");
         return;
       }
+      if (error?.status === 429) {
+        if (hasLiveVideo(video) || [...stageNode.querySelectorAll("[data-live-source-video]")].some(hasLiveVideo)) {
+          liveActive = true;
+          setStatus("LIVE EN COURS", true, false);
+        } else {
+          liveActive = false;
+          setStatus("Connexion au live…", false, true);
+          scheduleReconnect(sessionId, 1200);
+        }
+        return;
+      }
       liveActive = false;
       setStatus(error instanceof Error ? error.message : "Impossible de rejoindre ce live.", false, false);
     } finally {

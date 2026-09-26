@@ -41,17 +41,21 @@ export const apiRateLimit = rateLimit({
 
 export const liveRealtimeRateLimit = rateLimit({
   windowMs: 60_000,
-  max: Number(process.env.RATE_LIMIT_LIVE_REALTIME || 180),
+  max: Number(process.env.RATE_LIMIT_LIVE_REALTIME || 360),
   keyFn: (req) => {
     const body = req.body && typeof req.body === "object" ? req.body : {};
+    const operation = String(req.path || req.originalUrl || "unknown")
+      .replace(/\?.*$/, "")
+      .replace(/[^a-z0-9/_-]+/gi, "")
+      .slice(0, 96) || "unknown";
     const viewerId = String(body.viewerId || "").trim();
-    if (viewerId) return `live-viewer:${viewerId}`;
+    if (viewerId) return `live-viewer:${viewerId}:${operation}`;
     const publisherKey = String(body.publisherKey || "").trim();
     if (publisherKey) {
       const sourceId = String(body.sourceId || "primary").trim() || "primary";
-      return `live-publisher:${publisherKey}:${sourceId}`;
+      return `live-publisher:${publisherKey}:${sourceId}:${operation}`;
     }
-    return `live-realtime-ip:${req.ip || req.headers["x-forwarded-for"] || "unknown"}`;
+    return `live-realtime-ip:${req.ip || req.headers["x-forwarded-for"] || "unknown"}:${operation}`;
   }
 });
 
