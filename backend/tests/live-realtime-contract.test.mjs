@@ -88,7 +88,8 @@ test("frontend Live supports two cameras, Cloudflare mid mapping and real reconn
   assert.match(registry,/LIVE_PUBLISHER_ADMIN_ROLES/);
 });
 
-test("Cloudflare viewers submit ICE-complete localDescription answers",()=>{assert.match(viewer,/await waitIce\(pc\)/);assert.match(viewer,/const local = pc\.localDescription \|\| answer/);assert.match(viewer,/sdp:\s*local\.sdp/);});\ntest("paired phone publishers unregister through their capability key",()=>{
+test("Cloudflare viewers submit ICE-complete localDescription answers",()=>{assert.match(viewer,/await waitIce\(pc\)/);assert.match(viewer,/const local = pc\.localDescription \|\| answer/);assert.match(viewer,/sdp:\s*local\.sdp/);});
+test("paired phone publishers unregister through their capability key",()=>{
   assert.match(route,/publisherKey/);
   assert.match(route,/stopRealtimePublisher\(\{liveId,sourceId:body\.sourceId,publisherKey\}\)/);
   assert.match(publisher,/stopServerRegistration/);
