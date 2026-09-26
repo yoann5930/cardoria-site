@@ -25,7 +25,7 @@ test("Live API mounts the complete WebRTC transport",()=>{
 
 test("WebRTC uses a dedicated logical-session rate limiter instead of the shared API bucket",()=>{
   assert.match(rateLimit,/liveRealtimeRateLimit/);
-  assert.match(rateLimit,/RATE_LIMIT_LIVE_REALTIME\\s*\\|\\|\\s*360/);
+  assert.match(rateLimit,/RATE_LIMIT_LIVE_REALTIME\s*\|\|\s*360/);
   assert.match(rateLimit,/live-viewer:/);
   assert.match(rateLimit,/operation/);
   assert.match(rateLimit,/req\.path/);
