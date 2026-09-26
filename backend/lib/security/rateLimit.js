@@ -39,6 +39,22 @@ export const apiRateLimit = rateLimit({
   keyFn: (req) => req.ip || req.headers["x-forwarded-for"] || "unknown"
 });
 
+export const liveRealtimeRateLimit = rateLimit({
+  windowMs: 60_000,
+  max: Number(process.env.RATE_LIMIT_LIVE_REALTIME || 180),
+  keyFn: (req) => {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const viewerId = String(body.viewerId || "").trim();
+    if (viewerId) return `live-viewer:${viewerId}`;
+    const publisherKey = String(body.publisherKey || "").trim();
+    if (publisherKey) {
+      const sourceId = String(body.sourceId || "primary").trim() || "primary";
+      return `live-publisher:${publisherKey}:${sourceId}`;
+    }
+    return `live-realtime-ip:${req.ip || req.headers["x-forwarded-for"] || "unknown"}`;
+  }
+});
+
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60_000,
   max: Number(process.env.RATE_LIMIT_AUTH || 10),
