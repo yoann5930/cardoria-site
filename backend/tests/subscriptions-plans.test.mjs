@@ -40,7 +40,8 @@ test("Pro pays shipping for first 6 distinct Live buyers only", () => {
   assert.equal(isLiveBuyerShippingPaidByCardoria("pro", "b6", firstFive), true);
   assert.equal(isLiveBuyerShippingPaidByCardoria("pro", "b7", [...firstFive, "b6"]), false);
   assert.equal(isLiveBuyerShippingPaidByCardoria("pro", "b2", [...firstFive, "b6"]), true);
-  assert.equal(marketplaceCommissionRate("pro", 1), 0.05);
+  for (let n = 1; n <= 5; n += 1) assert.equal(marketplaceCommissionRate("pro", n), 0.03);
+  assert.equal(marketplaceCommissionRate("pro", 6), 0.05);
 });
 
 test("Elite pays first 15 distinct Live buyers and gets 15 Marketplace fee-free captures", () => {
@@ -48,7 +49,8 @@ test("Elite pays first 15 distinct Live buyers and gets 15 Marketplace fee-free 
   assert.equal(isLiveBuyerShippingPaidByCardoria("elite", "b15", first14), true);
   assert.equal(isLiveBuyerShippingPaidByCardoria("elite", "b16", [...first14, "b15"]), false);
   for (let n = 1; n <= 15; n += 1) assert.equal(marketplaceCommissionRate("elite", n), 0);
-  assert.equal(marketplaceCommissionRate("elite", 16), 0.05);
+  assert.equal(marketplaceCommissionRate("elite", 16), 0.03);
+  assert.equal(marketplaceCommissionRate("elite", 100), 0.03);
   assert.equal(getSellerPlan("elite").livePriority, true);
   assert.equal(getSellerPlan("elite").badge, true);
 });
@@ -82,10 +84,29 @@ test("durable seller plan state and capture ledger are idempotent", async () => 
   try {
     const mod = await import(`../lib/subscriptions/seller-plans.js?test=${Date.now()}`);
     assert.equal(mod.getSellerPlanState("seller-a").active, false);
+    const standardQuote = mod.getMarketplaceFeeQuote({ sellerId: "seller-a", grossAmountEur: 100, capturedAt: "2026-09-01T00:00:00Z" });
+    assert.equal(standardQuote.offerLinked, false);
+    assert.equal(standardQuote.subscriptionActive, false);
+    assert.equal(standardQuote.termsSource, "market_standard");
+    assert.equal(standardQuote.planId, "");
+    assert.equal(standardQuote.commissionPercent, 5);
+    assert.equal(standardQuote.platformFee, 5);
     const active = mod.setSellerPlan("seller-a", "elite", { status: "active", startedAt: "2026-09-01T00:00:00Z" });
     assert.equal(active.planId, "elite");
     assert.equal(active.active, true);
     assert.equal(active.entitlements.marketplace.freeCapturedSalesPerCalendarMonth, 15);
+    const individualWithStoredPack = mod.getMarketplaceFeeQuote({ sellerId: "seller-a", grossAmountEur: 100, capturedAt: "2026-09-01T00:00:00Z", useSellerPlanBenefits: false });
+    assert.equal(individualWithStoredPack.offerLinked, false);
+    assert.equal(individualWithStoredPack.planId, "");
+    assert.equal(individualWithStoredPack.commissionPercent, 5);
+    assert.equal(individualWithStoredPack.platformFee, 5);
+    const eliteQuote = mod.getMarketplaceFeeQuote({ sellerId: "seller-a", grossAmountEur: 100, capturedAt: "2026-09-01T00:00:00Z" });
+    assert.equal(eliteQuote.offerLinked, true);
+    assert.equal(eliteQuote.subscriptionActive, true);
+    assert.equal(eliteQuote.termsSource, "seller_plan");
+    assert.equal(eliteQuote.planId, "elite");
+    assert.equal(eliteQuote.commissionPercent, 0);
+    assert.equal(eliteQuote.platformFee, 0);
 
     const first = mod.recordMarketplaceCapture({ orderId: "order-1", sellerId: "seller-a", capturedAt: "2026-09-03T12:00:00Z" });
     const duplicate = mod.recordMarketplaceCapture({ orderId: "order-1", sellerId: "seller-a", capturedAt: "2026-09-03T12:01:00Z" });

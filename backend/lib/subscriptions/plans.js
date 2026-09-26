@@ -6,6 +6,8 @@ const PLAN_DEFINITIONS = Object.freeze({
     liveCommissionRate: 0.06,
     liveCardoriaShippingBuyerLimit: 0,
     marketplaceCommissionRate: 0.05,
+    marketplaceIntroCommissionRate: 0.05,
+    marketplaceIntroCapturedSalesPerMonth: 0,
     marketplaceFreeCapturedSalesPerMonth: 0,
     livePriority: false,
     badge: false,
@@ -18,6 +20,8 @@ const PLAN_DEFINITIONS = Object.freeze({
     liveCommissionRate: 0.045,
     liveCardoriaShippingBuyerLimit: 6,
     marketplaceCommissionRate: 0.05,
+    marketplaceIntroCommissionRate: 0.03,
+    marketplaceIntroCapturedSalesPerMonth: 5,
     marketplaceFreeCapturedSalesPerMonth: 0,
     livePriority: false,
     badge: false,
@@ -29,7 +33,9 @@ const PLAN_DEFINITIONS = Object.freeze({
     monthlyPriceEur: 129.9,
     liveCommissionRate: 0.03,
     liveCardoriaShippingBuyerLimit: 15,
-    marketplaceCommissionRate: 0.05,
+    marketplaceCommissionRate: 0.03,
+    marketplaceIntroCommissionRate: 0.03,
+    marketplaceIntroCapturedSalesPerMonth: 0,
     marketplaceFreeCapturedSalesPerMonth: 15,
     livePriority: true,
     badge: true,
@@ -39,6 +45,7 @@ const PLAN_DEFINITIONS = Object.freeze({
 
 export const SELLER_PLANS = PLAN_DEFINITIONS;
 export const DEFAULT_SELLER_PLAN = "starter";
+export const STANDARD_MARKETPLACE_COMMISSION_RATE = 0.05;
 
 function normalizePlanId(planId) {
   return String(planId || "").trim().toLowerCase();
@@ -106,6 +113,7 @@ export function marketplaceCommissionRate(planId, capturedSaleNumberInCalendarMo
   const saleNumber = Number(capturedSaleNumberInCalendarMonth);
   if (!Number.isInteger(saleNumber) || saleNumber < 1) throw Object.assign(new Error("Numero de vente Marketplace capturee invalide."), { code: 400, status: 400 });
   if (plan.marketplaceFreeCapturedSalesPerMonth > 0 && saleNumber <= plan.marketplaceFreeCapturedSalesPerMonth) return 0;
+  if (plan.marketplaceIntroCapturedSalesPerMonth > 0 && saleNumber <= plan.marketplaceIntroCapturedSalesPerMonth) return plan.marketplaceIntroCommissionRate;
   return plan.marketplaceCommissionRate;
 }
 
@@ -148,6 +156,8 @@ export function getSellerPlanEntitlements(planId) {
     },
     marketplace: {
       commissionRate: plan.marketplaceCommissionRate,
+      introCommissionRate: plan.marketplaceIntroCommissionRate,
+      introCapturedSalesPerCalendarMonth: plan.marketplaceIntroCapturedSalesPerMonth,
       freeCapturedSalesPerCalendarMonth: plan.marketplaceFreeCapturedSalesPerMonth,
       groupingKey: "buyer + seller + open_shipment",
       closesAtShipmentDeparture: true,

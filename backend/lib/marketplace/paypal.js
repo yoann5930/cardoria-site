@@ -203,7 +203,7 @@ export async function syncSellerPayPalStatus(sellerId, paypalMerchantId = "") {
   });
 }
 
-function platformFeeFor(order, additionalCapturedSales = 0) {
+function platformFeeFor(order, seller, additionalCapturedSales = 0) {
   const includeShipping = String(process.env.MARKETPLACE_COMMISSION_INCLUDE_SHIPPING || "false").toLowerCase() === "true";
   return getMarketplaceFeeQuote({
     sellerId: order.sellerId,
@@ -211,14 +211,14 @@ function platformFeeFor(order, additionalCapturedSales = 0) {
     shippingCostEur: Number(order.shippingCost || 0),
     includeShipping,
     capturedAt: new Date(),
-    additionalCapturedSales
+    additionalCapturedSales,
+    useSellerPlanBenefits: seller?.sellerType === "professional"
   });
 }
 
 function ensureSellerCanReceive(order) {
   const seller = getSeller(order.sellerId);
   if (!seller) throw new Error(`Vendeur ${order.sellerId} introuvable.`);
-  if (!seller.subscriptionActive) throw new Error(`Le vendeur ${seller.displayName || seller.id} doit avoir un abonnement Cardoria actif avant la vente.`);
   if (!seller.paypalMerchantId || !seller.paypalPaymentsReceivable || seller.paypalOnboardingStatus !== "ready") {
     throw new Error(`Le vendeur ${seller.displayName || seller.id} doit terminer l'activation PayPal avant la vente.`);
   }
@@ -237,7 +237,7 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
     const seller = ensureSellerCanReceive(order);
     sellers.push(seller);
     const offset = sameCheckoutOffsets.get(order.sellerId) || 0;
-    const quote = platformFeeFor(order, offset);
+    const quote = platformFeeFor(order, seller, offset);
     sameCheckoutOffsets.set(order.sellerId, offset + 1);
     const fee = quote.platformFee;
     fees.push({

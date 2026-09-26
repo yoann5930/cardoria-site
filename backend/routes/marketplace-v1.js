@@ -14,7 +14,7 @@ import { getMarketplaceStats } from "../lib/marketplace/v1/index.js";
 import { isMarketplaceDemoMode } from "../lib/marketplace/demo-mode.js";
 import { generateMarketplaceSitemapXml } from "../lib/seo/marketplace-sitemap.js";
 import { listSellerPlans } from "../lib/subscriptions/plans.js";
-import { assertActiveSellerPlan, getSellerPlanState } from "../lib/subscriptions/seller-plans.js";
+import { getSellerPlanState } from "../lib/subscriptions/seller-plans.js";
 import paypalMarketplaceRoutes from "./marketplace-paypal.js";
 
 const router = Router();
@@ -101,7 +101,6 @@ router.get("/v1/listings/:id", (req, res) => {
 router.post("/v1/listings", (req, res) => {
   try {
     const seller = assertSellerSession(req, req.body?.sellerId || "");
-    if (req.body?.status !== "draft") assertActiveSellerPlan(seller.id);
     if (req.body?.status !== "draft" && !seller.paypalReady && !isMarketplaceDemoMode()) throw new MarketplaceAuthError("Activez d'abord votre compte vendeur PayPal avant de publier une annonce.", 409);
     const listing = createListingV1({ ...(req.body || {}), sellerId: seller.id, sellerEmail: seller.email });
     res.status(201).json({ ok: true, listing, seller: publicSeller(seller), demoMode: isMarketplaceDemoMode() });
@@ -110,7 +109,6 @@ router.post("/v1/listings", (req, res) => {
 router.put("/v1/listings/:id", (req, res) => {
   try {
     const { seller } = assertSellerOwnsListing(req, req.params.id);
-    if (req.body?.status === "active") assertActiveSellerPlan(seller.id);
     if (req.body?.status === "active" && !seller.paypalReady && !isMarketplaceDemoMode()) throw new MarketplaceAuthError("Activez d'abord votre compte vendeur PayPal avant de publier l'annonce.", 409);
     const listing = updateListingV1(req.params.id, seller.id, req.body || {});
     res.json({ ok: true, listing, demoMode: isMarketplaceDemoMode() });
