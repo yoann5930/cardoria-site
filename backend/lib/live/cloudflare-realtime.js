@@ -50,12 +50,15 @@ export async function createCloudflareSession() {
 }
 
 export async function publishCloudflareTracks({ cloudflareSessionId, offer, tracks }) {
+  const requested = (tracks || []).map((track) => ({
+    location: "local",
+    mid: track.mid,
+    trackName: track.trackName,
+    kind: track.kind
+  }));
   const result = await cloudflareRequest(`/sessions/${encodeURIComponent(cloudflareSessionId)}/tracks/new`, {
     method: "POST",
-    body: JSON.stringify({
-      sessionDescription: offer,
-      tracks: tracks.map((track) => ({ location: "local", mid: track.mid, trackName: track.trackName, kind: track.kind }))
-    })
+    body: JSON.stringify({ sessionDescription: offer, tracks: requested })
   });
   if (!result.sessionDescription) {
     const error = new Error("Cloudflare did not return a WebRTC answer.");
@@ -64,8 +67,20 @@ export async function publishCloudflareTracks({ cloudflareSessionId, offer, trac
     throw error;
   }
   const publishedTracks = (result.tracks || [])
-    .filter((track) => !track.errorCode && track.trackName)
-    .map((track) => ({ location: "remote", sessionId: cloudflareSessionId, trackName: track.trackName }));
+    .filter((track) => !track.errorCode)
+    .map((track, index) => {
+      const original = (tracks || []).find((item) => item.trackName === track.trackName)
+        || (tracks || []).find((item) => item.mid === track.mid)
+        || (tracks || [])[index]
+        || {};
+      return {
+        location: "remote",
+        sessionId: cloudflareSessionId,
+        trackName: track.trackName || original.trackName || "",
+        kind: original.kind || track.kind || ""
+      };
+    })
+    .filter((track) => track.trackName);
   if (!publishedTracks.length) {
     const error = new Error("Cloudflare did not publish any media tracks.");
     error.status = 502;
@@ -77,9 +92,14 @@ export async function publishCloudflareTracks({ cloudflareSessionId, offer, trac
 
 export async function subscribeCloudflareTracks({ tracks }) {
   const cloudflareSessionId = await createCloudflareSession();
+  const requested = (tracks || []).map((track) => ({
+    location: "remote",
+    sessionId: track.sessionId,
+    trackName: track.trackName
+  }));
   const result = await cloudflareRequest(`/sessions/${encodeURIComponent(cloudflareSessionId)}/tracks/new`, {
     method: "POST",
-    body: JSON.stringify({ tracks })
+    body: JSON.stringify({ tracks: requested })
   });
   if (!result.sessionDescription) {
     const error = new Error("Cloudflare did not return a viewer WebRTC offer.");
@@ -87,10 +107,31 @@ export async function subscribeCloudflareTracks({ tracks }) {
     error.code = "CLOUDFLARE_REALTIME_INVALID_RESPONSE";
     throw error;
   }
+  const subscriptions = (result.tracks || [])
+    .filter((track) => !track.errorCode)
+    .map((track, index) => {
+      const original = (tracks || []).find((item) => item.trackName === track.trackName && (!track.sessionId || item.sessionId === track.sessionId))
+        || (tracks || [])[index]
+        || {};
+      return {
+        mid: String(track.mid ?? ""),
+        sourceId: String(original.sourceId || ""),
+        trackName: String(track.trackName || original.trackName || ""),
+        kind: String(original.kind || track.kind || "")
+      };
+    })
+    .filter((item) => item.mid);
+  if (!subscriptions.length) {
+    const error = new Error("Cloudflare did not subscribe any media tracks.");
+    error.status = 502;
+    error.code = "CLOUDFLARE_REALTIME_NO_TRACKS";
+    throw error;
+  }
   return {
     cloudflareSessionId,
     offer: result.sessionDescription,
-    mids: (result.tracks || []).filter((track) => !track.errorCode).map((track) => track.mid)
+    mids: subscriptions.map((item) => item.mid),
+    subscriptions
   };
 }
 
