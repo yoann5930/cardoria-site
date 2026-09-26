@@ -48,7 +48,7 @@ check_live_public_chat() {
   local headers
   check /live.html 200
   grep -Fq 'cardoria-live-actions.js?v=20260923-live-split' "$OUT"
-  grep -Fq 'cardoria-live-viewer.js?v=20260926-live-delivery' "$OUT"
+  grep -Fq 'cardoria-live-viewer.js?v=20260926-live-ice-answer' "$OUT"
 
   headers=$(curl -sSI "$BASE/live.html" | tr -d '\r')
   printf '%s\n' "$headers" | grep -qi '^Cache-Control: .*no-store'
@@ -61,6 +61,9 @@ check_live_public_chat() {
   fi
 
   check /js/cardoria-live-viewer.js 200
+  grep -Fq 'await waitIce(pc)' "$OUT"
+  grep -Fq 'const local = pc.localDescription || answer' "$OUT"
+  grep -Fq 'sdp: local.sdp || ""' "$OUT"
   headers=$(curl -sSI "$BASE/js/cardoria-live-viewer.js" | tr -d '\r')
   printf '%s\n' "$headers" | grep -qi '^Cache-Control: .*no-store'
   if grep -Fq 'Aucune caméra disponible.' "$OUT"; then
