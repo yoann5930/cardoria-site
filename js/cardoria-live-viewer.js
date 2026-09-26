@@ -145,13 +145,15 @@
       reconnectTimer = null;
       if (activeSessionId !== sessionId || reconnectBusy) return;
       reconnectBusy = true;
+      let failed = false;
       try {
         await connectRealtime(sessionId);
       } catch {
-        if (activeSessionId === sessionId) scheduleReconnect(sessionId, 1500);
+        failed = true;
       } finally {
         reconnectBusy = false;
       }
+      if (failed && activeSessionId === sessionId) scheduleReconnect(sessionId, 1500);
     }, delay);
   };
 
@@ -240,6 +242,8 @@
 
   const attachCloudflareRemote = (sessionId, pc, subscriptions = []) => {
     const byMid = new Map((subscriptions || []).map((item) => [String(item.mid ?? ""), item]));
+    const sourceOrder = [...new Set((subscriptions || []).map((item) => String(item.sourceId || "")).filter(Boolean))];
+    const mainSourceId = sourceOrder.includes("primary") ? "primary" : (sourceOrder[0] || "primary");
     const streams = new Map();
     pc.addEventListener("track", (event) => {
       if (activeSessionId !== sessionId) return;
@@ -253,7 +257,7 @@
         streams.set(sourceId, remoteStream);
       }
       remoteStream.addTrack(event.track);
-      const target = sourceTarget(sourceId);
+      const target = sourceId === mainSourceId ? video : sourceTarget(sourceId);
       target.srcObject = remoteStream;
       target.muted = target === video ? video.muted : true;
       connectedSourceIds.add(sourceId);
@@ -327,6 +331,8 @@
     peerConnection = null;
     peerConnections.forEach((pc) => pc.close());
     peerConnections.clear();
+    video.pause();
+    video.srcObject = null;
     removeSecondaryVideos();
     connectedSourceIds = new Set();
     currentTransport = "";
