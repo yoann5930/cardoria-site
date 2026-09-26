@@ -11,6 +11,8 @@ const viewerRuntime=fs.readFileSync(new URL("../public/js/cardoria-live-viewer.j
 const publisher=fs.readFileSync(new URL("../../js/cardoria-live-publisher.js",import.meta.url),"utf8");
 const publisherRuntime=fs.readFileSync(new URL("../public/js/cardoria-live-publisher.js",import.meta.url),"utf8");
 const livePage=fs.readFileSync(new URL("../../live.html",import.meta.url),"utf8");
+const server=fs.readFileSync(new URL("../server.js",import.meta.url),"utf8");
+const rateLimit=fs.readFileSync(new URL("../lib/security/rateLimit.js",import.meta.url),"utf8");
 
 test("Live API mounts the complete WebRTC transport",()=>{
   assert.match(live,/router\.use\("\/webrtc",\s*liveRealtimeRoutes\)/);
@@ -19,6 +21,15 @@ test("Live API mounts the complete WebRTC transport",()=>{
     "publisher/offers","publisher/answer","viewer/start","viewer/offer",
     "viewer/answers","viewer/answer","viewer/heartbeat","viewer/stop","status/:liveId"
   ]) assert.ok(route.includes(path),path);
+});
+
+test("WebRTC uses a dedicated logical-session rate limiter instead of the shared API bucket",()=>{
+  assert.match(rateLimit,/liveRealtimeRateLimit/);
+  assert.match(rateLimit,/RATE_LIMIT_LIVE_REALTIME\s*\|\|\s*180/);
+  assert.match(rateLimit,/live-viewer:/);
+  assert.match(rateLimit,/live-publisher:/);
+  assert.match(server,/startsWith\("\/webrtc"\).*liveRealtimeRateLimit/s);
+  assert.match(server,/return apiRateLimit\(req, res, next\)/);
 });
 
 test("Cloudflare credentials stay server side and subscriptions retain source mapping",()=>{
