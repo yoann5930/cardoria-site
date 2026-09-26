@@ -24,6 +24,12 @@ test("PayPal applies seller pack benefits only to professional sellers", () => {
   assert.match(paypal, /useSellerPlanBenefits: seller\?\.sellerType === "professional"/);
 });
 
+test("Pack messaging reflects exact Starter, Pro and Elite Market terms", () => {
+  assert.match(ui, /Pack Starter lié · aucun avantage Market · commission standard 5 %/);
+  assert.match(ui, /Pack Pro lié · 5 premières ventes à 3 %, puis 5 %/);
+  assert.match(ui, /Pack Elite lié · 15 premières ventes du mois sans commission, puis 3 %/);
+});
+
 test("Marketplace UI distinguishes standard sellers from linked pack benefits", () => {
   assert.match(ui, /Particulier : conditions Market standard, aucun pack professionnel requis/);
   assert.match(ui, /Professionnel sans pack Market lié : conditions Market standard/);
