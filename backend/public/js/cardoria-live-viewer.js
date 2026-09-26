@@ -38,6 +38,10 @@
   let answerTimer = null;
   let webrtcConfigured = null;
   let connectingSessionId = null;
+  let reconnectTimer = null;
+  let reconnectBusy = false;
+  let currentTransport = "";
+  let connectedSourceIds = new Set();
   let directorySelection = { id: "", kind: "live" };
   let selectedCategory = String(search.get("category") || "").trim().toLowerCase();
   const CATEGORY_LABELS = { pokemon: "Pokémon", yugioh: "Yu-Gi-Oh!", onepiece: "One Piece", lorcana: "Lorcana", magic: "Magic", other: "Autre" };
@@ -95,14 +99,62 @@
     stageNode.removeAttribute("data-sources");
   };
 
+  const hasLiveVideo = (node) => {
+    try { return Boolean(node?.srcObject?.getVideoTracks?.().some((track) => track.readyState !== "ended")); }
+    catch { return false; }
+  };
+
   const layoutStage = () => {
-    const count = peerConnections.size;
+    const mediaCount = (hasLiveVideo(video) ? 1 : 0)
+      + [...stageNode.querySelectorAll("[data-live-source-video]")].filter(hasLiveVideo).length;
+    const count = Math.max(mediaCount, peerConnections.size);
     stageNode.dataset.sources = String(count);
     stageNode.querySelectorAll("[data-live-source-video]").forEach((node) => {
       node.style.cssText = count >= 2
         ? "width:100%;height:100%;object-fit:contain;background:#000;position:static;inset:auto;border:0;border-radius:0"
         : "position:absolute;right:12px;bottom:12px;width:34%;height:34%;object-fit:cover;border:2px solid #e6c25a;border-radius:12px;background:#000;z-index:3";
     });
+  };
+
+  const sourceTarget = (sourceId) => {
+    if (sourceId === "primary") return video;
+    let target = stageNode.querySelector(`[data-live-source-video="${sourceId}"]`);
+    if (!target) {
+      target = document.createElement("video");
+      target.dataset.liveSourceVideo = sourceId;
+      target.autoplay = true;
+      target.playsInline = true;
+      target.muted = true;
+      stageNode.style.position = "relative";
+      stageNode.appendChild(target);
+    }
+    return target;
+  };
+
+  const sameSources = (a, b) => a.size === b.size && [...a].every((value) => b.has(value));
+
+  const clearReconnect = () => {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  };
+
+  const scheduleReconnect = (sessionId, delay = 750) => {
+    if (!sessionId || activeSessionId !== sessionId || reconnectTimer || reconnectBusy) return;
+    setStatus("Connexion au live interrompue. Reconnexion…", false, true);
+    reconnectTimer = setTimeout(async () => {
+      reconnectTimer = null;
+      if (activeSessionId !== sessionId || reconnectBusy) return;
+      reconnectBusy = true;
+      let failed = false;
+      try {
+        await connectRealtime(sessionId);
+      } catch {
+        failed = true;
+      } finally {
+        reconnectBusy = false;
+      }
+      if (failed && activeSessionId === sessionId) scheduleReconnect(sessionId, 1500);
+    }, delay);
   };
 
   const detachSource = (sourceId) => {
@@ -147,36 +199,93 @@
 
   const attachRemote = (sessionId, sourceId, pc, index) => {
     const remoteStream = new MediaStream();
+    let disconnectTimer = null;
     pc.addEventListener("track", (event) => {
       if (activeSessionId !== sessionId) return;
       tuneReceiverForLowLatency(event.receiver);
       remoteStream.addTrack(event.track);
-      let target = video;
-      const useMain = index === 0 || (sourceId === "primary" && !stageNode.querySelector("[data-live-source-video]"));
-      if (!useMain || (sourceId !== "primary" && index > 0)) {
-        target = stageNode.querySelector(`[data-live-source-video="${sourceId}"]`);
-        if (!target) {
-          target = document.createElement("video");
-          target.dataset.liveSourceVideo = sourceId;
-          target.autoplay = true;
-          target.playsInline = true;
-          target.muted = true;
-          stageNode.style.position = "relative";
-          stageNode.appendChild(target);
-        }
-      }
+      const target = sourceId === "primary" || index === 0 ? video : sourceTarget(sourceId);
       target.srcObject = remoteStream;
       target.muted = target === video ? video.muted : true;
       soundButton?.removeAttribute("hidden");
       liveActive = true;
+      connectedSourceIds.add(sourceId);
       setStatus("LIVE EN COURS", true, false);
       layoutStage();
       target.play().catch(() => {});
     });
     pc.addEventListener("connectionstatechange", () => {
       if (activeSessionId !== sessionId) return;
-      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-        setStatus("Connexion au live interrompue. Reconnexion…", false, !peerConnections.size);
+      if (pc.connectionState === "connected") {
+        if (disconnectTimer) clearTimeout(disconnectTimer);
+        disconnectTimer = null;
+        return;
+      }
+      if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+        detachSource(sourceId);
+        connectedSourceIds.delete(sourceId);
+        scheduleReconnect(sessionId, 500);
+        return;
+      }
+      if (pc.connectionState === "disconnected" && !disconnectTimer) {
+        disconnectTimer = setTimeout(() => {
+          disconnectTimer = null;
+          if (pc.connectionState === "disconnected" && activeSessionId === sessionId) {
+            detachSource(sourceId);
+            connectedSourceIds.delete(sourceId);
+            scheduleReconnect(sessionId, 500);
+          }
+        }, 1500);
+      }
+    });
+  };
+
+  const attachCloudflareRemote = (sessionId, pc, subscriptions = []) => {
+    const byMid = new Map((subscriptions || []).map((item) => [String(item.mid ?? ""), item]));
+    const sourceOrder = [...new Set((subscriptions || []).map((item) => String(item.sourceId || "")).filter(Boolean))];
+    const mainSourceId = sourceOrder.includes("primary") ? "primary" : (sourceOrder[0] || "primary");
+    const streams = new Map();
+    pc.addEventListener("track", (event) => {
+      if (activeSessionId !== sessionId) return;
+      tuneReceiverForLowLatency(event.receiver);
+      const mid = String(event.transceiver?.mid ?? "");
+      const meta = byMid.get(mid) || {};
+      const sourceId = String(meta.sourceId || "primary");
+      let remoteStream = streams.get(sourceId);
+      if (!remoteStream) {
+        remoteStream = new MediaStream();
+        streams.set(sourceId, remoteStream);
+      }
+      remoteStream.addTrack(event.track);
+      const target = sourceId === mainSourceId ? video : sourceTarget(sourceId);
+      target.srcObject = remoteStream;
+      target.muted = target === video ? video.muted : true;
+      connectedSourceIds.add(sourceId);
+      soundButton?.removeAttribute("hidden");
+      liveActive = true;
+      setStatus("LIVE EN COURS", true, false);
+      layoutStage();
+      target.play().catch(() => {});
+    });
+    let disconnectTimer = null;
+    pc.addEventListener("connectionstatechange", () => {
+      if (activeSessionId !== sessionId) return;
+      if (pc.connectionState === "connected") {
+        if (disconnectTimer) clearTimeout(disconnectTimer);
+        disconnectTimer = null;
+        return;
+      }
+      if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+        scheduleReconnect(sessionId, 500);
+        return;
+      }
+      if (pc.connectionState === "disconnected" && !disconnectTimer) {
+        disconnectTimer = setTimeout(() => {
+          disconnectTimer = null;
+          if (pc.connectionState === "disconnected" && activeSessionId === sessionId) {
+            scheduleReconnect(sessionId, 500);
+          }
+        }, 1500);
       }
     });
   };
@@ -217,11 +326,16 @@
 
   const stopWebRtcViewer = async (notifyServer = true) => {
     stopHeartbeat();
+    clearReconnect();
     peerConnection?.close();
     peerConnection = null;
     peerConnections.forEach((pc) => pc.close());
     peerConnections.clear();
+    video.pause();
+    video.srcObject = null;
     removeSecondaryVideos();
+    connectedSourceIds = new Set();
+    currentTransport = "";
     const currentViewerId = viewerId;
     viewerId = null;
     if (notifyServer && currentViewerId) {
@@ -260,9 +374,18 @@
           await markLiveEnded("Ce Live est terminé. Retour à l'annuaire.");
           return;
         }
-        const sources = Array.isArray(heartbeat?.sources) ? heartbeat.sources : [];
+        const sources = Array.isArray(heartbeat?.sources) ? heartbeat.sources.map(String) : [];
         if (heartbeat?.provider === "cardoria-p2p") {
-          try { await syncViewerSources(sessionId, sources); } catch {}
+          try {
+            await syncViewerSources(sessionId, sources);
+            connectedSourceIds = new Set(sources);
+          } catch {}
+        } else if (heartbeat?.provider === "cloudflare-realtime") {
+          const nextSources = new Set(sources);
+          if ((currentTransport === "cloudflare-waiting" && nextSources.size)
+            || (currentTransport === "cloudflare" && !sameSources(nextSources, connectedSourceIds))) {
+            scheduleReconnect(sessionId, 250);
+          }
         }
         if (!sources.length) {
           liveActive = false;
@@ -274,7 +397,9 @@
 
   const connectP2P = async (sessionId, start) => {
     viewerId = start.viewerId;
+    currentTransport = "p2p";
     const sources = Array.isArray(start.sources) ? start.sources : [];
+    connectedSourceIds = new Set(sources.map((source) => String(source.sourceId || "")));
     startHeartbeat(sessionId, 1000);
     if (!sources.length || start.waiting) {
       liveActive = false;
@@ -295,21 +420,34 @@
   const connectCloudflare = async (sessionId, start) => {
     if (!start?.viewerId || !start?.offer?.sdp) throw new Error("Signal WebRTC incomplet.");
     viewerId = start.viewerId;
+    currentTransport = "cloudflare";
+    const subscriptions = Array.isArray(start.subscriptions) ? start.subscriptions : [];
+    connectedSourceIds = new Set(subscriptions.map((item) => String(item.sourceId || "")).filter(Boolean));
     const pc = new RTCPeerConnection(ICE);
     peerConnection = pc;
-    attachRemote(sessionId, "primary", pc, 0);
+    attachCloudflareRemote(sessionId, pc, subscriptions);
     await pc.setRemoteDescription(start.offer);
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     await apiPost("/api/live/webrtc/viewer/answer", { viewerId, answer: { type: "answer", sdp: answer.sdp || "" } });
-    startHeartbeat(sessionId, 3000);
+    startHeartbeat(sessionId, 1000);
   };
 
   const connectRealtime = async (sessionId) => {
     await stopWebRtcViewer(true);
+    if (activeSessionId !== sessionId) return;
     setStatus("Connexion WebRTC au live…", false, true);
     const start = await apiPost("/api/live/webrtc/viewer/start", { liveSessionId: sessionId });
     setViewers(start.viewerCount || 0);
+    if (start.waiting && start.provider === "cloudflare-realtime") {
+      viewerId = start.viewerId;
+      currentTransport = "cloudflare-waiting";
+      connectedSourceIds = new Set();
+      liveActive = false;
+      setStatus(WAITING_TITLE, false, true);
+      startHeartbeat(sessionId, 1000);
+      return;
+    }
     if (start.mode === "p2p" || start.provider === "cardoria-p2p") await connectP2P(sessionId, start);
     else await connectCloudflare(sessionId, start);
   };
@@ -559,6 +697,7 @@
   window.addEventListener("beforeunload", () => {
     if (directoryTimer) clearInterval(directoryTimer);
     stopHeartbeat();
+    clearReconnect();
     if (viewerId) {
       try { navigator.sendBeacon?.("/api/live/webrtc/viewer/stop", new Blob([JSON.stringify({ viewerId })], { type: "application/json" })); } catch {}
     }
