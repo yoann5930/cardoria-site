@@ -39,6 +39,7 @@ const PLAN_DEFINITIONS = Object.freeze({
 
 export const SELLER_PLANS = PLAN_DEFINITIONS;
 export const DEFAULT_SELLER_PLAN = "starter";
+export const STANDARD_MARKETPLACE_COMMISSION_RATE = 0.05;
 
 function normalizePlanId(planId) {
   return String(planId || "").trim().toLowerCase();
