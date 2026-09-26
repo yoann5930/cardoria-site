@@ -84,7 +84,7 @@ export function countCapturedMarketplaceSalesForMonth(sellerId, value = new Date
   return captures().filter((item) => item && item.sellerId === id && capturedSaleCalendarMonthKey(item.capturedAt) === month).length;
 }
 
-export function getMarketplaceFeeQuote({ sellerId, grossAmountEur, shippingCostEur = 0, includeShipping = false, capturedAt = new Date(), additionalCapturedSales = 0 }) {
+export function getMarketplaceFeeQuote({ sellerId, grossAmountEur, shippingCostEur = 0, includeShipping = false, capturedAt = new Date(), additionalCapturedSales = 0, useSellerPlanBenefits = true }) {
   const state = getSellerPlanState(sellerId);
   const alreadyCaptured = countCapturedMarketplaceSalesForMonth(sellerId, capturedAt);
   const offset = Number(additionalCapturedSales);
@@ -94,13 +94,14 @@ export function getMarketplaceFeeQuote({ sellerId, grossAmountEur, shippingCostE
   const shipping = Number(shippingCostEur || 0);
   if (!Number.isFinite(total) || total < 0 || !Number.isFinite(shipping) || shipping < 0) throw Object.assign(new Error("Montant Marketplace invalide."), { code: 400, status: 400 });
   const commissionBase = includeShipping ? total : Math.max(0, total - shipping);
-  const rate = state.active ? marketplaceCommissionRate(state.planId, capturedSaleNumber) : STANDARD_MARKETPLACE_COMMISSION_RATE;
+  const offerLinked = state.active && useSellerPlanBenefits === true;
+  const rate = offerLinked ? marketplaceCommissionRate(state.planId, capturedSaleNumber) : STANDARD_MARKETPLACE_COMMISSION_RATE;
   return {
     sellerId: state.sellerId,
-    planId: state.active ? state.planId : "",
+    planId: offerLinked ? state.planId : "",
     subscriptionActive: state.active,
-    offerLinked: state.active,
-    termsSource: state.active ? "seller_plan" : "market_standard",
+    offerLinked,
+    termsSource: offerLinked ? "seller_plan" : "market_standard",
     calendarMonth: capturedSaleCalendarMonthKey(capturedAt),
     alreadyCaptured,
     capturedSaleNumber,
