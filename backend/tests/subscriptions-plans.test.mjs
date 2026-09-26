@@ -91,13 +91,15 @@ test("durable seller plan state and capture ledger are idempotent", async () => 
     assert.equal(standardQuote.planId, "");
     assert.equal(standardQuote.commissionPercent, 5);
     assert.equal(standardQuote.platformFee, 5);
-    const individualWithStoredPack = mod.getMarketplaceFeeQuote({ sellerId: "seller-a", grossAmountEur: 100, capturedAt: "2026-09-01T00:00:00Z", useSellerPlanBenefits: false });
-    assert.equal(individualWithStoredPack.offerLinked, false);
-    assert.equal(individualWithStoredPack.commissionPercent, 5);
     const active = mod.setSellerPlan("seller-a", "elite", { status: "active", startedAt: "2026-09-01T00:00:00Z" });
     assert.equal(active.planId, "elite");
     assert.equal(active.active, true);
     assert.equal(active.entitlements.marketplace.freeCapturedSalesPerCalendarMonth, 15);
+    const individualWithStoredPack = mod.getMarketplaceFeeQuote({ sellerId: "seller-a", grossAmountEur: 100, capturedAt: "2026-09-01T00:00:00Z", useSellerPlanBenefits: false });
+    assert.equal(individualWithStoredPack.offerLinked, false);
+    assert.equal(individualWithStoredPack.planId, "");
+    assert.equal(individualWithStoredPack.commissionPercent, 5);
+    assert.equal(individualWithStoredPack.platformFee, 5);
     const eliteQuote = mod.getMarketplaceFeeQuote({ sellerId: "seller-a", grossAmountEur: 100, capturedAt: "2026-09-01T00:00:00Z" });
     assert.equal(eliteQuote.offerLinked, true);
     assert.equal(eliteQuote.subscriptionActive, true);
