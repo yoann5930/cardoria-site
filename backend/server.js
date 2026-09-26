@@ -59,7 +59,7 @@ import ultimateAdminRoutes from "./routes/ultimate-admin.js";
 import bigdataAnalyticsRoutes from "./routes/bigdata-analytics.js";
 import bigdataAdminRoutes from "./routes/bigdata-admin.js";
 import { applySecurityMiddleware, errorHandler } from "./lib/security/index.js";
-import { apiRateLimit, aiRateLimit } from "./lib/security/rateLimit.js";
+import { apiRateLimit, aiRateLimit, liveRealtimeRateLimit } from "./lib/security/rateLimit.js";
 import { migrateAuth } from "./lib/auth/migrate.js";
 import { scheduleAutoBackup } from "./lib/backup/full.js";
 import { cleanupLegacyLiveTestsOnce } from "./lib/live/cleanup-tests.js";
@@ -776,7 +776,10 @@ app.use("/api/bigdata", apiRateLimit, bigdataAnalyticsRoutes);
 app.use("/api/engine", apiRateLimit, engineRoutes);
 app.use("/api/marketplace", marketplacePersistenceMiddleware, apiRateLimit, marketplaceV1Routes);
 app.use("/api/payments", marketplacePersistenceMiddleware, apiRateLimit, paymentsRoutes);
-app.use("/api/live", marketplacePersistenceMiddleware, apiRateLimit, liveRoutes);
+app.use("/api/live", marketplacePersistenceMiddleware, (req, res, next) => {
+  if (String(req.path || "").startsWith("/webrtc")) return liveRealtimeRateLimit(req, res, next);
+  return apiRateLimit(req, res, next);
+}, liveRoutes);
 app.use("/api/seo", apiRateLimit, seoRoutes);
 
 app.use("/api/estimation-carte", (req, res, next) => {
