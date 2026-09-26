@@ -19,6 +19,10 @@ test("Active seller packs are linked to Marketplace benefits", () => {
   assert.match(sellers, /marketplaceOffer: subscription\.active \? subscription\.entitlements\?\.marketplace/);
 });
 
+test("PayPal applies seller pack benefits only to professional sellers", () => {
+  assert.match(paypal, /useSellerPlanBenefits: seller\?\.sellerType === "professional"/);
+});
+
 test("Marketplace UI distinguishes standard sellers from linked pack benefits", () => {
   assert.match(ui, /Particulier : conditions Market standard, aucun pack professionnel requis/);
   assert.match(ui, /Professionnel sans pack Market lié : conditions Market standard/);
