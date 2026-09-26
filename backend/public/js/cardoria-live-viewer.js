@@ -429,7 +429,9 @@
     await pc.setRemoteDescription(start.offer);
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-    await apiPost("/api/live/webrtc/viewer/answer", { viewerId, answer: { type: "answer", sdp: answer.sdp || "" } });
+    await waitIce(pc);
+    const local = pc.localDescription || answer;
+    await apiPost("/api/live/webrtc/viewer/answer", { viewerId, answer: { type: "answer", sdp: local.sdp || "" } });
     startHeartbeat(sessionId, 1000);
   };
 
