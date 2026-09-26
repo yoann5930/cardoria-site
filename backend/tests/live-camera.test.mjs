@@ -161,7 +161,7 @@ test("frontend admin/publisher : pas d’alerte Permission denied, pas de facing
   const publisher = readRepo("js/cardoria-live-publisher.js");
   assert.match(publisher, /CardoriaLiveMedia/);
   assert.match(publisher, /\/api\/live\/webrtc\/publisher\/start/);
-  assert.match(publisher, /cameraId:usedCameraId/);
+  assert.match(publisher, /cameraId:\s*usedCameraId/);
   assert.doesNotMatch(publisher, /facingMode:\s*opts\.facingMode\s*\|\|\s*["']environment["']/);
   const media = readRepo("js/cardoria-live-media.js");
   assert.match(media, /NotAllowedError/);
