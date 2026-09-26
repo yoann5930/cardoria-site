@@ -9,6 +9,7 @@
   }
   var publishers = {};
   var paymentTimer = null;
+  var transportTimer = null;
   var lastCameraAction = null;
   var selectedLiveId = "";
   var listedSessions = [];
@@ -63,6 +64,30 @@
     if (paymentTimer) clearInterval(paymentTimer);
     refreshPayments();
     paymentTimer = setInterval(refreshPayments,3000);
+  }
+  function refreshTransportStatus() {
+    var node = A.qs("#liveStudioTransport");
+    if (!node) return Promise.resolve();
+    return fetch(A.BACKEND + "/api/live/webrtc/status", { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("status"); return r.json(); })
+      .then(function (d) {
+        var cloudflare = d && (d.provider === "cloudflare-realtime" || d.cloudflareConfigured === true);
+        var ready = Number(d && d.publishers || 0);
+        var connecting = Number(d && d.connectingPublishers || 0);
+        node.textContent = cloudflare
+          ? "Diffusion vidéo : Cloudflare Realtime · caméras actives " + ready + (connecting ? " · connexion " + connecting : "")
+          : "Diffusion vidéo : P2P de secours · caméras actives " + ready + (connecting ? " · connexion " + connecting : "");
+        node.dataset.transport = cloudflare ? "cloudflare" : "p2p";
+      })
+      .catch(function () {
+        node.textContent = "Diffusion vidéo : état indisponible";
+        node.dataset.transport = "unknown";
+      });
+  }
+  function startTransportPolling() {
+    if (transportTimer) clearInterval(transportTimer);
+    refreshTransportStatus();
+    transportTimer = setInterval(refreshTransportStatus, 5000);
   }
   function media() {
     return window.CardoriaLiveMedia || {};
@@ -378,7 +403,7 @@
   A.renderShell("live", "Studio Live Cardoria", "Tableau de bord liveur : un écran pour vendre. Les réglages techniques restent repliés.",
     [
       '<div class="live-studio">',
-      '<header class="live-studio-controls"><div><h2>Contrôles Live</h2><p id="liveSelectedSession">Live sélectionné : créez un Live puis préparez vos lots.</p><p id="liveStudioStatus">Aucune salle</p></div>',
+      '<header class="live-studio-controls"><div><h2>Contrôles Live</h2><p id="liveSelectedSession">Live sélectionné : créez un Live puis préparez vos lots.</p><p id="liveStudioStatus">Aucune salle</p><p id="liveStudioTransport">Diffusion vidéo : vérification…</p></div>',
       '<div class="live-studio-control-btns">',
       '<button class="live-studio-btn live-studio-btn--go" type="button" id="liveGoStart" data-start="">Démarrer le Live</button>',
       '<button class="live-studio-btn live-studio-btn--pause" type="button" id="liveGoPause">Pause</button>',
@@ -463,5 +488,10 @@
   detectDevices();
   load();
   startPaymentPolling();
-  window.addEventListener("beforeunload", function () { if (paymentTimer) clearInterval(paymentTimer); stopCameras(); });
+  startTransportPolling();
+  window.addEventListener("beforeunload", function () {
+    if (paymentTimer) clearInterval(paymentTimer);
+    if (transportTimer) clearInterval(transportTimer);
+    stopCameras();
+  });
 })();

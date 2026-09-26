@@ -111,9 +111,9 @@ jobs:
           ! grep -q 'cardoria-live-admin-studio.js' live.html
           ! grep -q 'cardoria_admin_handoff_token' live.html
           grep -q 'Live en cours — en attente de diffusion' live.html
-          grep -q 'waiting:!sources.length' backend/lib/live/realtime-sessions.js
+          grep -Eq 'waiting:[[:space:]]*!sources.length' backend/lib/live/realtime-sessions.js
           grep -q 'cardoria-live-actions.js?v=20260923-live-split' live.html
-          grep -q 'cardoria-live-viewer.js?v=20260923-live-split' live.html
+          grep -q 'cardoria-live-viewer.js?v=20260926-live-delivery' live.html
           grep -q 'client-auth.js?v=20260923-live-public-journey' client-login.html
           grep -q 'ALWAYS_REVALIDATE_PUBLIC_PATHS' backend/server.js
       - name: Start clean backend
