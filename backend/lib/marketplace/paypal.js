@@ -203,7 +203,7 @@ export async function syncSellerPayPalStatus(sellerId, paypalMerchantId = "") {
   });
 }
 
-function platformFeeFor(order, additionalCapturedSales = 0) {
+function platformFeeFor(order, seller, additionalCapturedSales = 0) {
   const includeShipping = String(process.env.MARKETPLACE_COMMISSION_INCLUDE_SHIPPING || "false").toLowerCase() === "true";
   return getMarketplaceFeeQuote({
     sellerId: order.sellerId,
@@ -211,7 +211,8 @@ function platformFeeFor(order, additionalCapturedSales = 0) {
     shippingCostEur: Number(order.shippingCost || 0),
     includeShipping,
     capturedAt: new Date(),
-    additionalCapturedSales
+    additionalCapturedSales,
+    useSellerPlanBenefits: seller?.sellerType === "professional"
   });
 }
 
@@ -236,7 +237,7 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
     const seller = ensureSellerCanReceive(order);
     sellers.push(seller);
     const offset = sameCheckoutOffsets.get(order.sellerId) || 0;
-    const quote = platformFeeFor(order, offset);
+    const quote = platformFeeFor(order, seller, offset);
     sameCheckoutOffsets.set(order.sellerId, offset + 1);
     const fee = quote.platformFee;
     fees.push({
