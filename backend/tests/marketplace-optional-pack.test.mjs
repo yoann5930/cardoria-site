@@ -1,3 +1,4 @@
+// Scope rule: Pro first 5 sales are lifetime; Elite allowance resets monthly.
 // Business rule: Market open to individuals; professional packs only add linked benefits.
 import test from "node:test";
 import assert from "node:assert/strict";
