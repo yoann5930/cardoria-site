@@ -25,8 +25,10 @@ test("Live API mounts the complete WebRTC transport",()=>{
 
 test("WebRTC uses a dedicated logical-session rate limiter instead of the shared API bucket",()=>{
   assert.match(rateLimit,/liveRealtimeRateLimit/);
-  assert.match(rateLimit,/RATE_LIMIT_LIVE_REALTIME\s*\|\|\s*180/);
+  assert.match(rateLimit,/RATE_LIMIT_LIVE_REALTIME\\s*\\|\\|\\s*360/);
   assert.match(rateLimit,/live-viewer:/);
+  assert.match(rateLimit,/operation/);
+  assert.match(rateLimit,/req\.path/);
   assert.match(rateLimit,/live-publisher:/);
   assert.match(server,/startsWith\("\/webrtc"\).*liveRealtimeRateLimit/s);
   assert.match(server,/return apiRateLimit\(req, res, next\)/);
@@ -97,6 +99,13 @@ test("frontend Live supports two cameras, Cloudflare mid mapping and real reconn
   assert.match(registry,/sources:\s*status\.sources/);
   assert.match(registry,/super_admin/);
   assert.match(registry,/LIVE_PUBLISHER_ADMIN_ROLES/);
+});
+
+test("Viewer hides transient realtime 429 errors and reconnects",()=>{
+  assert.match(viewer,/error\?\.status === 429/);
+  assert.match(viewer,/setStatus\("Connexion au live…"/);
+  assert.match(viewer,/scheduleReconnect\(sessionId, 1200\)/);
+  assert.match(viewer,/setStatus\("LIVE EN COURS", true, false\)/);
 });
 
 test("Cloudflare viewers submit ICE-complete localDescription answers",()=>{assert.match(viewer,/await waitIce\(pc\)/);assert.match(viewer,/const local = pc\.localDescription \|\| answer/);assert.match(viewer,/sdp:\s*local\.sdp/);});
