@@ -82,10 +82,24 @@ test("durable seller plan state and capture ledger are idempotent", async () => 
   try {
     const mod = await import(`../lib/subscriptions/seller-plans.js?test=${Date.now()}`);
     assert.equal(mod.getSellerPlanState("seller-a").active, false);
+    const standardQuote = mod.getMarketplaceFeeQuote({ sellerId: "seller-a", grossAmountEur: 100, capturedAt: "2026-09-01T00:00:00Z" });
+    assert.equal(standardQuote.offerLinked, false);
+    assert.equal(standardQuote.subscriptionActive, false);
+    assert.equal(standardQuote.termsSource, "market_standard");
+    assert.equal(standardQuote.planId, "");
+    assert.equal(standardQuote.commissionPercent, 5);
+    assert.equal(standardQuote.platformFee, 5);
     const active = mod.setSellerPlan("seller-a", "elite", { status: "active", startedAt: "2026-09-01T00:00:00Z" });
     assert.equal(active.planId, "elite");
     assert.equal(active.active, true);
     assert.equal(active.entitlements.marketplace.freeCapturedSalesPerCalendarMonth, 15);
+    const eliteQuote = mod.getMarketplaceFeeQuote({ sellerId: "seller-a", grossAmountEur: 100, capturedAt: "2026-09-01T00:00:00Z" });
+    assert.equal(eliteQuote.offerLinked, true);
+    assert.equal(eliteQuote.subscriptionActive, true);
+    assert.equal(eliteQuote.termsSource, "seller_plan");
+    assert.equal(eliteQuote.planId, "elite");
+    assert.equal(eliteQuote.commissionPercent, 0);
+    assert.equal(eliteQuote.platformFee, 0);
 
     const first = mod.recordMarketplaceCapture({ orderId: "order-1", sellerId: "seller-a", capturedAt: "2026-09-03T12:00:00Z" });
     const duplicate = mod.recordMarketplaceCapture({ orderId: "order-1", sellerId: "seller-a", capturedAt: "2026-09-03T12:01:00Z" });
