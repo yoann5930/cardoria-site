@@ -1,5 +1,5 @@
 import { readJson, writeJson } from "../storage.js";
-import { DEFAULT_SELLER_PLAN, assertSellerPlan, capturedSaleCalendarMonthKey, getSellerPlanEntitlements, marketplaceCommissionAmount, marketplaceCommissionRate } from "./plans.js";
+import { DEFAULT_SELLER_PLAN, STANDARD_MARKETPLACE_COMMISSION_RATE, assertSellerPlan, capturedSaleCalendarMonthKey, getSellerPlanEntitlements, marketplaceCommissionAmount, marketplaceCommissionRate } from "./plans.js";
 
 const PLAN_STORE = "seller-subscriptions";
 const CAPTURE_STORE = "marketplace-captured-sales";
@@ -85,7 +85,7 @@ export function countCapturedMarketplaceSalesForMonth(sellerId, value = new Date
 }
 
 export function getMarketplaceFeeQuote({ sellerId, grossAmountEur, shippingCostEur = 0, includeShipping = false, capturedAt = new Date(), additionalCapturedSales = 0 }) {
-  const state = assertActiveSellerPlan(sellerId);
+  const state = getSellerPlanState(sellerId);
   const alreadyCaptured = countCapturedMarketplaceSalesForMonth(sellerId, capturedAt);
   const offset = Number(additionalCapturedSales);
   if (!Number.isInteger(offset) || offset < 0) throw Object.assign(new Error("Offset de ventes capturees invalide."), { code: 400, status: 400 });
@@ -94,16 +94,19 @@ export function getMarketplaceFeeQuote({ sellerId, grossAmountEur, shippingCostE
   const shipping = Number(shippingCostEur || 0);
   if (!Number.isFinite(total) || total < 0 || !Number.isFinite(shipping) || shipping < 0) throw Object.assign(new Error("Montant Marketplace invalide."), { code: 400, status: 400 });
   const commissionBase = includeShipping ? total : Math.max(0, total - shipping);
-  const rate = marketplaceCommissionRate(state.planId, capturedSaleNumber);
+  const rate = state.active ? marketplaceCommissionRate(state.planId, capturedSaleNumber) : STANDARD_MARKETPLACE_COMMISSION_RATE;
   return {
     sellerId: state.sellerId,
-    planId: state.planId,
+    planId: state.active ? state.planId : "",
+    subscriptionActive: state.active,
+    offerLinked: state.active,
+    termsSource: state.active ? "seller_plan" : "market_standard",
     calendarMonth: capturedSaleCalendarMonthKey(capturedAt),
     alreadyCaptured,
     capturedSaleNumber,
     commissionRate: rate,
     commissionPercent: rate * 100,
     commissionBase: Math.round(commissionBase * 100) / 100,
-    platformFee: marketplaceCommissionAmount(state.planId, capturedSaleNumber, commissionBase)
+    platformFee: Math.round(commissionBase * rate * 100) / 100
   };
 }
