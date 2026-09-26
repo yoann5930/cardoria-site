@@ -84,9 +84,17 @@ export function countCapturedMarketplaceSalesForMonth(sellerId, value = new Date
   return captures().filter((item) => item && item.sellerId === id && capturedSaleCalendarMonthKey(item.capturedAt) === month).length;
 }
 
+export function countCapturedMarketplaceSales(sellerId) {
+  const id = sellerIdValue(sellerId);
+  return captures().filter((item) => item && item.sellerId === id).length;
+}
+
 export function getMarketplaceFeeQuote({ sellerId, grossAmountEur, shippingCostEur = 0, includeShipping = false, capturedAt = new Date(), additionalCapturedSales = 0, useSellerPlanBenefits = true }) {
   const state = getSellerPlanState(sellerId);
-  const alreadyCaptured = countCapturedMarketplaceSalesForMonth(sellerId, capturedAt);
+  const offerPlan = state.active && useSellerPlanBenefits === true ? assertSellerPlan(state.planId) : null;
+  const alreadyCaptured = offerPlan?.marketplaceBenefitWindow === "lifetime"
+    ? countCapturedMarketplaceSales(sellerId)
+    : countCapturedMarketplaceSalesForMonth(sellerId, capturedAt);
   const offset = Number(additionalCapturedSales);
   if (!Number.isInteger(offset) || offset < 0) throw Object.assign(new Error("Offset de ventes capturees invalide."), { code: 400, status: 400 });
   const capturedSaleNumber = alreadyCaptured + offset + 1;
@@ -102,6 +110,7 @@ export function getMarketplaceFeeQuote({ sellerId, grossAmountEur, shippingCostE
     subscriptionActive: state.active,
     offerLinked,
     termsSource: offerLinked ? "seller_plan" : "market_standard",
+    benefitWindow: offerLinked ? offerPlan.marketplaceBenefitWindow : "none",
     calendarMonth: capturedSaleCalendarMonthKey(capturedAt),
     alreadyCaptured,
     capturedSaleNumber,

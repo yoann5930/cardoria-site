@@ -71,6 +71,40 @@ test("captured-sale counter ignores uncaptured, isolates sellers and resets by m
   assert.equal(nextCapturedSaleNumber({ capturedSales: rows, sellerId: "s1", capturedAt: "2026-10-01T00:00:00Z" }), 1);
 });
 
+test("Pro first 5 Marketplace sales are lifetime; Elite 15 free sales reset monthly", async () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "cardoria-market-benefits-"));
+  const cwd = process.cwd();
+  process.chdir(temp);
+  try {
+    const mod = await import(`../lib/subscriptions/seller-plans.js?benefits=${Date.now()}`);
+    mod.setSellerPlan("seller-pro", "pro", { status: "active", startedAt: "2026-01-01T00:00:00Z" });
+    for (let n = 1; n <= 4; n += 1) {
+      mod.recordMarketplaceCapture({ orderId: `pro-${n}`, sellerId: "seller-pro", capturedAt: n <= 2 ? `2026-01-0${n}T12:00:00Z` : `2026-02-0${n}T12:00:00Z` });
+    }
+    const fifth = mod.getMarketplaceFeeQuote({ sellerId: "seller-pro", grossAmountEur: 100, capturedAt: "2026-03-01T00:00:00Z" });
+    assert.equal(fifth.capturedSaleNumber, 5);
+    assert.equal(fifth.commissionPercent, 3);
+    assert.equal(fifth.benefitWindow, "lifetime");
+    mod.recordMarketplaceCapture({ orderId: "pro-5", sellerId: "seller-pro", capturedAt: "2026-03-01T12:00:00Z" });
+    const sixth = mod.getMarketplaceFeeQuote({ sellerId: "seller-pro", grossAmountEur: 100, capturedAt: "2026-04-01T00:00:00Z" });
+    assert.equal(sixth.capturedSaleNumber, 6);
+    assert.equal(sixth.commissionPercent, 5);
+
+    mod.setSellerPlan("seller-elite", "elite", { status: "active", startedAt: "2026-01-01T00:00:00Z" });
+    for (let n = 1; n <= 15; n += 1) mod.recordMarketplaceCapture({ orderId: `elite-jan-${n}`, sellerId: "seller-elite", capturedAt: `2026-01-${String(n).padStart(2, "0")}T12:00:00Z` });
+    const eliteSixteenth = mod.getMarketplaceFeeQuote({ sellerId: "seller-elite", grossAmountEur: 100, capturedAt: "2026-01-20T00:00:00Z" });
+    assert.equal(eliteSixteenth.capturedSaleNumber, 16);
+    assert.equal(eliteSixteenth.commissionPercent, 3);
+    assert.equal(eliteSixteenth.benefitWindow, "calendar_month");
+    const eliteNewMonth = mod.getMarketplaceFeeQuote({ sellerId: "seller-elite", grossAmountEur: 100, capturedAt: "2026-02-01T00:00:00Z" });
+    assert.equal(eliteNewMonth.capturedSaleNumber, 1);
+    assert.equal(eliteNewMonth.commissionPercent, 0);
+  } finally {
+    process.chdir(cwd);
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+});
+
 test("invalid plan and invalid amounts are rejected", () => {
   assert.throws(() => getSellerPlan("unknown"), /inconnu/i);
   assert.throws(() => getLiveCommissionAmount("starter", -1), /invalide/i);
