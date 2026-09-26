@@ -14,8 +14,8 @@ test("Marketplace publication does not require a professional pack", () => {
 });
 
 test("Active seller packs are linked to Marketplace benefits", () => {
-  assert.match(sellers, /marketplaceOfferLinked: subscription\.active/);
-  assert.match(sellers, /marketplaceOfferPlanId: subscription\.active \? subscription\.planId/);
+  assert.match(sellers, /marketplaceOfferLinked: row\.seller_type === "professional" && subscription\.active/);
+  assert.match(sellers, /marketplaceOfferPlanId: row\.seller_type === "professional" && subscription\.active \? subscription\.planId/);
   assert.match(sellers, /marketplaceOffer: subscription\.active \? subscription\.entitlements\?\.marketplace/);
 });
 
