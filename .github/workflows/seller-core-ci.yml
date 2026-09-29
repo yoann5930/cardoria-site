@@ -49,7 +49,7 @@ jobs:
       - name: Professional seller verification
         run: node scripts/professional-verification.test.mjs
       - name: Existing seller Live upgrade guard
-        working-directory: ..
+        working-directory: .
         run: |
           grep -q 'seller.sellerType !== "professional" || !seller.professionalVerified' js/marketplace-sell.js
           grep -q 'Passer mon compte vendeur en Professionnel' js/marketplace-sell.js
