@@ -65,6 +65,7 @@ import { scheduleAutoBackup } from "./lib/backup/full.js";
 import { cleanupLegacyLiveTestsOnce } from "./lib/live/cleanup-tests.js";
 import { promoteDueScheduledLiveSessions } from "./lib/live/sessions.js";
 import { reconcileStaleLiveCheckouts } from "./lib/live/payment-reconciliation.js";
+import { runMonthlySubscriptionInvoiceCycle } from "./lib/subscriptions/invoices.js";
 import { initLaunch, connectionJournalMiddleware, maintenanceMiddleware } from "./lib/launch/index.js";
 import systemRoutes from "./routes/system.js";
 import sendcloudRoutes from "./routes/sendcloud.js";
@@ -705,6 +706,19 @@ const livePaymentReconcileIntervalMs = Math.max(30000, Number(process.env.LIVE_P
 const livePaymentReconcileTimer = setInterval(() => { void reconcileStaleLivePayments(); }, livePaymentReconcileIntervalMs);
 livePaymentReconcileTimer.unref?.();
 
+async function runSubscriptionBillingCycle() {
+  try {
+    const result = await runMonthlySubscriptionInvoiceCycle();
+    if (result.created || result.failed) console.log(`[subscription-invoices] checked=${result.checked} created=${result.created} sent=${result.sent} failed=${result.failed}`);
+  } catch (error) {
+    console.error("[subscription-invoices] cycle error", error?.message || String(error));
+  }
+}
+const subscriptionBillingIntervalMs = Math.max(3600000, Number(process.env.SUBSCRIPTION_BILLING_INTERVAL_MS) || 21600000);
+if (process.env.NODE_ENV !== "test") void runSubscriptionBillingCycle();
+const subscriptionBillingTimer = setInterval(() => { if (process.env.NODE_ENV !== "test") void runSubscriptionBillingCycle(); }, subscriptionBillingIntervalMs);
+subscriptionBillingTimer.unref?.();
+
 const skipCatalogPreload = process.env.NODE_ENV === "test";
 if (skipCatalogPreload) {
   console.log("[startup] catalog-preload: skipped in test");
@@ -819,6 +833,7 @@ function shutdown(signal) {
   clearInterval(marketRefreshTimer);
   clearInterval(liveScheduleTimer);
   clearInterval(livePaymentReconcileTimer);
+  clearInterval(subscriptionBillingTimer);
   const forceExit = setTimeout(() => process.exit(1), 10000); forceExit.unref();
   server.close(async () => {
     const enginePersisted = await flushEnginePersistence(`shutdown-${signal.toLowerCase()}`);
