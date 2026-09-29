@@ -1,6 +1,6 @@
 /** Controle d'acces Marketplace Cardoria. */
 import { validateSession } from "../../auth/session.js";
-import { getSellerByAuthUserId } from "../sellers.js";
+import { getOrLinkSellerForAuthenticatedUser } from "../sellers.js";
 import { getListing } from "../listings.js";
 import { getOrder } from "../orders.js";
 import { floorCardPrice } from "../../pricing/card-price-floor.js";
@@ -27,8 +27,8 @@ export function getMarketplaceUser(req) {
 }
 export function assertSellerSession(req, expectedSellerId = "") {
   const user = getMarketplaceUser(req);
-  const seller = getSellerByAuthUserId(user.id);
-  if (!seller) throw new MarketplaceAuthError("Compte vendeur non lie a cette session. Les anciens profils doivent etre verifies par Cardoria.", 403);
+  const seller = getOrLinkSellerForAuthenticatedUser({ authUserId: user.id, email: user.email });
+  if (!seller) throw new MarketplaceAuthError("Aucun profil vendeur n'est associé à ce compte client Cardoria.", 403);
   if (expectedSellerId && seller.id !== String(expectedSellerId)) throw new MarketplaceAuthError("Ce compte ne possede pas ce profil vendeur.", 403);
   return seller;
 }
@@ -51,7 +51,7 @@ export function assertOrderParticipant(req, orderId) {
   const order = getOrder(orderId);
   if (!order) throw new MarketplaceAuthError("Commande introuvable.", 404);
   const buyer = order.buyerId && String(order.buyerId) === String(user.id);
-  const seller = getSellerByAuthUserId(user.id);
+  const seller = getOrLinkSellerForAuthenticatedUser({ authUserId: user.id, email: user.email });
   if (!buyer && (!seller || seller.id !== order.sellerId)) throw new MarketplaceAuthError("Acces refuse a cette commande.", 403);
   return { user, order, seller: seller || null };
 }

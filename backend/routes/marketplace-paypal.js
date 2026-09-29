@@ -1,6 +1,6 @@
 /** Routes PayPal Marketplace Cardoria. */
 import { Router } from "express";
-import { getSeller, getSellerByAuthUserId, registerSeller, updateSellerProfessionalVerification } from "../lib/marketplace/sellers.js";
+import { getSeller, getOrLinkSellerForAuthenticatedUser, registerSeller, updateSellerProfessionalVerification } from "../lib/marketplace/sellers.js";
 import { verifyFrenchProfessionalSiret } from "../lib/marketplace/professional-verification.js";
 import { getCart, createOrdersFromCart } from "../lib/marketplace/v1/cart.js";
 import { updateOrderStatus } from "../lib/marketplace/orders.js";
@@ -46,7 +46,7 @@ router.post("/v1/paypal/webhook", async (req, res) => {
 router.post("/v1/paypal/sellers/register", async (req, res) => {
   try {
     const user = getMarketplaceUser(req);
-    let seller = getSellerByAuthUserId(user.id);
+    let seller = getOrLinkSellerForAuthenticatedUser({ authUserId: user.id, email: user.email });
     if (!seller) {
       const sellerType = req.body?.sellerType === "professional" ? "professional" : "individual";
       let professionalVerification = null;
@@ -67,7 +67,7 @@ router.post("/v1/paypal/sellers/register", async (req, res) => {
 router.get("/v1/paypal/sellers/me", (req, res) => {
   try {
     const user = getMarketplaceUser(req);
-    res.json({ ok: true, seller: getSellerByAuthUserId(user.id) || null });
+    res.json({ ok: true, seller: getOrLinkSellerForAuthenticatedUser({ authUserId: user.id, email: user.email }) || null });
   } catch (error) { fail(res, error); }
 });
 router.post("/v1/paypal/sellers/:id/verify-professional", async (req, res) => {
