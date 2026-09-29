@@ -69,6 +69,18 @@ try{
   assert.equal((await page.locator("#lasLaunchPreset").textContent()).trim(),"Valider / préparer");
   assert.equal(await page.locator(".live-studio-actions").isVisible(),false);
 
+  // Commandes opérateur : pas de faux bouton "Vendu", navigation claire et épinglage réel.
+  assert.equal((await page.locator("#lasPrev").textContent()).trim(),"← Précédent");
+  assert.equal((await page.locator("#lasPin").textContent()).trim(),"📌 Épingler");
+  assert.equal((await page.locator("#lasReplay").textContent()).trim(),"↻ Relancer l’item");
+  assert.equal((await page.locator("#lasSkip").textContent()).trim(),"Passer");
+  assert.equal((await page.locator("#lasNext").textContent()).trim(),"Suivant →");
+  assert.equal(await page.locator("#lasSold").count(),0,"aucun bouton Vendu manuel");
+  await page.click("#lasPin");
+  await page.waitForTimeout(30);
+  let operatorCalls=JSON.parse(await page.evaluate(()=>localStorage.getItem("__calls")||"[]"));
+  assert.ok(operatorCalls.some((x)=>x.path.endsWith("/actions/pin")&&x.method==="POST"),"épinglage envoyé");
+
   // Box Break: Cardoria calcule automatiquement les boosters depuis la référence scellée.
   await page.selectOption("#lasGameProduct","LOT-2");
   await page.selectOption("#lasGameType","box_break");
