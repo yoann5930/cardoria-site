@@ -45,6 +45,16 @@
         </form>
         <form id="clientRegisterForm" class="client-auth-form" autocomplete="on" hidden>
           <label>Nom ou prénom<input id="clientRegisterName" type="text" autocomplete="name" maxlength="120" placeholder="Votre nom"></label>
+          <label>Type de compte
+            <select id="clientRegisterAccountType">
+              <option value="individual">Particulier</option>
+              <option value="professional">Professionnel</option>
+            </select>
+          </label>
+          <div id="clientRegisterProfessionalFields" class="client-professional-fields" hidden>
+            <label>SIRET professionnel<input id="clientRegisterSiret" type="text" inputmode="numeric" maxlength="14" pattern="[0-9]{14}" placeholder="14 chiffres"></label>
+            <p class="client-field-help">Le compte Professionnel sert à l’accès Liveur. La Marketplace reste accessible à tous.</p>
+          </div>
           <label>Email<input id="clientRegisterEmail" type="email" autocomplete="email" required placeholder="vous@exemple.fr"></label>
           <label>Mot de passe<input id="clientRegisterPassword" type="password" autocomplete="new-password" minlength="10" required placeholder="10 caractères minimum"></label>
           <p class="client-auth-help">10 caractères minimum avec des lettres et des chiffres.</p>
