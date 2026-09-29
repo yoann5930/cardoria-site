@@ -24,3 +24,15 @@
 @media(max-width:720px){.live-studio-actions,.live-studio-quick,.live-energy-grid{grid-template-columns:1fr!important}.live-action-group:last-child{grid-column:auto}}
 
 #lasGiveBuyer{display:block}
+
+.live-studio-operator-buttons{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+.live-studio-operator-buttons button{font-weight:800;letter-spacing:.01em}
+.live-studio-operator-buttons button:disabled{opacity:.38;cursor:not-allowed}
+.live-studio-command-help{margin-top:-4px!important;margin-bottom:12px!important}
+.live-action-status{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;margin:10px 0;padding:10px 12px;border:1px solid rgba(211,169,44,.28);border-radius:10px;background:rgba(7,9,12,.78)}
+.live-action-status strong{color:#f0d46e;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.live-action-status span{grid-column:1/2;color:#d6d7da;font-size:12px}
+.live-action-status button{grid-column:2;grid-row:1/3;min-height:38px;white-space:nowrap}
+.live-action-danger{border-color:rgba(220,91,91,.5)!important;color:#ffb2b2!important}
+@media(max-width:1100px){.live-studio-operator-buttons{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:720px){.live-studio-operator-buttons{grid-template-columns:repeat(2,minmax(0,1fr))!important}.live-action-status{grid-template-columns:1fr}.live-action-status button{grid-column:1;grid-row:auto;width:100%}}
