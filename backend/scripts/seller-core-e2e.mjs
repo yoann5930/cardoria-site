@@ -1,6 +1,7 @@
 import { setSellerPlan } from "../lib/subscriptions/seller-plans.js";
 import { updateSellerPayPal, updateSellerProfessionalVerification } from "../lib/marketplace/sellers.js";
 import { createOrder, updateOrderStatus } from "../lib/marketplace/orders.js";
+import { getDb } from "../lib/engine/database.js";
 
 const BASE = process.env.TEST_BASE_URL || "http://127.0.0.1:10000";
 const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -41,6 +42,15 @@ const sellerAccountB = await register("seller-b");
 const buyer = await register("buyer");
 const sellerA = await registerSeller(sellerAccountA, "Seller A");
 const sellerB = await registerSeller(sellerAccountB, "Seller B");
+
+// Regression: a legacy seller may have lost/not yet had auth_user_id. The
+// authenticated account with the same email must recover the same seller row
+// without asking for SIRET/profile creation again.
+getDb().prepare("UPDATE mk_sellers SET auth_user_id='' WHERE id=?").run(sellerA.id);
+const recoveredSeller = await auth(sellerAccountA.token, "/api/marketplace/v1/paypal/sellers/me");
+assert(recoveredSeller.response.status === 200, "Legacy seller recovery endpoint failed");
+assert(recoveredSeller.body.seller?.id === sellerA.id, "Legacy seller was not re-linked to authenticated account");
+assert(recoveredSeller.body.seller?.authUserId === sellerAccountA.user.id, "Recovered seller auth_user_id was not persisted");
 
 const publicProfile = await json(`/api/marketplace/v1/sellers/${sellerA.id}/public`);
 assert(publicProfile.response.status === 200 && publicProfile.body.seller?.id === sellerA.id, "Public seller profile unavailable");

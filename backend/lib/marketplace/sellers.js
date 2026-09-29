@@ -17,6 +17,36 @@ export function getSellerByAuthUserId(authUserId) {
   return row ? toSeller(row) : null;
 }
 
+/**
+ * Resolve the seller profile for an authenticated Cardoria account.
+ * Legacy seller rows may predate auth_user_id. When the authenticated account
+ * email exactly matches such an unlinked seller, bind it once to the stable
+ * auth user id so the seller profile (SIRET, verification, listings, sales)
+ * persists across logins and devices.
+ */
+export function getOrLinkSellerForAuthenticatedUser({ authUserId, email }) {
+  const ownerId = String(authUserId || "").trim();
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!ownerId) return null;
+
+  const linked = getSellerByAuthUserId(ownerId);
+  if (linked) return linked;
+  if (!normalizedEmail) return null;
+
+  const db = getDb();
+  const legacyRow = db.prepare("SELECT id, auth_user_id FROM mk_sellers WHERE email = ?").get(normalizedEmail);
+  if (!legacyRow) return null;
+
+  const currentOwner = String(legacyRow.auth_user_id || "").trim();
+  if (currentOwner && currentOwner !== ownerId) return null;
+
+  if (!currentOwner) {
+    db.prepare("UPDATE mk_sellers SET auth_user_id = ? WHERE id = ? AND COALESCE(auth_user_id,'') = ''")
+      .run(ownerId, legacyRow.id);
+  }
+  return getSellerByAuthUserId(ownerId);
+}
+
 export function registerSeller({ email, displayName, sellerType, bio, authUserId, professionalVerification = null }) {
   const db = getDb();
   const normalizedEmail = String(email || "").trim().toLowerCase();
