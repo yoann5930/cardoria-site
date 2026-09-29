@@ -36,11 +36,14 @@ export function registerSeller({ email, displayName, sellerType, bio, authUserId
   const verification = type === "professional" && professionalVerification?.verified ? professionalVerification : null;
   db.prepare(`INSERT INTO mk_sellers (
     id,email,auth_user_id,display_name,seller_type,bio,created_at,
-    siret,professional_verified,professional_verified_at,professional_legal_name,professional_verification_source
-  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    siret,professional_verified,professional_verified_at,professional_legal_name,professional_verification_source,
+    professional_siren,professional_activity_code,professional_legal_category,professional_establishment_address
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     id, normalizedEmail, ownerId, displayName || normalizedEmail.split("@")[0], type, bio || "", now,
     verification?.siret || "", verification ? 1 : 0, verification?.verifiedAt || "",
-    verification?.legalName || "", verification?.source || ""
+    verification?.legalName || "", verification?.source || "",
+    verification?.siren || "", verification?.activityCode || "", verification?.legalCategory || "",
+    verification?.establishmentAddress || ""
   );
   return getSeller(id);
 }
@@ -53,13 +56,20 @@ export function updateSellerProfessionalVerification(sellerId, verification) {
   }
   getDb().prepare(`UPDATE mk_sellers
     SET seller_type='professional', siret=?, professional_verified=1,
-        professional_verified_at=?, professional_legal_name=?, professional_verification_source=?
+        professional_verified_at=?, professional_legal_name=?, professional_verification_source=?,
+        professional_siren=?, professional_activity_code=?, professional_legal_category=?,
+        professional_establishment_address=?
     WHERE id=?`).run(
       String(verification.siret),
       String(verification.verifiedAt || new Date().toISOString()),
       String(verification.legalName || "").slice(0, 200),
       String(verification.source || "").slice(0, 200),
+      String(verification.siren || "").slice(0, 9),
+      String(verification.activityCode || "").slice(0, 20),
+      String(verification.legalCategory || "").slice(0, 40),
+      String(verification.establishmentAddress || "").slice(0, 300),
       sellerId
+    );
     );
   return getSeller(sellerId);
 }
@@ -141,6 +151,10 @@ function toSeller(row) {
     professionalVerifiedAt: row.professional_verified_at || "",
     professionalLegalName: row.professional_legal_name || "",
     professionalVerificationSource: row.professional_verification_source || "",
+    professionalSiren: row.professional_siren || "",
+    professionalActivityCode: row.professional_activity_code || "",
+    professionalLegalCategory: row.professional_legal_category || "",
+    professionalEstablishmentAddress: row.professional_establishment_address || "",
     avatar: row.avatar,
     bio: row.bio,
     ratingAvg: row.rating_avg,
