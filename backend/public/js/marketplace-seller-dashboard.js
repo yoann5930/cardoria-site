@@ -8,7 +8,7 @@
   function senderForm(sender, ready) {
     sender = sender || {};
     return "<section style='border:1px solid rgba(212,175,55,.25);padding:14px;margin:14px 0;border-radius:10px'>" +
-      "<h2>Adresse d'expédition Live</h2><p>" + (ready ? "✅ Adresse expéditeur prête." : "⚠️ Renseignez cette adresse avant de démarrer un Live.") + "</p>" +
+      "<h2>Adresse d'expédition Live</h2><p>" + (ready ? "✅ Adresse expéditeur prête." : "⚠️ Renseignez cette adresse avant votre première vente ou expédition Live.") + "</p>" +
       "<form id='sellerSenderForm' style='display:grid;gap:8px;max-width:620px'>" +
       "<label>Nom / raison sociale<input id='sp-name' required value='" + M.esc(sender.name || seller.displayName || "") + "'></label>" +
       "<label>Adresse<input id='sp-address1' required value='" + M.esc(sender.addressLine1 || "") + "'></label>" +
@@ -44,7 +44,7 @@
   ]); }).then(function (r) {
     var d = r[0], profile = r[1], liveShipping = r[2];
     root.innerHTML = "<p><strong>" + M.esc(seller.displayName) + "</strong> " + M.sellerBadge(seller) + "</p>" +
-      "<p><a href='mes-annonces.html'>Mes annonces</a> · <a href='vendre.html'>Publier</a> · <a href='live-vendeur.html'>Live vendeur (PayPal)</a></p>" +
+      "<p><a href='mes-annonces.html'>Mes annonces</a> · <a href='vendre.html'>Publier</a> · <a href='live-vendeur.html'>Live vendeur</a></p>" +
       senderForm(profile.sender, profile.ready) +
       "<h2>Expéditions Live</h2>" + renderShipments(liveShipping.shipments || []) +
       "<h2>Commandes Marketplace à traiter</h2>" + ((d.orders || []).map(function (o) {
