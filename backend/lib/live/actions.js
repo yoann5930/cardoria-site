@@ -98,6 +98,7 @@ export function startNextBoosterAuction(liveId,{startPrice,durationSeconds=30}={
   const live=requireLive(liveId),{d,state}=stateFor(live.id,true),br=state.break;
   if(!br||!br.auctionSequence||!Array.isArray(br.boosterLabels))throw Object.assign(new Error("Aucun Box Break / Hit & Run prêt pour les enchères."),{status:409});
   closeExpired(state);
+  save(d);
   if(state.auction?.status==="running")throw Object.assign(new Error("Une enchère est déjà en cours."),{status:409});
   if(state.auction?.status==="ended"&&state.auction.boosterNumber){
     const already=(br.completedBoosters||[]).some(x=>x.auctionId===state.auction.id);
