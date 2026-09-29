@@ -17,7 +17,7 @@ export function getSellerByAuthUserId(authUserId) {
   return row ? toSeller(row) : null;
 }
 
-export function registerSeller({ email, displayName, sellerType, bio, authUserId }) {
+export function registerSeller({ email, displayName, sellerType, bio, authUserId, professionalVerification = null }) {
   const db = getDb();
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const ownerId = String(authUserId || "").trim();
@@ -32,8 +32,36 @@ export function registerSeller({ email, displayName, sellerType, bio, authUserId
   }
   const id = makeMarketId("SLR");
   const now = new Date().toISOString();
-  db.prepare(`INSERT INTO mk_sellers (id,email,auth_user_id,display_name,seller_type,bio,created_at) VALUES (?,?,?,?,?,?,?)`).run(id, normalizedEmail, ownerId, displayName || normalizedEmail.split("@")[0], sellerType || "individual", bio || "", now);
+  const type = sellerType === "professional" ? "professional" : "individual";
+  const verification = type === "professional" && professionalVerification?.verified ? professionalVerification : null;
+  db.prepare(`INSERT INTO mk_sellers (
+    id,email,auth_user_id,display_name,seller_type,bio,created_at,
+    siret,professional_verified,professional_verified_at,professional_legal_name,professional_verification_source
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    id, normalizedEmail, ownerId, displayName || normalizedEmail.split("@")[0], type, bio || "", now,
+    verification?.siret || "", verification ? 1 : 0, verification?.verifiedAt || "",
+    verification?.legalName || "", verification?.source || ""
+  );
   return getSeller(id);
+}
+
+export function updateSellerProfessionalVerification(sellerId, verification) {
+  const seller = getSeller(sellerId);
+  if (!seller) return null;
+  if (!verification?.verified || !/^\d{14}$/.test(String(verification.siret || ""))) {
+    throw Object.assign(new Error("Vérification professionnelle invalide."), { status: 400 });
+  }
+  getDb().prepare(`UPDATE mk_sellers
+    SET seller_type='professional', siret=?, professional_verified=1,
+        professional_verified_at=?, professional_legal_name=?, professional_verification_source=?
+    WHERE id=?`).run(
+      String(verification.siret),
+      String(verification.verifiedAt || new Date().toISOString()),
+      String(verification.legalName || "").slice(0, 200),
+      String(verification.source || "").slice(0, 200),
+      sellerId
+    );
+  return getSeller(sellerId);
 }
 
 export function updateSellerPayPal(sellerId, patch = {}) {
@@ -108,6 +136,11 @@ function toSeller(row) {
     displayName: row.display_name,
     sellerType: row.seller_type,
     verified: !!row.verified,
+    siret: row.siret || "",
+    professionalVerified: !!row.professional_verified,
+    professionalVerifiedAt: row.professional_verified_at || "",
+    professionalLegalName: row.professional_legal_name || "",
+    professionalVerificationSource: row.professional_verification_source || "",
     avatar: row.avatar,
     bio: row.bio,
     ratingAvg: row.rating_avg,
