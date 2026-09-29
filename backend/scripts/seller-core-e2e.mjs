@@ -67,6 +67,11 @@ updateSellerProfessionalVerification(sellerA.id, {
 const professionalLiveAccess = await auth(sellerAccountA.token, "/api/live/seller/sessions");
 assert(professionalLiveAccess.response.status === 200, "Verified professional seller cannot access Live before PayPal activation");
 
+const linkedSellerAfterUpgrade = await auth(sellerAccountA.token, "/api/marketplace/v1/paypal/sellers/me");
+assert(linkedSellerAfterUpgrade.response.status === 200, "Upgraded seller is not linked to authenticated session");
+assert(linkedSellerAfterUpgrade.body.seller?.sellerType === "professional", "Existing individual seller was not upgraded to professional");
+assert(linkedSellerAfterUpgrade.body.seller?.professionalVerified === true, "Existing seller lost professional verification after session sync");
+
 const liveBeforePaypal = await auth(sellerAccountA.token, "/api/live/seller/sessions", {
   method: "POST",
   body: JSON.stringify({ title: `Live Pro without PayPal ${suffix}`, category: "pokemon", products: [] })

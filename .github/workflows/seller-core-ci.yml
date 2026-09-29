@@ -48,6 +48,12 @@ jobs:
           grep -q 'Transition vendeur invalide' backend/routes/marketplace-v1.js
       - name: Professional seller verification
         run: node scripts/professional-verification.test.mjs
+      - name: Existing seller Live upgrade guard
+        working-directory: .
+        run: |
+          grep -q 'seller.sellerType !== "professional" || !seller.professionalVerified' js/marketplace-sell.js
+          grep -q 'Passer mon compte vendeur en Professionnel' js/marketplace-sell.js
+          grep -q 'PayPal n’est pas nécessaire pour accéder au Studio Live' js/marketplace-sell.js
       - name: Start clean backend
         run: |
           rm -rf data

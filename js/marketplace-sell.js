@@ -40,7 +40,8 @@
   }
 
   function renderProfessionalVerification(seller) {
-    root.innerHTML = '<section class="mk-seller-onboarding"><span class="mk-eyebrow">VÉRIFICATION PROFESSIONNELLE</span><h1>Vérifier votre SIRET</h1><p>Le Studio Live est réservé aux professionnels. Cardoria vérifie automatiquement le SIRET dans les données publiques SIRENE/INSEE.</p><div class="mk-form-grid"><input id="verifySiret" inputmode="numeric" maxlength="14" placeholder="SIRET — 14 chiffres" value="' + esc(seller.siret || "") + '"><button class="mk-btn mk-btn-primary" type="button" id="verifySiretBtn">Vérifier mon entreprise</button></div><div id="sellResult"></div></section>';
+    var legacyIndividual = seller.sellerType !== "professional";
+    root.innerHTML = '<section class="mk-seller-onboarding"><span class="mk-eyebrow">VÉRIFICATION PROFESSIONNELLE</span><h1>' + (legacyIndividual ? 'Passer mon compte vendeur en Professionnel' : 'Vérifier votre SIRET') + '</h1><p>Le Studio Live est réservé aux professionnels. Saisissez votre SIRET : Cardoria vérifie automatiquement l’entreprise et l’établissement dans les données publiques SIRENE/INSEE.</p>' + (legacyIndividual ? '<p class="mk-paypal-note">Votre ancien profil vendeur sera conservé et simplement converti en profil professionnel vérifié. Vous ne perdez pas vos données vendeur.</p>' : '') + '<div class="mk-form-grid"><input id="verifySiret" inputmode="numeric" maxlength="14" placeholder="SIRET — 14 chiffres" value="' + esc(seller.siret || "") + '"><button class="mk-btn mk-btn-primary" type="button" id="verifySiretBtn">' + (legacyIndividual ? 'Passer en Pro et vérifier mon SIRET' : 'Vérifier mon entreprise') + '</button></div><p class="mk-paypal-note">PayPal n’est pas nécessaire pour accéder au Studio Live. Il sera demandé uniquement pour encaisser des ventes.</p><div id="sellResult"></div></section>';
     document.getElementById("verifySiretBtn").onclick = function () {
       showResult("Vérification du SIRET en cours…", false);
       api("/v1/paypal/sellers/" + encodeURIComponent(seller.id) + "/verify-professional", { method: "POST", body: JSON.stringify({ siret: document.getElementById("verifySiret").value.replace(/\D/g, "") }) }).then(function (d) { M.setSeller(d.seller); render(); }).catch(function (e) { showResult(e.message, true); });
@@ -77,7 +78,7 @@
     if (!M.getToken() || !M.getAccount()) return renderAccount();
     var seller = M.getSeller();
     if (!seller) return renderRegistration();
-    if (seller.sellerType === "professional" && !seller.professionalVerified) return renderProfessionalVerification(seller);
+    if (seller.sellerType !== "professional" || !seller.professionalVerified) return renderProfessionalVerification(seller);
     if (!seller.paypalReady && !isDemoMode()) return renderPayPalActivation(seller);
     renderListingForm(seller);
   }
