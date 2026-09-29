@@ -377,6 +377,10 @@
     var n = document.getElementById("lasState");
     if (!n) return;
     var parts = [];
+    if (s.preparedGame && s.preparedGame.status === "ready") {
+      var names = { buy_now:"Vente directe", auction:"Enchère", flash:"Vente flash", box_break:"Box Break", energy_game:"Jeu de l’énergie", hit_run_ex:"Hit & Run EX", hit_run_ar:"Hit & Run AR", hit_run_full_art:"Hit & Run Full Art", giveaway:"Giveaway", giveaway_subscriber:"Giveaway Abonné", giveaway_buyer:"Giveaway Acheteur", break:"Break personnalisé" };
+      parts.push("<div class='live-game-ready'><div><small>PRÊT À LANCER</small><strong>" + esc(names[s.preparedGame.type] || s.preparedGame.type) + "</strong><span>" + esc(s.preparedGame.productName || "") + "</span></div><button type='button' id='lasLaunchPreparedGame' class='live-game-launch-arrow' title='Le liveur lance le jeu'>→</button></div>");
+    }
     if (s.auction) parts.push("Enchère : " + esc(s.auction.status) + " · " + euro(s.auction.currentPrice) + (s.auction.status === "running" ? " <button type='button' id='lasAuctionStop'>Stop enchère</button>" : ""));
     if (s.flash) parts.push("Flash : " + esc(s.flash.status) + " · " + euro(s.flash.price));
     if (s.giveaway) parts.push("Giveaway : " + esc(s.giveaway.status) + " · " + ((s.giveaway.entries || []).length) + " participant(s)" + (s.giveaway.winner ? " · gagnant " + esc(s.giveaway.winner.name) : "") + (s.giveaway.status === "running" || s.giveaway.status === "ready_to_draw" ? " <button type='button' id='lasDraw'>Tirer gagnant</button>" : ""));
@@ -396,6 +400,11 @@
       }
     }
     n.innerHTML = parts.join("<br>") || "Aucune action en cours.";
+    var launchPrepared = document.getElementById("lasLaunchPreparedGame");
+    if (launchPrepared) launchPrepared.onclick = function () {
+      launchPrepared.disabled = true;
+      postAction("game/launch", {});
+    };
     var nextBooster = document.getElementById("lasNextBoosterAuction");
     if (nextBooster) nextBooster.onclick = function () {
       if (nextBooster.disabled) return;
