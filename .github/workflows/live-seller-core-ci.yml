@@ -11,6 +11,10 @@ on:
       - 'backend/scripts/live-seller-core-e2e.mjs'
       - 'js/live-vendeur.js'
       - 'backend/public/js/live-vendeur.js'
+      - 'js/live-studio-actions-ui.js'
+      - 'backend/public/js/live-studio-actions-ui.js'
+      - 'style.css'
+      - 'backend/public/style.css'
       - '.github/workflows/live-seller-core-ci.yml'
   push:
     branches:
@@ -59,6 +63,11 @@ jobs:
           grep -q 'ne peut pas être redémarré' backend/routes/live.js
           grep -q 'ownerRole:"seller"\|ownerRole: "seller"' backend/routes/live.js
           grep -q 'provider: "paypal"' backend/routes/live.js
+          grep -q 'router.get("/seller/sessions/:id"' backend/routes/live.js
+          grep -q 'router.get("/seller/:liveId/state"' backend/routes/live-actions.js
+          grep -q '/api/live/seller/sessions/' js/live-studio-actions-ui.js
+          grep -q '/api/live/actions/seller/' js/live-studio-actions-ui.js
+          grep -q 'PACKS PROFESSIONNELS' js/live-vendeur.js
       - name: Start clean backend
         run: |
           rm -rf data
