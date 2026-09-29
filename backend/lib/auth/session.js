@@ -31,7 +31,7 @@ export function validateSession(token) {
   if (!token) return null;
   const db = getDb();
   const row = db.prepare(`
-    SELECT s.id AS sessionId, s.expires_at, u.id, u.email, u.role, u.name, u.totp_enabled, u.active
+    SELECT s.id AS sessionId, s.expires_at, u.id, u.email, u.role, u.name, u.account_type, u.totp_enabled, u.active
     FROM auth_sessions s
     JOIN auth_users u ON u.id = s.user_id
     WHERE s.token_hash = ? AND s.expires_at > ?
@@ -49,6 +49,7 @@ export function validateSession(token) {
     email: row.email,
     role: row.role,
     name: row.name,
+    accountType: row.account_type === "professional" ? "professional" : "individual",
     totpEnabled: !!row.totp_enabled
   };
 }
