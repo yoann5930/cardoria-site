@@ -3,7 +3,7 @@
   var M = window.CardoriaMarketplace, root = document.getElementById("root");
   if (!M || !root) return;
   if (!M.getToken()) {
-    root.innerHTML = "<p>Connectez-vous avec votre compte client Cardoria pour accéder au Live. <a href='client-login.html'>Se connecter</a>.</p>";
+    root.innerHTML = "<p>Connectez-vous avec votre compte client Cardoria pour accéder au Live. <a href='client-login.html?mode=professional'>Se connecter</a>.</p>";
     return;
   }
   var publisherHandle = null, paymentTimer = null, selectedLiveId = "", sellerPlanState = null, sellerPlans = [], sessionFilter = "upcoming";
@@ -244,11 +244,11 @@
   function boot(seller) {
     seller = seller || M.getSeller();
     if (!seller) {
-      root.innerHTML = "<p>Ce compte Cardoria n’est pas encore configuré pour le Live. <a href='/client-login.html'>Ouvrir Mon compte</a> et choisissez Professionnel.</p>";
+      root.innerHTML = "<p>Ce compte Cardoria n’est pas encore configuré pour le Live. <a href='/client-login.html?mode=professional'>Ouvrir Mon compte</a> et choisissez Professionnel.</p>";
       return;
     }
     if (seller.sellerType !== "professional" || !seller.professionalVerified) {
-      root.innerHTML = "<p>Votre compte Cardoria est connecté, mais le Studio Live nécessite le profil Professionnel avec SIRET vérifié. <a href='/client-login.html'>Ouvrir Mon compte</a>.</p>";
+      root.innerHTML = "<p>Votre compte Cardoria est connecté, mais le Studio Live nécessite le profil Professionnel avec SIRET vérifié. <a href='/client-login.html?mode=professional'>Ouvrir Mon compte</a>.</p>";
       return;
     }
     shell();
@@ -267,7 +267,7 @@
       boot(seller);
     });
   }).catch(function (e) {
-    root.innerHTML = "<p>" + esc(e.message || "Profil Liveur indisponible.") + " <a href='/client-login.html'>Retour à Mon compte</a>.</p>";
+    root.innerHTML = "<p>" + esc(e.message || "Profil Liveur indisponible.") + " <a href='/client-login.html?mode=professional'>Retour à Mon compte</a>.</p>";
   });
   window.addEventListener("beforeunload", function () { if (paymentTimer) clearInterval(paymentTimer); });
 })();

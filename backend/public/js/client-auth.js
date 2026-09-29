@@ -206,6 +206,26 @@
     setMessage("");
   }
 
+  function professionalModeRequested() {
+    return new URLSearchParams(location.search).get("mode") === "professional";
+  }
+
+  function showProfessionalSetup({ forceProfessional = false, focus = false } = {}) {
+    const panel = qs("clientProfessionalSetupPanel");
+    const select = qs("clientAccountType");
+    if (!panel || !select) return;
+    const isPro = currentUser && currentUser.accountType === "professional";
+    panel.hidden = !(professionalModeRequested() || isPro);
+    if (forceProfessional && !isPro) select.value = "professional";
+    refreshAccountTypeFields();
+    if (focus && !panel.hidden) {
+      setTimeout(() => {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (select.value === "professional") qs("clientProfessionalSiret")?.focus();
+      }, 80);
+    }
+  }
+
   function refreshRegisterAccountTypeFields() {
     const select = qs("clientRegisterAccountType");
     const fields = qs("clientRegisterProfessionalFields");
@@ -229,7 +249,9 @@
   function fillProfile(user) {
     qs("clientProfileName").value = user.name || "";
     qs("clientProfilePhone").value = user.phone || "";
-    if (qs("clientAccountType")) qs("clientAccountType").value = user.accountType === "professional" ? "professional" : "individual";
+    if (qs("clientAccountType")) {
+      qs("clientAccountType").value = user.accountType === "professional" || professionalModeRequested() ? "professional" : "individual";
+    }
     refreshAccountTypeFields();
     qs("clientProfileAddress1").value = user.addressLine1 || "";
     qs("clientProfileAddress2").value = user.addressLine2 || "";
@@ -262,6 +284,7 @@
     qs("clientAccountName").textContent = user.name || "Client";
     qs("clientAccountEmail").textContent = user.email || "";
     fillProfile(user);
+    showProfessionalSetup({ forceProfessional: professionalModeRequested(), focus: professionalModeRequested() });
     notifyEmbedParent();
     if (!isEmbed()) loadDashboardData();
   }
@@ -441,37 +464,25 @@
     } catch (e) { setMessage(e.message, "error"); }
   }
 
-  async function saveProfile(event) {
+  async function saveProfessionalIdentity(event) {
     event.preventDefault();
-    setMessage("Enregistrement du profil...");
+    setMessage("Enregistrement du statut...");
     try {
       const accountType = qs("clientAccountType")?.value === "professional" ? "professional" : "individual";
-      const location = await validatedProfileLocation();
-      const data = await api("/api/auth/profile", {
-        method: "PATCH",
-        body: JSON.stringify({
-          name: qs("clientProfileName").value.trim(), phone: qs("clientProfilePhone").value.trim(),
-          accountType,
-          addressLine1: qs("clientProfileAddress1").value.trim(), addressLine2: qs("clientProfileAddress2").value.trim(),
-          postalCode: location.postalCode, city: location.city,
-          country: location.countryCode,
-          shippingPreference: "mondial_relay", relay: selectedRelay
-        })
-      });
-
       let seller = null;
       if (accountType === "professional") {
         const siret = String(qs("clientProfessionalSiret")?.value || "").replace(/\D/g, "");
         if (!/^\d{14}$/.test(siret)) throw new Error("Saisissez un SIRET professionnel valide à 14 chiffres.");
+
         const sellerData = await api("/api/marketplace/v1/paypal/sellers/me", { method: "GET" });
         seller = sellerData.seller || null;
         if (!seller) {
           const created = await api("/api/marketplace/v1/paypal/sellers/register", {
             method: "POST",
-            body: JSON.stringify({ displayName: data.user.name || data.user.email, sellerType: "professional", siret })
+            body: JSON.stringify({ displayName: currentUser?.name || currentUser?.email || "Liveur Cardoria", sellerType: "professional", siret })
           });
           seller = created.seller || null;
-        } else if (!seller.professionalVerified || String(seller.siret || "") !== siret) {
+        } else if (!seller.professionalVerified || String(seller.siret || "") !== siret || seller.sellerType !== "professional") {
           const verified = await api("/api/marketplace/v1/paypal/sellers/" + encodeURIComponent(seller.id) + "/verify-professional", {
             method: "POST",
             body: JSON.stringify({ siret })
@@ -480,16 +491,46 @@
         }
       }
 
+      const data = await api("/api/auth/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ accountType })
+      });
+      currentUser = data.user;
+      setAccount(data.user);
+      fillProfile(data.user);
+      showProfessionalSetup({ forceProfessional: accountType === "professional" });
+      renderProfessionalAccount(seller);
+      if (accountType === "professional") {
+        setMessage("Compte professionnel enregistré. Votre SIRET est lié à ce compte Cardoria et l’accès Liveur est activé.", "success");
+      } else {
+        renderSubscriptionInvoices(null, []);
+        setMessage("Compte particulier enregistré. La Marketplace reste accessible.", "success");
+      }
+      if (!isEmbed()) loadDashboardData();
+    } catch (e) { setMessage(e.message, "error"); }
+  }
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    setMessage("Enregistrement du profil...");
+    try {
+      const location = await validatedProfileLocation();
+      const data = await api("/api/auth/profile", {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: qs("clientProfileName").value.trim(), phone: qs("clientProfilePhone").value.trim(),
+          addressLine1: qs("clientProfileAddress1").value.trim(), addressLine2: qs("clientProfileAddress2").value.trim(),
+          postalCode: location.postalCode, city: location.city,
+          country: location.countryCode,
+          shippingPreference: "mondial_relay", relay: selectedRelay
+        })
+      });
       currentUser = data.user;
       setAccount(data.user);
       qs("clientAccountName").textContent = data.user.name || "Client";
       fillProfile(data.user);
-      if (accountType === "professional") renderProfessionalAccount(seller);
-      else {
-        renderProfessionalAccount(null);
-        renderSubscriptionInvoices(null, []);
-      }
-      setMessage(accountType === "professional" ? "Profil professionnel enregistré. L’accès Liveur utilise maintenant ce compte Cardoria." : "Profil particulier enregistré. La Marketplace reste accessible.", "success");
+      showProfessionalSetup({ forceProfessional: professionalModeRequested() });
+      setMessage("Profil enregistré.", "success");
       if (!isEmbed()) loadDashboardData();
     } catch (e) { setMessage(e.message, "error"); }
   }
@@ -661,6 +702,7 @@
     refreshRegisterAccountTypeFields();
     qs("clientLogoutButton")?.addEventListener("click", logout);
     qs("clientProfileForm")?.addEventListener("submit", saveProfile);
+    qs("clientProfessionalActivationForm")?.addEventListener("submit", saveProfessionalIdentity);
     qs("clientAccountType")?.addEventListener("change", refreshAccountTypeFields);
     qs("clientChooseRelay")?.addEventListener("click", chooseRelay);
     qs("clientProfilePostalCode")?.addEventListener("input", schedulePostalLookup);
@@ -684,8 +726,13 @@
     });
     if (isEmbed()) document.documentElement.classList.add("client-auth-embed");
     const mode=new URLSearchParams(location.search).get("mode");
-    if(mode==="register")showForm("register");
-    else if(mode==="login")showForm("login");
+    if(mode==="register") showForm("register");
+    else if(mode==="login") showForm("login");
+    else if(mode==="professional" && !getToken()) {
+      showForm("register");
+      if (qs("clientRegisterAccountType")) qs("clientRegisterAccountType").value = "professional";
+      refreshRegisterAccountTypeFields();
+    }
     restore();
   }
   document.addEventListener("DOMContentLoaded", init);
