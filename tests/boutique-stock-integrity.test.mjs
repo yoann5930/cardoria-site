@@ -300,7 +300,9 @@ test("cart, admin stock alerts and Colissimo gate stay in place", () => {
   assert.match(adminStock, /Retiré de la Boutique/);
   assert.match(adminStock, /Stock bloqué — remboursement en attente/);
   assert.match(adminOrders, /stockImpact/);
-  assert.match(fs.readFileSync("backend/routes/payments-admin.js", "utf8"), /COLISSIMO_LABEL_IN_PROGRESS/);
+  const shipmentFlow = fs.readFileSync("backend/lib/boutique/shipment-creation.js", "utf8");
+  assert.match(shipmentFlow, /SHIPMENT_CREATION_IN_PROGRESS/);
+  assert.match(shipmentFlow, /COLISSIMO_NOT_READY/);
   assert.match(envExample, /COLISSIMO_LIVE_LABELS_ENABLED=false/);
 });
 
