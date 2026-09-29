@@ -34,10 +34,10 @@
     });
   }
   function listPath() { return isAdmin ? "/api/admin/live/sessions" : "/api/live/seller/sessions"; }
-  function sessionPath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) : "/api/live/sessions/" + encodeURIComponent(id); }
+  function sessionPath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) : "/api/live/seller/sessions/" + encodeURIComponent(id); }
   function patchPath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) : "/api/live/seller/sessions/" + encodeURIComponent(id); }
   function actionPath(id, suffix) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) + "/actions/" + suffix : "/api/live/actions/seller/" + encodeURIComponent(id) + "/" + suffix; }
-  function statePath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) + "/actions" : "/api/live/actions/" + encodeURIComponent(id) + "/state"; }
+  function statePath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) + "/actions" : "/api/live/actions/seller/" + encodeURIComponent(id) + "/state"; }
   function checkoutPath() { return isAdmin ? "/api/admin/live/checkouts" : "/api/live/seller/checkouts"; }
   function prefs() {
     try { return JSON.parse(localStorage.getItem("cardoria-live-studio-prefs") || "{}"); } catch (e) { return {}; }
