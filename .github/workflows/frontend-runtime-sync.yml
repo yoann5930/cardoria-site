@@ -39,7 +39,7 @@ jobs:
             if [ -d "$dir" ]; then cp -a "$dir" backend/public/; fi
           done
           fingerprint=$(find backend/public -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')
-          printf 'frontend-runtime-sha256=%s\n' "$fingerprint" > backend/.frontend-runtime-sha
+          echo "frontend-runtime-sha256=$fingerprint"
 
       - name: Validate required runtime pages
         shell: bash
@@ -79,7 +79,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git add -A backend/public backend/.frontend-runtime-sha
+          git add -A backend/public
           if git diff --cached --quiet; then
             echo "Frontend runtime already synchronized."
             exit 0
