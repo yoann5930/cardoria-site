@@ -19,7 +19,7 @@ const pickup = {
   city: "Valenciennes"
 };
 
-test("Mondial Relay pickup is required and normalized without dropping identity fields", () => {
+test("Mondial Relay pickup keeps carrier and Sendcloud identity fields", () => {
   const point = normalizePickupPoint({ ...pickup, street: "10 rue des Arts", houseNumber: "", sendcloudServicePointId: "987654321" });
   assert.equal(point.id, "012345");
   assert.equal(point.name, "Tabac du Centre");
