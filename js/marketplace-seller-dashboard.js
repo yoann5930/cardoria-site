@@ -2,8 +2,8 @@
   "use strict";
   var M = window.CardoriaMarketplace;
   var root = document.getElementById("root");
-  var seller = M.getSeller();
-  if (!M.getToken() || !seller) { root.innerHTML = "<p>Connectez votre compte vendeur sur <a href='vendre.html'>Vendre</a>.</p>"; return; }
+  var seller = null;
+  if (!M.getToken()) { root.innerHTML = "<p>Connectez votre compte vendeur sur <a href='vendre.html'>Vendre</a>.</p>"; return; }
 
   function senderForm(sender, ready) {
     sender = sender || {};
@@ -34,11 +34,14 @@
   }
 
   root.innerHTML = "<p>Chargement espace vendeur…</p>";
-  Promise.all([
+  Promise.resolve(M.syncSeller ? M.syncSeller() : M.getSeller()).then(function (currentSeller) {
+    seller = currentSeller;
+    if (!seller) throw new Error("Aucun profil vendeur lié à cette session.");
+    return Promise.all([
     M.api("/v1/sellers/" + encodeURIComponent(seller.id) + "/orders"),
     M.api("/v1/sellers/" + encodeURIComponent(seller.id) + "/sender-profile"),
     fetch((window.CARDORIA_BACKEND || location.origin) + "/api/live/seller/shipments", { headers: { Authorization: "Bearer " + M.getToken(), Accept: "application/json" }, cache: "no-store" }).then(function (r) { return r.json().then(function (d) { if (!r.ok || d.ok === false) throw new Error(d.error || "Expéditions Live indisponibles."); return d; }); })
-  ]).then(function (r) {
+  ]); }).then(function (r) {
     var d = r[0], profile = r[1], liveShipping = r[2];
     root.innerHTML = "<p><strong>" + M.esc(seller.displayName) + "</strong> " + M.sellerBadge(seller) + "</p>" +
       "<p><a href='mes-annonces.html'>Mes annonces</a> · <a href='vendre.html'>Publier</a> · <a href='live-vendeur.html'>Live vendeur (PayPal)</a></p>" +
