@@ -355,8 +355,28 @@
     if (s.auction) parts.push("Enchère : " + esc(s.auction.status) + " · " + euro(s.auction.currentPrice) + (s.auction.status === "running" ? " <button type='button' id='lasAuctionStop'>Stop enchère</button>" : ""));
     if (s.flash) parts.push("Flash : " + esc(s.flash.status) + " · " + euro(s.flash.price));
     if (s.giveaway) parts.push("Giveaway : " + esc(s.giveaway.status) + " · " + ((s.giveaway.entries || []).length) + " participant(s)" + (s.giveaway.winner ? " · gagnant " + esc(s.giveaway.winner.name) : "") + (s.giveaway.status === "running" || s.giveaway.status === "ready_to_draw" ? " <button type='button' id='lasDraw'>Tirer gagnant</button>" : ""));
-    if (s.break) parts.push("Break : " + esc(s.break.status) + " · " + Number(s.break.remainingSpots != null ? s.break.remainingSpots : s.break.spots) + " spots restants");
+    if (s.break) {
+      parts.push("Break : " + esc(s.break.status) + " · " + Number(s.break.remainingSpots != null ? s.break.remainingSpots : s.break.spots) + " spots restants");
+      if (s.break.auctionSequence && Array.isArray(s.break.boosterLabels)) {
+        var currentIndex = Math.max(0, Number(s.break.currentBoosterIndex || 0));
+        var auctionEndedWithWinner = s.auction && s.auction.status === "ended" && s.auction.highestBidder && Number(s.auction.boosterNumber || 0) === currentIndex + 1;
+        var readyIndex = auctionEndedWithWinner ? currentIndex + 1 : currentIndex;
+        var readyLabel = s.break.boosterLabels[readyIndex] || "";
+        var auctionRunning = s.auction && s.auction.status === "running";
+        if (readyLabel) {
+          parts.push("<div class='live-booster-next'><div><small>PROCHAIN BOOSTER</small><strong>#" + (readyIndex + 1) + " " + esc(s.break.productName || "Booster") + "</strong><span>" + esc(readyLabel) + "</span></div><button type='button' id='lasNextBoosterAuction' class='live-booster-arrow'" + (auctionRunning ? " disabled title='Une enchère est déjà en cours'" : " title='Lancer l’enchère de ce booster'") + ">→</button></div>");
+        } else {
+          parts.push("<div class='live-booster-complete'>✓ Tous les boosters ont été traités.</div>");
+        }
+      }
+    }
     n.innerHTML = parts.join("<br>") || "Aucune action en cours.";
+    var nextBooster = document.getElementById("lasNextBoosterAuction");
+    if (nextBooster) nextBooster.onclick = function () {
+      if (nextBooster.disabled) return;
+      nextBooster.disabled = true;
+      postAction("booster-auction/next", { startPrice: Number((s.break && s.break.pricePerSpot) || 1), durationSeconds: Number(prefs().auctionDuration || 30) });
+    };
     var stop = document.getElementById("lasAuctionStop");
     if (stop) stop.onclick = function () { postAction("auction/stop", {}); };
     var draw = document.getElementById("lasDraw");
