@@ -42,6 +42,7 @@ export function normalizePickupPoint(raw) {
   const address = clean(raw.address || [raw.street, raw.houseNumber].filter(Boolean).join(" "), 200);
   const postalCode = clean(raw.postalCode, 12);
   const city = clean(raw.city, 80);
+  const sendcloudServicePointId = clean(raw.sendcloudServicePointId, 40);
   if (!id || !name || !address || !postalCode || !city) return null;
   return {
     id,
@@ -51,7 +52,8 @@ export function normalizePickupPoint(raw) {
     city,
     countryCode: (clean(raw.countryCode || raw.country || "FR", 2).toUpperCase() || "FR"),
     carrierCode: "mondial_relay",
-    carrierServicePointId: clean(raw.carrierServicePointId || id, 20)
+    carrierServicePointId: clean(raw.carrierServicePointId || id, 20),
+    sendcloudServicePointId: /^\d+$/.test(sendcloudServicePointId) ? sendcloudServicePointId : ""
   };
 }
 
