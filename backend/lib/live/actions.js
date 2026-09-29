@@ -165,7 +165,12 @@ export async function launchPreparedGame(liveId){
   else if(type==="giveaway_subscriber")result=startGiveaway(liveId,{productId,durationSeconds:cfg.durationSeconds||60,eligibility:"subscriber"});
   else if(type==="giveaway_buyer")result=startBuyerGiveaway(liveId,{productId,durationSeconds:cfg.durationSeconds||60});
   else if(type==="energy_game")result=await startEnergyGame(liveId,{...cfg});
-  else result=startBreak(liveId,{productId,...cfg,breakType:type});
+  else {
+    result=startBreak(liveId,{productId,...cfg,breakType:type});
+    if(["box_break","hit_run_ex","hit_run_ar","hit_run_full_art"].includes(type)){
+      result={break:result,auction:startNextBoosterAuction(liveId,{startPrice:cfg.pricePerSpot,durationSeconds:cfg.durationSeconds||30})};
+    }
+  }
   const current=stateFor(liveId,true);current.state.preparedGame={...prepared,status:"launched",launchedAt:nowIso()};current.state.updatedAt=nowIso();save(current.d);
   return{prepared:structuredClone(current.state.preparedGame),result};
 }
