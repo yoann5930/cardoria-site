@@ -4,34 +4,38 @@ import fs from "node:fs";
 
 const source = fs.readFileSync("js/admin/admin-orders.js", "utf8");
 const runtime = fs.readFileSync("backend/public/js/admin/admin-orders.js", "utf8");
+const route = fs.readFileSync("backend/routes/payments-admin.js", "utf8");
+const flow = fs.readFileSync("backend/lib/boutique/shipment-creation.js", "utf8");
 
-test("saving an Expédiée Colissimo order auto-creates a label when tracking is empty", () => {
-  assert.match(source, /data\.status==="Expédiée" && data\.carrier==="Colissimo \(La Poste\)" && !String\(data\.tracking\|\|""\)\.trim\(\)/);
-  assert.match(source, /\/colissimo-label/);
-  assert.match(source, /weightGrams:Math\.trunc\(weight\)/);
+test("moving a paid Boutique order to En préparation creates the shipment server-side", () => {
+  assert.match(route, /nextStatus === "En préparation"/);
+  assert.match(route, /createBoutiqueShipmentForPreparation\(current\.id/);
+  assert.match(route, /shipmentCreated/);
+  assert.match(flow, /createColissimoLabel/);
+  assert.match(flow, /createSendcloudShipment/);
 });
 
-test("Colissimo tracking number is injected in the tracking input before the order update", () => {
-  assert.match(source, /data\.tracking=String\(label\.trackingNumber\|\|label\.parcelNumber\|\|""\)\.trim\(\)/);
-  assert.match(source, /trackingInput\.value=data\.tracking/);
-  const createIndex = source.indexOf('/colissimo-label');
-  const putIndex = source.indexOf('method:"PUT",body:JSON.stringify(data)');
-  assert.ok(createIndex >= 0 && putIndex > createIndex, "label creation must happen before the order PUT");
+test("tracking is persisted by the shipment flow before the admin UI reloads the order", () => {
+  assert.match(flow, /current\.tracking = clean\(shipment\.trackingNumber/);
+  assert.match(flow, /current\.colissimoParcelNumber = clean\(shipment\.parcelNumber/);
+  assert.match(flow, /current\.status = "En préparation"/);
+  assert.match(source, /savedTracking=String\(d\.order\?\.tracking\|\|""\)\.trim\(\)/);
 });
 
 test("an existing Colissimo parcel number is displayed as a tracking fallback", () => {
   assert.match(source, /o\.tracking\|\|o\.colissimoParcelNumber\|\|""/);
 });
 
-test("automatic label purchase remains gated by Colissimo production readiness", () => {
-  assert.match(source, /colissimo\.configured && colissimo\.senderConfigured && colissimo\.labelPurchasesEnabled/);
-  assert.match(source, /Colissimo n’est pas encore prêt pour créer une étiquette réelle/);
+test("automatic label purchase remains gated by server-side Colissimo production readiness", () => {
+  assert.match(flow, /getColissimoStatus\(\)/);
+  assert.match(flow, /!status\.configured \|\| !status\.senderConfigured \|\| !status\.labelPurchasesEnabled/);
+  assert.match(flow, /COLISSIMO_NOT_READY/);
 });
 
-test("saving keeps the existing tracking email flow after shipment", () => {
-  assert.match(source, /d\.emailNotification\.sent/);
-  assert.match(source, /Mail de suivi envoyé/);
-  assert.match(source, /Commande expédiée · suivi/);
+test("admin no longer contains a second manual Colissimo label purchase path", () => {
+  assert.doesNotMatch(source, /\/colissimo-label/);
+  assert.doesNotMatch(source, /data-colissimo-create/);
+  assert.match(source, /\/shipping-label/);
 });
 
 test("source and OVH runtime stay identical", () => {

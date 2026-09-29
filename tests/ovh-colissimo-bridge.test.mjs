@@ -15,7 +15,7 @@ test("Colissimo OVH credentials use a fixed stdin-only secure bridge", () => {
   const lib = read("backend/lib/colissimo.js");
 
   assert.match(dispatch, /- colissimo-configure/);
-  assert.match(run, /colissimo-configure\|mondial-relay-configure\) ;;/);
+  assert.match(run, /mondial-relay-configure\|sendcloud-configure\|live-test-audit\|live-test-cleanup\) ;;/);
   assert.match(run, /COLISSIMO_API_KEY: \$\{\{ secrets\.OVH_COLISSIMO_API_KEY \}\}/);
   assert.match(run, /printf '%s' "\$COLISSIMO_API_KEY" \| ssh/);
   assert.match(run, /test -n "\$\{COLISSIMO_API_KEY:-\}"/);
@@ -43,9 +43,11 @@ test("Colissimo OVH credentials use a fixed stdin-only secure bridge", () => {
 test("Colissimo label creation stays gated and does not replace Mondial Relay", () => {
   const live = read("backend/lib/live/shipments.js");
   const admin = read("backend/routes/payments-admin.js");
+  const boutiqueFlow = read("backend/lib/boutique/shipment-creation.js");
   assert.match(live, /mondialRelayLabelPurchasesEnabled/);
   assert.match(live, /MONDIAL_RELAY_LABELS_NOT_ACTIVATED/);
   assert.match(admin, /Mondial Relay/);
-  assert.match(admin, /createColissimoLabel/);
+  assert.match(boutiqueFlow, /createColissimoLabel/);
+  assert.match(boutiqueFlow, /createSendcloudShipment/);
   assert.doesNotMatch(live, /createColissimoLabel/);
 });
