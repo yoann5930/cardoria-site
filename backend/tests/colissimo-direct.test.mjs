@@ -122,24 +122,29 @@ test("real Colissimo label creation stays locked until explicitly enabled", asyn
   });
 });
 
-test("Boutique admin route protects duplicate labels and reconciliation ambiguity", () => {
+test("Boutique preparation flow protects duplicate Colissimo labels and reconciliation ambiguity", () => {
   const routes = fs.readFileSync("backend/routes/payments-admin.js", "utf8");
-  assert.match(routes, /boutique-orders\/:id\/colissimo-label/);
-  assert.match(routes, /COLISSIMO_LABEL_ALREADY_CREATED/);
-  assert.match(routes, /COLISSIMO_LABEL_IN_PROGRESS/);
-  assert.match(routes, /withColissimoLabelLock/);
-  assert.match(routes, /COLISSIMO_RECONCILIATION_REQUIRED/);
-  assert.match(routes, /paymentStatus !== "paid"/);
-  assert.match(routes, /shippingWeightGrams/);
+  const flow = fs.readFileSync("backend/lib/boutique/shipment-creation.js", "utf8");
+  assert.match(routes, /nextStatus === "En préparation"/);
+  assert.match(routes, /createBoutiqueShipmentForPreparation\(current\.id/);
+  assert.match(flow, /shipmentCreation/);
+  assert.match(flow, /creation_pending/);
+  assert.match(flow, /reconciliation_required/);
+  assert.match(flow, /SHIPMENT_CREATION_IN_PROGRESS/);
+  assert.match(flow, /SHIPMENT_RECONCILIATION_REQUIRED/);
+  assert.match(flow, /paymentStatus !== "paid"/);
+  assert.match(flow, /resolveBoutiqueOrderWeight/);
+  assert.match(flow, /createColissimoLabel/);
   assert.match(routes, /downloadColissimoLabel/);
 });
 
-test("admin order UI exposes Colissimo weight, create and download controls", () => {
+test("admin order UI keeps shipment creation server-side and only exposes persisted label actions", () => {
   const source = fs.readFileSync("js/admin/admin-orders.js", "utf8");
   const runtime = fs.readFileSync("backend/public/js/admin/admin-orders.js", "utf8");
-  assert.match(source, /Poids du colis \(g\)/);
-  assert.match(source, /data-colissimo-create/);
-  assert.match(source, /data-colissimo-download/);
-  assert.match(source, /rapprochement requis dans la Cbox/i);
+  assert.doesNotMatch(source, /data-colissimo-create/);
+  assert.match(source, /data-shipping-label/);
+  assert.match(source, /data-shipping-print/);
+  assert.match(source, /Le passage à <strong>En préparation<\/strong> crée automatiquement l’étiquette réelle/);
+  assert.match(source, /readonly placeholder="Enregistré par le parcours d’expédition"/);
   assert.equal(runtime, source);
 });
