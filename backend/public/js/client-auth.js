@@ -206,6 +206,15 @@
     setMessage("");
   }
 
+  function refreshRegisterAccountTypeFields() {
+    const select = qs("clientRegisterAccountType");
+    const fields = qs("clientRegisterProfessionalFields");
+    const siret = qs("clientRegisterSiret");
+    const pro = select && select.value === "professional";
+    if (fields) fields.hidden = !pro;
+    if (siret) siret.required = !!pro;
+  }
+
   function refreshAccountTypeFields() {
     const select = qs("clientAccountType");
     const fields = qs("clientProfessionalFields");
@@ -314,15 +323,26 @@
     setMessage("Création du compte...");
     try {
       const password = qs("clientRegisterPassword").value;
+      const accountType = qs("clientRegisterAccountType")?.value === "professional" ? "professional" : "individual";
+      const siret = String(qs("clientRegisterSiret")?.value || "").replace(/\D/g, "");
       if (password.length < 10 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) throw new Error("Le mot de passe doit contenir au moins 10 caractères, avec des lettres et des chiffres.");
+      if (accountType === "professional" && !/^\d{14}$/.test(siret)) throw new Error("Saisissez votre SIRET professionnel à 14 chiffres.");
       const data = await api("/api/auth/register", {
         method: "POST",
-        body: JSON.stringify({ name: qs("clientRegisterName").value.trim(), email: qs("clientRegisterEmail").value.trim(), password })
+        body: JSON.stringify({
+          name: qs("clientRegisterName").value.trim(),
+          email: qs("clientRegisterEmail").value.trim(),
+          password,
+          accountType,
+          siret: accountType === "professional" ? siret : ""
+        })
       });
       if (!isClient(data.user)) throw new Error("Création du compte client impossible.");
       setToken(data.token);
       showAccount(data.user);
-      setMessage("");
+      setMessage(accountType === "professional"
+        ? "Compte professionnel créé. Votre SIRET est enregistré et votre accès Liveur est lié à ce compte."
+        : "Compte particulier créé. La Marketplace est accessible avec ce compte.", "success");
     } catch (e) {
       setToken("");
       setMessage(e.message, "error");
@@ -637,6 +657,8 @@
     qs("clientRegisterTab")?.addEventListener("click", () => showForm("register"));
     qs("clientLoginForm")?.addEventListener("submit", login);
     qs("clientRegisterForm")?.addEventListener("submit", register);
+    qs("clientRegisterAccountType")?.addEventListener("change", refreshRegisterAccountTypeFields);
+    refreshRegisterAccountTypeFields();
     qs("clientLogoutButton")?.addEventListener("click", logout);
     qs("clientProfileForm")?.addEventListener("submit", saveProfile);
     qs("clientAccountType")?.addEventListener("change", refreshAccountTypeFields);
