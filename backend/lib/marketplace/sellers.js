@@ -17,6 +17,29 @@ export function getSellerByAuthUserId(authUserId) {
   return row ? toSeller(row) : null;
 }
 
+export function getOrLinkSellerForAuthenticatedUser({ authUserId, email }) {
+  const ownerId = String(authUserId || "").trim();
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!ownerId) return null;
+
+  const linked = getSellerByAuthUserId(ownerId);
+  if (linked) return linked;
+  if (!normalizedEmail) return null;
+
+  const db = getDb();
+  const legacy = db.prepare("SELECT id, auth_user_id FROM mk_sellers WHERE email = ?").get(normalizedEmail);
+  if (!legacy) return null;
+
+  const currentOwner = String(legacy.auth_user_id || "").trim();
+  if (currentOwner && currentOwner !== ownerId) return null;
+
+  if (!currentOwner) {
+    db.prepare("UPDATE mk_sellers SET auth_user_id = ? WHERE id = ? AND COALESCE(auth_user_id,'') = ''")
+      .run(ownerId, legacy.id);
+  }
+  return getSellerByAuthUserId(ownerId);
+}
+
 export function registerSeller({ email, displayName, sellerType, bio, authUserId, professionalVerification = null }) {
   const db = getDb();
   const normalizedEmail = String(email || "").trim().toLowerCase();
