@@ -50,6 +50,10 @@ async function ensureRemoteSchema(client) {
   await client.query(`ALTER TABLE mk_sellers ADD COLUMN IF NOT EXISTS professional_verified_at TEXT DEFAULT ''`);
   await client.query(`ALTER TABLE mk_sellers ADD COLUMN IF NOT EXISTS professional_legal_name TEXT DEFAULT ''`);
   await client.query(`ALTER TABLE mk_sellers ADD COLUMN IF NOT EXISTS professional_verification_source TEXT DEFAULT ''`);
+  await client.query(`ALTER TABLE mk_sellers ADD COLUMN IF NOT EXISTS professional_siren TEXT DEFAULT ''`);
+  await client.query(`ALTER TABLE mk_sellers ADD COLUMN IF NOT EXISTS professional_activity_code TEXT DEFAULT ''`);
+  await client.query(`ALTER TABLE mk_sellers ADD COLUMN IF NOT EXISTS professional_legal_category TEXT DEFAULT ''`);
+  await client.query(`ALTER TABLE mk_sellers ADD COLUMN IF NOT EXISTS professional_establishment_address TEXT DEFAULT ''`);
   await client.query(`ALTER TABLE mk_orders ADD COLUMN IF NOT EXISTS shipping_pickup_point_json TEXT DEFAULT ''`);
   await client.query(`CREATE INDEX IF NOT EXISTS idx_mk_sellers_auth_user ON mk_sellers(auth_user_id)`);
 }
