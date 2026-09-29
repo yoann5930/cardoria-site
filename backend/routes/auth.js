@@ -37,7 +37,7 @@ function validPassword(value) {
 function publicUser(user) {
   return {
     id: user.id, email: user.email, role: user.role, name: user.name, totpEnabled: !!user.totpEnabled,
-    firstName: user.firstName || "", lastName: user.lastName || "", phone: user.phone || "",
+    firstName: user.firstName || "", lastName: user.lastName || "", phone: user.phone || "", accountType: user.accountType === "professional" ? "professional" : "individual",
     addressLine1: user.addressLine1 || "", addressLine2: user.addressLine2 || "",
     postalCode: user.postalCode || "", city: user.city || "", country: user.country || "FR",
     shippingPreference: user.shippingPreference || "mondial_relay",
