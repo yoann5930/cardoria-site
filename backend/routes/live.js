@@ -31,6 +31,14 @@ function fail(res, error, fallback = 400) {
   return res.status(status).json({ ok: false, error: error?.message || "Erreur Live", code: typeof error?.code === "string" ? error.code : "", provider: error?.provider || error?.expectedProvider, expectedProvider: error?.expectedProvider, requestedProvider: error?.requestedProvider });
 }
 function sellerActor(req) {
+  const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "") || String(req.headers["x-session-token"] || "");
+  const user = validateSession(token);
+  if (!user || user.role !== "client") {
+    throw Object.assign(new Error("Connexion client Cardoria requise."), { status: 401, code: "CLIENT_SESSION_REQUIRED" });
+  }
+  if (user.accountType !== "professional") {
+    throw Object.assign(new Error("Activez le profil Professionnel dans Mon compte pour accéder au Studio Live."), { status: 403, code: "CLIENT_PROFESSIONAL_PROFILE_REQUIRED" });
+  }
   const seller = assertSellerSession(req);
   if (seller.sellerType !== "professional" || !seller.professionalVerified) {
     throw Object.assign(new Error("Le Live vendeur est réservé aux professionnels dont le SIRET a été vérifié."), {
