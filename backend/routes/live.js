@@ -30,7 +30,16 @@ function fail(res, error, fallback = 400) {
   const status = Number.isInteger(raw) && raw >= 400 && raw <= 599 ? raw : fallback;
   return res.status(status).json({ ok: false, error: error?.message || "Erreur Live", code: typeof error?.code === "string" ? error.code : "", provider: error?.provider || error?.expectedProvider, expectedProvider: error?.expectedProvider, requestedProvider: error?.requestedProvider });
 }
-function sellerActor(req) { const seller = assertSellerSession(req); return { role: "seller", sellerId: seller.id, id: seller.id, email: seller.email, seller }; }
+function sellerActor(req) {
+  const seller = assertSellerSession(req);
+  if (seller.sellerType !== "professional" || !seller.professionalVerified) {
+    throw Object.assign(new Error("Le Live vendeur est réservé aux professionnels dont le SIRET a été vérifié."), {
+      status: 403,
+      code: "SELLER_PROFESSIONAL_VERIFICATION_REQUIRED"
+    });
+  }
+  return { role: "seller", sellerId: seller.id, id: seller.id, email: seller.email, seller };
+}
 function assertSellerLiveCanStart(actor, liveId) {
   const session = getLiveSession(liveId);
   if (!session) throw Object.assign(new Error("Live introuvable."), { status: 404 });
@@ -39,9 +48,6 @@ function assertSellerLiveCanStart(actor, liveId) {
   }
   if (["ended", "cancelled"].includes(String(session.status || "").toLowerCase())) {
     throw Object.assign(new Error("Ce Live est fermé et ne peut pas être redémarré."), { status: 409 });
-  }
-  if (!actor?.seller?.senderReady) {
-    throw Object.assign(new Error("Renseignez l'adresse d'expédition du vendeur avant de démarrer le Live."), { status: 409, code: "SELLER_SENDER_PROFILE_REQUIRED" });
   }
   return session;
 }

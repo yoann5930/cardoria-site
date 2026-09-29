@@ -20,8 +20,13 @@
   function getAccount() { try { return JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch (_) { return null; } }
   function setSession(data) {
     if (!data || !data.token) return;
+    var previous = getAccount();
+    var next = data.user || null;
     localStorage.setItem(TOKEN_KEY, data.token); localStorage.removeItem(LEGACY_TOKEN_KEY);
-    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(data.user || null));
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(next));
+    if (!previous || !next || String(previous.id || "") !== String(next.id || "")) {
+      localStorage.removeItem(SELLER_KEY);
+    }
   }
   function logout() {
     var token = getToken();
@@ -38,6 +43,13 @@
     return fetch(url, opts).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || d.ok === false) { var e = new Error(d.error || "Erreur Cardoria"); e.status = r.status; throw e; } return d; }); });
   }
   function api(path, opts) { return fetchJson(BACKEND + "/api/marketplace" + path, opts); }
+  function syncSeller() {
+    if (!getToken()) { setSeller(null); return Promise.resolve(null); }
+    return api("/v1/paypal/sellers/me").then(function (d) {
+      setSeller(d.seller || null);
+      return d.seller || null;
+    });
+  }
   function auth(path, opts) { return fetchJson(BACKEND + "/api/auth" + path, opts); }
   function login(email, password) { return auth("/login", { method: "POST", body: JSON.stringify({ email: email, password: password }) }).then(function (d) { setSession(d); return d; }); }
   function register(email, password, name) { return auth("/register", { method: "POST", body: JSON.stringify({ email: email, password: password, name: name }) }).then(function (d) { setSession(d); return d; }); }
@@ -50,5 +62,5 @@
   function sellerBadge(seller) { if (!seller) return ""; var html = ""; if (seller.verified) html += '<span class="mk-badge mk-badge-verified">✓ Vérifié</span> '; if (seller.sellerType === "professional") html += '<span class="mk-badge mk-badge-pro">Pro</span>'; return html; }
   function statusClass(s) { if (["paid", "delivered"].includes(s)) return "mk-status-paid"; if (["shipped", "preparing"].includes(s)) return "mk-status-shipped"; return "mk-status-pending"; }
 
-  global.CardoriaMarketplace = { BACKEND: BACKEND, getUserId: getUserId, getSeller: getSeller, setSeller: setSeller, getToken: getToken, getAccount: getAccount, setSession: setSession, logout: logout, authHeaders: authHeaders, api: api, auth: auth, login: login, register: register, me: me, euro: euro, esc: esc, listingUrl: listingUrl, sellerUrl: sellerUrl, compareUrl: compareUrl, sellerBadge: sellerBadge, statusClass: statusClass };
+  global.CardoriaMarketplace = { BACKEND: BACKEND, getUserId: getUserId, getSeller: getSeller, setSeller: setSeller, syncSeller: syncSeller, getToken: getToken, getAccount: getAccount, setSession: setSession, logout: logout, authHeaders: authHeaders, api: api, auth: auth, login: login, register: register, me: me, euro: euro, esc: esc, listingUrl: listingUrl, sellerUrl: sellerUrl, compareUrl: compareUrl, sellerBadge: sellerBadge, statusClass: statusClass };
 })(window);

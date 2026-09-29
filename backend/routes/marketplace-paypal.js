@@ -1,6 +1,7 @@
 /** Routes PayPal Marketplace Cardoria. */
 import { Router } from "express";
-import { getSeller, getSellerByAuthUserId, registerSeller } from "../lib/marketplace/sellers.js";
+import { getSeller, getSellerByAuthUserId, registerSeller, updateSellerProfessionalVerification } from "../lib/marketplace/sellers.js";
+import { verifyFrenchProfessionalSiret } from "../lib/marketplace/professional-verification.js";
 import { getCart, createOrdersFromCart } from "../lib/marketplace/v1/cart.js";
 import { updateOrderStatus } from "../lib/marketplace/orders.js";
 import { getMarketplacePersistenceStatus } from "../lib/marketplace/persistence.js";
@@ -42,12 +43,38 @@ router.post("/v1/paypal/webhook", async (req, res) => {
   try { res.json({ ok: true, ...(await handlePayPalWebhook(req.headers, req.body || {})) }); }
   catch (error) { fail(res, error); }
 });
-router.post("/v1/paypal/sellers/register", (req, res) => {
+router.post("/v1/paypal/sellers/register", async (req, res) => {
   try {
     const user = getMarketplaceUser(req);
     let seller = getSellerByAuthUserId(user.id);
-    if (!seller) seller = registerSeller({ email: user.email, authUserId: user.id, displayName: String(req.body?.displayName || user.name || user.email.split("@")[0]).trim().slice(0, 120), sellerType: req.body?.sellerType === "professional" ? "professional" : "individual" });
+    if (!seller) {
+      const sellerType = req.body?.sellerType === "professional" ? "professional" : "individual";
+      let professionalVerification = null;
+      if (sellerType === "professional") {
+        professionalVerification = await verifyFrenchProfessionalSiret(req.body?.siret);
+      }
+      seller = registerSeller({
+        email: user.email,
+        authUserId: user.id,
+        displayName: String(req.body?.displayName || user.name || user.email.split("@")[0]).trim().slice(0, 120),
+        sellerType,
+        professionalVerification
+      });
+    }
     res.json({ ok: true, seller });
+  } catch (error) { fail(res, error); }
+});
+router.get("/v1/paypal/sellers/me", (req, res) => {
+  try {
+    const user = getMarketplaceUser(req);
+    res.json({ ok: true, seller: getSellerByAuthUserId(user.id) || null });
+  } catch (error) { fail(res, error); }
+});
+router.post("/v1/paypal/sellers/:id/verify-professional", async (req, res) => {
+  try {
+    const seller = assertSellerSession(req, req.params.id);
+    const verification = await verifyFrenchProfessionalSiret(req.body?.siret);
+    res.json({ ok: true, seller: updateSellerProfessionalVerification(seller.id, verification), verification });
   } catch (error) { fail(res, error); }
 });
 router.post("/v1/paypal/sellers/:id/onboard", async (req, res) => {

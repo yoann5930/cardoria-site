@@ -1,5 +1,6 @@
 // Public Live account chat regression coverage.
 import { setSellerPlan } from "../lib/subscriptions/seller-plans.js";
+import { updateSellerProfessionalVerification } from "../lib/marketplace/sellers.js";
 
 const BASE = process.env.TEST_BASE_URL || "http://127.0.0.1:10000";
 const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -31,6 +32,13 @@ const sellerRegistration = await auth(token, "/api/marketplace/v1/paypal/sellers
   body: JSON.stringify({ displayName: "Live Public Seller", sellerType: "individual" })
 });
 assert(sellerRegistration.response.status === 200 && sellerRegistration.body.seller?.id, "Seller profile registration failed");
+updateSellerProfessionalVerification(sellerRegistration.body.seller.id, {
+  verified: true,
+  siret: "33333333333333",
+  legalName: "Live Public Seller Test Pro",
+  source: "live-public-e2e",
+  verifiedAt: new Date().toISOString()
+});
 
 const maliciousTitle = `<img src=x onerror=alert(1)> Live Public ${suffix}`;
 const maliciousProduct = `<script>alert(1)</script> Booster ${suffix}`;
@@ -64,9 +72,7 @@ const draftViewer = await json("/api/live/webrtc/viewer/start", {
 });
 assert(draftViewer.response.status === 404, "Viewer can join a draft live");
 
-// An incomplete sender profile must not silently pass the new live prerequisite.
-const incomplete = await auth(token, `/api/live/seller/sessions/${encodeURIComponent(liveId)}/start`, { method: "POST", body: "{}" });
-assert(incomplete.response.status === 409, "Missing sender address did not block live start");
+// Shipping details may be completed after Live access; they must not gate Studio access.
 const sellerId = sellerRegistration.body.seller.id;
 const sender = await auth(token, `/api/marketplace/v1/sellers/${encodeURIComponent(sellerId)}/sender-profile`, {
   method: "PUT",
@@ -128,6 +134,13 @@ const eliteSellerRegistration = await auth(eliteToken, "/api/marketplace/v1/payp
 });
 assert(eliteSellerRegistration.response.status === 200 && eliteSellerRegistration.body.seller?.id, "Elite seller profile registration failed");
 const eliteSellerId = eliteSellerRegistration.body.seller.id;
+updateSellerProfessionalVerification(eliteSellerId, {
+  verified: true,
+  siret: "44444444444444",
+  legalName: "Live Elite Seller Test Pro",
+  source: "live-public-e2e",
+  verifiedAt: new Date().toISOString()
+});
 setSellerPlan(eliteSellerId, "elite", { status: "active" });
 const eliteSender = await auth(eliteToken, `/api/marketplace/v1/sellers/${encodeURIComponent(eliteSellerId)}/sender-profile`, {
   method: "PUT",

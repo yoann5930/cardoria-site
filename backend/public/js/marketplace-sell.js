@@ -27,14 +27,28 @@
 
   function renderRegistration() {
     var account = M.getAccount();
-    root.innerHTML = '<section class="mk-seller-onboarding"><span class="mk-eyebrow">VENDEUR MARKETPLACE</span><h1>Créer mon profil vendeur</h1><p>Compte connecté : <strong>' + esc(account.email) + '</strong>. Le profil vendeur sera lié définitivement à cette identité.</p><div class="mk-form-grid"><input id="sName" placeholder="Nom affiché" value="' + esc(account.name || "") + '"><select id="sType"><option value="individual">Particulier</option><option value="professional">Professionnel</option></select><button class="mk-btn mk-btn-primary" type="button" id="createSellerBtn">Créer mon profil vendeur</button></div><p class="mk-paypal-note">' + esc(commissionText()) + '</p><div id="sellResult"></div></section>';
+    root.innerHTML = '<section class="mk-seller-onboarding"><span class="mk-eyebrow">VENDEUR CARDORIA</span><h1>Créer mon profil vendeur</h1><p>Compte connecté : <strong>' + esc(account.email) + '</strong>. Pour diffuser un Live, le compte doit être professionnel et son SIRET vérifié.</p><div class="mk-form-grid"><input id="sName" placeholder="Nom affiché" value="' + esc(account.name || "") + '"><select id="sType"><option value="professional" selected>Professionnel</option><option value="individual">Particulier (Marketplace uniquement)</option></select><input id="sSiret" inputmode="numeric" maxlength="14" placeholder="SIRET — 14 chiffres"><button class="mk-btn mk-btn-primary" type="button" id="createSellerBtn">Créer mon profil vendeur</button></div><p class="mk-paypal-note">Le SIRET professionnel est contrôlé automatiquement dans les données publiques SIRENE/INSEE. PayPal pourra être activé ensuite et ne bloque pas l’accès au Studio Live.</p><div id="sellResult"></div></section>';
+    var type = document.getElementById("sType"), siret = document.getElementById("sSiret");
+    type.onchange = function () { siret.style.display = type.value === "professional" ? "" : "none"; };
     document.getElementById("createSellerBtn").onclick = function () {
-      api("/v1/paypal/sellers/register", { method: "POST", body: JSON.stringify({ displayName: document.getElementById("sName").value.trim(), sellerType: document.getElementById("sType").value }) }).then(function (d) { M.setSeller(d.seller); render(); }).catch(function (e) { showResult(e.message, true); });
+      var sellerType = type.value;
+      var body = { displayName: document.getElementById("sName").value.trim(), sellerType: sellerType };
+      if (sellerType === "professional") body.siret = siret.value.replace(/\D/g, "");
+      showResult(sellerType === "professional" ? "Vérification du SIRET en cours…" : "Création du profil…", false);
+      api("/v1/paypal/sellers/register", { method: "POST", body: JSON.stringify(body) }).then(function (d) { M.setSeller(d.seller); render(); }).catch(function (e) { showResult(e.message, true); });
+    };
+  }
+
+  function renderProfessionalVerification(seller) {
+    root.innerHTML = '<section class="mk-seller-onboarding"><span class="mk-eyebrow">VÉRIFICATION PROFESSIONNELLE</span><h1>Vérifier votre SIRET</h1><p>Le Studio Live est réservé aux professionnels. Cardoria vérifie automatiquement le SIRET dans les données publiques SIRENE/INSEE.</p><div class="mk-form-grid"><input id="verifySiret" inputmode="numeric" maxlength="14" placeholder="SIRET — 14 chiffres" value="' + esc(seller.siret || "") + '"><button class="mk-btn mk-btn-primary" type="button" id="verifySiretBtn">Vérifier mon entreprise</button></div><div id="sellResult"></div></section>';
+    document.getElementById("verifySiretBtn").onclick = function () {
+      showResult("Vérification du SIRET en cours…", false);
+      api("/v1/paypal/sellers/" + encodeURIComponent(seller.id) + "/verify-professional", { method: "POST", body: JSON.stringify({ siret: document.getElementById("verifySiret").value.replace(/\D/g, "") }) }).then(function (d) { M.setSeller(d.seller); render(); }).catch(function (e) { showResult(e.message, true); });
     };
   }
 
   function renderPayPalActivation(seller) {
-    root.innerHTML = '<section class="mk-seller-onboarding"><span class="mk-eyebrow">PAIEMENT VENDEUR</span><h1>Activez les règlements PayPal</h1><p>Bonjour <strong>' + esc(seller.displayName) + '</strong>. PayPal doit relier votre compte vendeur avant publication.</p><div class="mk-paypal-status"><strong>Statut PayPal</strong><span>' + (seller.paypalOnboardingStatus === "pending" ? "Activation en cours" : "À activer") + '</span></div><p class="mk-paypal-note">' + esc(commissionText()) + '</p><div class="mk-actions"><button class="mk-btn mk-btn-primary" type="button" id="paypalOnboardBtn">Activer PayPal</button><button class="mk-btn mk-btn-secondary" type="button" id="paypalRefreshBtn">Vérifier mon activation</button></div><div id="sellResult"></div></section>';
+    root.innerHTML = '<section class="mk-seller-onboarding"><span class="mk-eyebrow">COMPTE VENDEUR ACTIF</span><h1>Votre accès Live est prêt</h1><p><strong>' + esc(seller.professionalLegalName || seller.displayName) + '</strong> — SIRET vérifié : ' + esc(seller.siret || "") + '.</p><div class="mk-actions"><a class="mk-btn mk-btn-primary" href="/live-vendeur.html">Accéder au Studio Live</a> <button class="mk-btn mk-btn-secondary" type="button" id="paypalOnboardBtn">Renseigner / activer PayPal</button><button class="mk-btn mk-btn-secondary" type="button" id="paypalRefreshBtn">Vérifier PayPal</button></div><div class="mk-paypal-status"><strong>PayPal</strong><span>' + (seller.paypalOnboardingStatus === "pending" ? "Activation en cours" : "Non activé — les encaissements restent bloqués") + '</span></div><p class="mk-paypal-note">PayPal n’empêche pas de créer, préparer ou diffuser un Live. Il devient obligatoire uniquement pour encaisser une vente.</p><div id="sellResult"></div></section>';
     document.getElementById("paypalOnboardBtn").onclick = function () { api("/v1/paypal/sellers/" + encodeURIComponent(seller.id) + "/onboard", { method: "POST", body: "{}" }).then(function (d) { if (!d.url) throw new Error("Lien PayPal indisponible."); location.href = d.url; }).catch(function (e) { showResult(e.message, true); }); };
     document.getElementById("paypalRefreshBtn").onclick = function () { syncSellerStatus(seller); };
   }
@@ -63,9 +77,26 @@
     if (!M.getToken() || !M.getAccount()) return renderAccount();
     var seller = M.getSeller();
     if (!seller) return renderRegistration();
+    if (seller.sellerType === "professional" && !seller.professionalVerified) return renderProfessionalVerification(seller);
     if (!seller.paypalReady && !isDemoMode()) return renderPayPalActivation(seller);
     renderListingForm(seller);
   }
-  function init() { api("/v1/paypal/config").then(function (d) { config = d; var seller = M.getSeller(); var params = new URLSearchParams(location.search); if (seller && params.get("paypal") === "return" && !isDemoMode()) return syncSellerStatus(seller); render(); }).catch(function (e) { root.innerHTML = '<div class="panel"><h1>Marketplace temporairement indisponible</h1><p>' + esc(e.message) + '</p></div>'; }); }
+  function syncCurrentSeller() {
+    if (!M.getToken()) return Promise.resolve(null);
+    return api("/v1/paypal/sellers/me").then(function (d) {
+      M.setSeller(d.seller || null);
+      return d.seller || null;
+    });
+  }
+  function init() {
+    api("/v1/paypal/config").then(function (d) {
+      config = d;
+      return syncCurrentSeller().catch(function () { return M.getSeller(); });
+    }).then(function (seller) {
+      var params = new URLSearchParams(location.search);
+      if (seller && params.get("paypal") === "return" && !isDemoMode()) return syncSellerStatus(seller);
+      render();
+    }).catch(function (e) { root.innerHTML = '<div class="panel"><h1>Marketplace temporairement indisponible</h1><p>' + esc(e.message) + '</p></div>'; });
+  }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();

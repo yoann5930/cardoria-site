@@ -1,3 +1,4 @@
+import { updateSellerProfessionalVerification } from "../lib/marketplace/sellers.js";
 const BASE=process.env.TEST_BASE_URL||"http://127.0.0.1:10000";
 const suffix=`${Date.now()}-${Math.floor(Math.random()*10000)}`,password="Live-Seller-E2E-2026!";
 function assert(condition,message){if(!condition)throw new Error(message);}
@@ -7,6 +8,8 @@ async function register(label){const email=`${label}-${suffix}@cardoria.invalid`
 async function registerSeller(account,displayName){const result=await auth(account.token,"/api/marketplace/v1/paypal/sellers/register",{method:"POST",body:JSON.stringify({displayName,sellerType:"individual"})});assert(result.response.status===200&&result.body.seller?.id,`Seller registration failed for ${displayName}`);return result.body.seller;}
 const sellerAccountA=await register("live-seller-a"),sellerAccountB=await register("live-seller-b"),buyer=await register("live-buyer");
 const sellerA=await registerSeller(sellerAccountA,"Live Seller A"),sellerB=await registerSeller(sellerAccountB,"Live Seller B");
+updateSellerProfessionalVerification(sellerA.id,{verified:true,siret:"11111111111111",legalName:"Live Seller A Test Pro",source:"live-seller-core-e2e",verifiedAt:new Date().toISOString()});
+updateSellerProfessionalVerification(sellerB.id,{verified:true,siret:"22222222222222",legalName:"Live Seller B Test Pro",source:"live-seller-core-e2e",verifiedAt:new Date().toISOString()});
 for(const[account,seller,city]of[[sellerAccountA,sellerA,"Paris"],[sellerAccountB,sellerB,"Lille"]]){
   const sender=await auth(account.token,`/api/marketplace/v1/sellers/${seller.id}/sender-profile`,{method:"PUT",body:JSON.stringify({name:seller.displayName,addressLine1:"1 rue Test",postalCode:city==="Paris"?"75001":"59000",city,countryCode:"FR",phone:"0600000000"})});assert(sender.response.status===200&&sender.body.ready===true,"Seller sender profile setup failed");
 }

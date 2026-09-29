@@ -74,10 +74,8 @@ jobs:
             exit 1
           fi
 
-      - name: Auto-sync runtime into current pull request branch
+      - name: Verify pull request runtime is synchronized
         if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -86,16 +84,9 @@ jobs:
             echo "Frontend runtime already synchronized."
             exit 0
           fi
-          branch="${{ github.event.pull_request.head.ref }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore(frontend): sync OVH runtime [frontend-runtime-sync]"
-          git push origin HEAD:"$branch"
-          echo "Frontend runtime synchronized automatically into PR branch $branch."
-          for workflow in cardoria-production-ci.yml security-admin-ci.yml final-audit-ci.yml; do
-            gh workflow run "$workflow" --ref "$branch"
-            echo "Dispatched required workflow: $workflow"
-          done
+          echo "::error::Frontend runtime drift detected. Commit the synchronized runtime in the pull request before merge."
+          git diff --cached --stat
+          exit 1
 
       - name: Verify main remains synchronized
         if: github.event_name == 'push'

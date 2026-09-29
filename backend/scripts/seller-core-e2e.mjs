@@ -1,5 +1,5 @@
 import { setSellerPlan } from "../lib/subscriptions/seller-plans.js";
-import { updateSellerPayPal } from "../lib/marketplace/sellers.js";
+import { updateSellerPayPal, updateSellerProfessionalVerification } from "../lib/marketplace/sellers.js";
 import { createOrder, updateOrderStatus } from "../lib/marketplace/orders.js";
 
 const BASE = process.env.TEST_BASE_URL || "http://127.0.0.1:10000";
@@ -52,6 +52,32 @@ const ownSubscription = await auth(sellerAccountA.token, `/api/marketplace/v1/se
 assert(ownSubscription.response.status === 200 && ownSubscription.body.subscription?.sellerId === sellerA.id, "Seller cannot read own subscription");
 const foreignSubscription = await auth(sellerAccountB.token, `/api/marketplace/v1/sellers/${sellerA.id}/subscription`);
 assert(foreignSubscription.response.status === 403, "Seller B can read Seller A subscription");
+
+const individualLiveAccess = await auth(sellerAccountA.token, "/api/live/seller/sessions");
+assert(individualLiveAccess.response.status === 403, "Individual seller can access Live seller studio");
+
+updateSellerProfessionalVerification(sellerA.id, {
+  verified: true,
+  siret: "12345678901234",
+  legalName: "Seller A Test Pro",
+  source: "seller-core-e2e",
+  verifiedAt: new Date().toISOString()
+});
+
+const professionalLiveAccess = await auth(sellerAccountA.token, "/api/live/seller/sessions");
+assert(professionalLiveAccess.response.status === 200, "Verified professional seller cannot access Live before PayPal activation");
+
+const liveBeforePaypal = await auth(sellerAccountA.token, "/api/live/seller/sessions", {
+  method: "POST",
+  body: JSON.stringify({ title: `Live Pro without PayPal ${suffix}`, category: "pokemon", products: [] })
+});
+assert(liveBeforePaypal.response.status === 200 && liveBeforePaypal.body.session?.id, "Verified professional seller cannot create Live before PayPal activation");
+
+const startedBeforePaypal = await auth(sellerAccountA.token, `/api/live/seller/sessions/${liveBeforePaypal.body.session.id}/start`, {
+  method: "POST",
+  body: "{}"
+});
+assert(startedBeforePaypal.response.status === 200 && startedBeforePaypal.body.session?.status === "live", "PayPal or sender profile still blocks Live start");
 
 const draft = await auth(sellerAccountA.token, "/api/marketplace/v1/listings", {
   method: "POST",
