@@ -50,6 +50,13 @@ export function assertActiveSellerPlan(sellerId) {
   return state;
 }
 
+export function listSellerPlanStates({ activeOnly = false } = {}) {
+  const rows = subscriptions().filter((item) => item && item.sellerId);
+  return rows
+    .map((item) => getSellerPlanState(item.sellerId))
+    .filter((state) => !activeOnly || state.active);
+}
+
 export function setSellerPlan(sellerId, planId, { status = "active", startedAt = new Date() } = {}) {
   const id = sellerIdValue(sellerId);
   const plan = assertSellerPlan(planId);

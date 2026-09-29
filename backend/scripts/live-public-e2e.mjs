@@ -39,6 +39,8 @@ updateSellerProfessionalVerification(sellerRegistration.body.seller.id, {
   source: "live-public-e2e",
   verifiedAt: new Date().toISOString()
 });
+const proProfile = await auth(token, "/api/auth/profile", { method: "PATCH", body: JSON.stringify({ accountType: "professional" }) });
+assert(proProfile.response.status === 200 && proProfile.body.user?.accountType === "professional", "Public seller account type upgrade failed");
 
 const maliciousTitle = `<img src=x onerror=alert(1)> Live Public ${suffix}`;
 const maliciousProduct = `<script>alert(1)</script> Booster ${suffix}`;
@@ -141,6 +143,8 @@ updateSellerProfessionalVerification(eliteSellerId, {
   source: "live-public-e2e",
   verifiedAt: new Date().toISOString()
 });
+const eliteProProfile = await auth(eliteToken, "/api/auth/profile", { method: "PATCH", body: JSON.stringify({ accountType: "professional" }) });
+assert(eliteProProfile.response.status === 200 && eliteProProfile.body.user?.accountType === "professional", "Elite seller account type upgrade failed");
 setSellerPlan(eliteSellerId, "elite", { status: "active" });
 const eliteSender = await auth(eliteToken, `/api/marketplace/v1/sellers/${encodeURIComponent(eliteSellerId)}/sender-profile`, {
   method: "PUT",

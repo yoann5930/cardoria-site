@@ -15,6 +15,7 @@ import { isMarketplaceDemoMode } from "../lib/marketplace/demo-mode.js";
 import { generateMarketplaceSitemapXml } from "../lib/seo/marketplace-sitemap.js";
 import { listSellerPlans } from "../lib/subscriptions/plans.js";
 import { getSellerPlanState } from "../lib/subscriptions/seller-plans.js";
+import { getSubscriptionInvoice, listSubscriptionInvoicesForSeller } from "../lib/subscriptions/invoices.js";
 import paypalMarketplaceRoutes from "./marketplace-paypal.js";
 
 const router = Router();
@@ -80,6 +81,20 @@ router.put("/v1/sellers/:id/sender-profile", (req, res) => {
 router.get("/v1/sellers/:id/subscription", (req, res) => {
   try { const seller = assertSellerSession(req, req.params.id); res.json({ ok: true, subscription: getSellerPlanState(seller.id) }); }
   catch (e) { fail(res, e, 403); }
+});
+router.get("/v1/sellers/:id/subscription-invoices", (req, res) => {
+  try {
+    const seller = assertSellerSession(req, req.params.id);
+    res.json({ ok: true, invoices: listSubscriptionInvoicesForSeller(seller.id) });
+  } catch (e) { fail(res, e, 403); }
+});
+router.get("/v1/sellers/:id/subscription-invoices/:invoiceNumber", (req, res) => {
+  try {
+    const seller = assertSellerSession(req, req.params.id);
+    const invoice = getSubscriptionInvoice(req.params.invoiceNumber, seller.id);
+    if (!invoice) return res.status(404).json({ ok: false, error: "Facture d’abonnement introuvable." });
+    res.type("text/html; charset=utf-8").send(invoice.html);
+  } catch (e) { fail(res, e, 403); }
 });
 router.get("/v1/sitemap/listings", (req, res) => res.json({ ok: true, entries: getListingsSitemapEntries(Number(req.query.limit) || 5000) }));
 router.get("/v1/sitemap.xml", (req, res) => {

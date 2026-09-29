@@ -18,15 +18,16 @@ export function getUserById(id) {
   return row ? mapUser(row) : null;
 }
 
-export function createUser({ email, password, role = "client", name = "" }) {
+export function createUser({ email, password, role = "client", name = "", accountType = "individual" }) {
   if (!ROLES.includes(role)) throw new Error("Rôle invalide");
   const db = getDb();
   const now = new Date().toISOString();
   const id = makeId("usr");
+  const normalizedAccountType = accountType === "professional" ? "professional" : "individual";
   db.prepare(`
-    INSERT INTO auth_users (id, email, password_hash, role, name, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, email.toLowerCase(), hashPassword(password), role, name, now, now);
+    INSERT INTO auth_users (id, email, password_hash, role, name, account_type, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, email.toLowerCase(), hashPassword(password), role, name, normalizedAccountType, now, now);
   return getUserById(id);
 }
 
@@ -60,6 +61,8 @@ export function updateClientProfile(userId, patch = {}) {
   const firstName = patch.firstName == null ? current.firstName : cleanProfile(patch.firstName, 80);
   const lastName = patch.lastName == null ? current.lastName : cleanProfile(patch.lastName, 80);
   const phone = patch.phone == null ? current.phone : cleanProfile(patch.phone, 32);
+  const accountTypeRaw = patch.accountType == null ? current.accountType : cleanProfile(patch.accountType, 32).toLowerCase();
+  const accountType = accountTypeRaw === "professional" ? "professional" : "individual";
   const addressLine1 = patch.addressLine1 == null ? current.addressLine1 : cleanProfile(patch.addressLine1, 160);
   const addressLine2 = patch.addressLine2 == null ? current.addressLine2 : cleanProfile(patch.addressLine2, 160);
   const postalCode = patch.postalCode == null ? current.postalCode : cleanProfile(patch.postalCode, 24).toUpperCase();
@@ -82,13 +85,13 @@ export function updateClientProfile(userId, patch = {}) {
   const name = cleanProfile(patch.name == null ? current.name : patch.name, 120) || [firstName, lastName].filter(Boolean).join(" ").trim();
   getDb().prepare(`
     UPDATE auth_users SET
-      name=?, first_name=?, last_name=?, phone=?, address_line1=?, address_line2=?,
+      name=?, first_name=?, last_name=?, phone=?, account_type=?, address_line1=?, address_line2=?,
       postal_code=?, city=?, country=?, shipping_preference=?,
       relay_id=?, relay_name=?, relay_address=?, relay_postal_code=?, relay_city=?,
       relay_country=?, relay_carrier_code=?, relay_carrier_service_point_id=?, updated_at=?
     WHERE id=?
   `).run(
-    name, firstName, lastName, phone, addressLine1, addressLine2,
+    name, firstName, lastName, phone, accountType, addressLine1, addressLine2,
     postalCode, city, country || "FR", shippingPreference || "mondial_relay",
     relayId, relayName, relayAddress, relayPostalCode, relayCity,
     relayCountry || "FR", relayCarrierCode || "mondial_relay", relayCarrierServicePointId,
@@ -177,6 +180,7 @@ function mapUser(row, includeHash = false) {
     firstName: row.first_name || "",
     lastName: row.last_name || "",
     phone: row.phone || "",
+    accountType: row.account_type === "professional" ? "professional" : "individual",
     addressLine1: row.address_line1 || "",
     addressLine2: row.address_line2 || "",
     postalCode: row.postal_code || "",

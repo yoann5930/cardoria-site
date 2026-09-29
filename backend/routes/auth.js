@@ -17,6 +17,8 @@ import { logAudit } from "../lib/audit.js";
 import { readJson } from "../lib/storage.js";
 import { resolveFrenchPostalCity } from "../lib/france-communes.js";
 import { publicClientOrder as formatPublicClientOrder } from "../lib/boutique/shipping.js";
+import { registerSeller } from "../lib/marketplace/sellers.js";
+import { verifyFrenchProfessionalSiret } from "../lib/marketplace/professional-verification.js";
 
 const router = Router();
 const ADMIN_CODE_LOGIN_TEMP_DISABLED = true;
@@ -37,7 +39,7 @@ function validPassword(value) {
 function publicUser(user) {
   return {
     id: user.id, email: user.email, role: user.role, name: user.name, totpEnabled: !!user.totpEnabled,
-    firstName: user.firstName || "", lastName: user.lastName || "", phone: user.phone || "",
+    firstName: user.firstName || "", lastName: user.lastName || "", phone: user.phone || "", accountType: user.accountType === "professional" ? "professional" : "individual",
     addressLine1: user.addressLine1 || "", addressLine2: user.addressLine2 || "",
     postalCode: user.postalCode || "", city: user.city || "", country: user.country || "FR",
     shippingPreference: user.shippingPreference || "mondial_relay",
@@ -88,28 +90,50 @@ function beginAdmin2fa(user, req, origin = "password") {
   };
 }
 
-router.post("/register", authRateLimit, (req, res) => {
+router.post("/register", authRateLimit, async (req, res) => {
   try {
     const email = normalizedEmail(req.body?.email);
     const password = String(req.body?.password || "");
     const name = String(req.body?.name || "").trim().slice(0, 120);
+    const accountType = req.body?.accountType === "professional" ? "professional" : "individual";
+    const siret = String(req.body?.siret || "").replace(/\D/g, "");
+
     if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ ok: false, error: "Email invalide." });
     if (!validPassword(password)) return res.status(400).json({ ok: false, error: "Mot de passe: 10 caracteres minimum avec lettres et chiffres." });
     if (getUserByEmail(email)) return res.status(409).json({ ok: false, error: "Un compte existe deja pour cet email." });
-    const user = createUser({ email, password, role: "client", name });
+
+    let professionalVerification = null;
+    if (accountType === "professional") {
+      if (!/^\d{14}$/.test(siret)) return res.status(400).json({ ok: false, error: "SIRET professionnel invalide : 14 chiffres requis." });
+      professionalVerification = await verifyFrenchProfessionalSiret(siret);
+    }
+
+    const user = createUser({ email, password, role: "client", name, accountType });
+    if (accountType === "professional") {
+      registerSeller({
+        email: user.email,
+        authUserId: user.id,
+        displayName: name || user.email.split("@")[0],
+        sellerType: "professional",
+        professionalVerification
+      });
+    }
+
     const session = createSession(user.id, { ip: req.ip, userAgent: req.headers["user-agent"], ttlHours: CLIENT_SESSION_HOURS });
-    logAudit({ type: "auth", action: "client_register", user: email, detail: "marketplace" });
+    logAudit({ type: "auth", action: "client_register", user: email, detail: accountType === "professional" ? "professional_live" : "individual_marketplace" });
     notifySafely(sendEmail({
       kind: "welcome",
       to: email,
       subject: "Bienvenue chez Cardoria",
-      text: `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte client Cardoria est créé.\nRetrouvez vos commandes, votre suivi colis et vos informations depuis votre espace.`,
+      text: accountType === "professional"
+        ? `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte professionnel Cardoria est créé et lié à votre profil Liveur.\nVotre SIRET a été enregistré pour l’accès au Studio Live.`
+        : `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte particulier Cardoria est créé.\nLa Boutique et la Marketplace sont accessibles avec ce compte.`,
       actionUrl: `${publicSiteOrigin()}/client-login.html`,
       actionLabel: "Accéder à mon espace"
     }), "welcome");
-    res.status(201).json({ ok: true, token: session.token, expiresAt: session.expiresAt, user: publicUser(user) });
+    res.status(201).json({ ok: true, token: session.token, expiresAt: session.expiresAt, user: publicUser(user), accountType });
   } catch (e) {
-    res.status(400).json({ ok: false, error: e.message });
+    res.status(e.status || e.code || 400).json({ ok: false, error: e.message });
   }
 });
 
