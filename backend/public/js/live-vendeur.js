@@ -3,7 +3,7 @@
   var M = window.CardoriaMarketplace, root = document.getElementById("root");
   if (!M || !root) return;
   if (!M.getToken()) {
-    root.innerHTML = "<p>Connectez votre compte vendeur sur <a href='vendre.html'>Vendre</a>.</p>";
+    root.innerHTML = "<p>Connectez-vous avec votre compte client Cardoria pour accéder au Live. <a href='client-login.html'>Se connecter</a>.</p>";
     return;
   }
   var publisherHandle = null, paymentTimer = null, selectedLiveId = "", sellerPlanState = null, sellerPlans = [], sessionFilter = "upcoming";
@@ -244,11 +244,11 @@
   function boot(seller) {
     seller = seller || M.getSeller();
     if (!seller) {
-      root.innerHTML = "<p>Créez ou vérifiez votre profil vendeur professionnel sur <a href='vendre.html'>Vendre</a>.</p>";
+      root.innerHTML = "<p>Ce compte client Cardoria n’a pas encore de profil vendeur. <a href='vendre.html'>Créer mon profil vendeur</a>.</p>";
       return;
     }
     if (seller.sellerType !== "professional" || !seller.professionalVerified) {
-      root.innerHTML = "<p>Le Studio Live est réservé aux professionnels dont le SIRET a été vérifié. <a href='vendre.html'>Vérifier mon SIRET</a>.</p>";
+      root.innerHTML = "<p>Votre compte client Cardoria est connecté, mais le Studio Live nécessite un profil professionnel avec SIRET vérifié. <a href='vendre.html'>Vérifier mon SIRET</a>.</p>";
       return;
     }
     shell();
