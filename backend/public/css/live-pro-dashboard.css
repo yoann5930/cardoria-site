@@ -119,3 +119,14 @@ body.live-pro-page{
 .live-pro-page .live-studio-game-picker button{min-height:48px;border-radius:999px;background:#171717;color:#fff;border:0;padding:0 18px;font-weight:900}
 .live-pro-page .live-studio-hint{margin:6px 0 12px;padding:9px 11px;border-radius:10px;background:#f3f3f4;color:#666!important;font-size:12px}
 @media(max-width:900px){.live-pro-page .live-studio-game-picker{grid-template-columns:1fr}.live-pro-page .live-studio-game-picker button{width:100%}}
+
+
+.live-pro-page .live-game-ready,.live-pro-page .live-booster-next{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:12px;padding:14px 16px;border:1px solid #dedee1;border-radius:16px;background:#fff}
+.live-pro-page .live-game-ready>div,.live-pro-page .live-booster-next>div{display:grid;gap:3px}
+.live-pro-page .live-game-ready small,.live-pro-page .live-booster-next small{font-size:10px;letter-spacing:.11em;color:#8a8a8a;font-weight:900}
+.live-pro-page .live-game-ready strong,.live-pro-page .live-booster-next strong{font-size:17px;color:#111}
+.live-pro-page .live-game-ready span,.live-pro-page .live-booster-next span{font-size:12px;color:#707070}
+.live-pro-page .live-game-launch-arrow,.live-pro-page .live-booster-arrow{width:42px;height:42px;min-width:42px;border-radius:50%;border:0;background:#171717;color:#fff;font-size:21px;font-weight:900;display:grid;place-items:center;cursor:pointer;box-shadow:0 5px 14px rgba(0,0,0,.12)}
+.live-pro-page .live-game-launch-arrow:hover,.live-pro-page .live-booster-arrow:hover{transform:translateX(1px)}
+.live-pro-page .live-game-launch-arrow:disabled,.live-pro-page .live-booster-arrow:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.live-pro-page .live-booster-complete{margin-top:10px;padding:10px 12px;border-radius:12px;background:#eef8f0;color:#26713a;font-weight:900}
