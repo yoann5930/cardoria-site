@@ -67,3 +67,15 @@ test("seller and admin card-price inputs communicate the one-euro minimum",()=>{
   assert.equal(sellerRuntime,seller);
   assert.equal(stockRuntime,stockAdmin);
 });
+
+
+test("catalogue intelligence never invents a fallback price when market data is missing",()=>{
+  const intelligence=fs.readFileSync("backend/lib/ai/intelligence.js","utf8");
+  const cardUi=fs.readFileSync("js/carte.js","utf8");
+  const cardUiRuntime=fs.readFileSync("backend/public/js/carte.js","utf8");
+  assert.doesNotMatch(intelligence,/card\.prices\?\.recommended \|\| card\.avgPrice \|\| 10/);
+  assert.match(intelligence,/if \(seedPrice\) seedPriceHistoryIfEmpty\(cardId, seedPrice\)/);
+  assert.match(intelligence,/recommendedPrice <= 0\) return null/);
+  assert.match(cardUi,/Données de prix insuffisantes pour générer un conseil Cardoria fiable/);
+  assert.equal(cardUiRuntime,cardUi);
+});
