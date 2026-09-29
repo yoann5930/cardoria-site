@@ -99,6 +99,23 @@ export function migrateAuth() {
   ensureColumn(db, "auth_users", "relay_carrier_service_point_id", "TEXT DEFAULT ''");
   ensureColumn(db, "auth_users", "account_type", "TEXT DEFAULT 'individual'");
 
+  // Existing Liveur Pro accounts keep their professional identity after this migration.
+  const hasSellerTable = db.prepare("SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='mk_sellers'").get();
+  if (hasSellerTable) {
+    db.exec(`
+      UPDATE auth_users
+      SET account_type='professional'
+      WHERE role='client'
+        AND id IN (
+          SELECT auth_user_id
+          FROM mk_sellers
+          WHERE COALESCE(auth_user_id,'') <> ''
+            AND LOWER(COALESCE(seller_type,''))='professional'
+            AND COALESCE(siret,'') <> ''
+        )
+    `);
+  }
+
   seedDefaultAdmin(db);
 }
 
