@@ -102,7 +102,12 @@ async function sendInvoice(invoice) {
       { label: "Pack", value: invoice.planName },
       { label: "Total TTC", value: money(invoice.total) },
       { label: "SIRET", value: invoice.siret || "—" }
-    ]
+    ],
+    attachments: [{
+      filename: invoice.invoiceNumber + ".html",
+      content: Buffer.from(invoiceHtml(invoice), "utf8"),
+      contentType: "text/html; charset=utf-8"
+    }]
   });
   return sent;
 }
