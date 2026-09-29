@@ -20,12 +20,13 @@ const pickup = {
 };
 
 test("Mondial Relay pickup is required and normalized without dropping identity fields", () => {
-  const point = normalizePickupPoint({ ...pickup, street: "10 rue des Arts", houseNumber: "" });
+  const point = normalizePickupPoint({ ...pickup, street: "10 rue des Arts", houseNumber: "", sendcloudServicePointId: "987654321" });
   assert.equal(point.id, "012345");
   assert.equal(point.name, "Tabac du Centre");
   assert.equal(point.address, "10 rue des Arts");
   assert.equal(point.postalCode, "59300");
   assert.equal(point.city, "Valenciennes");
+  assert.equal(point.sendcloudServicePointId, "987654321");
   const selected = resolveBoutiqueShippingSelection({ shippingMethod: "mondial_relay", pickupPoint: pickup });
   assert.equal(selected.carrier, "Mondial Relay");
   assert.equal(selected.pickupPoint.id, "012345");
@@ -108,7 +109,8 @@ test("checkout persists Point Relais and preparation triggers one real shipment 
 
   assert.match(checkout, /pickupPoint: selection\.pickupPoint/);
   assert.match(boutique, /shippingMethod: shippingMethod\(\)/);
-  assert.match(boutique, /\/api\/mondial-relay\/service-points/);
+  assert.match(boutique, /\/api\/sendcloud\/service-points/);
+  assert.match(boutique, /sendcloudServicePointId/);
   assert.match(admin, /data-shipping-label/);
   assert.match(admin, /Marquer comme expédiée/);
   assert.match(admin, /readonly placeholder="Enregistré par le parcours d’expédition"/);
@@ -120,6 +122,7 @@ test("checkout persists Point Relais and preparation triggers one real shipment 
   assert.match(creation, /creation_pending/);
   assert.match(creation, /reconciliation_required/);
   assert.match(creation, /findSendcloudShipmentByOrderNumber/);
+  assert.match(creation, /pickup\.sendcloudServicePointId/);
   const sumup = fs.readFileSync("backend/lib/payments/sumup.js", "utf8");
   assert.match(sumup, /o\.shipmentStatus\s*=\s*shipmentStatusOf\(o\)/);
 });
