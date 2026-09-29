@@ -37,11 +37,20 @@
     if (isAdmin || !M || !M.getSeller) return Promise.resolve([]);
     var seller = M.getSeller();
     if (!seller || !seller.id) return Promise.resolve([]);
-    return M.api("/v1/sellers/" + encodeURIComponent(seller.id) + "/listings?limit=100").then(function (d) {
-      var existing = new Set((sessionProducts || []).map(function (p) { return String(p.id); }));
-      return (d.listings || []).filter(function (listing) {
+    var existing = new Set((sessionProducts || []).map(function (p) { return String(p.id); }));
+    var all = [];
+    function page(n) {
+      return M.api("/v1/sellers/" + encodeURIComponent(seller.id) + "/listings?limit=100&page=" + n).then(function (d) {
+        var rows = d.listings || [];
+        all = all.concat(rows);
+        if (rows.length === 100 && n < 50) return page(n + 1);
+        return all;
+      });
+    }
+    return page(1).then(function (rows) {
+      return rows.filter(function (listing) {
         var status = String(listing.status || "").toLowerCase();
-        return !existing.has("MK-" + String(listing.id)) && Number(listing.stock || 0) > 0 && (status === "active" || status === "draft");
+        return !existing.has("MK-" + String(listing.id)) && Number(listing.stock || 0) > 0 && status !== "removed" && status !== "sold";
       }).map(function (listing) {
         return {
           id: "MK-" + String(listing.id),
@@ -53,10 +62,18 @@
           durationSeconds: 30,
           shippingWeightGrams: 20,
           catalogOnly: true,
-          listingId: String(listing.id)
+          listingId: String(listing.id),
+          description: String(listing.description || ""),
+          extension: String(listing.extension || "")
         };
       });
     }).catch(function () { return []; });
+  }
+  function resolveBoosterUnits(product) {
+    if (!product) return Promise.resolve({ unitsPerPackage: 1, packaging: "other", source: "fallback" });
+    if (Number(product.unitsPerPackage || 0) > 0) return Promise.resolve({ unitsPerPackage: Number(product.unitsPerPackage), packaging: product.packaging || "other", source: "item" });
+    var url=(window.CARDORIA_BACKEND||location.origin)+"/api/live/actions/sealed-units/resolve?name="+encodeURIComponent(product.name||"")+"&extension="+encodeURIComponent(product.extension||"");
+    return fetch(url,{headers:{Accept:"application/json"},cache:"no-store"}).then(function(r){return r.json().then(function(d){if(!r.ok||d.ok===false)throw new Error(d.error||"Référence scellée introuvable");return d;});}).catch(function(){return {unitsPerPackage:1,packaging:"other",source:"fallback"};});
   }
   function listPath() { return isAdmin ? "/api/admin/live/sessions" : "/api/live/seller/sessions"; }
   function sessionPath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) : "/api/live/seller/sessions/" + encodeURIComponent(id); }
@@ -188,7 +205,7 @@
         "<div class='live-studio-game-picker'>",
         "<label><span>1. Item à mettre en jeu</span><select id='lasGameProduct'><option value=''>Choisir un item</option>" +
           (products.length ? "<optgroup label='Items de ce Live'>" + products.map(function (p) { return "<option value='" + esc(p.id) + "'" + (current && current.id === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</optgroup>" : "") +
-          (sellerItems.length ? "<optgroup label='Mes items vendeur'>" + sellerItems.map(function (p) { return "<option value='" + esc(p.id) + "'>" + esc(p.name) + " · stock " + esc(p.stock) + "</option>"; }).join("") + "</optgroup>" : "") +
+          (sellerItems.length ? "<optgroup label='Tous mes items vendeur'>" + sellerItems.map(function (p) { return "<option value='" + esc(p.id) + "'>" + esc(p.name) + " · stock " + esc(p.stock) + "</option>"; }).join("") + "</optgroup>" : "") +
           (!products.length && !sellerItems.length ? "<option value='' disabled>Aucun item disponible</option>" : "") +
           "<option value='__new__'>＋ Ajouter un nouvel item</option></select></label>",
         "<label><span>2. Type de jeu</span><select id='lasGameType'><option value='buy_now'>Vente directe</option><option value='auction'>Enchère</option><option value='flash'>Vente flash</option><option value='box_break'>Box Break</option><option value='energy_game'>Jeu de l’énergie</option><option value='hit_run_ex'>Hit & Run EX</option><option value='hit_run_ar'>Hit & Run AR</option><option value='hit_run_full_art'>Hit & Run Full Art</option><option value='giveaway'>Giveaway</option><option value='giveaway_subscriber'>Giveaway Abonné</option><option value='giveaway_buyer'>Giveaway Acheteur</option><option value='break'>Break personnalisé</option></select></label>",
@@ -324,25 +341,36 @@
       }).catch(function (e) { alert(e.message); });
     }
     function prepareBoosterGame(title, product, type) {
-      openSheet(title,
-        "<label>Nombre de displays <input id='lasDisplayCount' type='number' min='1' max='100' value='1'></label>" +
-        "<label>Boosters par display <input id='lasBoostersPerDisplay' type='number' min='1' max='100' value='" + Math.max(1, Number(product.stock || 18)) + "'></label>" +
-        "<p class='live-studio-hint'>Cardoria calcule automatiquement le total et numérote Booster 1, Booster 2, Booster 3…</p>" +
-        "<label>Prix de départ de l’enchère <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number(product.price || 1) + "'></label>" +
-        "<label>Durée de l’enchère <select id='lasGameDuration'><option value='30'>30 s</option><option value='45'>45 s</option><option value='60'>60 s</option></select></label>",
-        function () {
-          var displays = Math.max(1, Number(document.getElementById("lasDisplayCount").value || 1));
-          var perDisplay = Math.max(1, Number(document.getElementById("lasBoostersPerDisplay").value || 1));
-          var boosterCount = displays * perDisplay;
-          prepareGame(type, product, {
-            displayCount: displays,
-            boostersPerDisplay: perDisplay,
-            boosterCount: boosterCount,
-            pricePerSpot: Number(document.getElementById("lasSpotPrice").value || 0),
-            durationSeconds: Number(document.getElementById("lasGameDuration").value || 30)
-          });
+      return resolveBoosterUnits(product).then(function (meta) {
+        var units=Math.max(1,Number(meta.unitsPerPackage||1));
+        var stock=Math.max(1,Number(product.stock||1));
+        openSheet(title,
+          "<label>Quantité d’items mise en jeu <input id='lasItemCount' type='number' min='1' max='" + stock + "' value='1'></label>" +
+          "<label>Boosters par item <input id='lasBoostersPerItem' type='number' min='1' max='1000' value='" + units + "'></label>" +
+          "<p class='live-studio-hint'>Référence : " + esc(meta.packaging||"item") + " · Cardoria calcule automatiquement le total de boosters et les numérote.</p>" +
+          "<div class='live-studio-hint'><strong>Total boosters : <span id='lasBoosterTotal'>" + units + "</span></strong></div>" +
+          "<label>Prix de départ de l’enchère <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number(product.price || 1) + "'></label>" +
+          "<label>Durée de l’enchère <select id='lasGameDuration'><option value='30'>30 s</option><option value='45'>45 s</option><option value='60'>60 s</option></select></label>",
+          function () {
+            var itemCount=Math.max(1,Number(document.getElementById("lasItemCount").value||1));
+            var perItem=Math.max(1,Number(document.getElementById("lasBoostersPerItem").value||1));
+            var boosterCount=itemCount*perItem;
+            prepareGame(type, product, {
+              itemCount:itemCount,
+              boostersPerItem:perItem,
+              boosterCount:boosterCount,
+              pricePerSpot:Number(document.getElementById("lasSpotPrice").value||0),
+              durationSeconds:Number(document.getElementById("lasGameDuration").value||30)
+            });
+          }
+        );
+        function refreshTotal(){
+          var a=document.getElementById("lasItemCount"),b=document.getElementById("lasBoostersPerItem"),out=document.getElementById("lasBoosterTotal");
+          if(out)out.textContent=String(Math.max(1,Number(a&&a.value||1))*Math.max(1,Number(b&&b.value||1)));
         }
-      );
+        var itemCount=document.getElementById("lasItemCount"),perItem=document.getElementById("lasBoostersPerItem");
+        if(itemCount)itemCount.oninput=refreshTotal;if(perItem)perItem.oninput=refreshTotal;refreshTotal();
+      });
     }
     if (launchPreset) launchPreset.onclick = function () {
       var type = gameType ? gameType.value : "buy_now";
@@ -375,24 +403,27 @@
       if (type === "hit_run_ar") return prepareBoosterGame("Préparer Hit & Run AR", product, "hit_run_ar");
       if (type === "hit_run_full_art") return prepareBoosterGame("Préparer Hit & Run Full Art", product, "hit_run_full_art");
       if (type === "energy_game") {
-        return openSheet("Préparer le Jeu de l’énergie",
-          "<label>Quantité de boosters mise en jeu <input id='lasBoosterCount' type='number' min='1' max='1000' value='" + Math.max(1, Number((product && product.stock) || 1)) + "'></label>" +
-          "<label>Nombre de jeux <input id='lasEnergyGamesCount' type='number' min='1' max='100' value='1'></label>" +
-          "<label>Extensions / items Pokémon <input id='lasEnergyItems' placeholder='Ex. EV10, EB10'></label>" +
-          "<label>Prix / spot <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number((product && product.price) || 1) + "'></label>",
-          function () {
-            var count = Math.max(1, Number(document.getElementById("lasEnergyGamesCount").value || 1));
-            var items = document.getElementById("lasEnergyItems").value.split(/[+,;\\n]/).map(function (x) { return x.trim(); }).filter(Boolean);
-            var games = [];
-            for (var i = 0; i < count; i += 1) games.push({ type:"other", items:items, detail:product ? product.name : "" });
-            prepareGame("energy_game", product, {
-              boosterCount:Math.max(1,Number(document.getElementById("lasBoosterCount").value||1)),
-              gamesCount:count,
-              energyGames:games,
-              pricePerSpot:Number(document.getElementById("lasSpotPrice").value||0)
-            });
-          }
-        );
+        return resolveBoosterUnits(product).then(function(meta){
+          var units=Math.max(1,Number(meta.unitsPerPackage||1)),stock=Math.max(1,Number((product&&product.stock)||1));
+          openSheet("Préparer le Jeu de l’énergie",
+            "<label>Quantité d’items mise en jeu <input id='lasEnergyItemCount' type='number' min='1' max='" + stock + "' value='1'></label>" +
+            "<label>Boosters par item <input id='lasEnergyPerItem' type='number' min='1' max='1000' value='" + units + "'></label>" +
+            "<div class='live-studio-hint'><strong>Total boosters : <span id='lasEnergyBoosterTotal'>" + units + "</span></strong></div>" +
+            "<label>Nombre de jeux <input id='lasEnergyGamesCount' type='number' min='1' max='100' value='1'></label>" +
+            "<label>Extensions / items Pokémon <input id='lasEnergyItems' placeholder='Ex. EV10, EB10' value='" + esc((product&&product.extension)||"") + "'></label>" +
+            "<label>Prix / spot <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number((product && product.price) || 1) + "'></label>",
+            function () {
+              var count=Math.max(1,Number(document.getElementById("lasEnergyGamesCount").value||1));
+              var items=document.getElementById("lasEnergyItems").value.split(/[+,;\\n]/).map(function(x){return x.trim();}).filter(Boolean);
+              var games=[];for(var i=0;i<count;i+=1)games.push({type:"other",items:items,detail:product?product.name:""});
+              var itemCount=Math.max(1,Number(document.getElementById("lasEnergyItemCount").value||1));
+              var perItem=Math.max(1,Number(document.getElementById("lasEnergyPerItem").value||1));
+              prepareGame("energy_game",product,{boosterCount:itemCount*perItem,gamesCount:count,energyGames:games,pricePerSpot:Number(document.getElementById("lasSpotPrice").value||0)});
+            }
+          );
+          function refreshEnergyTotal(){var a=document.getElementById("lasEnergyItemCount"),b=document.getElementById("lasEnergyPerItem"),out=document.getElementById("lasEnergyBoosterTotal");if(out)out.textContent=String(Math.max(1,Number(a&&a.value||1))*Math.max(1,Number(b&&b.value||1)));}
+          var a=document.getElementById("lasEnergyItemCount"),b=document.getElementById("lasEnergyPerItem");if(a)a.oninput=refreshEnergyTotal;if(b)b.oninput=refreshEnergyTotal;refreshEnergyTotal();
+        });
       }
       return openSheet("Préparer le Break",
         "<label>Spots <input id='lasSpots' type='number' min='1' value='" + Math.max(1, Number((product && product.stock) || 12)) + "'></label>" +
