@@ -129,7 +129,11 @@
     fetch(backend + "/api/ai/intelligence/" + encodeURIComponent(cardId))
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d.ok || !d.intelligence) return;
+        if (!d.ok) return;
+        if (!d.intelligence) {
+          box.innerHTML = "<p class='small'>Données de prix insuffisantes pour générer un conseil Cardoria fiable.</p>";
+          return;
+        }
         box.innerHTML = CardoriaAI.renderIntelligencePanel(d.intelligence);
       }).catch(function () { /* Optional enrichment. */ });
   }
