@@ -10,9 +10,12 @@ import { withBoutiqueOrderLock } from "../lib/boutique/order-lock.js";
 import { getOrder as getMarketplaceOrder } from "../lib/marketplace/orders.js";
 import { readJson, writeJson } from "../lib/storage.js";
 import { downloadColissimoLabel, getColissimoStatus } from "../lib/colissimo.js";
-import { downloadSendcloudLabel } from "../lib/sendcloud.js";
+import {
+  downloadSendcloudLabel,
+  getServicePoint as getSendcloudServicePoint,
+  searchMondialRelayServicePoints as searchSendcloudMondialRelayServicePoints
+} from "../lib/sendcloud.js";
 import { createBoutiqueShipmentForPreparation } from "../lib/boutique/shipment-creation.js";
-import { searchMondialRelayServicePoints } from "../lib/mondial-relay.js";
 import { getBoutiqueEmailConfiguration, sendBoutiquePurchaseEmail, sendBoutiqueTrackingEmail } from "../lib/boutique/customer-emails.js";
 import {
   colissimoAdminMessage,
@@ -28,6 +31,23 @@ const BOUTIQUE_STATUSES = ["À préparer", "En préparation", "Prête à expédi
 const BOUTIQUE_CARRIERS = ["Colissimo (La Poste)", "La Poste", "Mondial Relay", "Relais Colis"];
 function clean(value, max = 500) {
   return String(value == null ? "" : value).trim().slice(0, max);
+}
+
+function pickupFromSendcloudPoint(point) {
+  if (!point || point.carrierCode !== "mondial_relay" || point.active === false) return null;
+  const carrierServicePointId = clean(point.carrierServicePointId || point.id, 20);
+  const sendcloudServicePointId = clean(point.id, 40);
+  return normalizePickupPoint({
+    id: carrierServicePointId,
+    carrierServicePointId,
+    sendcloudServicePointId,
+    name: point.name,
+    street: point.street,
+    houseNumber: point.houseNumber,
+    postalCode: point.postalCode,
+    city: point.city,
+    countryCode: point.countryCode || "FR"
+  });
 }
 
 function money(value) {
@@ -204,15 +224,15 @@ router.get("/boutique-orders/:id/relay-options", async (req, res) => {
     return res.status(400).json({ ok: false, code: "RELAY_SEARCH_ADDRESS_REQUIRED", error: "Code postal ou ville de livraison requis pour rechercher un Point Relais." });
   }
   try {
-    const result = await searchMondialRelayServicePoints({
+    const result = await searchSendcloudMondialRelayServicePoints({
       countryCode: clean(shipping.countryCode || shipping.country || "FR", 2) || "FR",
       postalCode,
       city,
       radius: 15000,
       limit: 15
     });
-    const points = (result.points || []).map((point) => normalizePickupPoint(point)).filter(Boolean);
-    res.json({ ok: true, points, count: points.length });
+    const points = (result.points || []).map(pickupFromSendcloudPoint).filter(Boolean);
+    res.json({ ok: true, provider: "sendcloud", points, count: points.length });
   } catch (error) {
     res.status(error?.status || 502).json({ ok: false, code: error?.code || "MONDIAL_RELAY_SEARCH_FAILED", error: error?.message || "Recherche Point Relais indisponible." });
   }
@@ -224,20 +244,18 @@ router.put("/boutique-orders/:id/pickup-point", WRITE_ADMIN, async (req, res) =>
   if (order.status === "Expédiée" || order.status === "Livrée" || order.tracking) {
     return res.status(409).json({ ok: false, code: "ORDER_ALREADY_SHIPPED", error: "Le Point Relais ne peut plus être modifié après création de l'expédition." });
   }
-  const relayId = clean(req.body?.relayId, 20);
-  if (!/^\d{1,8}$/.test(relayId)) {
-    return res.status(400).json({ ok: false, code: "SERVICE_POINT_INVALID", error: "Point Relais invalide." });
+  const servicePointId = clean(req.body?.servicePointId, 40);
+  if (!/^\d+$/.test(servicePointId) || !Number.isSafeInteger(Number(servicePointId)) || Number(servicePointId) <= 0) {
+    return res.status(400).json({ ok: false, code: "SERVICE_POINT_INVALID", error: "Point Relais Sendcloud invalide." });
   }
   try {
-    const result = await searchMondialRelayServicePoints({
-      countryCode: "FR",
-      relayId,
-      limit: 10,
-      radius: 15000
-    });
-    const point = (result.points || []).map((item) => normalizePickupPoint(item)).find((item) => item && String(item.id) === relayId);
+    const remote = await getSendcloudServicePoint(Number(servicePointId));
+    if (!remote?.active || remote.carrierCode !== "mondial_relay" || remote.countryCode !== "FR") {
+      return res.status(404).json({ ok: false, code: "SERVICE_POINT_NOT_FOUND", error: "Point Relais Mondial Relay indisponible chez Sendcloud." });
+    }
+    const point = pickupFromSendcloudPoint(remote);
     if (!point) {
-      return res.status(404).json({ ok: false, code: "SERVICE_POINT_NOT_FOUND", error: "Point Relais Mondial Relay introuvable." });
+      return res.status(404).json({ ok: false, code: "SERVICE_POINT_NOT_FOUND", error: "Point Relais Mondial Relay indisponible chez Sendcloud." });
     }
     const updated = await withBoutiqueOrderLock(() => {
       const orders = readJson("orders", []);

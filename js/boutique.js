@@ -457,9 +457,12 @@
   }
 
   function pickRelay(point) {
+    var carrierServicePointId = String(point.carrierServicePointId || point.id || "").trim();
+    var sendcloudServicePointId = String(point.id || "").trim();
     selectedRelay = {
-      id: String(point.id),
-      carrierServicePointId: point.carrierServicePointId || String(point.id),
+      id: carrierServicePointId,
+      carrierServicePointId: carrierServicePointId,
+      sendcloudServicePointId: sendcloudServicePointId,
       name: point.name || "",
       address: [point.street, point.houseNumber].filter(Boolean).join(" ") || point.address || "",
       postalCode: point.postalCode || "",
@@ -481,7 +484,7 @@
     }
     try {
       if (message) message.textContent = "Recherche des Points Relais Mondial Relay...";
-      const response = await fetch(BACKEND_URL + "/api/mondial-relay/service-points?" + new URLSearchParams({
+      const response = await fetch(BACKEND_URL + "/api/sendcloud/service-points?" + new URLSearchParams({
         postalCode,
         city,
         countryCode: "FR",
@@ -506,7 +509,7 @@
         const address = document.createElement("p");
         address.textContent = [point.street, point.houseNumber].filter(Boolean).join(" ");
         const cityLine = document.createElement("p");
-        cityLine.textContent = [point.postalCode, point.city, point.id ? "n° " + point.id : ""].filter(Boolean).join(" ");
+        cityLine.textContent = [point.postalCode, point.city, (point.carrierServicePointId||point.id) ? "n° " + (point.carrierServicePointId||point.id) : ""].filter(Boolean).join(" ");
         const button = document.createElement("button");
         button.type = "button";
         button.className = "shop-pay";
@@ -664,10 +667,11 @@
         if (qs(id) && value) qs(id).value = value;
       }
 
-      if (user.relay && user.relay.id) {
+      if (user.relay && user.relay.id && user.relay.sendcloudServicePointId) {
         selectedRelay = {
           id: String(user.relay.id),
           carrierServicePointId: user.relay.carrierServicePointId || String(user.relay.id),
+          sendcloudServicePointId: String(user.relay.sendcloudServicePointId),
           name: user.relay.name || "",
           address: user.relay.address || "",
           postalCode: user.relay.postalCode || "",
@@ -677,6 +681,11 @@
         };
         const relayRadio = document.querySelector('input[name="shopShippingMethod"][value="mondial_relay"]');
         if (user.shippingPreference === "mondial_relay" && relayRadio) relayRadio.checked = true;
+        renderRelaySummary();
+      } else if (user.shippingPreference === "mondial_relay") {
+        const relayRadio = document.querySelector('input[name="shopShippingMethod"][value="mondial_relay"]');
+        if (relayRadio) relayRadio.checked = true;
+        selectedRelay = null;
         renderRelaySummary();
       }
       const account = document.querySelector(".shop-client-account");
