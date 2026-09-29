@@ -70,7 +70,6 @@ export function updateSellerProfessionalVerification(sellerId, verification) {
       String(verification.establishmentAddress || "").slice(0, 300),
       sellerId
     );
-    );
   return getSeller(sellerId);
 }
 
