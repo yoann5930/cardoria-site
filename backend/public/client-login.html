@@ -71,6 +71,28 @@
         <div><small>PROFIL LIVRAISON</small><strong id="clientStatProfile">—</strong><span id="clientStatProfileText">À compléter</span></div>
       </div>
 
+      <section class="client-dashboard-panel client-pro-panel" id="clientProfessionalPanel">
+        <div class="client-panel-head">
+          <div><p class="client-auth-kicker">STATUT DU COMPTE</p><h2 id="clientProTitle">Compte particulier</h2></div>
+          <span id="clientProBadge" class="client-pro-badge">PARTICULIER</span>
+        </div>
+        <div class="client-pro-grid">
+          <div><small>SIRET</small><strong id="clientProSiret">Non enregistré</strong></div>
+          <div><small>STATUT</small><strong id="clientProStatus">Particulier</strong></div>
+          <div><small>PACK SOUSCRIT</small><strong id="clientProPack">Aucun pack actif</strong></div>
+          <div><small>ACCÈS LIVEUR</small><strong id="clientProLive">Non activé</strong></div>
+        </div>
+        <div class="client-pro-actions">
+          <a id="clientProLiveLink" href="/live-vendeur.html" hidden>Ouvrir le Studio Liveur</a>
+          <a id="clientProManageLink" href="/vendre.html">Gérer mon profil vendeur</a>
+        </div>
+      </section>
+
+      <section class="client-dashboard-panel client-billing-panel" id="clientBillingPanel">
+        <div class="client-panel-head"><div><p class="client-auth-kicker">ABONNEMENT</p><h2>Mes factures de pack</h2></div></div>
+        <div id="clientSubscriptionInvoices"><p class="client-muted">Aucune facture d’abonnement.</p></div>
+      </section>
+
       <div class="client-dashboard-grid">
         <section class="client-dashboard-panel client-dashboard-orders">
           <div class="client-panel-head"><div><p class="client-auth-kicker">ACTIVITÉ</p><h2>Mes derniers achats</h2></div><a href="/client-orders.html">Tout voir</a></div>
