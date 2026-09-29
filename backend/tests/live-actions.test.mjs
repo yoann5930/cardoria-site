@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { __setLiveStoreForTests, __resetLiveStoreForTests, createLiveSession, setLiveStatus } from "../lib/live/sessions.js";
-import { __setLiveActionsStoreForTests, __resetLiveActionsStoreForTests, addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, pinLiveProduct, placeAuctionBid, startAuction, startBreak, startFlashSale, startGiveaway, stopAuction } from "../lib/live/actions.js";
+import { __setLiveActionsStoreForTests, __resetLiveActionsStoreForTests, addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, launchPreparedGame, pinLiveProduct, placeAuctionBid, prepareLiveGame, startAuction, startBreak, startFlashSale, startGiveaway, stopAuction } from "../lib/live/actions.js";
 
 const admin = { role: "admin", id: "admin-test", email: "admin@test.local" };
 function setup() {
@@ -27,6 +27,22 @@ test("giveaway is free, deduplicates email and draws one winner", () => { const 
 test("flash, break and chat are exposed in state", () => { const id=setup(); try { const flash=startFlashSale(id,{productId:"LOT-1",price:4,durationSeconds:30}); assert.equal(flash.price,4); const br=startBreak(id,{productId:"LOT-1",spots:8,pricePerSpot:3}); assert.equal(br.spots,8); assert.equal(br.pricePerSpot,3); const msg=addLiveChatMessage(id,{name:"Viewer",message:"Bonjour"}); assert.equal(msg.message,"Bonjour"); const state=getLiveActionState(id); assert.equal(state.flash.status,"running"); assert.equal(state.break.status,"running"); assert.equal(state.chat.length,1); } finally { teardown(); } });
 
 test("booster games derive spots and numbering from booster quantity", () => { const id=setup(); try { const br=startBreak(id,{productId:"LOT-1",breakType:"box_break",boosterCount:6,pricePerSpot:4}); assert.equal(br.spots,6); assert.equal(br.boosterCount,6); assert.deepEqual(br.boosterLabels,["Booster 1","Booster 2","Booster 3","Booster 4","Booster 5","Booster 6"]); assert.deepEqual(br.spotLabels,br.boosterLabels); assert.throws(()=>startBreak(id,{productId:"LOT-1",breakType:"hit_run_ex",pricePerSpot:4}),/quantité de boosters/i); } finally { teardown(); } });
+
+
+test("prepared booster game waits for the liveur before starting booster #1", async () => {
+  const id=setup();
+  try {
+    const prepared=prepareLiveGame(id,{type:"box_break",productId:"LOT-1",config:{boosterCount:3,pricePerSpot:4,durationSeconds:30}});
+    assert.equal(prepared.status,"ready");
+    const launched=await launchPreparedGame(id);
+    assert.equal(launched.prepared.status,"launched");
+    const state=getLiveActionState(id);
+    assert.equal(state.break.breakType,"box_break");
+    assert.equal(state.break.currentBoosterIndex,0);
+    assert.equal(state.break.currentBoosterLabel,"Booster 1");
+    assert.equal(state.auction,null);
+  } finally { teardown(); }
+});
 
 
 test("subscriber giveaway records subscriber eligibility", () => { const id=setup(); try { const g=startGiveaway(id,{productId:"GIV-1",durationSeconds:60,eligibility:"subscriber"}); assert.equal(g.status,"running"); assert.equal(g.eligibility,"subscriber"); } finally { teardown(); } });

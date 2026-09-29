@@ -4,6 +4,7 @@ import { validateSession } from "../lib/auth/session.js";
 import { followSeller, isFollowingSeller } from "../lib/live/follows.js";
 import { getLiveSession } from "../lib/live/sessions.js";
 import { resolveEnergyItems, searchEnergyCatalog } from "../lib/live/energy-catalog.js";
+import { classifySealedPackaging, inferSealedUnits, listSealedProducts } from "../lib/engine/sealed-products.js";
 import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, prepareLiveGame, launchPreparedGame, setLiveProductEnergyTypes, startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, startBuyerGiveaway, startNextBoosterAuction, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
 
 const router=Router(),rateBuckets=new Map();
@@ -28,6 +29,22 @@ function publicState(state){
 }
 function requireBidderEmail(body){const email=String(body?.bidderEmail||"").trim().toLowerCase();if(!/^\S+@\S+\.\S+$/.test(email))throw Object.assign(new Error("Email acheteur obligatoire pour pouvoir payer l'enchere gagnee."),{status:400});return{...body,bidderEmail:email};}
 function rateLimit(req,kind,limit,windowMs){const key=[kind,req.params.liveId,String(req.ip||req.socket?.remoteAddress||"unknown")].join(":");const now=Date.now(),entry=rateBuckets.get(key);if(!entry||now-entry.startedAt>=windowMs){rateBuckets.set(key,{startedAt:now,count:1});return;}entry.count++;if(entry.count>limit)throw Object.assign(new Error("Trop de requetes Live. Reessayez dans quelques secondes."),{status:429});if(rateBuckets.size>5000){for(const[k,v]of rateBuckets)if(now-v.startedAt>60_000)rateBuckets.delete(k);}}
+router.get("/sealed-units/resolve",(req,res)=>{try{
+  const name=String(req.query.name||"").trim().slice(0,240),extension=String(req.query.extension||"").trim().slice(0,180);
+  if(!name)return res.status(400).json({ok:false,error:"Nom d’item requis."});
+  const packaging=classifySealedPackaging(name,"");
+  const inferred=Math.max(1,Number(inferSealedUnits(name,packaging))||1);
+  const candidates=listSealedProducts({q:name,limit:20,activeOnly:true});
+  const norm=(v)=>String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const target=norm(name),targetExt=norm(extension);
+  const ranked=candidates.map((x)=>{
+    const n=norm(x.name),e=norm(x.extension);
+    let score=0;if(n===target)score+=100;if(n.includes(target)||target.includes(n))score+=30;if(targetExt&&e===targetExt)score+=40;if(targetExt&&e.includes(targetExt))score+=15;
+    return{x,score};
+  }).sort((a,b)=>b.score-a.score);
+  const best=ranked[0]&&ranked[0].score>0?ranked[0].x:null;
+  res.json({ok:true,packaging:best?.packaging||packaging,unitsPerPackage:Math.max(1,Number(best?.unitsPerPackage||inferred)||1),source:best?"catalog":"inferred",reference:best?{id:best.id,name:best.name,extension:best.extension}:null});
+}catch(e){fail(res,e,400);}});
 router.get("/energy-catalog/search",async(req,res)=>{try{res.json({ok:true,items:await searchEnergyCatalog(req.query.q||"",req.query.limit)});}catch(e){fail(res,e,502);}});
 router.get("/energy-catalog/resolve",async(req,res)=>{try{const items=String(req.query.items||"").split(/[+,;\n]/).map(x=>x.trim()).filter(Boolean);res.json({ok:true,...await resolveEnergyItems(items)});}catch(e){fail(res,e,502);}});
 router.get("/:liveId/state",(req,res)=>{try{assertPublicLive(req.params.liveId);res.json({ok:true,state:publicState(getLiveActionState(req.params.liveId))});}catch(e){fail(res,e,404);}});
