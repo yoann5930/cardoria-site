@@ -192,7 +192,8 @@
           (!products.length && !sellerItems.length ? "<option value='' disabled>Aucun item disponible</option>" : "") +
           "<option value='__new__'>＋ Ajouter un nouvel item</option></select></label>",
         "<label><span>2. Type de jeu</span><select id='lasGameType'><option value='buy_now'>Vente directe</option><option value='auction'>Enchère</option><option value='flash'>Vente flash</option><option value='box_break'>Box Break</option><option value='energy_game'>Jeu de l’énergie</option><option value='hit_run_ex'>Hit & Run EX</option><option value='hit_run_ar'>Hit & Run AR</option><option value='hit_run_full_art'>Hit & Run Full Art</option><option value='giveaway'>Giveaway</option><option value='giveaway_subscriber'>Giveaway Abonné</option><option value='giveaway_buyer'>Giveaway Acheteur</option><option value='break'>Break personnalisé</option></select></label>",
-        "<button type='button' id='lasLaunchPreset' class='is-primary'>Préparer le jeu</button>",
+        "<button type='button' id='lasLaunchPreset' class='is-primary'>Valider / préparer</button>",
+        "<p class='live-studio-hint'>Choisissez l’item et le type de jeu. Valider prépare uniquement l’action. Le lancement reste manuel avec le petit bouton →.</p>",
         "</div>",
         "<div class='live-studio-actions' hidden aria-hidden='true'>",
         "<button type='button' id='lasBuyNow'>Vente</button>",
@@ -462,7 +463,7 @@
     var parts = [];
     if (s.preparedGame && s.preparedGame.status === "ready") {
       var names = { buy_now:"Vente directe", auction:"Enchère", flash:"Vente flash", box_break:"Box Break", energy_game:"Jeu de l’énergie", hit_run_ex:"Hit & Run EX", hit_run_ar:"Hit & Run AR", hit_run_full_art:"Hit & Run Full Art", giveaway:"Giveaway", giveaway_subscriber:"Giveaway Abonné", giveaway_buyer:"Giveaway Acheteur", break:"Break personnalisé" };
-      parts.push("<div class='live-game-ready'><div><small>PRÊT À LANCER</small><strong>" + esc(names[s.preparedGame.type] || s.preparedGame.type) + "</strong><span>" + esc(s.preparedGame.productName || "") + "</span></div><button type='button' id='lasLaunchPreparedGame' class='live-game-launch-arrow' title='Le liveur lance le jeu'>→</button></div>");
+      parts.push("<div class='live-game-ready'><div><small>PRÊT À LANCER</small><strong>" + esc(names[s.preparedGame.type] || s.preparedGame.type) + "</strong><span>" + esc(s.preparedGame.productName || "") + "</span></div><button type='button' id='lasLaunchPreparedGame' class='live-game-launch-arrow' aria-label='Lancer le jeu préparé' title='Lancer maintenant'>→</button></div>");
     }
     if (s.auction) parts.push("Enchère : " + esc(s.auction.status) + " · " + euro(s.auction.currentPrice) + (s.auction.status === "running" ? " <button type='button' id='lasAuctionStop'>Stop enchère</button>" : ""));
     if (s.flash) parts.push("Flash : " + esc(s.flash.status) + " · " + euro(s.flash.price));
@@ -476,7 +477,7 @@
         var readyLabel = s.break.boosterLabels[readyIndex] || "";
         var auctionRunning = s.auction && s.auction.status === "running";
         if (readyLabel) {
-          parts.push("<div class='live-booster-next'><div><small>PROCHAIN BOOSTER</small><strong>#" + (readyIndex + 1) + " " + esc(s.break.productName || "Booster") + "</strong><span>" + esc(readyLabel) + "</span></div><button type='button' id='lasNextBoosterAuction' class='live-booster-arrow'" + (auctionRunning ? " disabled title='Une enchère est déjà en cours'" : " title='Lancer l’enchère de ce booster'") + ">→</button></div>");
+          parts.push("<div class='live-booster-next'><div><small>PROCHAIN BOOSTER — PRÊT</small><strong>#" + (readyIndex + 1) + " " + esc(s.break.productName || "Booster") + "</strong><span>" + esc(readyLabel) + "</span></div><button type='button' id='lasNextBoosterAuction' class='live-booster-arrow' aria-label='Lancer l’enchère du booster suivant'" + (auctionRunning ? " disabled title='Une enchère est déjà en cours'" : " title='Lancer l’enchère de ce booster'") + ">→</button></div>");
         } else {
           parts.push("<div class='live-booster-complete'>✓ Tous les boosters ont été traités.</div>");
         }
