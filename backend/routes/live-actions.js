@@ -4,7 +4,7 @@ import { validateSession } from "../lib/auth/session.js";
 import { followSeller, isFollowingSeller } from "../lib/live/follows.js";
 import { getLiveSession } from "../lib/live/sessions.js";
 import { resolveEnergyItems, searchEnergyCatalog } from "../lib/live/energy-catalog.js";
-import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, setLiveProductEnergyTypes, startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, startBuyerGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
+import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, setLiveProductEnergyTypes, startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, startBuyerGiveaway, startNextBoosterAuction, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
 
 const router=Router(),rateBuckets=new Map();
 function fail(res,error,fallback=400){res.status(error?.status||fallback).json({ok:false,error:error?.message||"Erreur action Live",code:error?.code||"",minimum:error?.minimum});}
@@ -57,6 +57,7 @@ router.post("/seller/:liveId/energy-config",(req,res)=>{try{assertSellerOwner(re
 router.post("/seller/:liveId/pin",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,state:pinLiveProduct(req.params.liveId,req.body?.productId)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/unpin",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,state:unpinLiveProduct(req.params.liveId)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/auction/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,auction:startAuction(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
+router.post("/seller/:liveId/booster-auction/next",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,auction:startNextBoosterAuction(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/auction/stop",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,auction:stopAuction(req.params.liveId)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/flash/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,flash:startFlashSale(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/giveaway/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);const body=req.body||{};const giveaway=body.eligibility==="buyer"?startBuyerGiveaway(req.params.liveId,body):startGiveaway(req.params.liveId,body);res.json({ok:true,giveaway});}catch(e){fail(res,e,401);}});
