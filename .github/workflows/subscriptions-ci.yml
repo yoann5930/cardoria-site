@@ -43,6 +43,7 @@ jobs:
         run: |
           node --check lib/subscriptions/plans.js
           node --check lib/subscriptions/seller-plans.js
+          node --check lib/subscriptions/invoices.js
           node --check lib/marketplace/paypal.js
           node --check lib/marketplace/sellers.js
           node --check routes/marketplace-v1.js
