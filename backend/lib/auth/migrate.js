@@ -97,6 +97,7 @@ export function migrateAuth() {
   ensureColumn(db, "auth_users", "relay_country", "TEXT DEFAULT 'FR'");
   ensureColumn(db, "auth_users", "relay_carrier_code", "TEXT DEFAULT 'mondial_relay'");
   ensureColumn(db, "auth_users", "relay_carrier_service_point_id", "TEXT DEFAULT ''");
+  ensureColumn(db, "auth_users", "account_type", "TEXT DEFAULT 'individual'");
 
   seedDefaultAdmin(db);
 }
