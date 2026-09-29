@@ -74,11 +74,11 @@ jobs:
           grep -q '/api/live/actions/seller/' js/live-studio-actions-ui.js
           grep -q 'PACKS PROFESSIONNELS' js/live-vendeur.js
           grep -q '/v1/sellers/' js/live-studio-actions-ui.js
-          grep -q 'Mes items vendeur' js/live-studio-actions-ui.js
+          grep -q 'Tous mes items vendeur' js/live-studio-actions-ui.js
           grep -q 'Ajouter un nouvel item' js/live-studio-actions-ui.js
           grep -q 'giveaway_subscriber' js/live-studio-actions-ui.js
           grep -q 'giveaway_buyer' js/live-studio-actions-ui.js
-          grep -q 'Valider</button>' js/live-studio-actions-ui.js
+          grep -q 'Valider / préparer</button>' js/live-studio-actions-ui.js
           grep -q 'Cardoria identity: clear operator UI' css/live-pro-dashboard.css
       - name: Start clean backend
         run: |
