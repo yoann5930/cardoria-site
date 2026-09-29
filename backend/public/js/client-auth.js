@@ -206,9 +206,22 @@
     setMessage("");
   }
 
+  function refreshAccountTypeFields() {
+    const select = qs("clientAccountType");
+    const fields = qs("clientProfessionalFields");
+    const pro = select && select.value === "professional";
+    if (fields) fields.hidden = !pro;
+    const proPanel = qs("clientProfessionalPanel");
+    const billingPanel = qs("clientBillingPanel");
+    if (proPanel) proPanel.hidden = !pro;
+    if (billingPanel) billingPanel.hidden = !pro;
+  }
+
   function fillProfile(user) {
     qs("clientProfileName").value = user.name || "";
     qs("clientProfilePhone").value = user.phone || "";
+    if (qs("clientAccountType")) qs("clientAccountType").value = user.accountType === "professional" ? "professional" : "individual";
+    refreshAccountTypeFields();
     qs("clientProfileAddress1").value = user.addressLine1 || "";
     qs("clientProfileAddress2").value = user.addressLine2 || "";
     qs("clientProfilePostalCode").value = user.postalCode || "";
@@ -412,22 +425,52 @@
     event.preventDefault();
     setMessage("Enregistrement du profil...");
     try {
+      const accountType = qs("clientAccountType")?.value === "professional" ? "professional" : "individual";
       const location = await validatedProfileLocation();
       const data = await api("/api/auth/profile", {
         method: "PATCH",
         body: JSON.stringify({
           name: qs("clientProfileName").value.trim(), phone: qs("clientProfilePhone").value.trim(),
+          accountType,
           addressLine1: qs("clientProfileAddress1").value.trim(), addressLine2: qs("clientProfileAddress2").value.trim(),
           postalCode: location.postalCode, city: location.city,
           country: location.countryCode,
           shippingPreference: "mondial_relay", relay: selectedRelay
         })
       });
+
+      let seller = null;
+      if (accountType === "professional") {
+        const siret = String(qs("clientProfessionalSiret")?.value || "").replace(/\D/g, "");
+        if (!/^\d{14}$/.test(siret)) throw new Error("Saisissez un SIRET professionnel valide à 14 chiffres.");
+        const sellerData = await api("/api/marketplace/v1/paypal/sellers/me", { method: "GET" });
+        seller = sellerData.seller || null;
+        if (!seller) {
+          const created = await api("/api/marketplace/v1/paypal/sellers/register", {
+            method: "POST",
+            body: JSON.stringify({ displayName: data.user.name || data.user.email, sellerType: "professional", siret })
+          });
+          seller = created.seller || null;
+        } else if (!seller.professionalVerified || String(seller.siret || "") !== siret) {
+          const verified = await api("/api/marketplace/v1/paypal/sellers/" + encodeURIComponent(seller.id) + "/verify-professional", {
+            method: "POST",
+            body: JSON.stringify({ siret })
+          });
+          seller = verified.seller || seller;
+        }
+      }
+
       currentUser = data.user;
       setAccount(data.user);
       qs("clientAccountName").textContent = data.user.name || "Client";
       fillProfile(data.user);
-      setMessage("Profil de livraison enregistré.", "success");
+      if (accountType === "professional") renderProfessionalAccount(seller);
+      else {
+        renderProfessionalAccount(null);
+        renderSubscriptionInvoices(null, []);
+      }
+      setMessage(accountType === "professional" ? "Profil professionnel enregistré. L’accès Liveur utilise maintenant ce compte Cardoria." : "Profil particulier enregistré. La Marketplace reste accessible.", "success");
+      if (!isEmbed()) loadDashboardData();
     } catch (e) { setMessage(e.message, "error"); }
   }
 
@@ -467,9 +510,17 @@
     const title = qs("clientProTitle"), badge = qs("clientProBadge"), siret = qs("clientProSiret");
     const status = qs("clientProStatus"), pack = qs("clientProPack"), live = qs("clientProLive"), liveLink = qs("clientProLiveLink");
     if (!title || !badge || !siret || !status || !pack || !live) return;
+    const accountIsProfessional = Boolean(currentUser && currentUser.accountType === "professional");
     const hasSiret = Boolean(seller && String(seller.siret || "").trim());
     const verified = Boolean(seller && seller.professionalVerified);
     const activePack = Boolean(seller && seller.subscriptionActive && seller.planId);
+    const proPanel = qs("clientProfessionalPanel"), billingPanel = qs("clientBillingPanel");
+    if (proPanel) proPanel.hidden = !accountIsProfessional;
+    if (billingPanel) billingPanel.hidden = !accountIsProfessional;
+    if (!accountIsProfessional) {
+      if (liveLink) liveLink.hidden = true;
+      return;
+    }
     if (!hasSiret) {
       title.textContent = "Compte particulier";
       badge.textContent = "PARTICULIER";
@@ -485,6 +536,7 @@
     badge.textContent = verified ? "PRO VÉRIFIÉ" : "PRO";
     badge.classList.add("is-pro");
     siret.textContent = String(seller.siret);
+    if (qs("clientProfessionalSiret")) qs("clientProfessionalSiret").value = String(seller.siret || "");
     status.textContent = verified ? "Professionnel vérifié" : "Professionnel";
     pack.textContent = activePack ? planLabel(seller.planId) : "Aucun pack actif";
     live.textContent = verified ? "Accès Liveur actif" : "Vérification SIRET requise";
@@ -587,6 +639,7 @@
     qs("clientRegisterForm")?.addEventListener("submit", register);
     qs("clientLogoutButton")?.addEventListener("click", logout);
     qs("clientProfileForm")?.addEventListener("submit", saveProfile);
+    qs("clientAccountType")?.addEventListener("change", refreshAccountTypeFields);
     qs("clientChooseRelay")?.addEventListener("click", chooseRelay);
     qs("clientProfilePostalCode")?.addEventListener("input", schedulePostalLookup);
     qs("clientProfilePostalCode")?.addEventListener("blur", () => {
