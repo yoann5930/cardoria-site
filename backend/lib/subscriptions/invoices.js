@@ -116,13 +116,25 @@ export async function ensureCurrentSubscriptionInvoice(sellerId, now = new Date(
   if (!state?.active || !state.planStartedAt) return { created: false, reason: "inactive" };
   const seller = getSeller(state.sellerId);
   if (!seller?.email) return { created: false, reason: "seller_missing" };
+  if (!String(seller.siret || "").trim()) return { created: false, reason: "siret_required" };
   const period = currentPeriod(state.planStartedAt, now);
   if (!period) return { created: false, reason: "period_unavailable" };
 
   const key = state.sellerId + ":" + periodKey(period.start);
   let current = rows();
   const existing = current.find((item) => item.key === key);
-  if (existing) return { created: false, reason: "already_exists", invoice: existing };
+  if (existing) {
+    if (existing.emailStatus !== "sent") {
+      const sent = await sendInvoice(existing);
+      const index = current.findIndex((item) => item.key === key);
+      if (index >= 0) {
+        current[index] = { ...current[index], emailStatus: sent ? "sent" : "failed", emailedAt: sent ? new Date().toISOString() : (current[index].emailedAt || "") };
+        save(current);
+        return { created: false, retried: true, sent, invoice: current[index] };
+      }
+    }
+    return { created: false, reason: "already_exists", invoice: existing };
+  }
 
   const plan = assertSellerPlan(state.planId);
   const amounts = totals(plan.monthlyPriceEur);
