@@ -6,7 +6,7 @@
     root.innerHTML = "<p>Connectez votre compte vendeur sur <a href='vendre.html'>Vendre</a>.</p>";
     return;
   }
-  var publisherHandle = null, paymentTimer = null, selectedLiveId = "";
+  var publisherHandle = null, paymentTimer = null, selectedLiveId = "", sellerPlanState = null, sellerPlans = [];
   function api(path, options) {
     options = options || {};
     var headers = Object.assign({ "Content-Type": "application/json", Authorization: "Bearer " + M.getToken() }, options.headers || {});
@@ -23,6 +23,51 @@
     });
   }
   function euro(v) { return Number(v || 0).toLocaleString("fr-FR", { style: "currency", currency: "EUR" }); }
+  function percent(rate) { return Math.round(Number(rate || 0) * 1000) / 10 + " %"; }
+  function planCard(plan, currentPlanId, active) {
+    var isCurrent = active && plan.id === currentPlanId;
+    var market = plan.id === "starter"
+      ? "Marketplace : 5 %"
+      : plan.id === "pro"
+        ? "Marketplace : 3 % sur les 5 premières ventes, puis 5 %"
+        : "Marketplace : 15 premières ventes/mois à 0 %, puis 3 %";
+    var livePerk = plan.liveCardoriaShippingBuyerLimit > 0
+      ? "Port Cardoria : jusqu’à " + plan.liveCardoriaShippingBuyerLimit + " acheteur(s) distinct(s) par Live"
+      : "Port Cardoria : non inclus";
+    return "<article class='live-pro-plan" + (isCurrent ? " is-current" : "") + "'>" +
+      "<div class='live-pro-plan-head'><strong>" + esc(plan.name) + "</strong><span>" + euro(plan.monthlyPriceEur) + "/mois</span></div>" +
+      "<p>Commission Live : <strong>" + esc(percent(plan.liveCommissionRate)) + "</strong></p>" +
+      "<p>" + esc(market) + "</p>" +
+      "<p>" + esc(livePerk) + "</p>" +
+      (plan.livePriority ? "<p>⭐ Priorité d’affichage Live</p>" : "") +
+      (plan.badge ? "<p>🏅 Badge Elite</p>" : "") +
+      "<div class='live-pro-plan-state'>" + (isCurrent ? "✓ Pack actuel" : "Disponible") + "</div>" +
+      "</article>";
+  }
+  function renderProOverview(seller) {
+    var host = document.getElementById("liveProOverview");
+    if (!host) return;
+    var currentPlanId = sellerPlanState && sellerPlanState.planId ? sellerPlanState.planId : (seller.planId || "starter");
+    var active = Boolean(sellerPlanState && sellerPlanState.active);
+    var planName = currentPlanId ? currentPlanId.charAt(0).toUpperCase() + currentPlanId.slice(1) : "Starter";
+    host.innerHTML = "<section class='live-pro-summary'>" +
+      "<div class='live-pro-summary-main'><span class='live-pro-eyebrow'>COMPTE LIVEUR PROFESSIONNEL</span><h2>" + esc(seller.professionalLegalName || seller.displayName) + "</h2>" +
+      "<div class='live-pro-chips'><span>✓ SIRET vérifié</span><span>Pack : " + esc(planName) + (active ? " actif" : " à activer") + "</span><span>PayPal : " + (seller.paypalReady ? "✓ prêt" : "à renseigner avant encaissement") + "</span></div></div>" +
+      "<div class='live-pro-shortcuts'><a href='#liveCreateZone'>＋ Créer un Live</a><button type='button' id='liveQuickStart'>▶ Démarrer</button><button type='button' id='liveQuickCam'>🎥 Caméra</button><a href='#livePaymentsZone'>€ Ventes</a></div>" +
+      "</section>" +
+      "<section class='live-pro-packs'><div class='live-pro-section-head'><div><span class='live-pro-eyebrow'>PACKS PROFESSIONNELS</span><h2>Choisissez le niveau adapté à vos Lives</h2></div><p>Le pack définit les commissions et les avantages. PayPal reste séparé et sert uniquement aux encaissements.</p></div>" +
+      "<div class='live-pro-plan-grid'>" + sellerPlans.map(function (plan) { return planCard(plan, currentPlanId, active); }).join("") + "</div></section>";
+    var quickStart = document.getElementById("liveQuickStart");
+    if (quickStart) quickStart.onclick = function () {
+      if (!selectedLiveId) return document.getElementById("liveCreateZone")?.scrollIntoView({ behavior: "smooth" });
+      publishLive(selectedLiveId);
+    };
+    var quickCam = document.getElementById("liveQuickCam");
+    if (quickCam) quickCam.onclick = function () {
+      if (!selectedLiveId) return document.getElementById("liveCreateZone")?.scrollIntoView({ behavior: "smooth" });
+      publishLive(selectedLiveId);
+    };
+  }
   function state(status) {
     var s = String(status || "").toLowerCase();
     if (["paid", "completed", "authorized", "authorised"].includes(s)) return { key: "paid", icon: "🟢", label: "Autorisé / Payé" };
@@ -91,6 +136,7 @@
   function shell() {
     root.innerHTML = [
       "<div class='live-seller-studio live-studio'>",
+      "<div id='liveProOverview'></div>",
       "<header class='live-studio-controls'><div><h2>Studio Live vendeur</h2><p id='liveSelectedSession'>Créez un Live pour commencer.</p><p><strong>Paiement des ventes : PayPal.</strong> La commission Cardoria suit votre abonnement.</p></div>",
       "<div class='live-studio-control-btns'>",
       "<button class='live-studio-btn live-studio-btn--go' type='button' id='lvStart'>Démarrer le Live</button>",
@@ -103,10 +149,10 @@
       "<details class='live-studio-cam-settings'><summary>Réglages caméra</summary><p id='lvCameraPair'></p><button class='live-studio-btn' type='button' id='lvCam2'>Caméra 2 / téléphone</button><p>La Caméra 2 PC indépendante arrive ensuite. Le téléphone reste disponible.</p></details>",
       "</section><section id='liveActionStudio' class='live-studio-stage'></section></div>",
       "<section class='live-studio-activity'><article><h3>Spectateurs</h3><p id='liveStudioViewers'>0</p></article><article><h3>Chat</h3><div id='liveStudioChat'>Aucun message</div></article><article><h3>Dernière vente</h3><p id='liveStudioLastSale'>—</p></article><article><h3>Paiements</h3><p id='lvPaymentsSummary'>Payés: 0 · En attente: 0 · Refusés: 0</p></article></section>",
-      "<details class='live-studio-prepare'><summary>Préparer le Live / historique</summary>",
-      "<p>Salle d’abord, ventes ensuite. Aucun produit ni prix n'est demandé pour créer une salle.</p>",
-      "<div><input id='lvTitle' placeholder='Titre du Live' value='Live vendeur'> <select id='lvCategory'><option value='pokemon'>Pokémon</option><option value='yugioh'>Yu-Gi-Oh!</option><option value='onepiece'>One Piece</option><option value='lorcana'>Lorcana</option><option value='magic'>Magic</option><option value='other' selected>Autre</option></select> <button id='lvCreate' type='button'>Créer le Live</button></div>",
-      "<h2>Paiements du Live</h2><table><thead><tr><th>Statut</th><th>Acheteur</th><th>Lot</th><th>Montant</th><th>Paiement</th><th>Mise à jour</th></tr></thead><tbody id='lvPaymentsBody'></tbody></table>",
+      "<details class='live-studio-prepare' open id='liveCreateZone'><summary>Créer et préparer mon Live</summary>",
+      "<p>Créez votre salle en quelques secondes. Aucun produit ni prix n’est obligatoire pour commencer.</p>",
+      "<div class='live-pro-create-row'><input id='lvTitle' placeholder='Titre du Live' value='Live vendeur'> <select id='lvCategory'><option value='pokemon'>Pokémon</option><option value='yugioh'>Yu-Gi-Oh!</option><option value='onepiece'>One Piece</option><option value='lorcana'>Lorcana</option><option value='magic'>Magic</option><option value='other' selected>Autre</option></select> <button id='lvCreate' type='button'>Créer le Live</button></div>",
+      "<h2 id='livePaymentsZone'>Paiements du Live</h2><table><thead><tr><th>Statut</th><th>Acheteur</th><th>Lot</th><th>Montant</th><th>Paiement</th><th>Mise à jour</th></tr></thead><tbody id='lvPaymentsBody'></tbody></table>",
       "<h2>Mes Lives</h2><div id='lvSessions'></div></details></div>"
     ].join("");
     document.getElementById("lvCreate").onclick = function () {
@@ -150,8 +196,8 @@
       renderPayments(r[1].checkouts || []);
     }).catch(function (e) { alert(e.message); });
   }
-  function boot() {
-    var seller = M.getSeller();
+  function boot(seller) {
+    seller = seller || M.getSeller();
     if (!seller) {
       root.innerHTML = "<p>Créez ou vérifiez votre profil vendeur professionnel sur <a href='vendre.html'>Vendre</a>.</p>";
       return;
@@ -161,10 +207,21 @@
       return;
     }
     shell();
+    renderProOverview(seller);
     load();
     paymentTimer = setInterval(refreshPayments,3000);
   }
-  Promise.resolve(M.syncSeller ? M.syncSeller() : M.getSeller()).then(boot).catch(function (e) {
+  Promise.resolve(M.syncSeller ? M.syncSeller() : M.getSeller()).then(function (seller) {
+    if (!seller) return boot(seller);
+    return Promise.all([
+      M.api("/v1/sellers/" + encodeURIComponent(seller.id) + "/subscription").catch(function () { return { subscription: null }; }),
+      M.api("/v1/plans").catch(function () { return { plans: [] }; })
+    ]).then(function (r) {
+      sellerPlanState = r[0] && r[0].subscription ? r[0].subscription : null;
+      sellerPlans = r[1] && Array.isArray(r[1].plans) ? r[1].plans : [];
+      boot(seller);
+    });
+  }).catch(function (e) {
     root.innerHTML = "<p>" + esc(e.message || "Profil vendeur indisponible.") + " <a href='vendre.html'>Retour au compte vendeur</a>.</p>";
   });
   window.addEventListener("beforeunload", function () { if (paymentTimer) clearInterval(paymentTimer); });
