@@ -44,7 +44,7 @@ try {
       }]
     }), { status: 200, headers: { "content-type": "application/json" } });
   };
-  const verified = await verifyFrenchProfessionalSiret("123 456 789 01234");
+  const verified = await verifyFrenchProfessionalSiret("941 466 385 00015");
   assert(verified.verified === true, "Verified SIRET rejected");
   assert(verified.siret === "94146638500015", "SIRET normalization failed");
   assert(verified.legalName === "TEST ENTREPRISE ACTIVE", "Legal name missing");
