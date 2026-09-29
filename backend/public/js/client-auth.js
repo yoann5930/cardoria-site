@@ -458,6 +458,78 @@
     });
   }
 
+  function planLabel(planId) {
+    const id = String(planId || "").trim().toLowerCase();
+    return ({ starter: "Starter", pro: "Pro", elite: "Elite" })[id] || (id ? id.charAt(0).toUpperCase() + id.slice(1) : "");
+  }
+
+  function renderProfessionalAccount(seller) {
+    const title = qs("clientProTitle"), badge = qs("clientProBadge"), siret = qs("clientProSiret");
+    const status = qs("clientProStatus"), pack = qs("clientProPack"), live = qs("clientProLive"), liveLink = qs("clientProLiveLink");
+    if (!title || !badge || !siret || !status || !pack || !live) return;
+    const hasSiret = Boolean(seller && String(seller.siret || "").trim());
+    const verified = Boolean(seller && seller.professionalVerified);
+    const activePack = Boolean(seller && seller.subscriptionActive && seller.planId);
+    if (!hasSiret) {
+      title.textContent = "Compte particulier";
+      badge.textContent = "PARTICULIER";
+      badge.classList.remove("is-pro");
+      siret.textContent = "Non enregistré";
+      status.textContent = "Particulier";
+      pack.textContent = "Aucun pack actif";
+      live.textContent = "Non activé";
+      if (liveLink) liveLink.hidden = true;
+      return;
+    }
+    title.textContent = "Compte professionnel";
+    badge.textContent = verified ? "PRO VÉRIFIÉ" : "PRO";
+    badge.classList.add("is-pro");
+    siret.textContent = String(seller.siret);
+    status.textContent = verified ? "Professionnel vérifié" : "Professionnel";
+    pack.textContent = activePack ? planLabel(seller.planId) : "Aucun pack actif";
+    live.textContent = verified ? "Accès Liveur actif" : "Vérification SIRET requise";
+    if (liveLink) liveLink.hidden = !verified;
+  }
+
+  function renderSubscriptionInvoices(seller, invoices) {
+    const host = qs("clientSubscriptionInvoices");
+    if (!host) return;
+    const items = Array.isArray(invoices) ? invoices : [];
+    if (!seller || !String(seller.siret || "").trim()) {
+      host.innerHTML = '<p class="client-muted">Les factures de pack apparaissent ici pour les comptes professionnels.</p>';
+      return;
+    }
+    if (!items.length) {
+      host.innerHTML = '<p class="client-muted">Aucune facture d’abonnement disponible pour le moment.</p>';
+      return;
+    }
+    host.replaceChildren();
+    items.slice(0, 24).forEach((invoice) => {
+      const row = document.createElement("div"); row.className = "client-billing-row";
+      const info = document.createElement("div");
+      const title = document.createElement("strong"); title.textContent = invoice.invoiceNumber || "Facture abonnement";
+      const meta = document.createElement("span");
+      const date = invoice.issuedAt ? new Date(invoice.issuedAt).toLocaleDateString("fr-FR") : "";
+      meta.textContent = [invoice.planName || invoice.planId || "Pack", date, euro(invoice.total)].filter(Boolean).join(" · ");
+      info.append(title, meta);
+      const button = document.createElement("button"); button.type = "button"; button.className = "client-auth-secondary is-compact"; button.textContent = "Voir la facture";
+      button.addEventListener("click", async () => {
+        try {
+          const res = await fetch(API + "/api/marketplace/v1/sellers/" + encodeURIComponent(seller.id) + "/subscription-invoices/" + encodeURIComponent(invoice.invoiceNumber), {
+            headers: { Authorization: "Bearer " + getToken(), Accept: "text/html" }, cache: "no-store"
+          });
+          if (!res.ok) throw new Error("Facture indisponible.");
+          const html = await res.text();
+          const blob = new Blob([html], { type: "text/html" });
+          const url = URL.createObjectURL(blob);
+          window.open(url, "_blank", "noopener");
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch (error) { setMessage(error.message, "error"); }
+      });
+      row.append(info, button); host.appendChild(row);
+    });
+  }
+
   function renderLive(items) {
     const host = qs("clientLiveShipments");
     qs("clientStatLive").textContent = String(items.length);
@@ -479,18 +551,24 @@
 
   async function loadDashboardData() {
     if (!getToken()) return;
-    const [boutiqueResult, marketplaceResult, liveResult] = await Promise.allSettled([
+    const sellerResult = await api("/api/marketplace/v1/paypal/sellers/me").then((value) => ({ ok: true, value })).catch(() => ({ ok: false, value: { seller: null } }));
+    const seller = sellerResult.value.seller || null;
+    const [boutiqueResult, marketplaceResult, liveResult, invoicesResult] = await Promise.allSettled([
       api("/api/auth/orders"),
       api("/api/marketplace/v1/orders"),
-      api("/api/live/my-shipments")
+      api("/api/live/my-shipments"),
+      seller ? api("/api/marketplace/v1/sellers/" + encodeURIComponent(seller.id) + "/subscription-invoices") : Promise.resolve({ invoices: [] })
     ]);
     const boutique = boutiqueResult.status === "fulfilled" && Array.isArray(boutiqueResult.value.orders) ? boutiqueResult.value.orders : [];
     const marketplace = marketplaceResult.status === "fulfilled" && Array.isArray(marketplaceResult.value.orders) ? marketplaceResult.value.orders : [];
     const live = liveResult.status === "fulfilled" && Array.isArray(liveResult.value.shipments) ? liveResult.value.shipments : [];
+    const invoices = invoicesResult.status === "fulfilled" && Array.isArray(invoicesResult.value.invoices) ? invoicesResult.value.invoices : [];
     qs("clientStatBoutique").textContent = String(boutique.length);
     qs("clientStatMarketplace").textContent = String(marketplace.length);
     renderRecentOrders(boutique, marketplace);
     renderLive(live);
+    renderProfessionalAccount(seller);
+    renderSubscriptionInvoices(seller, invoices);
   }
 
   async function logout() {
