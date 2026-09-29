@@ -46,6 +46,8 @@ jobs:
           grep -q 'assertSellerFulfillmentTransition' backend/routes/marketplace-v1.js
           grep -q 'La commande doit etre payee' backend/routes/marketplace-v1.js
           grep -q 'Transition vendeur invalide' backend/routes/marketplace-v1.js
+      - name: Professional seller verification
+        run: node scripts/professional-verification.test.mjs
       - name: Start clean backend
         run: |
           rm -rf data
