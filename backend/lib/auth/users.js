@@ -18,15 +18,16 @@ export function getUserById(id) {
   return row ? mapUser(row) : null;
 }
 
-export function createUser({ email, password, role = "client", name = "" }) {
+export function createUser({ email, password, role = "client", name = "", accountType = "individual" }) {
   if (!ROLES.includes(role)) throw new Error("Rôle invalide");
   const db = getDb();
   const now = new Date().toISOString();
   const id = makeId("usr");
+  const normalizedAccountType = accountType === "professional" ? "professional" : "individual";
   db.prepare(`
-    INSERT INTO auth_users (id, email, password_hash, role, name, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, email.toLowerCase(), hashPassword(password), role, name, now, now);
+    INSERT INTO auth_users (id, email, password_hash, role, name, account_type, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, email.toLowerCase(), hashPassword(password), role, name, normalizedAccountType, now, now);
   return getUserById(id);
 }
 
