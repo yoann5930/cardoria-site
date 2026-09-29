@@ -26,6 +26,16 @@ function fixture(){
     }
     if(path==="/api/admin/live/sessions/LIVE-BROWSER/actions") return {state:window.__state};
     if(path==="/api/admin/live/checkouts") return {checkouts:[{id:"C1",status:"paid",productName:"Booster test",amount:7.29,customerEmail:"buyer@example.com",customerName:"Buyer"}]};
+    if(path.endsWith("/actions/game/prepare")) {
+      const body=JSON.parse((options&&options.body)||"{}");
+      const product=window.__session.products.find((p)=>p.id===body.productId);
+      window.__state.preparedGame={id:"PREP-1",type:body.type,productId:body.productId,productName:product?product.name:"",config:body.config||{},status:"ready"};
+      return {ok:true,preparedGame:window.__state.preparedGame};
+    }
+    if(path.endsWith("/actions/game/launch")) {
+      if(window.__state.preparedGame) window.__state.preparedGame={...window.__state.preparedGame,status:"launched"};
+      return {ok:true,prepared:window.__state.preparedGame,result:{kind:"auction"}};
+    }
     if(path.includes("/actions/")) return {ok:true,state:window.__state,giveaway:{status:"running"},break:{status:"running"},auction:{status:"running"},flash:{status:"running"}};
     return {ok:true};
   }};
@@ -39,6 +49,7 @@ const server=http.createServer((req,res)=>{
   if(url.pathname==="/admin-live.html"){res.writeHead(200,{"content-type":"text/html"});res.end(fixture());return;}
   if(url.pathname.startsWith("/api/live/webrtc/status/")){res.writeHead(200,{"content-type":"application/json"});res.end(JSON.stringify({viewers:3}));return;}
   if(url.pathname==="/api/live/actions/energy-catalog/resolve"){res.writeHead(200,{"content-type":"application/json"});res.end(JSON.stringify({ok:true,items:[{setId:"sv10",setName:"EV10"}],spots:["Feu","Eau","Psy","Dresseur / Supporter"]}));return;}
+  if(url.pathname==="/api/live/actions/sealed-units/resolve"){res.writeHead(200,{"content-type":"application/json"});res.end(JSON.stringify({ok:true,packaging:"display",unitsPerPackage:18,source:"catalog",reference:{id:"sealed-1",name:"Display test",extension:"EV10"}}));return;}
   const rel=url.pathname.replace(/^\//,""),file=path.join(root,rel);
   if(file.startsWith(root)&&fs.existsSync(file)&&fs.statSync(file).isFile()){res.writeHead(200,{"content-type":mime[path.extname(file)]||"application/octet-stream"});fs.createReadStream(file).pipe(res);return;}
   res.writeHead(404);res.end("not found");
@@ -49,37 +60,47 @@ const browser=await chromium.launch({headless:true});
 const page=await browser.newPage({viewport:{width:1365,height:900}});
 try{
   await page.goto("http://127.0.0.1:"+port+"/admin-live.html",{waitUntil:"networkidle"});
-  await page.waitForSelector("#lasGroupSales");
-  await page.waitForSelector("#lasBoxBreak");
-  await page.waitForSelector("#lasGiveBuyer");
-  const groups=await page.locator(".live-action-group-title").allTextContents();
-  assert.deepEqual(groups,["Vendre","Jeux / breaks","Animation"]);
-  for(const id of ["lasBuyNow","lasAuction","lasFlash","lasBreak","lasBoxBreak","lasGame","lasGiveaway","lasGiveBuyer"]){
-    assert.equal(await page.locator("#"+id).isVisible(),true,id+" doit être visible");
-    const h=await page.locator("#"+id).evaluate((el)=>el.getBoundingClientRect().height);
-    assert.ok(h>=40,id+" doit être utilisable au clic");
-  }
-  assert.equal(await page.locator("#lasGiveFollow").isVisible(),false);
-  await page.click("#lasAuction"); assert.equal(await page.locator("#lasSheetTitle").textContent(),"Enchère"); await page.click("#lasSheetCancel");
-  await page.click("#lasFlash"); assert.equal(await page.locator("#lasSheetTitle").textContent(),"Vente flash"); await page.click("#lasSheetCancel");
-  await page.click("#lasBreak"); assert.equal(await page.locator("#lasSheetTitle").textContent(),"Ouverture / break"); await page.click("#lasSheetCancel");
-  await page.click("#lasBoxBreak"); assert.equal(await page.locator("#lasSheetTitle").textContent(),"Box Break"); await page.click("#lasSheetCancel");
-  await page.click("#lasGame"); assert.equal(await page.locator("#lasSheetTitle").textContent(),"Jeu de l’énergie");
-  await page.selectOption("#lasEnergyGameCount","2"); assert.equal(await page.locator("[data-energy-game-row]").count(),2);
-  await page.fill("[data-energy-game-items='0']","EV10"); await page.click("[data-energy-game-preview='0']");
-  await page.waitForFunction(()=>document.querySelector("[data-energy-game-preview-box='0']").textContent.includes("Spots détectés"));
-  await page.click("#lasSheetCancel");
-  await page.click("#lasGiveaway"); assert.equal(await page.locator("#lasSheetTitle").textContent(),"Giveaway"); await page.click("#lasSheetCancel");
-  await page.click("#lasGiveBuyer"); assert.equal(await page.locator("#lasSheetTitle").textContent(),"Giveaway Acheteur");
-  await page.click("#lasSheetGo"); await page.waitForTimeout(100);
+  await page.waitForSelector("#lasGameProduct");
+  await page.waitForSelector("#lasGameType");
+  await page.waitForSelector("#lasLaunchPreset");
+
+  assert.equal(await page.locator("#lasGameProduct").isVisible(),true);
+  assert.equal(await page.locator("#lasGameType").isVisible(),true);
+  assert.equal((await page.locator("#lasLaunchPreset").textContent()).trim(),"Valider / préparer");
+  assert.equal(await page.locator(".live-studio-actions").isVisible(),false);
+
+  // Box Break: Cardoria calcule automatiquement les boosters depuis la référence scellée.
+  await page.selectOption("#lasGameProduct","LOT-2");
+  await page.selectOption("#lasGameType","box_break");
+  await page.click("#lasLaunchPreset");
+  await page.waitForSelector("#lasBoosterTotal");
+  assert.equal((await page.locator("#lasBoostersPerItem").inputValue()),"18");
+  assert.equal((await page.locator("#lasBoosterTotal").textContent()).trim(),"18");
+  await page.fill("#lasItemCount","2");
+  await page.waitForTimeout(20);
+  assert.equal((await page.locator("#lasBoosterTotal").textContent()).trim(),"36");
+  await page.click("#lasSheetGo");
+  await page.waitForSelector("#lasLaunchPreparedGame");
+
   let calls=JSON.parse(await page.evaluate(()=>localStorage.getItem("__calls")||"[]"));
-  assert.ok(calls.some((x)=>x.path.endsWith("/actions/giveaway/buyer/start")&&x.method==="POST"));
+  const prepareCall=calls.find((x)=>x.path.endsWith("/actions/game/prepare")&&x.method==="POST");
+  assert.ok(prepareCall,"préparation Box Break envoyée");
+  const prepareBody=JSON.parse(prepareCall.body);
+  assert.equal(prepareBody.config.boosterCount,36);
+  assert.ok(!calls.some((x)=>x.path.endsWith("/actions/auction/start")),"aucune enchère auto");
+
+  await page.click("#lasLaunchPreparedGame");
+  await page.waitForTimeout(100);
+  calls=JSON.parse(await page.evaluate(()=>localStorage.getItem("__calls")||"[]"));
+  assert.ok(calls.some((x)=>x.path.endsWith("/actions/game/launch")&&x.method==="POST"),"lancement manuel envoyé");
+
   await page.setViewportSize({width:390,height:844});
   await page.goto("http://127.0.0.1:"+port+"/admin-live.html",{waitUntil:"networkidle"});
-  await page.waitForSelector("#lasGroupSales");
-  const cols=await page.locator(".live-studio-actions").evaluate((el)=>getComputedStyle(el).gridTemplateColumns.split(" ").length);
-  assert.equal(cols,1);
-  for(const id of ["lasBuyNow","lasAuction","lasFlash","lasBreak","lasBoxBreak","lasGame","lasGiveaway","lasGiveBuyer"]) assert.equal(await page.locator("#"+id).isVisible(),true);
+  await page.waitForSelector("#lasGameProduct");
+  assert.equal(await page.locator("#lasGameProduct").isVisible(),true);
+  assert.equal(await page.locator("#lasGameType").isVisible(),true);
+  assert.equal(await page.locator("#lasLaunchPreset").isVisible(),true);
+  assert.equal(await page.locator(".live-studio-actions").isVisible(),false);
   const alerts=await page.evaluate(()=>window.__alerts); assert.deepEqual(alerts,[]);
   console.log("LIVE ADMIN SALES MENU BROWSER E2E OK");
 } finally {
