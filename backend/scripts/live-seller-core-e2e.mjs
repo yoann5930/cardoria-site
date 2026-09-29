@@ -10,6 +10,10 @@ const sellerAccountA=await register("live-seller-a"),sellerAccountB=await regist
 const sellerA=await registerSeller(sellerAccountA,"Live Seller A"),sellerB=await registerSeller(sellerAccountB,"Live Seller B");
 updateSellerProfessionalVerification(sellerA.id,{verified:true,siret:"11111111111111",legalName:"Live Seller A Test Pro",source:"live-seller-core-e2e",verifiedAt:new Date().toISOString()});
 updateSellerProfessionalVerification(sellerB.id,{verified:true,siret:"22222222222222",legalName:"Live Seller B Test Pro",source:"live-seller-core-e2e",verifiedAt:new Date().toISOString()});
+for (const account of [sellerAccountA,sellerAccountB]) {
+  const profile=await auth(account.token,"/api/auth/profile",{method:"PATCH",body:JSON.stringify({accountType:"professional"})});
+  assert(profile.response.status===200&&profile.body.user?.accountType==="professional","Professional account type upgrade failed");
+}
 for(const[account,seller,city]of[[sellerAccountA,sellerA,"Paris"],[sellerAccountB,sellerB,"Lille"]]){
   const sender=await auth(account.token,`/api/marketplace/v1/sellers/${seller.id}/sender-profile`,{method:"PUT",body:JSON.stringify({name:seller.displayName,addressLine1:"1 rue Test",postalCode:city==="Paris"?"75001":"59000",city,countryCode:"FR",phone:"0600000000"})});assert(sender.response.status===200&&sender.body.ready===true,"Seller sender profile setup failed");
 }
