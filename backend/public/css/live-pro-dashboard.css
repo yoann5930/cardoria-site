@@ -130,3 +130,25 @@ body.live-pro-page{
 .live-pro-page .live-game-launch-arrow:hover,.live-pro-page .live-booster-arrow:hover{transform:translateX(1px)}
 .live-pro-page .live-game-launch-arrow:disabled,.live-pro-page .live-booster-arrow:disabled{opacity:.35;cursor:not-allowed;transform:none}
 .live-pro-page .live-booster-complete{margin-top:10px;padding:10px 12px;border-radius:12px;background:#eef8f0;color:#26713a;font-weight:900}
+
+
+/* Cardoria identity: clear operator UI with black/gold brand accents. */
+.live-pro-page{background:linear-gradient(180deg,#f4f4f5 0,#f7f7f8 52%,#f1f1f2 100%)}
+.live-pro-page .live-pro-sidebar{background:#080a0d;border-right-color:#1d2025;box-shadow:8px 0 26px rgba(0,0,0,.08)}
+.live-pro-page .live-pro-sidebar nav a{color:#8e9299}
+.live-pro-page .live-pro-sidebar nav a:hover{background:#171a1f;color:#e7c75d}
+.live-pro-page .live-pro-sidebar nav a.is-active{background:linear-gradient(145deg,#d7b84f,#a97f18);color:#080a0d;box-shadow:0 7px 18px rgba(185,143,28,.24)}
+.live-pro-page .live-pro-page-head{padding:20px 22px;border-radius:20px;background:linear-gradient(120deg,#080a0d,#15171b);border:1px solid #252930;box-shadow:0 8px 28px rgba(0,0,0,.1)}
+.live-pro-page .live-pro-page-head h1{color:#f4d56d}
+.live-pro-page .live-pro-page-head p{color:#aeb1b7}
+.live-pro-page .live-pro-page-head .live-pro-eyebrow{color:#caa539}
+.live-pro-page .live-pro-page-head-actions a{background:#22262b;color:#f0d16a!important;border:1px solid #3b3420}
+.live-pro-page .live-pro-summary{border-top:3px solid #c9a239}
+.live-pro-page .live-pro-packs,.live-pro-page .live-pro-lives-panel,.live-pro-page .live-studio-controls,.live-pro-page .live-studio-video,.live-pro-page .live-studio-current,.live-pro-page .live-studio-queue,.live-pro-page .live-studio-prepare{border-color:#ddd7c6}
+.live-pro-page .live-pro-action-primary,.live-pro-page .live-studio-btn--go,.live-pro-page .live-studio-game-picker button{background:linear-gradient(145deg,#1a1c20,#060708);color:#f0d16a!important;border:1px solid #3c3420}
+.live-pro-page .live-pro-live-card.is-current{border-color:#c7a33c;box-shadow:0 0 0 1px #c7a33c,0 8px 24px rgba(176,137,33,.1)}
+.live-pro-page .live-pro-tabs button.is-active:after{background:#c7a33c}
+.live-pro-page .live-studio-game-picker{background:linear-gradient(180deg,#fffdf8,#faf8f2);border-color:#dfd3ad}
+.live-pro-page .live-studio-game-picker select{border-color:#d8c991}
+.live-pro-page .live-studio-game-picker select:focus{outline:2px solid rgba(199,163,60,.25);border-color:#b98f22}
+.live-pro-page .live-game-launch-arrow,.live-pro-page .live-booster-arrow{background:#101216;color:#e9c85d;border:1px solid #b68e27}
