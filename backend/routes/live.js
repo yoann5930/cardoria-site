@@ -49,9 +49,6 @@ function assertSellerLiveCanStart(actor, liveId) {
   if (["ended", "cancelled"].includes(String(session.status || "").toLowerCase())) {
     throw Object.assign(new Error("Ce Live est fermé et ne peut pas être redémarré."), { status: 409 });
   }
-  if (!actor?.seller?.senderReady) {
-    throw Object.assign(new Error("Renseignez l'adresse d'expédition du vendeur avant de démarrer le Live."), { status: 409, code: "SELLER_SENDER_PROFILE_REQUIRED" });
-  }
   return session;
 }
 function safePublicText(value) { return String(value == null ? "" : value).replace(/[<>]/g, ""); }
