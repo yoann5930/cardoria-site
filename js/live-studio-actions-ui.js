@@ -150,12 +150,16 @@
         "<button type='button' id='lasReplay'>Relancer</button>",
         "<button type='button' id='lasPrev'>Précédent</button>",
         "</div>",
+        "<div class='live-studio-game-picker'>",
+        "<label>Item à mettre en jeu<select id='lasGameProduct'><option value=''>Choisir un item</option>" + products.map(function (p) { return "<option value='" + esc(p.id) + "'" + (current && current.id === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select></label>",
+        "<label>Type de jeu<select id='lasGameType'><option value='buy_now'>Vente directe</option><option value='auction'>Enchère</option><option value='flash'>Vente flash</option><option value='box_break'>Box Break</option><option value='energy_game'>Jeu de l’énergie</option><option value='hit_run_ex'>Hit & Run EX</option><option value='hit_run_ar'>Hit & Run AR</option><option value='hit_run_full_art'>Hit & Run Full Art</option><option value='giveaway'>Giveaway</option><option value='giveaway_subscriber'>Giveaway Abonné</option><option value='giveaway_buyer'>Giveaway Acheteur</option><option value='break'>Break personnalisé</option></select></label>",
+        "<button type='button' id='lasLaunchPreset' class='is-primary'>Préparer ce jeu</button>",
+        "</div>",
         "<div class='live-studio-actions'>",
         "<button type='button' id='lasBuyNow'>Vente</button>",
         "<button type='button' id='lasAuction' class='is-primary'>Lancer enchère</button>",
         "<button type='button' id='lasFlash'>Flash</button>",
         "<button type='button' id='lasBreak'>Break</button>",
-        "<button type='button' id='lasGame' disabled title='Les jeux TCG arrivent après ce tableau de bord.'>Jeu</button>",
         "<button type='button' id='lasGiveaway'>Giveaway</button>",
         "<button type='button' id='lasGiveFollow'>Giveaway Abonné</button>",
         "<button type='button' id='lasGiveBuyer' title='Réservé aux acheteurs ayant un paiement validé pendant ce Live.'>Giveaway Acheteur</button>",
@@ -222,6 +226,48 @@
       if (!p) return;
       setCurrent(p, true);
     };
+    var gameProduct = document.getElementById("lasGameProduct");
+    var gameType = document.getElementById("lasGameType");
+    var launchPreset = document.getElementById("lasLaunchPreset");
+    function chosenProduct() {
+      var id = gameProduct && gameProduct.value;
+      var p = products.filter(function (item) { return item.id === id; })[0] || current || products[0] || null;
+      if (!p) alert("Ajoutez d’abord un item au Live.");
+      return p;
+    }
+    function openSpotPreset(title, product, breakType) {
+      openSheet(title, "<label>Nombre de spots <input id='lasSpots' type='number' min='1' value='" + Math.max(1, Number(product.stock || 12)) + "'></label><label>Prix / spot <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number(product.price || 1) + "'></label>", function () {
+        document.getElementById("lasSheet").hidden = true;
+        postAction("break/start", { productId: product.id, spots: Number(document.getElementById("lasSpots").value || 1), pricePerSpot: Number(document.getElementById("lasSpotPrice").value || 0), breakType: breakType });
+      });
+    }
+    if (launchPreset) launchPreset.onclick = function () {
+      var p = chosenProduct(), type = gameType ? gameType.value : "buy_now";
+      if (!p && type !== "energy_game") return;
+      if (p) setCurrent(p, false);
+      if (type === "buy_now") return p && setCurrent(p, true);
+      if (type === "auction") return document.getElementById("lasAuction").click();
+      if (type === "flash") return document.getElementById("lasFlash").click();
+      if (type === "giveaway") return document.getElementById("lasGiveaway").click();
+      if (type === "giveaway_subscriber") return document.getElementById("lasGiveFollow").click();
+      if (type === "giveaway_buyer") return document.getElementById("lasGiveBuyer").click();
+      if (type === "energy_game") {
+        return openSheet("Jeu de l’énergie", "<label>Nombre de jeux <input id='lasEnergyGamesCount' type='number' min='1' max='100' value='1'></label><label>Extensions / items Pokémon <input id='lasEnergyItems' placeholder='Ex. EV10, EB10'></label><label>Prix / spot <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number((p && p.price) || 1) + "'></label>", function () {
+          var count = Math.max(1, Number(document.getElementById("lasEnergyGamesCount").value || 1));
+          var items = document.getElementById("lasEnergyItems").value.split(/[+,;\n]/).map(function (x) { return x.trim(); }).filter(Boolean);
+          var games = [];
+          for (var i = 0; i < count; i += 1) games.push({ type: "other", items: items, detail: p ? p.name : "" });
+          document.getElementById("lasSheet").hidden = true;
+          postAction("break/start", { breakType: "energy_game", gamesCount: count, energyGames: games, pricePerSpot: Number(document.getElementById("lasSpotPrice").value || 0) });
+        });
+      }
+      if (type === "box_break") return openSpotPreset("Box Break", p, "box_break");
+      if (type === "hit_run_ex") return openSpotPreset("Hit & Run EX", p, "hit_run_ex");
+      if (type === "hit_run_ar") return openSpotPreset("Hit & Run AR", p, "hit_run_ar");
+      if (type === "hit_run_full_art") return openSpotPreset("Hit & Run Full Art", p, "hit_run_full_art");
+      return openSpotPreset("Break personnalisé", p, "break");
+    };
+
     document.getElementById("lasAuction").onclick = function () {
       var p = needProduct();
       if (!p) return;
