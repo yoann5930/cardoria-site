@@ -64,6 +64,12 @@ updateSellerProfessionalVerification(sellerA.id, {
   verifiedAt: new Date().toISOString()
 });
 
+const professionalProfile = await auth(sellerAccountA.token, "/api/auth/profile", {
+  method: "PATCH",
+  body: JSON.stringify({ accountType: "professional" })
+});
+assert(professionalProfile.response.status === 200 && professionalProfile.body.user?.accountType === "professional", "Professional account type was not saved");
+
 const professionalLiveAccess = await auth(sellerAccountA.token, "/api/live/seller/sessions");
 assert(professionalLiveAccess.response.status === 200, "Verified professional seller cannot access Live before PayPal activation");
 
