@@ -2,7 +2,7 @@
   "use strict";
   var M = window.CardoriaMarketplace, root = document.getElementById("root");
   if (!M || !root) return;
-  if (!M.getToken() || !M.getSeller()) {
+  if (!M.getToken()) {
     root.innerHTML = "<p>Connectez votre compte vendeur sur <a href='vendre.html'>Vendre</a>.</p>";
     return;
   }
@@ -150,8 +150,22 @@
       renderPayments(r[1].checkouts || []);
     }).catch(function (e) { alert(e.message); });
   }
-  shell();
-  load();
-  paymentTimer = setInterval(refreshPayments,3000);
+  function boot() {
+    var seller = M.getSeller();
+    if (!seller) {
+      root.innerHTML = "<p>Créez ou vérifiez votre profil vendeur professionnel sur <a href='vendre.html'>Vendre</a>.</p>";
+      return;
+    }
+    if (seller.sellerType !== "professional" || !seller.professionalVerified) {
+      root.innerHTML = "<p>Le Studio Live est réservé aux professionnels dont le SIRET a été vérifié. <a href='vendre.html'>Vérifier mon SIRET</a>.</p>";
+      return;
+    }
+    shell();
+    load();
+    paymentTimer = setInterval(refreshPayments,3000);
+  }
+  Promise.resolve(M.syncSeller ? M.syncSeller() : M.getSeller()).then(boot).catch(function (e) {
+    root.innerHTML = "<p>" + esc(e.message || "Profil vendeur indisponible.") + " <a href='vendre.html'>Retour au compte vendeur</a>.</p>";
+  });
   window.addEventListener("beforeunload", function () { if (paymentTimer) clearInterval(paymentTimer); });
 })();
