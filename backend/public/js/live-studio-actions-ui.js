@@ -33,6 +33,31 @@
       });
     });
   }
+  function sellerCatalogProducts(sessionProducts) {
+    if (isAdmin || !M || !M.getSeller) return Promise.resolve([]);
+    var seller = M.getSeller();
+    if (!seller || !seller.id) return Promise.resolve([]);
+    return M.api("/v1/sellers/" + encodeURIComponent(seller.id) + "/listings?limit=100").then(function (d) {
+      var existing = new Set((sessionProducts || []).map(function (p) { return String(p.id); }));
+      return (d.listings || []).filter(function (listing) {
+        var status = String(listing.status || "").toLowerCase();
+        return !existing.has("MK-" + String(listing.id)) && Number(listing.stock || 0) > 0 && (status === "active" || status === "draft");
+      }).map(function (listing) {
+        return {
+          id: "MK-" + String(listing.id),
+          name: String(listing.title || "Item vendeur"),
+          price: Number(listing.price || 0),
+          stock: Math.max(1, Number(listing.stock || 1)),
+          qty: Math.max(1, Number(listing.stock || 1)),
+          mode: "buy_now",
+          durationSeconds: 30,
+          shippingWeightGrams: 20,
+          catalogOnly: true,
+          listingId: String(listing.id)
+        };
+      });
+    }).catch(function () { return []; });
+  }
   function listPath() { return isAdmin ? "/api/admin/live/sessions" : "/api/live/seller/sessions"; }
   function sessionPath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) : "/api/live/seller/sessions/" + encodeURIComponent(id); }
   function patchPath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) : "/api/live/seller/sessions/" + encodeURIComponent(id); }
@@ -129,11 +154,21 @@
       box.innerHTML = "<div class='live-studio-current'><h2>Produit actuel</h2><p>Créez un Live puis ajoutez des lots dans la file avant de démarrer.</p></div><div class='live-studio-queue'><h2>File suivante</h2><p>Préparez les produits ici. Pendant le Live, utilisez Suivant.</p></div>";
       return;
     }
-    Promise.all([api(sessionPath(selected)), api(statePath(selected)), api(checkoutPath()).catch(function () { return { checkouts: [] }; })]).then(function (r) {
+    api(sessionPath(selected)).then(function (sessionResponse) {
+      var session = sessionResponse.session || {};
+      return Promise.all([
+        Promise.resolve(sessionResponse),
+        api(statePath(selected)),
+        api(checkoutPath()).catch(function () { return { checkouts: [] }; }),
+        sellerCatalogProducts(session.products || [])
+      ]);
+    }).then(function (r) {
       var session = r[0].session || {};
       var state = r[1].state || {};
       var checkouts = r[2].checkouts || [];
       var products = session.products || [];
+      var sellerItems = r[3] || [];
+      var selectableProducts = products.concat(sellerItems);
       var current = currentProduct(session, state);
       var stored = prefs();
       var startPrice = current ? Number(current.price || stored.auctionStart || 1) : Number(stored.auctionStart || 1);
@@ -151,7 +186,11 @@
         "<button type='button' id='lasPrev'>Précédent</button>",
         "</div>",
         "<div class='live-studio-game-picker'>",
-        "<label><span>1. Item à mettre en jeu</span><select id='lasGameProduct'><option value=''>Choisir un item</option>" + products.map(function (p) { return "<option value='" + esc(p.id) + "'" + (current && current.id === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select></label>",
+        "<label><span>1. Item à mettre en jeu</span><select id='lasGameProduct'><option value=''>Choisir un item</option>" +
+          (products.length ? "<optgroup label='Items de ce Live'>" + products.map(function (p) { return "<option value='" + esc(p.id) + "'" + (current && current.id === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</optgroup>" : "") +
+          (sellerItems.length ? "<optgroup label='Mes items vendeur'>" + sellerItems.map(function (p) { return "<option value='" + esc(p.id) + "'>" + esc(p.name) + " · stock " + esc(p.stock) + "</option>"; }).join("") + "</optgroup>" : "") +
+          (!products.length && !sellerItems.length ? "<option value='' disabled>Aucun item disponible — ajoutez un lot ci-dessous</option>" : "") +
+          "</select></label>",
         "<label><span>2. Type de jeu</span><select id='lasGameType'><option value='buy_now'>Vente directe</option><option value='auction'>Enchère</option><option value='flash'>Vente flash</option><option value='box_break'>Box Break</option><option value='energy_game'>Jeu de l’énergie</option><option value='hit_run_ex'>Hit & Run EX</option><option value='hit_run_ar'>Hit & Run AR</option><option value='hit_run_full_art'>Hit & Run Full Art</option><option value='giveaway'>Giveaway</option><option value='break'>Break personnalisé</option></select></label>",
         "<button type='button' id='lasLaunchPreset' class='is-primary'>Préparer le jeu</button>",
         "</div>",
@@ -179,7 +218,7 @@
         }).join("") + "</select>",
         "</div>"
       ].join("");
-      bindEditor(session, products, state, current, startPrice, duration);
+      bindEditor(session, products, selectableProducts, state, current, startPrice, duration);
       showState(state);
       renderActivity(state, checkouts, session);
       if (state.giveaway && state.giveaway.status === "ready_to_draw" && !state.giveaway.winner && autoDrawId !== state.giveaway.id) {
@@ -190,7 +229,7 @@
       box.innerHTML = "<p>" + esc(e.message) + "</p>";
     });
   }
-  function bindEditor(session, products, state, current, startPrice, duration) {
+  function bindEditor(session, products, selectableProducts, state, current, startPrice, duration) {
     function needProduct() {
       if (!current) {
         alert("Ajoutez un lot dans la file, puis cliquez Relancer.");
@@ -231,13 +270,39 @@
     var launchPreset = document.getElementById("lasLaunchPreset");
     function selectedGameProduct() {
       var id = gameProduct && gameProduct.value;
-      var product = products.filter(function (item) { return item.id === id; })[0] || current || products[0] || null;
+      var product = (selectableProducts || products).filter(function (item) { return item.id === id; })[0] || current || (selectableProducts || products)[0] || null;
       if (!product) alert("Ajoutez d’abord un item au Live.");
       return product;
     }
+    function ensureProductInLive(product) {
+      if (!product) return Promise.resolve(null);
+      var existing = products.filter(function (item) { return item.id === product.id; })[0];
+      if (existing) return Promise.resolve(existing);
+      var imported = {
+        id: product.id,
+        name: product.name,
+        mode: "buy_now",
+        price: Math.max(0.01, Number(product.price || 1)),
+        qty: Math.max(1, Number(product.qty || product.stock || 1)),
+        stock: Math.max(1, Number(product.stock || 1)),
+        durationSeconds: 30,
+        shippingWeightGrams: Math.max(0, Number(product.shippingWeightGrams || 20))
+      };
+      var next = products.concat([imported]);
+      return api(patchPath(selected), { method: "PATCH", body: JSON.stringify({ products: next, currentLot: imported.id }) }).then(function () {
+        session.products = next;
+        products.push(imported);
+        return imported;
+      });
+    }
     function prepareGame(type, product, config) {
       document.getElementById("lasSheet").hidden = true;
-      return postAction("game/prepare", { type: type, productId: product ? product.id : "", config: config || {} });
+      return ensureProductInLive(product).then(function (liveProduct) {
+        if (liveProduct) return api(patchPath(selected), { method: "PATCH", body: JSON.stringify({ currentLot: liveProduct.id }) }).then(function () {
+          return postAction("game/prepare", { type: type, productId: liveProduct.id, config: config || {} });
+        });
+        return postAction("game/prepare", { type: type, productId: "", config: config || {} });
+      }).catch(function (e) { alert(e.message); });
     }
     function prepareBoosterGame(title, product, type) {
       openSheet(title,
@@ -264,8 +329,7 @@
       var type = gameType ? gameType.value : "buy_now";
       var product = selectedGameProduct();
       if (!product && type !== "energy_game") return;
-      if (product) setCurrent(product, false);
-      if (type === "buy_now") return prepareGame("buy_now", product, {});
+       if (type === "buy_now") return prepareGame("buy_now", product, {});
       if (type === "auction") {
         return openSheet("Préparer l’enchère",
           "<label>Prix de départ <input id='lasStart' type='number' min='0.01' step='0.01' value='" + Number((product && product.price) || startPrice || 1) + "'></label>" +
