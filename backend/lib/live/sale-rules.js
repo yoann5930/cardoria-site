@@ -12,7 +12,7 @@ export function resolveLiveSaleRule({ live, product, customerEmail }) {
     if (state.auction.status === "ended" && state.auction.highestBidder) {
       const winner = String(state.auction.highestBidder.email || "").trim().toLowerCase();
       if (!winner || winner !== email) throw Object.assign(new Error("Seul le gagnant de l'enchere peut payer ce lot."), { status: 403 });
-      return { kind: "auction", unitPrice: money(state.auction.currentPrice), actionId: state.auction.id };
+      return { kind: "auction", unitPrice: money(state.auction.currentPrice), actionId: state.auction.id, spotLabel: String(state.auction.spotLabel || ""), saleLabel: String(state.auction.productName || product.name) };
     }
   }
   if (state.flash?.productId === product.id && state.flash.status === "running" && new Date(state.flash.endsAt).getTime() > Date.now()) {

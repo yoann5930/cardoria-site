@@ -6,7 +6,7 @@
     root.innerHTML = "<p>Connectez votre compte vendeur sur <a href='vendre.html'>Vendre</a>.</p>";
     return;
   }
-  var publisherHandle = null, paymentTimer = null, selectedLiveId = "";
+  var publisherHandle = null, paymentTimer = null, selectedLiveId = "", sellerPlanState = null, sellerPlans = [], sessionFilter = "upcoming";
   function api(path, options) {
     options = options || {};
     var headers = Object.assign({ "Content-Type": "application/json", Authorization: "Bearer " + M.getToken() }, options.headers || {});
@@ -23,6 +23,51 @@
     });
   }
   function euro(v) { return Number(v || 0).toLocaleString("fr-FR", { style: "currency", currency: "EUR" }); }
+  function percent(rate) { return Math.round(Number(rate || 0) * 1000) / 10 + " %"; }
+  function planCard(plan, currentPlanId, active) {
+    var isCurrent = active && plan.id === currentPlanId;
+    var market = plan.id === "starter"
+      ? "Marketplace : 5 %"
+      : plan.id === "pro"
+        ? "Marketplace : 3 % sur les 5 premières ventes, puis 5 %"
+        : "Marketplace : 15 premières ventes/mois à 0 %, puis 3 %";
+    var livePerk = plan.liveCardoriaShippingBuyerLimit > 0
+      ? "Port Cardoria : jusqu’à " + plan.liveCardoriaShippingBuyerLimit + " acheteur(s) distinct(s) par Live"
+      : "Port Cardoria : non inclus";
+    return "<article class='live-pro-plan" + (isCurrent ? " is-current" : "") + "'>" +
+      "<div class='live-pro-plan-head'><strong>" + esc(plan.name) + "</strong><span>" + euro(plan.monthlyPriceEur) + "/mois</span></div>" +
+      "<p>Commission Live : <strong>" + esc(percent(plan.liveCommissionRate)) + "</strong></p>" +
+      "<p>" + esc(market) + "</p>" +
+      "<p>" + esc(livePerk) + "</p>" +
+      (plan.livePriority ? "<p>⭐ Priorité d’affichage Live</p>" : "") +
+      (plan.badge ? "<p>🏅 Badge Elite</p>" : "") +
+      "<div class='live-pro-plan-state'>" + (isCurrent ? "✓ Pack actuel" : "Disponible") + "</div>" +
+      "</article>";
+  }
+  function renderProOverview(seller) {
+    var host = document.getElementById("liveProOverview");
+    if (!host) return;
+    var currentPlanId = sellerPlanState && sellerPlanState.planId ? sellerPlanState.planId : (seller.planId || "starter");
+    var active = Boolean(sellerPlanState && sellerPlanState.active);
+    var planName = currentPlanId ? currentPlanId.charAt(0).toUpperCase() + currentPlanId.slice(1) : "Starter";
+    host.innerHTML = "<section class='live-pro-summary'>" +
+      "<div class='live-pro-summary-main'><span class='live-pro-eyebrow'>COMPTE LIVEUR PROFESSIONNEL</span><h2>" + esc(seller.professionalLegalName || seller.displayName) + "</h2>" +
+      "<div class='live-pro-chips'><span>✓ SIRET vérifié</span><span>Pack : " + esc(planName) + (active ? " actif" : " à activer") + "</span><span>PayPal : " + (seller.paypalReady ? "✓ prêt" : "à renseigner avant encaissement") + "</span></div></div>" +
+      "<div class='live-pro-shortcuts'><a href='#liveCreateZone'>＋ Créer un Live</a><button type='button' id='liveQuickStart'>▶ Démarrer</button><button type='button' id='liveQuickCam'>🎥 Caméra</button><a href='#livePaymentsZone'>€ Ventes</a></div>" +
+      "</section>" +
+      "<section class='live-pro-packs'><div class='live-pro-section-head'><div><span class='live-pro-eyebrow'>PACKS PROFESSIONNELS</span><h2>Choisissez le niveau adapté à vos Lives</h2></div><p>Le pack définit les commissions et les avantages. PayPal reste séparé et sert uniquement aux encaissements.</p></div>" +
+      "<div class='live-pro-plan-grid'>" + sellerPlans.map(function (plan) { return planCard(plan, currentPlanId, active); }).join("") + "</div></section>";
+    var quickStart = document.getElementById("liveQuickStart");
+    if (quickStart) quickStart.onclick = function () {
+      if (!selectedLiveId) return document.getElementById("liveCreateZone")?.scrollIntoView({ behavior: "smooth" });
+      publishLive(selectedLiveId);
+    };
+    var quickCam = document.getElementById("liveQuickCam");
+    if (quickCam) quickCam.onclick = function () {
+      if (!selectedLiveId) return document.getElementById("liveCreateZone")?.scrollIntoView({ behavior: "smooth" });
+      publishLive(selectedLiveId);
+    };
+  }
   function state(status) {
     var s = String(status || "").toLowerCase();
     if (["paid", "completed", "authorized", "authorised"].includes(s)) return { key: "paid", icon: "🟢", label: "Autorisé / Payé" };
@@ -71,27 +116,73 @@
       document.getElementById("lvPublishState").textContent = "Caméra 1 en diffusion.";
     }).catch(function (e) { alert(e.message); });
   }
+  function liveBucket(status) {
+    var s = String(status || "").toLowerCase();
+    if (s === "live") return "live";
+    if (s === "ended" || s === "cancelled" || s === "canceled") return "past";
+    return "upcoming";
+  }
+  function liveStatusLabel(status) {
+    var s = String(status || "").toLowerCase();
+    return ({ draft: "Brouillon", scheduled: "À venir", live: "En direct", ended: "Terminé", cancelled: "Annulé", canceled: "Annulé" })[s] || status || "Brouillon";
+  }
   function renderSessions(sessions) {
     var list = document.getElementById("lvSessions");
     if (!list) return;
-    if (!selectedLiveId && sessions && sessions[0]) selectedLiveId = sessions[0].id;
+    sessions = sessions || [];
+    if (!selectedLiveId && sessions[0]) selectedLiveId = sessions[0].id;
     announceSelected();
-    list.innerHTML = (sessions || []).map(function (s) {
-      var products = (s.products || []).map(function (p) { return esc(p.name) + " · " + esc(p.mode) + (p.mode === "giveaway" ? " gratuit" : " · " + euro(p.price)); }).join("<br>") || "Aucune vente configurée";
+
+    var filtered = sessions.filter(function (s) { return liveBucket(s.status) === sessionFilter; });
+    list.innerHTML = filtered.map(function (s) {
       var current = s.id === selectedLiveId ? " is-current" : "";
-      return "<div class='live-seller-card" + current + "' style='border:1px solid rgba(212,175,55,.25);padding:12px;margin:8px 0;border-radius:8px'><strong>" + esc(s.title) + "</strong> — " + esc(s.status) + " — <strong>PayPal</strong><p>" + products + "</p><button data-select='" + esc(s.id) + "'>Sélectionner</button></div>";
-    }).join("") || "<p>Aucun Live vendeur.</p>";
+      var bucket = liveBucket(s.status);
+      var statusClass = bucket === "live" ? " is-live" : (bucket === "past" ? " is-past" : "");
+      var productCount = Array.isArray(s.products) ? s.products.length : 0;
+      return "<article class='live-pro-live-card" + current + statusClass + "'>" +
+        "<div class='live-pro-live-card-main'><div class='live-pro-live-title-row'><h3>" + esc(s.title || "Live vendeur") + "</h3><span class='live-pro-status'>" + esc(liveStatusLabel(s.status)) + "</span></div>" +
+        "<p>" + productCount + " lot(s) préparé(s) · Paiement PayPal</p></div>" +
+        "<div class='live-pro-live-actions'>" +
+        "<button type='button' class='live-pro-action-primary' data-select='" + esc(s.id) + "'>" + (bucket === "live" ? "Ouvrir le studio" : "Préparer le live") + "</button>" +
+        (bucket !== "past" ? "<button type='button' data-open-cam='" + esc(s.id) + "'>Caméra</button>" : "") +
+        "<a href='/live.html" + (bucket === "live" ? "?live=" + encodeURIComponent(s.id) : "") + "'>Voir</a>" +
+        "</div></article>";
+    }).join("") || "<div class='live-pro-empty'>Aucun live dans cette section.</div>";
+
     list.querySelectorAll("[data-select]").forEach(function (b) {
-      b.onclick = function () { selectedLiveId = b.dataset.select; announceSelected(); renderSessions(sessions); };
+      b.onclick = function () {
+        selectedLiveId = b.dataset.select;
+        announceSelected();
+        renderSessions(sessions);
+        document.getElementById("liveStudioZone")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      };
     });
+    list.querySelectorAll("[data-open-cam]").forEach(function (b) {
+      b.onclick = function () {
+        selectedLiveId = b.dataset.openCam;
+        announceSelected();
+        renderSessions(sessions);
+        document.getElementById("liveStudioZone")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      };
+    });
+    document.querySelectorAll("[data-live-filter]").forEach(function (tab) {
+      tab.classList.toggle("is-active", tab.dataset.liveFilter === sessionFilter);
+      tab.onclick = function () {
+        sessionFilter = tab.dataset.liveFilter;
+        renderSessions(sessions);
+      };
+    });
+
     var label = document.getElementById("liveSelectedSession");
-    var session = (sessions || []).filter(function (s) { return s.id === selectedLiveId; })[0];
-    if (label) label.textContent = session ? ("Live sélectionné : " + session.title + " (" + session.status + ")") : "Créez un Live pour commencer.";
+    var session = sessions.filter(function (s) { return s.id === selectedLiveId; })[0];
+    if (label) label.textContent = session ? ("Live sélectionné : " + session.title + " (" + liveStatusLabel(session.status) + ")") : "Créez un Live pour commencer.";
   }
   function shell() {
     root.innerHTML = [
       "<div class='live-seller-studio live-studio'>",
-      "<header class='live-studio-controls'><div><h2>Studio Live vendeur</h2><p id='liveSelectedSession'>Créez un Live pour commencer.</p><p><strong>Paiement des ventes : PayPal.</strong> La commission Cardoria suit votre abonnement.</p></div>",
+      "<div id='liveProOverview'></div>",
+      "<section class='live-pro-lives-panel'><div class='live-pro-lives-head'><div><span class='live-pro-eyebrow'>MES LIVES</span><h2>Gérer mes lives</h2></div><a class='live-pro-new-live' href='#liveCreateZone'>＋ Créer un live</a></div><div class='live-pro-tabs'><button type='button' data-live-filter='upcoming' class='is-active'>À venir</button><button type='button' data-live-filter='live'>En direct</button><button type='button' data-live-filter='past'>Passés</button></div><div id='lvSessions'></div></section>",
+      "<header class='live-studio-controls' id='liveStudioZone'><div><h2>Studio Live vendeur</h2><p id='liveSelectedSession'>Créez un Live pour commencer.</p><p><strong>Paiement des ventes : PayPal.</strong> La commission Cardoria suit votre abonnement.</p></div>",
       "<div class='live-studio-control-btns'>",
       "<button class='live-studio-btn live-studio-btn--go' type='button' id='lvStart'>Démarrer le Live</button>",
       "<button class='live-studio-btn live-studio-btn--pause' type='button' id='lvPause'>Pause</button>",
@@ -103,11 +194,11 @@
       "<details class='live-studio-cam-settings'><summary>Réglages caméra</summary><p id='lvCameraPair'></p><button class='live-studio-btn' type='button' id='lvCam2'>Caméra 2 / téléphone</button><p>La Caméra 2 PC indépendante arrive ensuite. Le téléphone reste disponible.</p></details>",
       "</section><section id='liveActionStudio' class='live-studio-stage'></section></div>",
       "<section class='live-studio-activity'><article><h3>Spectateurs</h3><p id='liveStudioViewers'>0</p></article><article><h3>Chat</h3><div id='liveStudioChat'>Aucun message</div></article><article><h3>Dernière vente</h3><p id='liveStudioLastSale'>—</p></article><article><h3>Paiements</h3><p id='lvPaymentsSummary'>Payés: 0 · En attente: 0 · Refusés: 0</p></article></section>",
-      "<details class='live-studio-prepare'><summary>Préparer le Live / historique</summary>",
-      "<p>Salle d’abord, ventes ensuite. Aucun produit ni prix n'est demandé pour créer une salle.</p>",
-      "<div><input id='lvTitle' placeholder='Titre du Live' value='Live vendeur'> <select id='lvCategory'><option value='pokemon'>Pokémon</option><option value='yugioh'>Yu-Gi-Oh!</option><option value='onepiece'>One Piece</option><option value='lorcana'>Lorcana</option><option value='magic'>Magic</option><option value='other' selected>Autre</option></select> <button id='lvCreate' type='button'>Créer le Live</button></div>",
-      "<h2>Paiements du Live</h2><table><thead><tr><th>Statut</th><th>Acheteur</th><th>Lot</th><th>Montant</th><th>Paiement</th><th>Mise à jour</th></tr></thead><tbody id='lvPaymentsBody'></tbody></table>",
-      "<h2>Mes Lives</h2><div id='lvSessions'></div></details></div>"
+      "<details class='live-studio-prepare' open id='liveCreateZone'><summary>Créer et préparer mon Live</summary>",
+      "<p>Créez votre salle en quelques secondes. Aucun produit ni prix n’est obligatoire pour commencer.</p>",
+      "<div class='live-pro-create-row'><input id='lvTitle' placeholder='Titre du Live' value='Live vendeur'> <select id='lvCategory'><option value='pokemon'>Pokémon</option><option value='yugioh'>Yu-Gi-Oh!</option><option value='onepiece'>One Piece</option><option value='lorcana'>Lorcana</option><option value='magic'>Magic</option><option value='other' selected>Autre</option></select> <button id='lvCreate' type='button'>Créer le Live</button></div>",
+      "<h2 id='livePaymentsZone'>Paiements du Live</h2><table><thead><tr><th>Statut</th><th>Acheteur</th><th>Lot</th><th>Montant</th><th>Paiement</th><th>Mise à jour</th></tr></thead><tbody id='lvPaymentsBody'></tbody></table>",
+      "</details></div>"
     ].join("");
     document.getElementById("lvCreate").onclick = function () {
       var b = this;
@@ -150,8 +241,8 @@
       renderPayments(r[1].checkouts || []);
     }).catch(function (e) { alert(e.message); });
   }
-  function boot() {
-    var seller = M.getSeller();
+  function boot(seller) {
+    seller = seller || M.getSeller();
     if (!seller) {
       root.innerHTML = "<p>Créez ou vérifiez votre profil vendeur professionnel sur <a href='vendre.html'>Vendre</a>.</p>";
       return;
@@ -161,10 +252,21 @@
       return;
     }
     shell();
+    renderProOverview(seller);
     load();
     paymentTimer = setInterval(refreshPayments,3000);
   }
-  Promise.resolve(M.syncSeller ? M.syncSeller() : M.getSeller()).then(boot).catch(function (e) {
+  Promise.resolve(M.syncSeller ? M.syncSeller() : M.getSeller()).then(function (seller) {
+    if (!seller) return boot(seller);
+    return Promise.all([
+      M.api("/v1/sellers/" + encodeURIComponent(seller.id) + "/subscription").catch(function () { return { subscription: null }; }),
+      M.api("/v1/plans").catch(function () { return { plans: [] }; })
+    ]).then(function (r) {
+      sellerPlanState = r[0] && r[0].subscription ? r[0].subscription : null;
+      sellerPlans = r[1] && Array.isArray(r[1].plans) ? r[1].plans : [];
+      boot(seller);
+    });
+  }).catch(function (e) {
     root.innerHTML = "<p>" + esc(e.message || "Profil vendeur indisponible.") + " <a href='vendre.html'>Retour au compte vendeur</a>.</p>";
   });
   window.addEventListener("beforeunload", function () { if (paymentTimer) clearInterval(paymentTimer); });

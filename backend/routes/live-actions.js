@@ -4,7 +4,7 @@ import { validateSession } from "../lib/auth/session.js";
 import { followSeller, isFollowingSeller } from "../lib/live/follows.js";
 import { getLiveSession } from "../lib/live/sessions.js";
 import { resolveEnergyItems, searchEnergyCatalog } from "../lib/live/energy-catalog.js";
-import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, setLiveProductEnergyTypes, startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, startBuyerGiveaway, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
+import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, prepareLiveGame, launchPreparedGame, setLiveProductEnergyTypes, startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, startBuyerGiveaway, startNextBoosterAuction, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
 
 const router=Router(),rateBuckets=new Map();
 function fail(res,error,fallback=400){res.status(error?.status||fallback).json({ok:false,error:error?.message||"Erreur action Live",code:error?.code||"",minimum:error?.minimum});}
@@ -31,6 +31,7 @@ function rateLimit(req,kind,limit,windowMs){const key=[kind,req.params.liveId,St
 router.get("/energy-catalog/search",async(req,res)=>{try{res.json({ok:true,items:await searchEnergyCatalog(req.query.q||"",req.query.limit)});}catch(e){fail(res,e,502);}});
 router.get("/energy-catalog/resolve",async(req,res)=>{try{const items=String(req.query.items||"").split(/[+,;\n]/).map(x=>x.trim()).filter(Boolean);res.json({ok:true,...await resolveEnergyItems(items)});}catch(e){fail(res,e,502);}});
 router.get("/:liveId/state",(req,res)=>{try{assertPublicLive(req.params.liveId);res.json({ok:true,state:publicState(getLiveActionState(req.params.liveId))});}catch(e){fail(res,e,404);}});
+router.get("/seller/:liveId/state",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,state:getLiveActionState(req.params.liveId)});}catch(e){fail(res,e,401);}});
 router.get("/:liveId/chat",(req,res)=>{try{assertPublicLive(req.params.liveId);res.json({ok:true,messages:listLiveChat(req.params.liveId,req.query.limit)});}catch(e){fail(res,e,404);}});
 router.post("/:liveId/chat",(req,res)=>{try{rateLimit(req,"chat",5,10_000);assertPublicLive(req.params.liveId);const user=clientActor(req),name=String(user.name||"").trim();if(!name)throw Object.assign(new Error("Ajoutez un pseudo dans votre compte Cardoria avant d’écrire dans le chat."),{status:409,code:"CLIENT_PSEUDO_REQUIRED"});res.json({ok:true,message:addLiveChatMessage(req.params.liveId,{name,message:req.body?.message})});}catch(e){fail(res,e,401);}});
 router.post("/:liveId/bids",(req,res)=>{try{rateLimit(req,"bid",20,10_000);const result=placeAuctionBid(req.params.liveId,requireBidderEmail(req.body||{}));res.json({ok:true,auction:publicState({auction:result.auction}).auction,bid:{id:result.bid.id,amount:result.bid.amount,bidderName:result.bid.bidderName,createdAt:result.bid.createdAt}});}catch(e){fail(res,e);}});
@@ -54,8 +55,11 @@ router.post("/:liveId/giveaway/enter",(req,res)=>{try{
 }catch(e){fail(res,e);}});
 router.post("/seller/:liveId/energy-config",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,energyConfig:setLiveProductEnergyTypes(req.params.liveId,req.body?.productId,req.body?.energyTypes)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/pin",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,state:pinLiveProduct(req.params.liveId,req.body?.productId)});}catch(e){fail(res,e,401);}});
+router.post("/seller/:liveId/game/prepare",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,preparedGame:prepareLiveGame(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
+router.post("/seller/:liveId/game/launch",async(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,...await launchPreparedGame(req.params.liveId)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/unpin",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,state:unpinLiveProduct(req.params.liveId)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/auction/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,auction:startAuction(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
+router.post("/seller/:liveId/booster-auction/next",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,auction:startNextBoosterAuction(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/auction/stop",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,auction:stopAuction(req.params.liveId)});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/flash/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,flash:startFlashSale(req.params.liveId,req.body||{})});}catch(e){fail(res,e,401);}});
 router.post("/seller/:liveId/giveaway/start",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);const body=req.body||{};const giveaway=body.eligibility==="buyer"?startBuyerGiveaway(req.params.liveId,body):startGiveaway(req.params.liveId,body);res.json({ok:true,giveaway});}catch(e){fail(res,e,401);}});

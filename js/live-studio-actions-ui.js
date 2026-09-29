@@ -34,10 +34,10 @@
     });
   }
   function listPath() { return isAdmin ? "/api/admin/live/sessions" : "/api/live/seller/sessions"; }
-  function sessionPath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) : "/api/live/sessions/" + encodeURIComponent(id); }
+  function sessionPath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) : "/api/live/seller/sessions/" + encodeURIComponent(id); }
   function patchPath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) : "/api/live/seller/sessions/" + encodeURIComponent(id); }
   function actionPath(id, suffix) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) + "/actions/" + suffix : "/api/live/actions/seller/" + encodeURIComponent(id) + "/" + suffix; }
-  function statePath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) + "/actions" : "/api/live/actions/" + encodeURIComponent(id) + "/state"; }
+  function statePath(id) { return isAdmin ? "/api/admin/live/sessions/" + encodeURIComponent(id) + "/actions" : "/api/live/actions/seller/" + encodeURIComponent(id) + "/state"; }
   function checkoutPath() { return isAdmin ? "/api/admin/live/checkouts" : "/api/live/seller/checkouts"; }
   function prefs() {
     try { return JSON.parse(localStorage.getItem("cardoria-live-studio-prefs") || "{}"); } catch (e) { return {}; }
@@ -150,12 +150,16 @@
         "<button type='button' id='lasReplay'>Relancer</button>",
         "<button type='button' id='lasPrev'>Précédent</button>",
         "</div>",
-        "<div class='live-studio-actions'>",
+        "<div class='live-studio-game-picker'>",
+        "<label><span>1. Item à mettre en jeu</span><select id='lasGameProduct'><option value=''>Choisir un item</option>" + products.map(function (p) { return "<option value='" + esc(p.id) + "'" + (current && current.id === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select></label>",
+        "<label><span>2. Type de jeu</span><select id='lasGameType'><option value='buy_now'>Vente directe</option><option value='auction'>Enchère</option><option value='flash'>Vente flash</option><option value='box_break'>Box Break</option><option value='energy_game'>Jeu de l’énergie</option><option value='hit_run_ex'>Hit & Run EX</option><option value='hit_run_ar'>Hit & Run AR</option><option value='hit_run_full_art'>Hit & Run Full Art</option><option value='giveaway'>Giveaway</option><option value='break'>Break personnalisé</option></select></label>",
+        "<button type='button' id='lasLaunchPreset' class='is-primary'>Préparer le jeu</button>",
+        "</div>",
+        "<div class='live-studio-actions' hidden aria-hidden='true'>",
         "<button type='button' id='lasBuyNow'>Vente</button>",
         "<button type='button' id='lasAuction' class='is-primary'>Lancer enchère</button>",
         "<button type='button' id='lasFlash'>Flash</button>",
         "<button type='button' id='lasBreak'>Break</button>",
-        "<button type='button' id='lasGame' disabled title='Les jeux TCG arrivent après ce tableau de bord.'>Jeu</button>",
         "<button type='button' id='lasGiveaway'>Giveaway</button>",
         "<button type='button' id='lasGiveFollow'>Giveaway Abonné</button>",
         "<button type='button' id='lasGiveBuyer' title='Réservé aux acheteurs ayant un paiement validé pendant ce Live.'>Giveaway Acheteur</button>",
@@ -222,6 +226,96 @@
       if (!p) return;
       setCurrent(p, true);
     };
+    var gameProduct = document.getElementById("lasGameProduct");
+    var gameType = document.getElementById("lasGameType");
+    var launchPreset = document.getElementById("lasLaunchPreset");
+    function selectedGameProduct() {
+      var id = gameProduct && gameProduct.value;
+      var product = products.filter(function (item) { return item.id === id; })[0] || current || products[0] || null;
+      if (!product) alert("Ajoutez d’abord un item au Live.");
+      return product;
+    }
+    function prepareGame(type, product, config) {
+      document.getElementById("lasSheet").hidden = true;
+      return postAction("game/prepare", { type: type, productId: product ? product.id : "", config: config || {} });
+    }
+    function prepareBoosterGame(title, product, type) {
+      openSheet(title,
+        "<label>Nombre de displays <input id='lasDisplayCount' type='number' min='1' max='100' value='1'></label>" +
+        "<label>Boosters par display <input id='lasBoostersPerDisplay' type='number' min='1' max='100' value='" + Math.max(1, Number(product.stock || 18)) + "'></label>" +
+        "<p class='live-studio-hint'>Cardoria calcule automatiquement le total et numérote Booster 1, Booster 2, Booster 3…</p>" +
+        "<label>Prix de départ de l’enchère <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number(product.price || 1) + "'></label>" +
+        "<label>Durée de l’enchère <select id='lasGameDuration'><option value='30'>30 s</option><option value='45'>45 s</option><option value='60'>60 s</option></select></label>",
+        function () {
+          var displays = Math.max(1, Number(document.getElementById("lasDisplayCount").value || 1));
+          var perDisplay = Math.max(1, Number(document.getElementById("lasBoostersPerDisplay").value || 1));
+          var boosterCount = displays * perDisplay;
+          prepareGame(type, product, {
+            displayCount: displays,
+            boostersPerDisplay: perDisplay,
+            boosterCount: boosterCount,
+            pricePerSpot: Number(document.getElementById("lasSpotPrice").value || 0),
+            durationSeconds: Number(document.getElementById("lasGameDuration").value || 30)
+          });
+        }
+      );
+    }
+    if (launchPreset) launchPreset.onclick = function () {
+      var type = gameType ? gameType.value : "buy_now";
+      var product = selectedGameProduct();
+      if (!product && type !== "energy_game") return;
+      if (product) setCurrent(product, false);
+      if (type === "buy_now") return prepareGame("buy_now", product, {});
+      if (type === "auction") {
+        return openSheet("Préparer l’enchère",
+          "<label>Prix de départ <input id='lasStart' type='number' min='0.01' step='0.01' value='" + Number((product && product.price) || startPrice || 1) + "'></label>" +
+          "<label>Durée <select id='lasDuration'><option value='30'>30 s</option><option value='45'>45 s</option><option value='60'>60 s</option></select></label>",
+          function () { prepareGame("auction", product, { startPrice:Number(document.getElementById("lasStart").value||0), durationSeconds:Number(document.getElementById("lasDuration").value||30) }); }
+        );
+      }
+      if (type === "flash") {
+        return openSheet("Préparer la vente flash",
+          "<label>Prix <input id='lasFlashPrice' type='number' min='0.01' step='0.01' value='" + Number((product && product.price) || 1) + "'></label>" +
+          "<label>Durée <select id='lasDuration'><option value='30'>30 s</option><option value='60' selected>60 s</option><option value='120'>2 min</option></select></label>",
+          function () { prepareGame("flash", product, { price:Number(document.getElementById("lasFlashPrice").value||0), durationSeconds:Number(document.getElementById("lasDuration").value||60) }); }
+        );
+      }
+      if (type === "giveaway") {
+        return openSheet("Préparer le Giveaway",
+          "<label>Durée <select id='lasDuration'><option value='60'>60 s</option><option value='120'>2 min</option></select></label>",
+          function () { prepareGame("giveaway", product, { durationSeconds:Number(document.getElementById("lasDuration").value||60) }); }
+        );
+      }
+      if (type === "box_break") return prepareBoosterGame("Préparer le Box Break", product, "box_break");
+      if (type === "hit_run_ex") return prepareBoosterGame("Préparer Hit & Run EX", product, "hit_run_ex");
+      if (type === "hit_run_ar") return prepareBoosterGame("Préparer Hit & Run AR", product, "hit_run_ar");
+      if (type === "hit_run_full_art") return prepareBoosterGame("Préparer Hit & Run Full Art", product, "hit_run_full_art");
+      if (type === "energy_game") {
+        return openSheet("Préparer le Jeu de l’énergie",
+          "<label>Quantité de boosters mise en jeu <input id='lasBoosterCount' type='number' min='1' max='1000' value='" + Math.max(1, Number((product && product.stock) || 1)) + "'></label>" +
+          "<label>Nombre de jeux <input id='lasEnergyGamesCount' type='number' min='1' max='100' value='1'></label>" +
+          "<label>Extensions / items Pokémon <input id='lasEnergyItems' placeholder='Ex. EV10, EB10'></label>" +
+          "<label>Prix / spot <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number((product && product.price) || 1) + "'></label>",
+          function () {
+            var count = Math.max(1, Number(document.getElementById("lasEnergyGamesCount").value || 1));
+            var items = document.getElementById("lasEnergyItems").value.split(/[+,;\\n]/).map(function (x) { return x.trim(); }).filter(Boolean);
+            var games = [];
+            for (var i = 0; i < count; i += 1) games.push({ type:"other", items:items, detail:product ? product.name : "" });
+            prepareGame("energy_game", product, {
+              boosterCount:Math.max(1,Number(document.getElementById("lasBoosterCount").value||1)),
+              gamesCount:count,
+              energyGames:games,
+              pricePerSpot:Number(document.getElementById("lasSpotPrice").value||0)
+            });
+          }
+        );
+      }
+      return openSheet("Préparer le Break",
+        "<label>Spots <input id='lasSpots' type='number' min='1' value='" + Math.max(1, Number((product && product.stock) || 12)) + "'></label>" +
+        "<label>Prix / spot <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number((product && product.price) || 1) + "'></label>",
+        function () { prepareGame("break", product, { spots:Number(document.getElementById("lasSpots").value||1), pricePerSpot:Number(document.getElementById("lasSpotPrice").value||0) }); }
+      );
+    };
     document.getElementById("lasAuction").onclick = function () {
       var p = needProduct();
       if (!p) return;
@@ -283,11 +377,40 @@
     var n = document.getElementById("lasState");
     if (!n) return;
     var parts = [];
+    if (s.preparedGame && s.preparedGame.status === "ready") {
+      var names = { buy_now:"Vente directe", auction:"Enchère", flash:"Vente flash", box_break:"Box Break", energy_game:"Jeu de l’énergie", hit_run_ex:"Hit & Run EX", hit_run_ar:"Hit & Run AR", hit_run_full_art:"Hit & Run Full Art", giveaway:"Giveaway", giveaway_subscriber:"Giveaway Abonné", giveaway_buyer:"Giveaway Acheteur", break:"Break personnalisé" };
+      parts.push("<div class='live-game-ready'><div><small>PRÊT À LANCER</small><strong>" + esc(names[s.preparedGame.type] || s.preparedGame.type) + "</strong><span>" + esc(s.preparedGame.productName || "") + "</span></div><button type='button' id='lasLaunchPreparedGame' class='live-game-launch-arrow' title='Le liveur lance le jeu'>→</button></div>");
+    }
     if (s.auction) parts.push("Enchère : " + esc(s.auction.status) + " · " + euro(s.auction.currentPrice) + (s.auction.status === "running" ? " <button type='button' id='lasAuctionStop'>Stop enchère</button>" : ""));
     if (s.flash) parts.push("Flash : " + esc(s.flash.status) + " · " + euro(s.flash.price));
     if (s.giveaway) parts.push("Giveaway : " + esc(s.giveaway.status) + " · " + ((s.giveaway.entries || []).length) + " participant(s)" + (s.giveaway.winner ? " · gagnant " + esc(s.giveaway.winner.name) : "") + (s.giveaway.status === "running" || s.giveaway.status === "ready_to_draw" ? " <button type='button' id='lasDraw'>Tirer gagnant</button>" : ""));
-    if (s.break) parts.push("Break : " + esc(s.break.status) + " · " + Number(s.break.remainingSpots != null ? s.break.remainingSpots : s.break.spots) + " spots restants");
+    if (s.break) {
+      parts.push("Break : " + esc(s.break.status) + " · " + Number(s.break.remainingSpots != null ? s.break.remainingSpots : s.break.spots) + " spots restants");
+      if (s.break.auctionSequence && Array.isArray(s.break.boosterLabels)) {
+        var currentIndex = Math.max(0, Number(s.break.currentBoosterIndex || 0));
+        var auctionEndedWithWinner = s.auction && s.auction.status === "ended" && s.auction.highestBidder && Number(s.auction.boosterNumber || 0) === currentIndex + 1;
+        var readyIndex = auctionEndedWithWinner ? currentIndex + 1 : currentIndex;
+        var readyLabel = s.break.boosterLabels[readyIndex] || "";
+        var auctionRunning = s.auction && s.auction.status === "running";
+        if (readyLabel) {
+          parts.push("<div class='live-booster-next'><div><small>PROCHAIN BOOSTER</small><strong>#" + (readyIndex + 1) + " " + esc(s.break.productName || "Booster") + "</strong><span>" + esc(readyLabel) + "</span></div><button type='button' id='lasNextBoosterAuction' class='live-booster-arrow'" + (auctionRunning ? " disabled title='Une enchère est déjà en cours'" : " title='Lancer l’enchère de ce booster'") + ">→</button></div>");
+        } else {
+          parts.push("<div class='live-booster-complete'>✓ Tous les boosters ont été traités.</div>");
+        }
+      }
+    }
     n.innerHTML = parts.join("<br>") || "Aucune action en cours.";
+    var launchPrepared = document.getElementById("lasLaunchPreparedGame");
+    if (launchPrepared) launchPrepared.onclick = function () {
+      launchPrepared.disabled = true;
+      postAction("game/launch", {});
+    };
+    var nextBooster = document.getElementById("lasNextBoosterAuction");
+    if (nextBooster) nextBooster.onclick = function () {
+      if (nextBooster.disabled) return;
+      nextBooster.disabled = true;
+      postAction("booster-auction/next", { startPrice: Number((s.break && s.break.pricePerSpot) || 1), durationSeconds: Number(prefs().auctionDuration || 30) });
+    };
     var stop = document.getElementById("lasAuctionStop");
     if (stop) stop.onclick = function () { postAction("auction/stop", {}); };
     var draw = document.getElementById("lasDraw");
