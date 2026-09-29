@@ -19,8 +19,8 @@ function save(d){
 }
 function stateFor(liveId,create=false){
   const d=load();let state=d.states[liveId];
-  if(!state&&create){state={pinnedProductId:"",auction:null,flash:null,giveaway:null,giveawayAwards:[],break:null,energyTypesByProduct:{},chat:[],updatedAt:nowIso()};d.states[liveId]=state;save(d);}
-  if(state&&!state.energyTypesByProduct)state.energyTypesByProduct={};
+  if(!state&&create){state={pinnedProductId:"",auction:null,flash:null,giveaway:null,giveawayAwards:[],break:null,preparedGame:null,energyTypesByProduct:{},chat:[],updatedAt:nowIso()};d.states[liveId]=state;save(d);}
+  if(state&&!state.energyTypesByProduct)state.energyTypesByProduct={};if(state&&!Object.prototype.hasOwnProperty.call(state,"preparedGame"))state.preparedGame=null;
   // Preserve the current legacy winner BEFORE a new giveaway replaces it.
   if(state)recordGiveawayAward(state);
   return{d,state};
@@ -132,5 +132,42 @@ export function startNextBoosterAuction(liveId,{startPrice,durationSeconds=30}={
   return auction;
 }
 
+export function prepareLiveGame(liveId,{type,productId,config={}}={}){
+  const live=requireSession(liveId);
+  const gameType=clean(type,40).toLowerCase();
+  const allowed=new Set(["buy_now","auction","flash","box_break","energy_game","hit_run_ex","hit_run_ar","hit_run_full_art","giveaway","giveaway_subscriber","giveaway_buyer","break"]);
+  if(!allowed.has(gameType))throw Object.assign(new Error("Type de jeu invalide."),{status:400});
+  let product=null;
+  if(productId)product=productFor(live,productId);
+  if(!product&&gameType!=="energy_game")throw Object.assign(new Error("Choisissez un item avant de préparer le jeu."),{status:400});
+  const{d,state}=stateFor(live.id,true);
+  state.preparedGame={
+    id:"PREP-"+crypto.randomUUID(),
+    type:gameType,
+    productId:product?.id||"",
+    productName:product?.name||"Jeu de l’énergie",
+    config:structuredClone(config&&typeof config==="object"?config:{}),
+    status:"ready",
+    preparedAt:nowIso()
+  };
+  state.updatedAt=nowIso();save(d);return structuredClone(state.preparedGame);
+}
+export async function launchPreparedGame(liveId){
+  requireLive(liveId);
+  const{d,state}=stateFor(liveId,true),prepared=state.preparedGame;
+  if(!prepared||prepared.status!=="ready")throw Object.assign(new Error("Aucun jeu prêt à lancer."),{status:409});
+  const cfg=prepared.config||{},type=prepared.type,productId=prepared.productId;
+  let result=null;
+  if(type==="buy_now"){state.pinnedProductId=productId;result={kind:"buy_now",productId};}
+  else if(type==="auction")result=startAuction(liveId,{productId,startPrice:cfg.startPrice,durationSeconds:cfg.durationSeconds||30,mode:"standard"});
+  else if(type==="flash")result=startFlashSale(liveId,{productId,price:cfg.price,durationSeconds:cfg.durationSeconds||60});
+  else if(type==="giveaway")result=startGiveaway(liveId,{productId,durationSeconds:cfg.durationSeconds||60,eligibility:"public"});
+  else if(type==="giveaway_subscriber")result=startGiveaway(liveId,{productId,durationSeconds:cfg.durationSeconds||60,eligibility:"subscriber"});
+  else if(type==="giveaway_buyer")result=startBuyerGiveaway(liveId,{productId,durationSeconds:cfg.durationSeconds||60});
+  else if(type==="energy_game")result=await startEnergyGame(liveId,{...cfg});
+  else result=startBreak(liveId,{productId,...cfg,breakType:type});
+  const current=stateFor(liveId,true);current.state.preparedGame={...prepared,status:"launched",launchedAt:nowIso()};current.state.updatedAt=nowIso();save(current.d);
+  return{prepared:structuredClone(current.state.preparedGame),result};
+}
 export function addLiveChatMessage(liveId,{name,message}={}){requireLive(liveId);const text=clean(message,500);if(!text)throw Object.assign(new Error("Message vide."),{status:400});const{d,state}=stateFor(liveId,true),entry={id:"MSG-"+crypto.randomUUID(),name:clean(name,80)||"Spectateur",message:text,createdAt:nowIso()};state.chat.push(entry);state.chat=state.chat.slice(-200);state.updatedAt=nowIso();save(d);return entry;}
 export function listLiveChat(liveId,limit=50){requireLive(liveId);const{state}=stateFor(liveId,true);return structuredClone((state.chat||[]).slice(-Math.max(1,Math.min(200,Number(limit)||50))));}
