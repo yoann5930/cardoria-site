@@ -69,7 +69,7 @@ test("seller and admin card-price inputs communicate the one-euro minimum",()=>{
 });
 
 
-test("catalogue intelligence never invents a fallback price when market data is missing",()=>{
+test("catalogue intelligence never invents fallback pricing when market data is missing",()=>{
   const intelligence=fs.readFileSync("backend/lib/ai/intelligence.js","utf8");
   const cardUi=fs.readFileSync("js/carte.js","utf8");
   const cardUiRuntime=fs.readFileSync("backend/public/js/carte.js","utf8");
