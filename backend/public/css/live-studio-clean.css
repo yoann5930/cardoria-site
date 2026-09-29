@@ -2,6 +2,7 @@
 .live-studio-current,.live-studio-queue{min-width:0}
 .live-studio-quick{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px!important;margin:10px 0 12px}
 .live-studio-quick button{min-height:42px;width:100%;padding:8px 10px}
+.live-studio-actions[hidden]{display:none!important}
 .live-studio-actions{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px!important;align-items:start}
 .live-action-group{border:1px solid rgba(211,169,44,.32);border-radius:12px;background:rgba(10,12,16,.72);padding:10px;min-width:0}
 .live-action-group-title{font-size:12px;font-weight:800;color:#e4c866;text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px}
