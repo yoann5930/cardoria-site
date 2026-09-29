@@ -6,6 +6,21 @@ function normalizeSiret(value) {
   return String(value || "").replace(/\D/g, "");
 }
 
+function hasValidLuhn(number) {
+  let sum = 0;
+  let doubleDigit = false;
+  for (let index = number.length - 1; index >= 0; index -= 1) {
+    let digit = Number(number[index]);
+    if (doubleDigit) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    doubleDigit = !doubleDigit;
+  }
+  return sum % 10 === 0;
+}
+
 function legalName(result) {
   return String(
     result?.nom_complet ||
@@ -19,6 +34,7 @@ function legalName(result) {
 
 function establishmentRows(result) {
   const rows = [];
+  if (result?.siret) rows.push(result);
   if (result?.siege) rows.push(result.siege);
   if (Array.isArray(result?.matching_etablissements)) rows.push(...result.matching_etablissements);
   return rows;
@@ -36,6 +52,9 @@ export async function verifyFrenchProfessionalSiret(rawSiret) {
   const siret = normalizeSiret(rawSiret);
   if (!/^\d{14}$/.test(siret)) {
     throw Object.assign(new Error("SIRET invalide : 14 chiffres sont requis."), { status: 400, code: "SELLER_SIRET_INVALID" });
+  }
+  if (!hasValidLuhn(siret)) {
+    throw Object.assign(new Error("SIRET invalide : la clé de contrôle ne correspond pas."), { status: 400, code: "SELLER_SIRET_CHECKSUM_INVALID" });
   }
 
   const controller = new AbortController();
