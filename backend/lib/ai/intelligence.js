@@ -333,7 +333,10 @@ export function buildIntelligenceForCard(cardId, conditionGrade = "Near Mint") {
   const card = getCardById(cardId);
   if (!card) return null;
 
-  seedPriceHistoryIfEmpty(cardId, card.prices?.recommended || card.avgPrice || 10);
+  const seedPrice = [card.prices?.recommended, card.prices?.avg, card.avgPrice]
+    .map(Number)
+    .find((value) => Number.isFinite(value) && value > 0);
+  if (seedPrice) seedPriceHistoryIfEmpty(cardId, seedPrice);
 
   const cond = normalizeCondition(conditionGrade);
   const estimate = buildSmartEstimate({
@@ -357,10 +360,14 @@ export function buildIntelligenceForCard(cardId, conditionGrade = "Near Mint") {
 export function toClientIntelligence(intelligence) {
   if (!intelligence) return null;
   const p = intelligence.pricing || {};
+  const recommendedPrice = Number(p.cardoriaRecommended);
+  if (!Number.isFinite(recommendedPrice) || recommendedPrice <= 0) return null;
+  const rawSalePrice = Number(p.optimalSale);
+  const rawBuybackPrice = Number(p.professionalBuy);
   return {
-    recommendedPrice: p.cardoriaRecommended,
-    salePrice: p.optimalSale || p.cardoriaRecommended,
-    buybackPrice: p.professionalBuy,
+    recommendedPrice,
+    salePrice: Number.isFinite(rawSalePrice) && rawSalePrice > 0 ? rawSalePrice : recommendedPrice,
+    buybackPrice: Number.isFinite(rawBuybackPrice) && rawBuybackPrice > 0 ? rawBuybackPrice : null,
     cardoriaScore: intelligence.scores?.overall ?? null,
     recommendation: intelligence.recommendation
       ? { code: intelligence.recommendation.code, label: intelligence.recommendation.label, hint: intelligence.recommendation.clientHint || intelligence.recommendation.detail }
