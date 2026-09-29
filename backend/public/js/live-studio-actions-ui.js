@@ -151,9 +151,9 @@
         "<button type='button' id='lasPrev'>Précédent</button>",
         "</div>",
         "<div class='live-studio-game-picker'>",
-        "<label>Item à mettre en jeu<select id='lasGameProduct'><option value=''>Choisir un item</option>" + products.map(function (p) { return "<option value='" + esc(p.id) + "'" + (current && current.id === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select></label>",
-        "<label>Type de jeu<select id='lasGameType'><option value='buy_now'>Vente directe</option><option value='auction'>Enchère</option><option value='flash'>Vente flash</option><option value='box_break'>Box Break</option><option value='energy_game'>Jeu de l’énergie</option><option value='hit_run_ex'>Hit & Run EX</option><option value='hit_run_ar'>Hit & Run AR</option><option value='hit_run_full_art'>Hit & Run Full Art</option><option value='giveaway'>Giveaway</option><option value='giveaway_subscriber'>Giveaway Abonné</option><option value='giveaway_buyer'>Giveaway Acheteur</option><option value='break'>Break personnalisé</option></select></label>",
-        "<button type='button' id='lasLaunchPreset' class='is-primary'>Préparer ce jeu</button>",
+        "<label><span>1. Item à mettre en jeu</span><select id='lasGameProduct'><option value=''>Choisir un item</option>" + products.map(function (p) { return "<option value='" + esc(p.id) + "'" + (current && current.id === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select></label>",
+        "<label><span>2. Type de jeu</span><select id='lasGameType'><option value='buy_now'>Vente directe</option><option value='auction'>Enchère</option><option value='flash'>Vente flash</option><option value='box_break'>Box Break</option><option value='energy_game'>Jeu de l’énergie</option><option value='hit_run_ex'>Hit & Run EX</option><option value='hit_run_ar'>Hit & Run AR</option><option value='hit_run_full_art'>Hit & Run Full Art</option><option value='giveaway'>Giveaway</option><option value='break'>Break personnalisé</option></select></label>",
+        "<button type='button' id='lasLaunchPreset' class='is-primary'>Préparer le jeu</button>",
         "</div>",
         "<div class='live-studio-actions'>",
         "<button type='button' id='lasBuyNow'>Vente</button>",
@@ -229,45 +229,68 @@
     var gameProduct = document.getElementById("lasGameProduct");
     var gameType = document.getElementById("lasGameType");
     var launchPreset = document.getElementById("lasLaunchPreset");
-    function chosenProduct() {
+    function selectedGameProduct() {
       var id = gameProduct && gameProduct.value;
-      var p = products.filter(function (item) { return item.id === id; })[0] || current || products[0] || null;
-      if (!p) alert("Ajoutez d’abord un item au Live.");
-      return p;
+      var product = products.filter(function (item) { return item.id === id; })[0] || current || products[0] || null;
+      if (!product) alert("Ajoutez d’abord un item au Live.");
+      return product;
     }
-    function openSpotPreset(title, product, breakType) {
-      openSheet(title, "<label>Nombre de spots <input id='lasSpots' type='number' min='1' value='" + Math.max(1, Number(product.stock || 12)) + "'></label><label>Prix / spot <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number(product.price || 1) + "'></label>", function () {
-        document.getElementById("lasSheet").hidden = true;
-        postAction("break/start", { productId: product.id, spots: Number(document.getElementById("lasSpots").value || 1), pricePerSpot: Number(document.getElementById("lasSpotPrice").value || 0), breakType: breakType });
-      });
+    function openBoosterGame(title, product, breakType) {
+      openSheet(title,
+        "<label>Quantité de boosters mise en jeu <input id='lasBoosterCount' type='number' min='1' max='1000' value='" + Math.max(1, Number(product.stock || 1)) + "'></label>" +
+        "<p class='live-studio-hint'>La numérotation est automatique : Booster 1, Booster 2, Booster 3…</p>" +
+        "<label>Prix / booster <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number(product.price || 1) + "'></label>",
+        function () {
+          var boosterCount = Math.max(1, Number(document.getElementById("lasBoosterCount").value || 1));
+          document.getElementById("lasSheet").hidden = true;
+          postAction("break/start", {
+            productId: product.id,
+            boosterCount: boosterCount,
+            pricePerSpot: Number(document.getElementById("lasSpotPrice").value || 0),
+            breakType: breakType
+          });
+        }
+      );
     }
     if (launchPreset) launchPreset.onclick = function () {
-      var p = chosenProduct(), type = gameType ? gameType.value : "buy_now";
-      if (!p && type !== "energy_game") return;
-      if (p) setCurrent(p, false);
-      if (type === "buy_now") return p && setCurrent(p, true);
+      var type = gameType ? gameType.value : "buy_now";
+      var product = selectedGameProduct();
+      if (!product) return;
+      setCurrent(product, false);
+      if (type === "buy_now") return setCurrent(product, true);
       if (type === "auction") return document.getElementById("lasAuction").click();
       if (type === "flash") return document.getElementById("lasFlash").click();
       if (type === "giveaway") return document.getElementById("lasGiveaway").click();
-      if (type === "giveaway_subscriber") return document.getElementById("lasGiveFollow").click();
-      if (type === "giveaway_buyer") return document.getElementById("lasGiveBuyer").click();
+      if (type === "box_break") return openBoosterGame("Box Break", product, "box_break");
+      if (type === "hit_run_ex") return openBoosterGame("Hit & Run EX", product, "hit_run_ex");
+      if (type === "hit_run_ar") return openBoosterGame("Hit & Run AR", product, "hit_run_ar");
+      if (type === "hit_run_full_art") return openBoosterGame("Hit & Run Full Art", product, "hit_run_full_art");
       if (type === "energy_game") {
-        return openSheet("Jeu de l’énergie", "<label>Nombre de jeux <input id='lasEnergyGamesCount' type='number' min='1' max='100' value='1'></label><label>Extensions / items Pokémon <input id='lasEnergyItems' placeholder='Ex. EV10, EB10'></label><label>Prix / spot <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number((p && p.price) || 1) + "'></label>", function () {
-          var count = Math.max(1, Number(document.getElementById("lasEnergyGamesCount").value || 1));
-          var items = document.getElementById("lasEnergyItems").value.split(/[+,;\n]/).map(function (x) { return x.trim(); }).filter(Boolean);
-          var games = [];
-          for (var i = 0; i < count; i += 1) games.push({ type: "other", items: items, detail: p ? p.name : "" });
-          document.getElementById("lasSheet").hidden = true;
-          postAction("break/start", { breakType: "energy_game", gamesCount: count, energyGames: games, pricePerSpot: Number(document.getElementById("lasSpotPrice").value || 0) });
-        });
+        return openSheet("Jeu de l’énergie",
+          "<label>Quantité de boosters mise en jeu <input id='lasBoosterCount' type='number' min='1' max='1000' value='" + Math.max(1, Number(product.stock || 1)) + "'></label>" +
+          "<p class='live-studio-hint'>Les boosters seront numérotés automatiquement.</p>" +
+          "<label>Nombre de jeux <input id='lasEnergyGamesCount' type='number' min='1' max='100' value='1'></label>" +
+          "<label>Extensions / items Pokémon <input id='lasEnergyItems' placeholder='Ex. EV10, EB10'></label>" +
+          "<label>Prix / spot <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number(product.price || 1) + "'></label>",
+          function () {
+            var count = Math.max(1, Number(document.getElementById("lasEnergyGamesCount").value || 1));
+            var boosterCount = Math.max(1, Number(document.getElementById("lasBoosterCount").value || 1));
+            var items = document.getElementById("lasEnergyItems").value.split(/[+,;\\n]/).map(function (x) { return x.trim(); }).filter(Boolean);
+            var games = [];
+            for (var i = 0; i < count; i += 1) games.push({ type: "other", items: items, detail: product.name });
+            document.getElementById("lasSheet").hidden = true;
+            postAction("break/start", {
+              breakType: "energy_game",
+              boosterCount: boosterCount,
+              gamesCount: count,
+              energyGames: games,
+              pricePerSpot: Number(document.getElementById("lasSpotPrice").value || 0)
+            });
+          }
+        );
       }
-      if (type === "box_break") return openSpotPreset("Box Break", p, "box_break");
-      if (type === "hit_run_ex") return openSpotPreset("Hit & Run EX", p, "hit_run_ex");
-      if (type === "hit_run_ar") return openSpotPreset("Hit & Run AR", p, "hit_run_ar");
-      if (type === "hit_run_full_art") return openSpotPreset("Hit & Run Full Art", p, "hit_run_full_art");
-      return openSpotPreset("Break personnalisé", p, "break");
+      return document.getElementById("lasBreak").click();
     };
-
     document.getElementById("lasAuction").onclick = function () {
       var p = needProduct();
       if (!p) return;
