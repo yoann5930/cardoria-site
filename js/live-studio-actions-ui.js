@@ -189,9 +189,9 @@
         "<label><span>1. Item à mettre en jeu</span><select id='lasGameProduct'><option value=''>Choisir un item</option>" +
           (products.length ? "<optgroup label='Items de ce Live'>" + products.map(function (p) { return "<option value='" + esc(p.id) + "'" + (current && current.id === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</optgroup>" : "") +
           (sellerItems.length ? "<optgroup label='Mes items vendeur'>" + sellerItems.map(function (p) { return "<option value='" + esc(p.id) + "'>" + esc(p.name) + " · stock " + esc(p.stock) + "</option>"; }).join("") + "</optgroup>" : "") +
-          (!products.length && !sellerItems.length ? "<option value='' disabled>Aucun item disponible — ajoutez un lot ci-dessous</option>" : "") +
-          "</select></label>",
-        "<label><span>2. Type de jeu</span><select id='lasGameType'><option value='buy_now'>Vente directe</option><option value='auction'>Enchère</option><option value='flash'>Vente flash</option><option value='box_break'>Box Break</option><option value='energy_game'>Jeu de l’énergie</option><option value='hit_run_ex'>Hit & Run EX</option><option value='hit_run_ar'>Hit & Run AR</option><option value='hit_run_full_art'>Hit & Run Full Art</option><option value='giveaway'>Giveaway</option><option value='break'>Break personnalisé</option></select></label>",
+          (!products.length && !sellerItems.length ? "<option value='' disabled>Aucun item disponible</option>" : "") +
+          "<option value='__new__'>＋ Ajouter un nouvel item</option></select></label>",
+        "<label><span>2. Type de jeu</span><select id='lasGameType'><option value='buy_now'>Vente directe</option><option value='auction'>Enchère</option><option value='flash'>Vente flash</option><option value='box_break'>Box Break</option><option value='energy_game'>Jeu de l’énergie</option><option value='hit_run_ex'>Hit & Run EX</option><option value='hit_run_ar'>Hit & Run AR</option><option value='hit_run_full_art'>Hit & Run Full Art</option><option value='giveaway'>Giveaway</option><option value='giveaway_subscriber'>Giveaway Abonné</option><option value='giveaway_buyer'>Giveaway Acheteur</option><option value='break'>Break personnalisé</option></select></label>",
         "<button type='button' id='lasLaunchPreset' class='is-primary'>Préparer le jeu</button>",
         "</div>",
         "<div class='live-studio-actions' hidden aria-hidden='true'>",
@@ -204,7 +204,7 @@
         "<button type='button' id='lasGiveBuyer' title='Réservé aux acheteurs ayant un paiement validé pendant ce Live.'>Giveaway Acheteur</button>",
         "</div>",
         "<span class='live-studio-sr'>Achat immédiat</span><span class='live-studio-sr'>Enchère</span><span class='live-studio-sr'>Vente flash</span><span class='live-studio-sr'>Ouverture / break</span>",
-        "<div id='lasSheet' class='live-studio-sheet' hidden><h3 id='lasSheetTitle'></h3><div id='lasSheetFields'></div><div class='live-studio-quick'><button type='button' id='lasSheetGo'>Démarrer</button><button type='button' id='lasSheetCancel'>Annuler</button></div></div>",
+        "<div id='lasSheet' class='live-studio-sheet' hidden><h3 id='lasSheetTitle'></h3><div id='lasSheetFields'></div><div class='live-studio-quick'><button type='button' id='lasSheetGo'>Valider</button><button type='button' id='lasSheetCancel'>Annuler</button></div></div>",
         "<div id='lasState'></div>",
         "</div>",
         "<div class='live-studio-queue'><h2>File suivante</h2>",
@@ -268,6 +268,24 @@
     var gameProduct = document.getElementById("lasGameProduct");
     var gameType = document.getElementById("lasGameType");
     var launchPreset = document.getElementById("lasLaunchPreset");
+    if (gameProduct) gameProduct.onchange = function () {
+      if (gameProduct.value !== "__new__") return;
+      gameProduct.value = "";
+      openSheet("Ajouter un item au Live",
+        "<label>Nom de l’item <input id='lasQuickName' placeholder='Ex. Display EV10'></label>" +
+        "<label>Prix de référence <input id='lasQuickPrice' type='number' min='0.01' step='0.01' value='1'></label>" +
+        "<label>Quantité disponible <input id='lasQuickStock' type='number' min='1' max='1000' value='1'></label>",
+        function () {
+          var name = String(document.getElementById("lasQuickName").value || "").trim();
+          var price = Math.max(0.01, Number(document.getElementById("lasQuickPrice").value || 1));
+          var stock = Math.max(1, Number(document.getElementById("lasQuickStock").value || 1));
+          if (!name) return alert("Nom de l’item obligatoire.");
+          if (products.length >= 100) return alert("Ce Live contient déjà le maximum de 100 items.");
+          var item = { id:"LOT-" + Date.now(), name:name, mode:"buy_now", price:price, qty:stock, stock:stock, durationSeconds:30, shippingWeightGrams:20 };
+          api(patchPath(selected), { method:"PATCH", body:JSON.stringify({ products:products.concat([item]), currentLot:item.id }) }).then(loadEditor).catch(function (e) { alert(e.message); });
+        }
+      );
+    };
     function selectedGameProduct() {
       var id = gameProduct && gameProduct.value;
       var product = (selectableProducts || products).filter(function (item) { return item.id === id; })[0] || current || (selectableProducts || products)[0] || null;
@@ -344,10 +362,11 @@
           function () { prepareGame("flash", product, { price:Number(document.getElementById("lasFlashPrice").value||0), durationSeconds:Number(document.getElementById("lasDuration").value||60) }); }
         );
       }
-      if (type === "giveaway") {
-        return openSheet("Préparer le Giveaway",
+      if (type === "giveaway" || type === "giveaway_subscriber" || type === "giveaway_buyer") {
+        var giveawayTitle = type === "giveaway_subscriber" ? "Préparer le Giveaway Abonné" : type === "giveaway_buyer" ? "Préparer le Giveaway Acheteur" : "Préparer le Giveaway";
+        return openSheet(giveawayTitle,
           "<label>Durée <select id='lasDuration'><option value='60'>60 s</option><option value='120'>2 min</option></select></label>",
-          function () { prepareGame("giveaway", product, { durationSeconds:Number(document.getElementById("lasDuration").value||60) }); }
+          function () { prepareGame(type, product, { durationSeconds:Number(document.getElementById("lasDuration").value||60) }); }
         );
       }
       if (type === "box_break") return prepareBoosterGame("Préparer le Box Break", product, "box_break");
