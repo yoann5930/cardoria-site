@@ -19,6 +19,7 @@ github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops mail-dns-check
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops admin-password-reset-request
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops estimation-capture-check
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-sumup-configure
+github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-paypal-configure
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-mondial-relay-configure
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-colissimo-configure
 github-ops ALL=(root) NOPASSWD: /usr/local/bin/cardoria-ops sendcloud-configure

@@ -197,7 +197,7 @@ function toSeller(row) {
     paypalEmailConfirmed: !!row.paypal_email_confirmed,
     paypalPermissionsGranted: !!row.paypal_permissions_granted,
     paypalConnectedAt: row.paypal_connected_at || "",
-    paypalReady: !!(row.paypal_merchant_id && row.paypal_onboarding_status === "ready" && row.paypal_payments_receivable),
+    paypalReady: !!(row.paypal_merchant_id && row.paypal_onboarding_status === "ready" && row.paypal_payments_receivable && row.paypal_email_confirmed && row.paypal_permissions_granted),
     sender: {
       name: row.sender_name || row.display_name || "",
       addressLine1: row.sender_address_line1 || "",

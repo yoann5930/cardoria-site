@@ -3,7 +3,7 @@ import { handleVerifiedLiveFinancialEvent } from "../live/paypal-capture-validat
 import { getDb } from "../engine/database.js";
 import { getSeller } from "./sellers.js";
 import { getOrder, updateOrderStatus, markOrderPaymentStatus } from "./orders.js";
-import { captureLivePayPalOrder, captureMarketplacePayPalOrder } from "./paypal.js";
+import { captureLivePayPalOrder, captureMarketplacePayPalOrder, paypalApiBase } from "./paypal.js";
 import { applyLivePaymentStatus, listLiveCheckouts } from "../live/sessions.js";
 
 const PROTECTED_ORDER_STATUSES = new Set(["paid", "preparing", "shipped", "delivered", "refunded"]);
@@ -17,8 +17,7 @@ export function __resetPayPalWebhookVerifyForTests() {
   testVerify = null;
 }
 
-function envName() { return String(process.env.PAYPAL_ENV || "sandbox").toLowerCase() === "live" ? "live" : "sandbox"; }
-function apiBase() { return envName() === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com"; }
+function apiBase() { return paypalApiBase(); }
 async function accessToken() {
   const id = String(process.env.PAYPAL_CLIENT_ID || "").trim();
   const secret = String(process.env.PAYPAL_CLIENT_SECRET || "").trim();

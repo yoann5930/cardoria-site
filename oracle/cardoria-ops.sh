@@ -27,7 +27,7 @@ redact() {
 
 require_action() {
   case "$1" in
-    status|healthcheck|deploy|restart|backup|backup-prune|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check|sendcloud-configure|live-test-audit|live-test-cleanup) return 0 ;;
+    status|healthcheck|deploy|restart|backup|backup-prune|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check|sendcloud-configure|live-test-audit|live-test-cleanup|paypal-configure) return 0 ;;
     *) echo "FORBIDDEN action"; exit 1 ;;
   esac
 }
@@ -216,8 +216,8 @@ const proAccountsWithoutSeller = db.prepare(`
   LEFT JOIN mk_sellers s ON s.auth_user_id=u.id
   WHERE u.role='client' AND u.account_type='professional' AND u.active=1 AND s.id IS NULL
 `).get()?.n || 0;
-const integrationReady = cfg.configured && webhook;
-const sandboxReady = integrationReady && cfg.environment === "sandbox" && ready.length > 0;
+const integrationReady = cfg.environment === "live" && cfg.configured && webhook && !cfg.blocked;
+const sandboxReady = cfg.configured && webhook && cfg.environment === "sandbox" && ready.length > 0;
 const realMoneyReady = integrationReady && cfg.environment === "live" && ready.length > 0;
 const fullLiveReady = realMoneyReady && senderReady.length > 0;
 
@@ -442,6 +442,9 @@ install_ops_from_repo() {
   fi
   if [ -f "$APP_DIR/oracle/cardoria-ops-ssh-wrapper.sh" ]; then
     install -m 0755 -o root -g root "$APP_DIR/oracle/cardoria-ops-ssh-wrapper.sh" /usr/local/bin/cardoria-ops-ssh-wrapper
+  fi
+  if [ -f "$APP_DIR/oracle/paypal-configure.sh" ]; then
+    install -m 0755 -o root -g root "$APP_DIR/oracle/paypal-configure.sh" /usr/local/bin/cardoria-paypal-configure
   fi
   if [ -f "$APP_DIR/oracle/sudoers-cardoria-ops" ]; then
     tmp=$(mktemp)
@@ -896,4 +899,5 @@ case "$ACTION" in
   admin-password-reset-request) cmd_admin_password_reset_request ;;
   estimation-capture-check) cmd_estimation_capture_check ;;
   sendcloud-configure) cmd_sendcloud_configure ;;
+  paypal-configure) exec /usr/local/bin/cardoria-paypal-configure ;;
 esac

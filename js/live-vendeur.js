@@ -52,13 +52,13 @@
     var planName = currentPlanId ? currentPlanId.charAt(0).toUpperCase() + currentPlanId.slice(1) : "Starter";
     host.innerHTML = "<section class='live-pro-summary'>" +
       "<div class='live-pro-summary-main'><span class='live-pro-eyebrow'>COMPTE LIVEUR PROFESSIONNEL</span><h2>" + esc(seller.professionalLegalName || seller.displayName) + "</h2>" +
-      "<div class='live-pro-chips'><span>✓ SIRET vérifié</span><span>Pack : " + esc(planName) + (active ? " actif" : " à activer") + "</span><span>PayPal : " + (seller.paypalReady ? "✓ prêt" : "⚠ à activer avant encaissement") + "</span><span>Expédition : " + (seller.senderReady ? "✓ prête" : "⚠ adresse expéditeur requise") + "</span></div></div>" +
+      "<div class='live-pro-chips'><span>✓ SIRET vérifié</span><span>Pack : " + esc(planName) + (active ? " actif" : " à activer") + "</span><span id='lvPayPalState'>" + (seller.paypalReady ? "PayPal prêt" : "Connexion PayPal requise") + "</span><span>Expédition : " + (seller.senderReady ? "✓ prête" : "⚠ adresse expéditeur requise") + "</span></div></div>" +
       "<div class='live-pro-shortcuts'><a href='#liveCreateZone'>＋ Créer un Live</a><button type='button' id='liveQuickStart'>▶ Démarrer</button><button type='button' id='liveQuickCam'>🎥 Caméra</button><a href='#livePaymentsZone'>€ Ventes</a></div>" +
       "</section>" +
       "<section class='live-real-preflight'><div class='live-pro-section-head'><div><span class='live-pro-eyebrow'>PRÉ-TEST RÉEL</span><h2>Préparation encaissement & expédition</h2></div><p>Le Studio et les caméras restent accessibles même si un point n’est pas prêt. Les ventes réelles, elles, exigent PayPal prêt et une adresse expéditeur.</p></div>" +
       "<div class='live-preflight-grid'>" +
         "<article class='" + (seller.professionalVerified ? "is-ready" : "is-blocked") + "'><strong>SIRET</strong><span>" + (seller.professionalVerified ? "✓ Vérifié" : "Bloquant") + "</span></article>" +
-        "<article class='" + (seller.paypalReady ? "is-ready" : "is-blocked") + "'><strong>PayPal vendeur</strong><span>" + (seller.paypalReady ? "✓ Encaissement prêt" : "Bloquant pour un paiement réel") + "</span>" + (seller.paypalReady ? "" : "<a href='/vendre.html'>Activer / vérifier PayPal</a>") + "</article>" +
+        "<article class='" + (seller.paypalReady ? "is-ready" : "is-blocked") + "'><strong>PayPal vendeur</strong><span>" + (seller.paypalReady ? "PayPal prêt" : "Connexion PayPal requise") + "</span>" + (seller.paypalReady ? "" : "<button type='button' id='lvPayPalConnect'>Connecter PayPal</button><span>Activer / vérifier PayPal</span>") + "</article>" +
         "<article class='" + (seller.senderReady ? "is-ready" : "is-blocked") + "'><strong>Adresse expéditeur</strong><span>" + (seller.senderReady ? "✓ Expédition prête" : "Bloquant pour l’étiquette") + "</span></article>" +
       "</div>" +
       (!seller.senderReady ? "<form id='liveSenderForm' class='live-sender-form'><input id='liveSenderName' placeholder='Nom expéditeur' value='" + esc(seller.sender?.name || seller.displayName || "") + "'><input id='liveSenderAddress1' placeholder='Adresse' value='" + esc(seller.sender?.addressLine1 || "") + "'><input id='liveSenderPostal' placeholder='Code postal' value='" + esc(seller.sender?.postalCode || "") + "'><input id='liveSenderCity' placeholder='Ville' value='" + esc(seller.sender?.city || "") + "'><input id='liveSenderPhone' placeholder='Téléphone' value='" + esc(seller.sender?.phone || "") + "'><button type='submit'>Enregistrer l’adresse expéditeur</button></form>" : "") +
@@ -66,6 +66,16 @@
       "<section class='live-pro-packs'><div class='live-pro-section-head'><div><span class='live-pro-eyebrow'>PACKS PROFESSIONNELS</span><h2>Choisissez le niveau adapté à vos Lives</h2></div><p>Le pack définit les commissions et les avantages. PayPal reste séparé et sert uniquement aux encaissements.</p></div>" +
       "<div class='live-pro-plan-grid'>" + sellerPlans.map(function (plan) { return planCard(plan, currentPlanId, active); }).join("") + "</div></section>";
     var senderForm = document.getElementById("liveSenderForm");
+    var paypalConnect = document.getElementById("lvPayPalConnect");
+    if (paypalConnect) paypalConnect.onclick = function () {
+      M.api("/v1/paypal/config").then(function (cfg) {
+        return M.api("/v1/paypal/sellers/" + encodeURIComponent(seller.id) + "/onboard", { method: "POST", body: "{}" }).then(function (d) {
+          if (!d.url) throw new Error("Lien PayPal indisponible.");
+          if (cfg && cfg.environment === "live" && /sandbox\.paypal\.com/i.test(d.url)) throw new Error("Lien PayPal Sandbox refusé en production.");
+          location.href = d.url;
+        });
+      }).catch(function (e) { alert(e.message); });
+    };
     if (senderForm) senderForm.onsubmit = function (event) {
       event.preventDefault();
       var button = senderForm.querySelector("button[type='submit']");
@@ -209,7 +219,7 @@
       "<div class='live-seller-studio live-studio'>",
       "<div id='liveProOverview'></div>",
       "<section class='live-pro-lives-panel'><div class='live-pro-lives-head'><div><span class='live-pro-eyebrow'>MES LIVES</span><h2>Gérer mes lives</h2></div><a class='live-pro-new-live' href='#liveCreateZone'>＋ Créer un live</a></div><div class='live-pro-tabs'><button type='button' data-live-filter='upcoming' class='is-active'>À venir</button><button type='button' data-live-filter='live'>En direct</button><button type='button' data-live-filter='past'>Passés</button></div><div id='lvSessions'></div></section>",
-      "<header class='live-studio-controls' id='liveStudioZone'><div><h2>Studio Live vendeur</h2><p id='liveSelectedSession'>Créez un Live pour commencer.</p><p><strong>Paiement des ventes : PayPal.</strong> La commission Cardoria suit votre abonnement.</p></div>",
+      "<header class='live-studio-controls' id='liveStudioZone'><div><h2>Studio Live vendeur</h2><p id='liveSelectedSession'>Créez un Live pour commencer.</p><p id='lvStudioPayPal'>" + ((M.getSeller() && M.getSeller().paypalReady) ? "<strong>PayPal prêt</strong>" : "<strong>Connexion PayPal requise</strong>") + "</p><p>Paiement des ventes : PayPal. La caméra reste disponible. Seul l'encaissement est bloqué tant que PayPal n'est pas prêt.</p></div>",
       "<div class='live-studio-control-btns'>",
       "<button class='live-studio-btn live-studio-btn--go' type='button' id='lvStart'>Démarrer le Live</button>",
       "<button class='live-studio-btn live-studio-btn--pause' type='button' id='lvPause'>Pause</button>",

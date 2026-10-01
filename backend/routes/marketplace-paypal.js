@@ -29,6 +29,8 @@ router.get("/v1/paypal/config", (req, res) => {
     commissionConfigured: cfg.commissionPercent != null,
     commissionPercent: cfg.commissionPercent,
     delayedDisbursement: cfg.delayedDisbursement,
+    blocked: !!cfg.blocked,
+    livePaymentIntegrationReady: cfg.environment === "live" && cfg.configured && paypalWebhookConfigured() && !cfg.blocked,
     demoMode: isMarketplaceDemoMode(),
     presence: {
       PAYPAL_CLIENT_ID: Boolean(String(process.env.PAYPAL_CLIENT_ID || "").trim()),
@@ -50,7 +52,7 @@ router.post("/v1/paypal/sellers/register", async (req, res) => {
     if (!seller) {
       const sellerType = req.body?.sellerType === "professional" ? "professional" : "individual";
       let professionalVerification = null;
-      if (sellerType === "professional") {
+      if (sellerType === "professional" && String(req.body?.siret || "").replace(/\D/g, "")) {
         professionalVerification = await verifyFrenchProfessionalSiret(req.body?.siret);
       }
       seller = registerSeller({

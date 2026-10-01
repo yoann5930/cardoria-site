@@ -80,7 +80,9 @@ export function applySecurityMiddleware(app) {
       }
     }
     const frameAncestors = embeddableLogin ? "'self'" : "'none'";
-    res.setHeader("Content-Security-Policy", `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors ${frameAncestors}; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' blob:; connect-src 'self' https: stun: turn:; form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com; upgrade-insecure-requests`);
+    const paypalLive = String(process.env.NODE_ENV || "").toLowerCase() === "production" || String(process.env.PAYPAL_ENV || "").toLowerCase() === "live";
+    const paypalFormAction = paypalLive ? "https://www.paypal.com" : "https://www.paypal.com https://www.sandbox.paypal.com";
+    res.setHeader("Content-Security-Policy", `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors ${frameAncestors}; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' blob:; connect-src 'self' https: stun: turn:; form-action 'self' ${paypalFormAction}; upgrade-insecure-requests`);
     if (process.env.NODE_ENV === "production") res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     next();
   });
