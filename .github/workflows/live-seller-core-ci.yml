@@ -83,6 +83,10 @@ jobs:
           grep -q 'giveaway_buyer' js/live-studio-actions-ui.js
           grep -q 'Valider / préparer</button>' js/live-studio-actions-ui.js
           grep -q 'Cardoria identity: clear operator UI' css/live-pro-dashboard.css
+          grep -q 'PRÉ-TEST RÉEL' js/live-vendeur.js
+          grep -q 'Activer / vérifier PayPal' js/live-vendeur.js
+          grep -q 'sender-profile' js/live-vendeur.js
+          grep -q 'historicalBoosterPaymentReady' backend/scripts/live-seller-client-journey-e2e.mjs
       - name: Start clean backend
         run: |
           rm -rf data
