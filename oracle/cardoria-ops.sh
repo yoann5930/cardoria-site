@@ -200,21 +200,40 @@ cmd_live_test_audit() {
 import { getPayPalMarketplaceConfig } from "./lib/marketplace/paypal.js";
 import { paypalWebhookConfigured } from "./lib/marketplace/paypal-events.js";
 import { listSellers } from "./lib/marketplace/sellers.js";
+import { getDb } from "./lib/engine/database.js";
 
 const cfg = getPayPalMarketplaceConfig();
+const webhook = paypalWebhookConfigured();
 const sellers = listSellers(10000);
 const professionals = sellers.filter((seller) => seller.sellerType === "professional" && seller.professionalVerified);
 const ready = professionals.filter((seller) => seller.paypalReady);
 const senderReady = professionals.filter((seller) => seller.senderReady);
+const db = getDb();
+const proAccounts = db.prepare("SELECT COUNT(*) AS n FROM auth_users WHERE role='client' AND account_type='professional' AND active=1").get()?.n || 0;
+const proAccountsWithoutSeller = db.prepare(`
+  SELECT COUNT(*) AS n
+  FROM auth_users u
+  LEFT JOIN mk_sellers s ON s.auth_user_id=u.id
+  WHERE u.role='client' AND u.account_type='professional' AND u.active=1 AND s.id IS NULL
+`).get()?.n || 0;
+const integrationReady = cfg.configured && webhook;
+const sandboxReady = integrationReady && cfg.environment === "sandbox" && ready.length > 0;
+const realMoneyReady = integrationReady && cfg.environment === "live" && ready.length > 0;
+const fullLiveReady = realMoneyReady && senderReady.length > 0;
 
 console.log("--- real Live payment preflight ---");
 console.log("paypal_configured:", cfg.configured ? "yes" : "no");
 console.log("paypal_environment:", cfg.environment);
-console.log("paypal_webhook_configured:", paypalWebhookConfigured() ? "yes" : "no");
+console.log("paypal_webhook_configured:", webhook ? "yes" : "no");
+console.log("professional_client_accounts:", proAccounts);
+console.log("professional_accounts_without_seller:", proAccountsWithoutSeller);
 console.log("professional_verified_sellers:", professionals.length);
 console.log("professional_paypal_ready:", ready.length);
 console.log("professional_sender_ready:", senderReady.length);
-console.log("live_real_payment_server_ready:", cfg.configured && paypalWebhookConfigured() ? "yes" : "no");
+console.log("live_payment_integration_ready:", integrationReady ? "yes" : "no");
+console.log("live_sandbox_payment_test_ready:", sandboxReady ? "yes" : "no");
+console.log("live_real_money_payment_ready:", realMoneyReady ? "yes" : "no");
+console.log("live_full_real_test_ready:", fullLiveReady ? "yes" : "no");
 NODE
   ) | redact
 }
