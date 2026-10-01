@@ -82,7 +82,7 @@ function assertEnergySpotAvailable({liveId,productId,rule,spotLabel,excludeKey})
   if(occupied)throw Object.assign(new Error(`Le spot ${canonical} est déjà réservé ou vendu.`),{status:409,spotLabel:canonical});
   return canonical;
 }
-export function planLiveCheckout({liveId,productId,qty,spotLabel,customerId="",customerEmail,customerName,shippingAddress,servicePoint,checkoutRequestId,requireShippingAddress=false,requestedProvider,requestedAmount}){
+export function planLiveCheckout({liveId,productId,qty,spotLabel,actionId,customerId="",customerEmail,customerName,shippingAddress,servicePoint,checkoutRequestId,requireShippingAddress=false,requestedProvider,requestedAmount}){
   const live=getLiveSession(liveId);
   if(!live)throw Object.assign(new Error("Live introuvable."),{status:404});
   if(live.status!=="live")throw Object.assign(new Error("Ce Live doit être en cours pour accepter un paiement."),{status:409});
@@ -92,7 +92,7 @@ export function planLiveCheckout({liveId,productId,qty,spotLabel,customerId="",c
   if(!product&&energyBreak&&String(energyBreak.productId)===String(productId||""))product={id:energyBreak.productId,name:energyBreak.productName||"Jeu de l’énergie",mode:"break",price:energyBreak.pricePerSpot,stock:energyBreak.spots,qty:energyBreak.spots,shippingWeightGrams:Number(energyBreak.shippingWeightGrams||20),virtualProduct:true};
   if(!product)throw Object.assign(new Error("Produit Live introuvable."),{status:404});
   let units=Math.max(1,Math.min(20,Math.trunc(Number(qty)||1)));
-  const email=validateEmail(customerEmail),buyerId=clean(customerId,120),rule=resolveLiveSaleRule({live,product,customerEmail:email});
+  const email=validateEmail(customerEmail),buyerId=clean(customerId,120),rule=resolveLiveSaleRule({live,product,customerEmail:email,requestedActionId:actionId,requestedSpotLabel:spotLabel});
   if(rule.breakType==="energy_game")units=1;
   const requestId=normalizeCheckoutRequestId(checkoutRequestId);
   const keyFor=label=>[live.id,product.id,email,units,rule.actionId||rule.kind,label,...(requestId?[requestId]:[])].join(":");
