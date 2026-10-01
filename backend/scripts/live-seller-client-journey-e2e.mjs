@@ -119,8 +119,8 @@ const ended=await json(`/api/live/sessions/${liveId}`);
 assert(ended.response.status===404,"Ended Live is still public");
 console.log(JSON.stringify({
   pass:true,scenario:"seller-client-full-live-journey",sellerCreated:true,buyerCreated:true,
-  sellerSenderReady:true,buyerProfileReady:true,buyerRelayReady:true,followRequired:true,followed:true,
-  subscriberGiveawayWon:true,paidPurchases:[6,5,2],cumulativePaidItems:13,buyerPostagePaid:4.09,
+  sellerProfessional:true,sellerSiretVerified:true,sellerSenderReady:true,buyerProfileReady:true,buyerRelayReady:true,followRequired:true,followed:true,
+  historicalBoosterPaymentReady:true,subscriberGiveawayWon:true,paidPurchases:[6,5,2],cumulativePaidItems:13,buyerPostagePaid:4.09,
   buyerGiveawayWon:true,groupedPurchases:3,groupedGifts:2,shipmentWeightGrams:560,pack:"PACK-MR-1000",
   liveEnded:true,realPayment:false,realLabel:false
 },null,2));
