@@ -47,6 +47,11 @@ jobs:
           MR_API_V2_PASSWORD: ${{ secrets.OVH_MONDIAL_RELAY_API_V2_PASSWORD }}
           MR_API_V2_CUSTOMER_ID: ${{ secrets.OVH_MONDIAL_RELAY_API_V2_CUSTOMER_ID }}
           COLISSIMO_API_KEY: ${{ secrets.OVH_COLISSIMO_API_KEY }}
+          PAYPAL_CLIENT_ID: ${{ secrets.OVH_PAYPAL_CLIENT_ID }}
+          PAYPAL_CLIENT_SECRET: ${{ secrets.OVH_PAYPAL_CLIENT_SECRET }}
+          PAYPAL_PARTNER_MERCHANT_ID: ${{ secrets.OVH_PAYPAL_PARTNER_MERCHANT_ID }}
+          PAYPAL_PARTNER_ATTRIBUTION_ID: ${{ secrets.OVH_PAYPAL_PARTNER_ATTRIBUTION_ID }}
+          PAYPAL_WEBHOOK_ID: ${{ secrets.OVH_PAYPAL_WEBHOOK_ID }}
           SENDCLOUD_PUBLIC_KEY: ${{ secrets.SENDCLOUD_PUBLIC_KEY }}
           SENDCLOUD_SECRET_KEY: ${{ secrets.SENDCLOUD_SECRET_KEY }}
           OP: ${{ inputs.action }}
@@ -60,7 +65,7 @@ jobs:
           test -n "${OVH_VPS_HOST_FINGERPRINT:-}"
 
           case "$OP" in
-            status|healthcheck|deploy|restart|backup|backup-prune|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check|sumup-configure|colissimo-configure|mondial-relay-configure|sendcloud-configure|live-test-audit|live-test-cleanup) ;;
+            status|healthcheck|deploy|restart|backup|backup-prune|nginx-test|logs|rollback|report|backup-check|dns-check|https-enable|smtp-configure|smtp-domain-configure|mail-dns-check|admin-password-reset-request|estimation-capture-check|sumup-configure|colissimo-configure|mondial-relay-configure|sendcloud-configure|live-test-audit|live-test-cleanup|paypal-configure) ;;
             *) echo "FORBIDDEN action"; exit 1 ;;
           esac
           case "$BRANCH" in
@@ -128,7 +133,15 @@ jobs:
             test -n "${SENDCLOUD_PUBLIC_KEY:-}"
             test -n "${SENDCLOUD_SECRET_KEY:-}"
             printf '%s\n%s\n' "$SENDCLOUD_PUBLIC_KEY" "$SENDCLOUD_SECRET_KEY" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
-            unset SENDCLOUD_PUBLIC_KEY SENDCLOUD_SECRET_KEY
+            unset SENDCLOUD_PUBLIC_KEY SENDCLOUD_SECRET_KEY PAYPAL_CLIENT_ID PAYPAL_CLIENT_SECRET PAYPAL_PARTNER_MERCHANT_ID PAYPAL_PARTNER_ATTRIBUTION_ID PAYPAL_WEBHOOK_ID
+          elif [ "$OP" = paypal-configure ]; then
+            test -n "${PAYPAL_CLIENT_ID:-}"
+            test -n "${PAYPAL_CLIENT_SECRET:-}"
+            test -n "${PAYPAL_PARTNER_MERCHANT_ID:-}"
+            test -n "${PAYPAL_PARTNER_ATTRIBUTION_ID:-}"
+            test -n "${PAYPAL_WEBHOOK_ID:-}"
+            printf '%s\n%s\n%s\n%s\n%s\n' "$PAYPAL_CLIENT_ID" "$PAYPAL_CLIENT_SECRET" "$PAYPAL_PARTNER_MERCHANT_ID" "$PAYPAL_PARTNER_ATTRIBUTION_ID" "$PAYPAL_WEBHOOK_ID" | ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"
+            unset SENDCLOUD_PUBLIC_KEY SENDCLOUD_SECRET_KEY PAYPAL_CLIENT_ID PAYPAL_CLIENT_SECRET PAYPAL_PARTNER_MERCHANT_ID PAYPAL_PARTNER_ATTRIBUTION_ID PAYPAL_WEBHOOK_ID
           else
             unset SMTP_PASS DOMAIN_SMTP_HOST DOMAIN_SMTP_PORT DOMAIN_SMTP_SECURE DOMAIN_SMTP_USER DOMAIN_SMTP_PASS DOMAIN_MAIL_FROM DOMAIN_MAIL_FROM_NAME DOMAIN_MAIL_REPLY_TO DOMAIN_DKIM_SELECTOR SUMUP_API_KEY SUMUP_MERCHANT_CODE MR_ENSEIGNE MR_PRIVATE_KEY MR_API_V2_LOGIN MR_API_V2_PASSWORD MR_API_V2_CUSTOMER_ID COLISSIMO_API_KEY
             ssh "${ssh_args[@]}" "${OVH_VPS_USER}@${OVH_VPS_HOST}" "$remote_cmd"

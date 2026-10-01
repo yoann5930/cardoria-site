@@ -12,12 +12,53 @@ import { consumePaidCartItems } from "./v1/cart.js";
 const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
 const STANDARD_MARKETPLACE_COMMISSION_PERCENT = 5;
 
+export function resolvePayPalEnvironment(env = process.env) {
+  const production = String(env.NODE_ENV || "").toLowerCase() === "production";
+  const requested = String(env.PAYPAL_ENV || "sandbox").trim().toLowerCase() === "live" ? "live" : "sandbox";
+  if (production && requested !== "live") return { environment: "sandbox", blocked: true };
+  return { environment: requested, blocked: false };
+}
+
 function environment() {
-  return String(process.env.PAYPAL_ENV || "sandbox").toLowerCase() === "live" ? "live" : "sandbox";
+  return resolvePayPalEnvironment().environment;
+}
+
+export function paypalApiBase(env = process.env) {
+  const resolved = resolvePayPalEnvironment(env);
+  if (resolved.blocked) {
+    const error = new Error("Production OVH doit utiliser PAYPAL_ENV=live.");
+    error.status = 503;
+    error.code = "PAYPAL_LIVE_REQUIRED";
+    throw error;
+  }
+  return resolved.environment === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
 }
 
 function apiBase() {
-  return environment() === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+  return paypalApiBase();
+}
+
+export function assertLiveSellerOnboardingUrl(url, env = process.env) {
+  const href = String(url || "");
+  const resolved = resolvePayPalEnvironment(env);
+  if (resolved.blocked) {
+    const error = new Error("Production OVH doit utiliser PAYPAL_ENV=live.");
+    error.status = 503;
+    throw error;
+  }
+  let parsed;
+  try { parsed = new URL(href); } catch { throw new Error("Lien d'activation vendeur PayPal invalide."); }
+  if (parsed.protocol !== "https:") throw new Error("Lien d'activation vendeur PayPal invalide.");
+  if (resolved.environment === "live" && /(^|\.)sandbox\.paypal\.com$/i.test(parsed.hostname)) {
+    const error = new Error("Lien PayPal Sandbox refusé en production.");
+    error.status = 502;
+    throw error;
+  }
+  return href;
+}
+
+export function sellerPayPalSyncReady({ merchantId, permissionsGranted, emailConfirmed, paymentsReceivable } = {}) {
+  return Boolean(String(merchantId || "").trim() && permissionsGranted && emailConfirmed && paymentsReceivable);
 }
 
 function commissionPercent() {
@@ -33,10 +74,12 @@ export function getPayPalMarketplaceConfig() {
   const secret = String(process.env.PAYPAL_CLIENT_SECRET || "").trim();
   const partnerMerchantId = String(process.env.PAYPAL_PARTNER_MERCHANT_ID || "").trim();
   const attributionId = String(process.env.PAYPAL_PARTNER_ATTRIBUTION_ID || "").trim();
+  const resolved = resolvePayPalEnvironment();
   return {
     provider: "paypal",
-    environment: environment(),
-    configured: !!(clientId && secret && partnerMerchantId && attributionId),
+    environment: resolved.environment,
+    blocked: resolved.blocked,
+    configured: !resolved.blocked && !!(clientId && secret && partnerMerchantId && attributionId),
     commissionPercent: commissionPercent(),
     delayedDisbursement: delayedDisbursementEnabled()
   };
@@ -44,6 +87,7 @@ export function getPayPalMarketplaceConfig() {
 
 function assertConfigured() {
   const cfg = getPayPalMarketplaceConfig();
+  if (cfg.blocked) throw Object.assign(new Error("Production OVH doit utiliser PAYPAL_ENV=live."), { status: 503, code: "PAYPAL_LIVE_REQUIRED" });
   if (!cfg.configured) throw new Error("PayPal Marketplace non configuré côté serveur.");
   return cfg;
 }
@@ -136,7 +180,7 @@ export async function createSellerOnboarding({ sellerId, returnUrl }) {
     body: payload,
     requestId: `onboard-${seller.id}-${Date.now()}`
   });
-  const url = getActionUrl(result);
+  const url = assertLiveSellerOnboardingUrl(getActionUrl(result));
   if (!url) throw new Error("Lien d'activation vendeur PayPal introuvable.");
 
   updateSellerPayPal(seller.id, { onboardingStatus: "pending", trackingId: seller.id });
@@ -191,7 +235,7 @@ export async function syncSellerPayPalStatus(sellerId, paypalMerchantId = "") {
   const permissionsGranted = hasThirdPartyPermissions(integration);
   const emailConfirmed = Boolean(integration.primary_email_confirmed);
   const paymentsReceivable = Boolean(integration.payments_receivable);
-  const ready = Boolean(merchantId && permissionsGranted && emailConfirmed && paymentsReceivable);
+  const ready = sellerPayPalSyncReady({ merchantId, permissionsGranted, emailConfirmed, paymentsReceivable });
 
   return updateSellerPayPal(seller.id, {
     merchantId,
@@ -219,7 +263,7 @@ function platformFeeFor(order, seller, additionalCapturedSales = 0) {
 function ensureSellerCanReceive(order) {
   const seller = getSeller(order.sellerId);
   if (!seller) throw new Error(`Vendeur ${order.sellerId} introuvable.`);
-  if (!seller.paypalMerchantId || !seller.paypalPaymentsReceivable || seller.paypalOnboardingStatus !== "ready") {
+  if (!seller.paypalMerchantId || !seller.paypalPaymentsReceivable || !seller.paypalEmailConfirmed || !seller.paypalPermissionsGranted || seller.paypalOnboardingStatus !== "ready") {
     throw new Error(`Le vendeur ${seller.displayName || seller.id} doit terminer l'activation PayPal avant la vente.`);
   }
   return seller;
@@ -275,7 +319,7 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
     requestId: `cardoria-${orders.map((o) => o.id).join("-")}`.slice(0, 100),
     sellerMerchantId: uniqueSellerMerchantIds.length === 1 ? uniqueSellerMerchantIds[0] : ""
   });
-  const url = getActionUrl(result);
+  const url = assertLiveSellerOnboardingUrl(getActionUrl(result));
   if (!url) throw new Error("Lien de paiement PayPal introuvable.");
 
   const db = getDb();
@@ -289,6 +333,13 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
   });
 
   return { provider: "paypal", id: result.id, status: result.status, url, commissionPercent: cfg.commissionPercent, fees };
+}
+
+export async function probePayPalLiveOAuth() {
+  const resolved = resolvePayPalEnvironment();
+  if (resolved.blocked || resolved.environment !== "live") return { ok: false };
+  await getAccessToken();
+  return { ok: true };
 }
 
 export async function createLivePayPalOrder({ checkoutId, amount, sellerId, description, successUrl, cancelUrl, platformFee }) {
@@ -316,7 +367,7 @@ export async function createLivePayPalOrder({ checkoutId, amount, sellerId, desc
     requestId: `cardoria-live-${checkoutId}`.slice(0, 100),
     sellerMerchantId: seller.paypalMerchantId
   });
-  const url = getActionUrl(result);
+  const url = assertLiveSellerOnboardingUrl(getActionUrl(result));
   if (!url) throw new Error("Lien de paiement PayPal introuvable.");
   return { provider: "paypal", id: result.id, status: result.status, url, platformFee: fee, sellerNet: round2(amount - fee) };
 }

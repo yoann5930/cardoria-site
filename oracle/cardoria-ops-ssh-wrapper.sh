@@ -65,6 +65,9 @@ case "$cmd" in
   sumup-configure)
     exec sudo -n /usr/local/bin/cardoria-sumup-configure
     ;;
+  paypal-configure)
+    exec sudo -n /usr/local/bin/cardoria-paypal-configure
+    ;;
   mondial-relay-configure)
     exec sudo -n /usr/local/bin/cardoria-mondial-relay-configure
     ;;

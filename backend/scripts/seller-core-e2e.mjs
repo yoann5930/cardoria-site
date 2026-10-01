@@ -109,7 +109,7 @@ const publishNoPaypal = await auth(sellerAccountA.token, `/api/marketplace/v1/li
 });
 assert(publishNoPaypal.response.status === 409, "Seller can publish without PayPal ready");
 
-updateSellerPayPal(sellerA.id, { merchantId: `MERCHANT-${suffix}`, onboardingStatus: "ready", paymentsReceivable: true, connectedAt: new Date().toISOString() });
+updateSellerPayPal(sellerA.id, { merchantId: `MERCHANT-${suffix}`, onboardingStatus: "ready", paymentsReceivable: true, emailConfirmed: true, permissionsGranted: true, connectedAt: new Date().toISOString() });
 const published = await auth(sellerAccountA.token, `/api/marketplace/v1/listings/${draft.body.listing.id}`, {
   method: "PUT",
   body: JSON.stringify({ status: "active" })

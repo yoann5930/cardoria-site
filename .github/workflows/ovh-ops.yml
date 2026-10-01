@@ -28,6 +28,7 @@ on:
           - sumup-configure
           - mondial-relay-configure
           - colissimo-configure
+          - paypal-configure
       branch:
         description: Production deploy branch
         required: false
