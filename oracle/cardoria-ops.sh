@@ -196,6 +196,26 @@ cmd_live_test_audit() {
     set +a
     cd "$APP_DIR/backend"
     node scripts/live-test-maintenance.mjs audit
+    node --input-type=module <<'NODE'
+import { getPayPalMarketplaceConfig } from "./lib/marketplace/paypal.js";
+import { paypalWebhookConfigured } from "./lib/marketplace/paypal-events.js";
+import { listSellers } from "./lib/marketplace/sellers.js";
+
+const cfg = getPayPalMarketplaceConfig();
+const sellers = listSellers(10000);
+const professionals = sellers.filter((seller) => seller.sellerType === "professional" && seller.professionalVerified);
+const ready = professionals.filter((seller) => seller.paypalReady);
+const senderReady = professionals.filter((seller) => seller.senderReady);
+
+console.log("--- real Live payment preflight ---");
+console.log("paypal_configured:", cfg.configured ? "yes" : "no");
+console.log("paypal_environment:", cfg.environment);
+console.log("paypal_webhook_configured:", paypalWebhookConfigured() ? "yes" : "no");
+console.log("professional_verified_sellers:", professionals.length);
+console.log("professional_paypal_ready:", ready.length);
+console.log("professional_sender_ready:", senderReady.length);
+console.log("live_real_payment_server_ready:", cfg.configured && paypalWebhookConfigured() ? "yes" : "no");
+NODE
   ) | redact
 }
 
