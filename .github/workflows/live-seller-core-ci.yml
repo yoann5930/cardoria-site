@@ -9,6 +9,8 @@ on:
       - 'backend/routes/live-actions.js'
       - 'backend/lib/live/**'
       - 'backend/scripts/live-seller-core-e2e.mjs'
+      - 'backend/scripts/live-seller-client-journey-e2e.mjs'
+      - 'backend/scripts/live-seller-client-journey-e2e.mjs'
       - 'js/live-vendeur.js'
       - 'backend/public/js/live-vendeur.js'
       - 'js/live-studio-actions-ui.js'
@@ -60,6 +62,7 @@ jobs:
           node --check lib/live/sessions.js
           node --check lib/live/checkout.js
           node --check scripts/live-seller-core-e2e.mjs
+          node --check scripts/live-seller-client-journey-e2e.mjs
           node --check ../js/live-studio-actions-ui.js
       - name: Seller Live lifecycle guards
         working-directory: .
@@ -80,6 +83,10 @@ jobs:
           grep -q 'giveaway_buyer' js/live-studio-actions-ui.js
           grep -q 'Valider / préparer</button>' js/live-studio-actions-ui.js
           grep -q 'Cardoria identity: clear operator UI' css/live-pro-dashboard.css
+          grep -q 'PRÉ-TEST RÉEL' js/live-vendeur.js
+          grep -q 'Activer / vérifier PayPal' js/live-vendeur.js
+          grep -q 'sender-profile' js/live-vendeur.js
+          grep -q 'historicalBoosterPaymentReady' backend/scripts/live-seller-client-journey-e2e.mjs
       - name: Start clean backend
         run: |
           rm -rf data
@@ -97,6 +104,8 @@ jobs:
           test "$ready" = "true"
       - name: Live seller ownership routing actions and lifecycle E2E
         run: node scripts/live-seller-core-e2e.mjs
+      - name: Seller + client full preflight without real payment or label
+        run: node scripts/live-seller-client-journey-e2e.mjs
       - name: Existing Live regressions
         working-directory: .
         run: |

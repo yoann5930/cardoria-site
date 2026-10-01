@@ -152,3 +152,19 @@ body.live-pro-page{
 .live-pro-page .live-studio-game-picker select{border-color:#d8c991}
 .live-pro-page .live-studio-game-picker select:focus{outline:2px solid rgba(199,163,60,.25);border-color:#b98f22}
 .live-pro-page .live-game-launch-arrow,.live-pro-page .live-booster-arrow{background:#101216;color:#e9c85d;border:1px solid #b68e27}
+
+.live-real-preflight{margin:16px 0;padding:18px;border:1px solid rgba(212,170,49,.28);border-radius:14px;background:rgba(8,9,12,.88)}
+.live-preflight-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.live-preflight-grid article{display:grid;gap:5px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:#08090b}
+.live-preflight-grid article.is-ready{border-color:rgba(77,190,115,.42)}
+.live-preflight-grid article.is-blocked{border-color:rgba(225,103,78,.5)}
+.live-preflight-grid strong{font-size:12px;color:#f3db7d}
+.live-preflight-grid span{font-size:11px;color:#d4d6d9}
+.live-preflight-grid a{font-size:11px;color:#f0c84b;font-weight:800}
+.live-sender-form{display:grid;grid-template-columns:1.1fr 1.5fr .7fr 1fr 1fr auto;gap:8px;margin-top:12px}
+.live-sender-form input,.live-sender-form button{min-height:40px;border-radius:8px}
+.live-sender-form input{border:1px solid rgba(255,255,255,.1);background:#050608;color:#f6f6f6;padding:0 10px}
+.live-sender-form button{border:1px solid rgba(212,170,49,.45);background:#17130a;color:#f4d86e;font-weight:800;padding:0 12px}
+.live-preflight-status{margin:10px 0 0;font-size:12px;font-weight:800}
+@media(max-width:980px){.live-preflight-grid{grid-template-columns:1fr}.live-sender-form{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.live-sender-form{grid-template-columns:1fr}}

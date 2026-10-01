@@ -1,3 +1,4 @@
+import { updateSellerProfessionalVerification } from "../lib/marketplace/sellers.js";
 const BASE=process.env.TEST_BASE_URL||"http://127.0.0.1:10000";
 const suffix=`${Date.now()}-${Math.floor(Math.random()*10000)}`,password="Live-Journey-E2E-2026!";
 function assert(condition,message){if(!condition)throw new Error(message);}
@@ -8,7 +9,13 @@ const sellerAccount=await register("liveur-test");
 const buyer=await register("client-test");
 const sellerRegistration=await auth(sellerAccount.token,"/api/marketplace/v1/paypal/sellers/register",{method:"POST",body:JSON.stringify({displayName:"Liveur Test Cardoria",sellerType:"individual"})});
 assert(sellerRegistration.response.status===200&&sellerRegistration.body.seller?.id,"Seller registration failed");
-const seller=sellerRegistration.body.seller;
+let seller=sellerRegistration.body.seller;
+updateSellerProfessionalVerification(seller.id,{verified:true,siret:"55555555555555",legalName:"Liveur Test Cardoria Pro",source:"live-seller-client-journey-e2e",verifiedAt:new Date().toISOString()});
+const sellerProfile=await auth(sellerAccount.token,"/api/auth/profile",{method:"PATCH",body:JSON.stringify({accountType:"professional"})});
+assert(sellerProfile.response.status===200&&sellerProfile.body.user?.accountType==="professional","Seller client account is not Professional");
+const sellerMe=await auth(sellerAccount.token,"/api/marketplace/v1/paypal/sellers/me");
+assert(sellerMe.response.status===200&&sellerMe.body.seller?.professionalVerified===true,"Seller SIRET professional verification missing");
+seller=sellerMe.body.seller;
 const sender=await auth(sellerAccount.token,`/api/marketplace/v1/sellers/${seller.id}/sender-profile`,{method:"PUT",body:JSON.stringify({name:"Liveur Test Cardoria",addressLine1:"1 rue Test",postalCode:"59330",city:"Hautmont",countryCode:"FR",phone:"0600000000"})});
 assert(sender.response.status===200&&sender.body.ready===true,"Seller sender address is not ready");
 
@@ -22,7 +29,8 @@ const products=[
   {id:"GIFT-BUYER",name:"Cadeau Acheteur Test",mode:"giveaway",price:0,qty:2,stock:2,shippingWeightGrams:300},
   {id:"BUY-6",name:"Achat Test 6 EUR",mode:"buy_now",price:6,qty:10,stock:10,shippingWeightGrams:20},
   {id:"BUY-5",name:"Achat Test 5 EUR",mode:"buy_now",price:5,qty:10,stock:10,shippingWeightGrams:20},
-  {id:"BUY-2",name:"Achat Test 2 EUR",mode:"buy_now",price:2,qty:10,stock:10,shippingWeightGrams:20}
+  {id:"BUY-2",name:"Achat Test 2 EUR",mode:"buy_now",price:2,qty:10,stock:10,shippingWeightGrams:20},
+  {id:"BOX-3",name:"Display Test 3 Boosters",mode:"break",price:5,qty:3,stock:3,shippingWeightGrams:60}
 ];
 const created=await auth(sellerAccount.token,"/api/live/seller/sessions",{method:"POST",body:JSON.stringify({title:`Liveur + Client E2E ${suffix}`,products})});
 assert(created.response.status===200&&created.body.session?.ownerId===seller.id,"Seller Live creation failed");
@@ -49,6 +57,32 @@ async function plan(productId,amount){
   return result.body.checkout;
 }
 const crypto=await import("node:crypto");
+
+// Box Break regression before a real test:
+// Booster #1 remains payable after the liveur has already started Booster #2.
+const boxStart=await auth(sellerAccount.token,`/api/live/actions/seller/${liveId}/break/start`,{method:"POST",body:JSON.stringify({productId:"BOX-3",breakType:"box_break",boosterCount:3,pricePerSpot:5})});
+assert(boxStart.response.status===200&&boxStart.body.break?.boosterCount===3,"Box Break did not prepare 3 boosters");
+const booster1=await auth(sellerAccount.token,`/api/live/actions/seller/${liveId}/booster-auction/next`,{method:"POST",body:JSON.stringify({startPrice:5,durationSeconds:30})});
+assert(booster1.response.status===200&&booster1.body.auction?.boosterNumber===1,"Booster #1 auction did not start");
+const bid1=await auth(buyer.token,`/api/live/actions/${liveId}/bids`,{method:"POST",body:JSON.stringify({amount:7,bidderName:"Fake Name",bidderEmail:buyer.email})});
+assert(bid1.response.status===200&&bid1.body.auction?.currentPrice===7,"Buyer bid on Booster #1 failed");
+const stop1=await auth(sellerAccount.token,`/api/live/actions/seller/${liveId}/auction/stop`,{method:"POST",body:"{}"});
+assert(stop1.response.status===200&&stop1.body.auction?.status==="ended","Booster #1 auction did not stop");
+const booster2=await auth(sellerAccount.token,`/api/live/actions/seller/${liveId}/booster-auction/next`,{method:"POST",body:JSON.stringify({startPrice:5,durationSeconds:30})});
+assert(booster2.response.status===200&&booster2.body.auction?.boosterNumber===2,"Booster #2 did not wait for and start from the liveur action");
+const wins=await auth(buyer.token,`/api/live/actions/${liveId}/my-wins`);
+const historicalWin=(wins.body.wins||[]).find((x)=>x.actionId===booster1.body.auction.id);
+assert(wins.response.status===200&&historicalWin?.boosterNumber===1,"Buyer cannot recover historical Booster #1 win after Booster #2 starts");
+const historicalCheckout=await auth(buyer.token,"/api/live/checkout/plan",{method:"POST",body:JSON.stringify({
+  liveId,productId:"BOX-3",qty:1,provider:"paypal",amount:7,
+  actionId:booster1.body.auction.id,spotLabel:"Booster 1",
+  shippingAddress:buyerAddress,servicePoint:relay,checkoutRequestId:crypto.randomUUID()
+})});
+assert(historicalCheckout.response.status===200,"Historical Booster #1 checkout cannot be planned after Booster #2 starts");
+assert(historicalCheckout.body.checkout?.saleKind==="auction"&&historicalCheckout.body.checkout?.actionId===booster1.body.auction.id,"Historical Booster #1 checkout lost auction identity");
+assert(historicalCheckout.body.checkout?.spotLabel==="Booster 1"&&historicalCheckout.body.checkout?.unitPrice===7,"Historical Booster #1 price/label is wrong");
+sessions.saveLiveCheckout({...historicalCheckout.body.checkout,status:"failed",updatedAt:new Date().toISOString()});
+
 const first=await plan("BUY-6",6);
 assert(first.shippingPaidBy==="streamer"&&first.shippingAmount===0&&first.shippingItemTotalWithPurchase===6,"First 6 EUR giveaway-winner purchase shipping rule failed");
 sessions.saveLiveCheckout({...first,status:"paid",paymentProviderOrderId:"TEST-PAY-1",paymentProviderTransactionId:"TEST-CAP-1",updatedAt:new Date().toISOString()});
@@ -80,13 +114,14 @@ assert(String(group.relay?.id)==="12345","Shipment relay is missing");
 
 const stopped=await auth(sellerAccount.token,`/api/live/seller/sessions/${liveId}/stop`,{method:"POST",body:"{}"});
 assert(stopped.response.status===200&&stopped.body.session?.status==="ended","Seller Live did not stop");
-assert(stopped.body.shipping?.errors?.some(e=>e.code==="LIVE_LABELS_NOT_ACTIVATED"),"Test environment unexpectedly attempted a real label purchase");
+assert(Array.isArray(stopped.body.shipping?.created)&&stopped.body.shipping.created.length===0,"Preflight must never create a real shipment label");
+assert((stopped.body.shipping?.errors||[]).some(e=>["LIVE_LABELS_NOT_ACTIVATED","MONDIAL_RELAY_LABELS_NOT_ACTIVATED"].includes(e.code)),"Preflight must stop before any real carrier purchase");
 const ended=await json(`/api/live/sessions/${liveId}`);
 assert(ended.response.status===404,"Ended Live is still public");
 console.log(JSON.stringify({
   pass:true,scenario:"seller-client-full-live-journey",sellerCreated:true,buyerCreated:true,
-  sellerSenderReady:true,buyerProfileReady:true,buyerRelayReady:true,followRequired:true,followed:true,
-  subscriberGiveawayWon:true,paidPurchases:[6,5,2],cumulativePaidItems:13,buyerPostagePaid:4.09,
+  sellerProfessional:true,sellerSiretVerified:true,sellerSenderReady:true,buyerProfileReady:true,buyerRelayReady:true,followRequired:true,followed:true,
+  historicalBoosterPaymentReady:true,subscriberGiveawayWon:true,paidPurchases:[6,5,2],cumulativePaidItems:13,buyerPostagePaid:4.09,
   buyerGiveawayWon:true,groupedPurchases:3,groupedGifts:2,shipmentWeightGrams:560,pack:"PACK-MR-1000",
   liveEnded:true,realPayment:false,realLabel:false
 },null,2));
