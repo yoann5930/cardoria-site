@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { __setLiveStoreForTests, __resetLiveStoreForTests, applyLivePaymentStatus, createLiveSession, getLiveSession, setLiveStatus } from "../lib/live/sessions.js";
-import { __setLiveActionsStoreForTests, __resetLiveActionsStoreForTests, drawGiveaway, enterGiveaway, getLiveActionState, startAuction, stopAuction, placeAuctionBid, startFlashSale, startBreak, startGiveaway } from "../lib/live/actions.js";
+import { __setLiveActionsStoreForTests, __resetLiveActionsStoreForTests, drawGiveaway, enterGiveaway, getLiveActionState, startAuction, stopAuction, placeAuctionBid, startFlashSale, startBreak, startGiveaway, startNextBoosterAuction } from "../lib/live/actions.js";
 import { planLiveCheckout } from "../lib/live/checkout.js";
 
 const admin={role:"admin",id:"admin",email:"admin@test.local"};
@@ -30,6 +30,26 @@ test("flash uses active flash price, not catalog price",()=>{const id=setup();tr
 test("break checkout uses per-spot price and paid stock updates progress",()=>{const id=setup();try{startBreak(id,{productId:"BREAK",spots:12,pricePerSpot:3});const c=planLiveCheckout({liveId:id,productId:"BREAK",qty:2,customerEmail:"break@test.local"});assert.equal(c.unitPrice,3);assert.equal(c.amount,6);assert.equal(c.saleKind,"break");applyLivePaymentStatus(c.id,"paid");const state=getLiveActionState(id);assert.equal(state.break.soldSpots,2);assert.equal(state.break.remainingSpots,10);}finally{teardown();}});
 
 test("auction cannot be paid while running and only winner can pay final price",()=>{const id=setup();try{startAuction(id,{productId:"AUC",startPrice:5,durationSeconds:30,mode:"standard"});placeAuctionBid(id,{amount:7,bidderName:"Alice",bidderEmail:"alice@test.local"});assert.throws(()=>planLiveCheckout({liveId:id,productId:"AUC",qty:1,customerEmail:"alice@test.local"}),e=>e.status===409);stopAuction(id);assert.throws(()=>planLiveCheckout({liveId:id,productId:"AUC",qty:1,customerEmail:"bob@test.local"}),e=>e.status===403);const winner=planLiveCheckout({liveId:id,productId:"AUC",qty:1,customerEmail:"alice@test.local"});assert.equal(winner.amount,7);assert.equal(winner.saleKind,"auction");}finally{teardown();}});
+
+test("earlier booster winner can still pay after the next booster auction starts",()=>{const id=setup();try{
+  startBreak(id,{productId:"BREAK",breakType:"box_break",boosterCount:3,pricePerSpot:5});
+  const first=startNextBoosterAuction(id,{startPrice:5,durationSeconds:30});
+  placeAuctionBid(id,{amount:7,bidderName:"Alice",bidderEmail:"alice@test.local"});
+  stopAuction(id);
+  const second=startNextBoosterAuction(id,{startPrice:5,durationSeconds:30});
+  assert.equal(second.boosterNumber,2);
+  const state=getLiveActionState(id);
+  assert.equal(state.break.completedBoosters.length,1);
+  assert.equal(state.break.completedBoosters[0].auctionId,first.id);
+  assert.equal(state.break.completedBoosters[0].boosterNumber,1);
+  assert.throws(()=>planLiveCheckout({liveId:id,productId:"BREAK",qty:1,customerEmail:"bob@test.local",actionId:first.id,spotLabel:"Booster 1"}),e=>e.status===403);
+  const winner=planLiveCheckout({liveId:id,productId:"BREAK",qty:1,customerEmail:"alice@test.local",actionId:first.id,spotLabel:"Booster 1"});
+  assert.equal(winner.amount,7);
+  assert.equal(winner.saleKind,"auction");
+  assert.equal(winner.actionId,first.id);
+  assert.equal(winner.spotLabel,"Booster 1");
+  assert.match(winner.productName,/Booster/);
+}finally{teardown();}});
 
 test("giveaway cannot create payment and drawing consumes stock once",()=>{const id=setup();try{startGiveaway(id,{productId:"GIV",durationSeconds:60});enterGiveaway(id,{name:"Alice",email:"alice@test.local"});assert.throws(()=>planLiveCheckout({liveId:id,productId:"GIV",qty:1,customerEmail:"give@test.local"}),e=>e.status===409);const draw=drawGiveaway(id);assert.ok(draw.giveaway.winner);assert.equal(getLiveSession(id).products.find(p=>p.id==="GIV").stock,0);assert.equal(drawGiveaway(id).duplicate,true);assert.equal(getLiveSession(id).products.find(p=>p.id==="GIV").stock,0);}finally{teardown();}});
 
