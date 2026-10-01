@@ -33,6 +33,62 @@ function showFollowSellerPrompt(liveId,entry){
   };
 }
 function requireClientAccount(){var account=cachedAccount();if(!clientToken()||!account){openClientAuth();return null;}if(!String(account.name||"").trim()){openClientAuth(true);return null;}return account;}
+async function beginLiveCheckout(liveId,productId,options){
+  var account=requireClientAccount();if(!account)return;
+  options=options||{};
+  try{
+    if(!window.CardoriaLiveShippingAddress)throw new Error("Formulaire d'expédition indisponible.");
+    var shipping=await window.CardoriaLiveShippingAddress.collect({liveId:liveId,email:account.email,name:account.name});
+    if(!shipping)return;
+    var response=await fetch("/api/live/checkout",{method:"POST",headers:requestHeaders(),cache:"no-store",body:JSON.stringify({
+      liveId:liveId,productId:productId,qty:1,
+      actionId:options.actionId||"",spotLabel:options.spotLabel||"",
+      shippingAddress:shipping.address,servicePoint:shipping.servicePoint,
+      successUrl:location.origin+"/live.html?session="+encodeURIComponent(liveId),
+      cancelUrl:location.origin+"/live.html?session="+encodeURIComponent(liveId)
+    })});
+    var data=await response.json().catch(function(){return{};});
+    if(!response.ok||data.ok===false)throw responseError(response,data);
+    if(!data.checkout||!data.checkout.url)throw new Error("Lien de paiement Live non reçu.");
+    location.assign(data.checkout.url);
+  }catch(e){
+    if(e.code==="CLIENT_LOGIN_REQUIRED"||e.status===401)return openClientAuth();
+    alert(e.message||"Paiement Live indisponible.");
+    refresh();
+  }
+}
+function renderBuyerPayments(state,session,wins){
+  var content=document.getElementById("claContent");if(!content)return;
+  var products={};(session.products||[]).forEach(function(p){products[p.id]=p;});
+  var rows=[],account=cachedAccount(),liveId=currentSession();
+  (wins||[]).forEach(function(win){
+    var paid=["paid","completed"].includes(String(win.checkoutStatus||"").toLowerCase());
+    var pending=["pending","creating"].includes(String(win.checkoutStatus||"").toLowerCase());
+    rows.push("<div class='live-buyer-sale-row'><span><strong>"+esc(win.label||win.spotLabel||"Lot gagné")+"</strong><small>"+Number(win.amount||0).toFixed(2)+" €"+(paid?" · payé":pending?" · paiement en attente":" · à payer")+"</small></span>"+(paid?"<span class='live-buyer-paid'>Payé ✓</span>":"<button type='button' data-live-win-pay='"+esc(win.actionId)+"' data-product-id='"+esc(win.productId)+"' data-spot-label='"+esc(win.spotLabel||"")+"'>"+(pending&&win.paymentUrl?"Reprendre le paiement":"Payer")+" — "+Number(win.amount||0).toFixed(2)+" €</button>")+"</div>");
+  });
+  if(state.flash&&state.flash.status==="running"&&new Date(state.flash.endsAt).getTime()>Date.now()){
+    rows.push("<div class='live-buyer-sale-row'><span><strong>"+esc(state.flash.productName||"Vente flash")+"</strong><small>Vente flash en cours</small></span><button type='button' data-live-direct-pay='1' data-product-id='"+esc(state.flash.productId)+"'>Acheter — "+Number(state.flash.price||0).toFixed(2)+" €</button></div>");
+  }
+  if(state.pinnedProductId){
+    var pinned=products[state.pinnedProductId],mode=String(pinned&&pinned.mode||"buy_now");
+    if(pinned&&mode==="buy_now"){
+      rows.push("<div class='live-buyer-sale-row'><span><strong>"+esc(pinned.name||"Article")+"</strong><small>Achat immédiat</small></span><button type='button' data-live-direct-pay='1' data-product-id='"+esc(pinned.id)+"'>Acheter — "+Number(pinned.price||0).toFixed(2)+" €</button></div>");
+    }
+  }
+  if(state.break&&state.break.status==="running"&&!state.break.auctionSequence&&state.break.breakType!=="energy_game"){
+    rows.push("<div class='live-buyer-sale-row'><span><strong>"+esc(state.break.productName||"Break")+"</strong><small>"+Number(state.break.remainingSpots??state.break.spots??0)+" spot(s) restant(s)</small></span><button type='button' data-live-break-pay='1' data-product-id='"+esc(state.break.productId)+"'>Acheter un spot — "+Number(state.break.pricePerSpot||0).toFixed(2)+" €</button></div>");
+  }
+  if(!rows.length&&state.auction&&state.auction.status==="ended"&&state.auction.highestBidder&&!account){
+    rows.push("<div class='live-buyer-sale-row'><span><strong>Enchère terminée</strong><small>Connectez-vous pour vérifier si vous avez gagné ce lot.</small></span><button type='button' id='claWinnerLogin'>Se connecter</button></div>");
+  }
+  var old=document.getElementById("claBuyerPayments");if(old)old.remove();
+  if(!rows.length)return;
+  var box=document.createElement("div");box.id="claBuyerPayments";box.className="live-buyer-sales";box.innerHTML="<div class='live-buyer-sales-head'><strong>Achats / lots gagnés</strong></div>"+rows.join("");
+  content.appendChild(box);
+  box.querySelectorAll("[data-live-win-pay]").forEach(function(btn){btn.onclick=function(){beginLiveCheckout(liveId,btn.dataset.productId,{actionId:btn.dataset.liveWinPay,spotLabel:btn.dataset.spotLabel||""});};});
+  box.querySelectorAll("[data-live-direct-pay],[data-live-break-pay]").forEach(function(btn){btn.onclick=function(){beginLiveCheckout(liveId,btn.dataset.productId,{});};});
+  var login=document.getElementById("claWinnerLogin");if(login)login.onclick=function(){openClientAuth();};
+}
 function renderAction(state){ensure();var label=document.getElementById("claState"),content=document.getElementById("claContent"),parts=[];if(!state){label.textContent="Aucune action";content.innerHTML="";return;}if(state.auction&&state.auction.status==="running"){var a=state.auction;label.textContent="Enchère en cours";parts.push('<div><strong>'+esc(a.productName)+'</strong> · '+Number(a.currentPrice||0).toFixed(2)+' € · '+(a.mode==='sudden_death'?'mort subite':'standard')+' · fin '+esc(new Date(a.endsAt).toLocaleTimeString("fr-FR"))+'</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><input id="claBidAmount" type="number" min="0.01" step="0.50" value="'+Number((a.bids&&a.bids.length?a.currentPrice+0.5:a.startPrice)||0).toFixed(2)+'"><button id="claBid" type="button">Enchérir</button></div>');}else if(state.auction&&state.auction.status==="ended"&&state.auction.highestBidder){label.textContent="Enchère terminée";parts.push('<div><strong>'+esc(state.auction.productName)+'</strong> · gagnant : '+esc(state.auction.highestBidder.name||"-")+' · '+Number(state.auction.currentPrice||0).toFixed(2)+' €</div>');}else if(state.giveaway&&state.giveaway.status==="running"){var g=state.giveaway;label.textContent=g.eligibility==="subscriber"?"Giveaway Abonné en cours":"Giveaway en cours";parts.push('<div><strong>'+esc(g.productName)+'</strong> · '+(g.eligibility==="subscriber"?"abonnement au vendeur requis":"participation gratuite")+' · '+(g.entries||[]).length+' participant(s)</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button id="claGive" type="button">Participer gratuitement</button></div>');}else if(state.giveaway&&state.giveaway.winner){label.textContent="Giveaway terminé";parts.push('<div><strong>'+esc(state.giveaway.productName)+'</strong> · gagnant : '+esc(state.giveaway.winner.name||"-")+'</div>');}else if(state.flash&&state.flash.status==="running"){label.textContent="Vente flash";parts.push('<div><strong>'+esc(state.flash.productName)+'</strong> · '+Number(state.flash.price||0).toFixed(2)+' € · jusqu’à '+esc(new Date(state.flash.endsAt).toLocaleTimeString("fr-FR"))+'</div>');}else if(state.break&&state.break.status==="running"){label.textContent="Ouverture / break";parts.push('<div><strong>'+esc(state.break.productName)+'</strong> · '+Number(state.break.spots||0)+' spots · '+Number(state.break.pricePerSpot||0).toFixed(2)+' € / spot · '+Number(state.break.remainingSpots??state.break.spots??0)+' restant(s)</div>');}else{label.textContent=state.pinnedProductId?"Article épinglé":"Aucune action en cours";}content.innerHTML=parts.join("");var bid=document.getElementById("claBid");if(bid)bid.onclick=function(){var account=requireClientAccount();if(!account)return;post("/api/live/actions/"+encodeURIComponent(currentSession())+"/bids",{amount:Number(document.getElementById("claBidAmount").value),bidderName:account.name,bidderEmail:account.email}).then(refresh).catch(function(e){if(e.code==="CLIENT_LOGIN_REQUIRED"||e.status===401)return openClientAuth();alert(e.message);});};var give=document.getElementById("claGive");if(give)give.onclick=function(){var account=requireClientAccount();if(!account)return;var id=currentSession(),entry={name:account.name,email:account.email};post("/api/live/actions/"+encodeURIComponent(id)+"/giveaway/enter",entry).then(refresh).catch(function(e){if(e.code==="FOLLOW_REQUIRED")showFollowSellerPrompt(id,entry);else if(e.code==="CLIENT_LOGIN_REQUIRED"||e.status===401)openClientAuth();else alert(e.message);});};}
 function closeClientAuth(){var modal=document.getElementById("claClientAuthModal");if(modal)modal.remove();refreshChatIdentity();refresh();}
 function openClientAuth(profileOnly){var old=document.getElementById("claClientAuthModal");if(old)old.remove();var modal=document.createElement("div");modal.id="claClientAuthModal";modal.className="live-auth-modal";modal.innerHTML='<div class="live-auth-dialog" role="dialog" aria-modal="true" aria-label="Compte Cardoria"><div class="live-auth-head"><strong>'+(profileOnly?'Compléter votre profil':'Connexion ou inscription')+'</strong><button type="button" id="claAuthClose">×</button></div><iframe title="Compte Cardoria" src="/client-login.html?mode='+(profileOnly?'login':'register')+'&embed=1&return='+encodeURIComponent(location.pathname+location.search)+'"></iframe></div>';document.body.appendChild(modal);document.getElementById("claAuthClose").onclick=function(){modal.remove();};modal.addEventListener("click",function(e){if(e.target===modal)modal.remove();});var checks=0,watch=setInterval(function(){checks++;if(clientToken()&&cachedAccount()){clearInterval(watch);closeClientAuth();}else if(checks>240||!document.body.contains(modal))clearInterval(watch);},500);}
@@ -40,5 +96,5 @@ window.addEventListener("message",function(event){if(event.origin!==location.ori
 function renderChat(messages){ensure();refreshChatIdentity();var chat=document.getElementById("claChat");if(chat){var atBottom=chat.scrollHeight-chat.scrollTop-chat.clientHeight<48;chat.innerHTML=(messages||[]).map(function(m){return'<div class="live-chat-message"><strong>'+esc(m.name)+'</strong><span>'+esc(m.message)+'</span></div>';}).join("")||"<div class='live-chat-empty'>Aucun message.</div>";if(atBottom)chat.scrollTop=chat.scrollHeight;}}
 function sendChat(){var id=currentSession();if(!id)return alert("Choisissez un Live.");var account=cachedAccount();if(!clientToken()||!account)return openClientAuth();var message=document.getElementById("claMessage").value;if(!message.trim())return;post("/api/live/actions/"+encodeURIComponent(id)+"/chat",{message:message}).then(function(){document.getElementById("claMessage").value="";refresh();}).catch(function(e){if(e.code==="CLIENT_LOGIN_REQUIRED"||e.status===401)return openClientAuth();if(e.code==="CLIENT_PSEUDO_REQUIRED")return openClientAuth(true);alert(e.message);});}
 function refreshAudience(id){return get("/api/live/webrtc/status/"+encodeURIComponent(id)).then(function(d){var n=document.getElementById("cardoriaLiveViewers");if(n)n.textContent=Number(d.viewers||0)+" spectateur"+(Number(d.viewers||0)>1?"s":"");}).catch(function(){});}
-function refresh(){var id=currentSession();ensure();if(!id){renderAction(null);renderChat([]);return;}active=id;Promise.all([get("/api/live/actions/"+encodeURIComponent(id)+"/state"),get("/api/live/actions/"+encodeURIComponent(id)+"/chat"),get("/api/live/sessions/"+encodeURIComponent(id)),refreshAudience(id)]).then(function(r){var state=r[0].state||{},session=r[2].session||{};renderAction(state);renderChat(r[1].messages||[]);updateSaleButtons(state,id,session);}).catch(function(e){var s=document.getElementById("claState");if(s)s.textContent=e.message;});}
+function refresh(){var id=currentSession();ensure();if(!id){renderAction(null);renderChat([]);return;}active=id;var winsRequest=clientToken()?get("/api/live/actions/"+encodeURIComponent(id)+"/my-wins").catch(function(){return{wins:[]};}):Promise.resolve({wins:[]});Promise.all([get("/api/live/actions/"+encodeURIComponent(id)+"/state"),get("/api/live/actions/"+encodeURIComponent(id)+"/chat"),get("/api/live/sessions/"+encodeURIComponent(id)),refreshAudience(id),winsRequest]).then(function(r){var state=r[0].state||{},session=r[2].session||{},wins=r[4].wins||[];renderAction(state);renderBuyerPayments(state,session,wins);renderChat(r[1].messages||[]);updateSaleButtons(state,id,session);}).catch(function(e){var s=document.getElementById("claState");if(s)s.textContent=e.message;});}
 ensure();ensureChatDock();refresh();timer=setInterval(refresh,3000);window.addEventListener("storage",refreshChatIdentity);window.addEventListener("focus",refreshChatIdentity);window.addEventListener("beforeunload",function(){if(timer)clearInterval(timer);});})();

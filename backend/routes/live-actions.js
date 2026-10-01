@@ -2,7 +2,7 @@ import { Router } from "express";
 import { assertSellerSession } from "../lib/marketplace/v1/security.js";
 import { validateSession } from "../lib/auth/session.js";
 import { followSeller, isFollowingSeller } from "../lib/live/follows.js";
-import { getLiveSession } from "../lib/live/sessions.js";
+import { getLiveSession, listLiveCheckouts } from "../lib/live/sessions.js";
 import { resolveEnergyItems, searchEnergyCatalog } from "../lib/live/energy-catalog.js";
 import { classifySealedPackaging, inferSealedUnits, listSealedProducts } from "../lib/engine/sealed-products.js";
 import { addLiveChatMessage, drawGiveaway, enterGiveaway, getLiveActionState, listLiveChat, pinLiveProduct, placeAuctionBid, prepareLiveGame, launchPreparedGame, setLiveProductEnergyTypes, startAuction, startBreak, startEnergyGame, startFlashSale, startGiveaway, startBuyerGiveaway, startNextBoosterAuction, stopAuction, unpinLiveProduct } from "../lib/live/actions.js";
@@ -25,6 +25,13 @@ function publicState(state){
   delete copy.giveawayAwards;
   if(copy.auction){copy.auction.bids=(copy.auction.bids||[]).map(({bidderEmail,...bid})=>bid);if(copy.auction.highestBidder)delete copy.auction.highestBidder.email;}
   if(copy.giveaway){copy.giveaway.entries=(copy.giveaway.entries||[]).map(({email,...entry})=>entry);if(copy.giveaway.winner)delete copy.giveaway.winner.email;}
+  if(copy.break&&Array.isArray(copy.break.completedBoosters)){
+    copy.break.completedBoosters=copy.break.completedBoosters.map((item)=>{
+      const next={...item,winner:item.winner?{...item.winner}:null};
+      if(next.winner)delete next.winner.email;
+      return next;
+    });
+  }
   return copy;
 }
 function requireBidderEmail(body){const email=String(body?.bidderEmail||"").trim().toLowerCase();if(!/^\S+@\S+\.\S+$/.test(email))throw Object.assign(new Error("Email acheteur obligatoire pour pouvoir payer l'enchere gagnee."),{status:400});return{...body,bidderEmail:email};}
@@ -50,6 +57,37 @@ router.get("/energy-catalog/resolve",async(req,res)=>{try{const items=String(req
 router.get("/:liveId/state",(req,res)=>{try{assertPublicLive(req.params.liveId);res.json({ok:true,state:publicState(getLiveActionState(req.params.liveId))});}catch(e){fail(res,e,404);}});
 router.get("/seller/:liveId/state",(req,res)=>{try{assertSellerOwner(req,req.params.liveId);res.json({ok:true,state:getLiveActionState(req.params.liveId)});}catch(e){fail(res,e,401);}});
 router.get("/:liveId/chat",(req,res)=>{try{assertPublicLive(req.params.liveId);res.json({ok:true,messages:listLiveChat(req.params.liveId,req.query.limit)});}catch(e){fail(res,e,404);}});
+router.get("/:liveId/my-wins",(req,res)=>{try{
+  assertPublicLive(req.params.liveId);
+  const user=clientActor(req),email=String(user.email||"").trim().toLowerCase(),state=getLiveActionState(req.params.liveId);
+  const wins=[];
+  const add=(item)=>{
+    if(!item||String(item.winner?.email||"").trim().toLowerCase()!==email)return;
+    if(wins.some((x)=>x.actionId===String(item.auctionId||item.id||"")))return;
+    const actionId=String(item.auctionId||item.id||"");
+    const checkout=listLiveCheckouts({liveId:req.params.liveId})
+      .filter((c)=>String(c.actionId||"")===actionId&&(String(c.customerId||"")===String(user.id)||String(c.customerEmail||"").trim().toLowerCase()===email))
+      .sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")))[0]||null;
+    wins.push({
+      actionId,
+      productId:String(item.productId||state.break?.productId||""),
+      label:String(item.productName||item.saleLabel||(`#${item.boosterNumber||""} Booster ${state.break?.productName||""}`)).trim(),
+      spotLabel:String(item.boosterLabel||item.spotLabel||""),
+      boosterNumber:Number(item.boosterNumber||0),
+      amount:Number(item.amount??item.currentPrice??0),
+      checkoutStatus:String(checkout?.status||"unpaid"),
+      paymentUrl:String(checkout?.url||"")
+    });
+  };
+  for(const item of state.break?.completedBoosters||[])add(item);
+  if(state.auction?.status==="ended"&&state.auction.highestBidder)add({
+    auctionId:state.auction.id,productId:state.auction.productId,productName:state.auction.productName,
+    boosterNumber:state.auction.boosterNumber,boosterLabel:state.auction.spotLabel,
+    winner:state.auction.highestBidder,amount:state.auction.currentPrice
+  });
+  wins.sort((a,b)=>(a.boosterNumber||9999)-(b.boosterNumber||9999));
+  res.json({ok:true,wins});
+}catch(e){fail(res,e,401);}});
 router.post("/:liveId/chat",(req,res)=>{try{rateLimit(req,"chat",5,10_000);assertPublicLive(req.params.liveId);const user=clientActor(req),name=String(user.name||"").trim();if(!name)throw Object.assign(new Error("Ajoutez un pseudo dans votre compte Cardoria avant d’écrire dans le chat."),{status:409,code:"CLIENT_PSEUDO_REQUIRED"});res.json({ok:true,message:addLiveChatMessage(req.params.liveId,{name,message:req.body?.message})});}catch(e){fail(res,e,401);}});
 router.post("/:liveId/bids",(req,res)=>{try{rateLimit(req,"bid",20,10_000);const result=placeAuctionBid(req.params.liveId,requireBidderEmail(req.body||{}));res.json({ok:true,auction:publicState({auction:result.auction}).auction,bid:{id:result.bid.id,amount:result.bid.amount,bidderName:result.bid.bidderName,createdAt:result.bid.createdAt}});}catch(e){fail(res,e);}});
 router.get("/:liveId/follow",(req,res)=>{try{const live=liveSeller(req.params.liveId),user=clientActor(req);res.json({ok:true,sellerId:live.ownerId,following:isFollowingSeller({sellerId:live.ownerId,userId:user.id})});}catch(e){fail(res,e,401);}});

@@ -30,17 +30,34 @@ function requireLive(liveId){const live=requireSession(liveId);if(live.status!==
 function productFor(live,productId){const product=(live.products||[]).find(p=>p.id===String(productId||""));if(!product)throw Object.assign(new Error("Produit Live introuvable."),{status:404});return product;}
 function publicEmail(value){const e=clean(value,254).toLowerCase();if(e&&!/^\S+@\S+\.\S+$/.test(e))throw Object.assign(new Error("Adresse email invalide."),{status:400});return e;}
 function closeExpired(state){const now=Date.now();if(state?.auction?.status==="running"&&new Date(state.auction.endsAt).getTime()<=now){state.auction.status="ended";state.auction.endedAt=state.auction.endedAt||nowIso();}if(state?.flash?.status==="running"&&new Date(state.flash.endsAt).getTime()<=now){state.flash.status="ended";state.flash.endedAt=state.flash.endedAt||nowIso();}if(state?.giveaway?.status==="running"&&new Date(state.giveaway.endsAt).getTime()<=now)state.giveaway.status="ready_to_draw";}
+function archiveEndedBoosterAuction(state){
+  const br=state?.break,a=state?.auction;
+  if(!br?.auctionSequence||!a||a.status!=="ended"||!a.boosterNumber||!a.highestBidder)return false;
+  br.completedBoosters=Array.isArray(br.completedBoosters)?br.completedBoosters:[];
+  if(br.completedBoosters.some(x=>x.auctionId===a.id))return false;
+  br.completedBoosters.push({
+    boosterNumber:a.boosterNumber,
+    boosterLabel:a.spotLabel||`Booster ${a.boosterNumber}`,
+    productId:a.productId,
+    productName:a.productName,
+    auctionId:a.id,
+    winner:structuredClone(a.highestBidder),
+    amount:a.currentPrice,
+    endedAt:a.endedAt||nowIso()
+  });
+  return true;
+}
 function refreshBreakProgress(liveId,state){if(!state?.break)return;if(state.break.breakType==="energy_game"){const active=new Set(["planned","creating","pending","paid","completed","authorized","authorised","reconciliation_required"]),used=new Set(listLiveCheckouts({liveId}).filter(c=>c.actionId===state.break.id&&active.has(String(c.status||"").toLowerCase())&&c.spotLabel).map(c=>String(c.spotLabel)));state.break.soldSpots=Math.min(Number(state.break.spots||0),used.size);state.break.remainingSpots=Math.max(0,Number(state.break.spots||0)-state.break.soldSpots);if(state.break.remainingSpots===0&&state.break.status==="running"){state.break.status="sold_out";state.break.endedAt=nowIso();}return;}const live=getLiveSession(liveId),product=(live?.products||[]).find(p=>p.id===state.break.productId);if(!product)return;const start=Number(state.break.stockAtStart??state.break.spots),remainingStock=Math.max(0,Number(product.stock||0)),sold=Math.max(0,Math.min(Number(state.break.spots||0),start-remainingStock));state.break.soldSpots=sold;state.break.remainingSpots=Math.max(0,Number(state.break.spots||0)-sold);if(state.break.remainingSpots===0&&state.break.status==="running"){state.break.status="sold_out";state.break.endedAt=nowIso();}}
 export function __setLiveActionsStoreForTests(store){testStore=store||emptyStore();}
 export function __resetLiveActionsStoreForTests(){testStore=null;}
-export function getLiveActionState(liveId){const{d,state}=stateFor(String(liveId||""),true);closeExpired(state);refreshBreakProgress(liveId,state);state.updatedAt=nowIso();save(d);return structuredClone(state);}
+export function getLiveActionState(liveId){const{d,state}=stateFor(String(liveId||""),true);closeExpired(state);archiveEndedBoosterAuction(state);refreshBreakProgress(liveId,state);state.updatedAt=nowIso();save(d);return structuredClone(state);}
 export function getLiveGiveawayAwards(liveId,options={}){requireSession(liveId);const{d,state}=stateFor(String(liveId),true);save(d);return giveawayAwardsFromState(state,options);}
 export function setLiveProductEnergyTypes(liveId,productId,energyTypes){const live=requireSession(liveId),product=productFor(live,productId),types=normalizeEnergyTypes(energyTypes);if(!types.length)throw Object.assign(new Error("Sélectionnez au moins une énergie présente dans cet item."),{status:400});const{d,state}=stateFor(live.id,true);state.energyTypesByProduct[product.id]=types;state.updatedAt=nowIso();save(d);return{productId:product.id,energyTypes:[...types]};}
 export function pinLiveProduct(liveId,productId){const live=requireLive(liveId);productFor(live,productId);const{d,state}=stateFor(live.id,true);state.pinnedProductId=String(productId);state.updatedAt=nowIso();save(d);return structuredClone(state);}
 export function unpinLiveProduct(liveId){requireLive(liveId);const{d,state}=stateFor(liveId,true);state.pinnedProductId="";state.updatedAt=nowIso();save(d);return structuredClone(state);}
 export function startAuction(liveId,{productId,startPrice,durationSeconds=30,mode="standard",displayName="",boosterNumber=0,spotLabel=""}={}){const live=requireLive(liveId),product=productFor(live,productId),start=money(startPrice||product.price);if(start<=0)throw Object.assign(new Error("Prix de depart invalide."),{status:400});const duration=Math.max(5,Math.min(3600,Math.trunc(Number(durationSeconds)||30))),auctionMode=String(mode).toLowerCase()==="sudden_death"?"sudden_death":"standard",{d,state}=stateFor(live.id,true);if(state.auction?.status==="running")throw Object.assign(new Error("Une enchere est deja en cours."),{status:409});const started=Date.now();state.pinnedProductId=product.id;state.auction={id:"AUC-"+crypto.randomUUID(),productId:product.id,productName:clean(displayName,180)||product.name,baseProductName:product.name,boosterNumber:Math.max(0,Math.trunc(Number(boosterNumber)||0)),spotLabel:clean(spotLabel,80),status:"running",mode:auctionMode,startPrice:start,currentPrice:start,highestBidder:null,bids:[],startedAt:new Date(started).toISOString(),endsAt:new Date(started+duration*1000).toISOString(),durationSeconds:duration};state.updatedAt=nowIso();save(d);return structuredClone(state.auction);}
 export function placeAuctionBid(liveId,{amount,bidderName,bidderEmail}={}){requireLive(liveId);const{d,state}=stateFor(liveId,true);closeExpired(state);const a=state.auction;if(!a||a.status!=="running")throw Object.assign(new Error("Aucune enchere active."),{status:409});const bid=money(amount),minimum=a.bids.length?money(a.currentPrice+0.5):a.startPrice;if(bid<minimum)throw Object.assign(new Error(`Enchere minimale : ${minimum.toFixed(2)} EUR.`),{status:409,minimum});const name=clean(bidderName,80)||"Acheteur",email=publicEmail(bidderEmail),entry={id:"BID-"+crypto.randomUUID(),amount:bid,bidderName:name,bidderEmail:email,createdAt:nowIso()};a.bids.push(entry);a.currentPrice=bid;a.highestBidder={name,email};if(a.mode==="standard"){const remaining=new Date(a.endsAt).getTime()-Date.now();if(remaining<=10_000)a.endsAt=new Date(Date.now()+10_000).toISOString();}state.updatedAt=nowIso();save(d);return{auction:structuredClone(a),bid:entry};}
-export function stopAuction(liveId){requireLive(liveId);const{d,state}=stateFor(liveId,true);if(!state.auction)throw Object.assign(new Error("Aucune enchere."),{status:404});closeExpired(state);if(state.auction.status==="running")state.auction.status="ended";state.auction.endedAt=state.auction.endedAt||nowIso();state.updatedAt=nowIso();save(d);return structuredClone(state.auction);}
+export function stopAuction(liveId){requireLive(liveId);const{d,state}=stateFor(liveId,true);if(!state.auction)throw Object.assign(new Error("Aucune enchere."),{status:404});closeExpired(state);if(state.auction.status==="running")state.auction.status="ended";state.auction.endedAt=state.auction.endedAt||nowIso();archiveEndedBoosterAuction(state);state.updatedAt=nowIso();save(d);return structuredClone(state.auction);}
 export function startFlashSale(liveId,{productId,price,durationSeconds=60}={}){const live=requireLive(liveId),product=productFor(live,productId),flashPrice=money(price||product.price);if(flashPrice<=0)throw Object.assign(new Error("Prix flash invalide."),{status:400});const duration=Math.max(5,Math.min(3600,Math.trunc(Number(durationSeconds)||60))),started=Date.now(),{d,state}=stateFor(live.id,true);state.pinnedProductId=product.id;state.flash={id:"FLASH-"+crypto.randomUUID(),productId:product.id,productName:product.name,price:flashPrice,status:"running",startedAt:new Date(started).toISOString(),endsAt:new Date(started+duration*1000).toISOString()};state.updatedAt=nowIso();save(d);return structuredClone(state.flash);}
 export function startGiveaway(liveId,{productId,durationSeconds=60,eligibility="public"}={}){
   const live=requireLive(liveId),product=productFor(live,productId);
@@ -100,21 +117,10 @@ export function startNextBoosterAuction(liveId,{startPrice,durationSeconds=30}={
   closeExpired(state);
   save(d);
   if(state.auction?.status==="running")throw Object.assign(new Error("Une enchère est déjà en cours."),{status:409});
-  if(state.auction?.status==="ended"&&state.auction.boosterNumber){
-    const already=(br.completedBoosters||[]).some(x=>x.auctionId===state.auction.id);
-    if(!already&&state.auction.highestBidder){
-      br.completedBoosters=Array.isArray(br.completedBoosters)?br.completedBoosters:[];
-      br.completedBoosters.push({
-        boosterNumber:state.auction.boosterNumber,
-        boosterLabel:state.auction.spotLabel||`Booster ${state.auction.boosterNumber}`,
-        auctionId:state.auction.id,
-        winner:structuredClone(state.auction.highestBidder),
-        amount:state.auction.currentPrice,
-        endedAt:state.auction.endedAt||nowIso()
-      });
-      br.currentBoosterIndex=Math.min(br.boosterLabels.length,Number(br.currentBoosterIndex||0)+1);
-      br.currentBoosterLabel=br.boosterLabels[br.currentBoosterIndex]||"";
-    }
+  if(state.auction?.status==="ended"&&state.auction.boosterNumber&&state.auction.highestBidder){
+    archiveEndedBoosterAuction(state);
+    br.currentBoosterIndex=Math.min(br.boosterLabels.length,Math.max(Number(br.currentBoosterIndex||0),Number(state.auction.boosterNumber||0)));
+    br.currentBoosterLabel=br.boosterLabels[br.currentBoosterIndex]||"";
   }
   const index=Math.max(0,Number(br.currentBoosterIndex||0));
   if(index>=br.boosterLabels.length)throw Object.assign(new Error("Tous les boosters de ce jeu ont été traités."),{status:409,code:"BOOSTER_SEQUENCE_COMPLETE"});
