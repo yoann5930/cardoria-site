@@ -42,7 +42,7 @@ export function checkoutInputForBuyer(user, body = {}) {
   // seller identities, payer flags and payment statuses remain server-owned.
   return {
     liveId: body.liveId, productId: body.productId, qty: body.qty,
-    spotLabel: body.spotLabel, checkoutRequestId: body.checkoutRequestId,
+    spotLabel: body.spotLabel, actionId: body.actionId, checkoutRequestId: body.checkoutRequestId,
     customerId: String(user.id), customerEmail: emailKey(user.email),
     customerName: String(user.name || "Client Live").trim().slice(0, 120),
     shippingAddress: body.shippingAddress, servicePoint: body.servicePoint,
