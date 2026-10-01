@@ -48,10 +48,15 @@
     };
   }
 
+  function needsLiveProfessionalUpgrade(seller) {
+    return seller.sellerType !== "professional" || !seller.professionalVerified;
+  }
   function renderPayPalActivation(seller) {
-    root.innerHTML = '<section class="mk-seller-onboarding"><span class="mk-eyebrow">PAIEMENT VENDEUR</span><h1>Connecter PayPal</h1><p>Bonjour <strong>' + esc(seller.displayName) + '</strong>. La Marketplace utilise le même compte PayPal Live. Le Studio Live reste accessible sans PayPal.</p><div class="mk-paypal-status"><strong>Statut PayPal</strong><span>Connexion PayPal requise</span></div><div class="mk-actions"><button class="mk-btn mk-btn-primary" type="button" id="paypalOnboardBtn">Connecter PayPal</button><button class="mk-btn mk-btn-secondary" type="button" id="paypalRefreshBtn">Vérifier mon activation</button></div><p class="mk-paypal-note">Le retour PayPal revient sur Cardoria. Le SIRET n’est demandé que pour un Liveur Pro.</p><div id="sellResult"></div></section>';
+    root.innerHTML = '<section class="mk-seller-onboarding"><span class="mk-eyebrow">PAIEMENT VENDEUR</span><h1>Connecter PayPal</h1><p>Bonjour <strong>' + esc(seller.displayName) + '</strong>. La Marketplace utilise le même compte PayPal Live. PayPal n’est pas nécessaire pour accéder au Studio Live.</p><div class="mk-paypal-status"><strong>Statut PayPal</strong><span>Connexion PayPal requise</span></div><div class="mk-actions"><button class="mk-btn mk-btn-primary" type="button" id="paypalOnboardBtn">Connecter PayPal</button><button class="mk-btn mk-btn-secondary" type="button" id="paypalRefreshBtn">Vérifier mon activation</button>' + (needsLiveProfessionalUpgrade(seller) ? '<button class="mk-btn mk-btn-secondary" type="button" id="liveUpgradeBtn">Vérifier le SIRET Liveur Pro</button>' : '') + '</div><p class="mk-paypal-note">Le retour PayPal revient sur Cardoria. Le SIRET n’est demandé que pour un Liveur Pro.</p><div id="sellResult"></div></section>';
     document.getElementById("paypalOnboardBtn").onclick = function () { api("/v1/paypal/sellers/" + encodeURIComponent(seller.id) + "/onboard", { method: "POST", body: "{}" }).then(function (d) { if (!d.url) throw new Error("Lien PayPal indisponible."); if (config && config.environment === "live" && /sandbox\.paypal\.com/i.test(d.url)) throw new Error("Lien PayPal Sandbox refusé en production."); location.href = d.url; }).catch(function (e) { showResult(e.message, true); }); };
     document.getElementById("paypalRefreshBtn").onclick = function () { syncSellerStatus(seller); };
+    var upgrade = document.getElementById("liveUpgradeBtn");
+    if (upgrade) upgrade.onclick = function () { renderProfessionalVerification(seller); };
   }
 
   function renderListingForm(seller) {
