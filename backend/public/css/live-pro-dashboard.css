@@ -168,3 +168,84 @@ body.live-pro-page{
 .live-preflight-status{margin:10px 0 0;font-size:12px;font-weight:800}
 @media(max-width:980px){.live-preflight-grid{grid-template-columns:1fr}.live-sender-form{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.live-sender-form{grid-template-columns:1fr}}
+
+/* Unified Cardoria button palette */
+.live-pro-page{
+  --cardoria-black:#080a0d;
+  --cardoria-black-soft:#171a1f;
+  --cardoria-gold:#c7a33c;
+  --cardoria-gold-strong:#d7b84f;
+  --cardoria-gold-light:#f0d16a;
+  --cardoria-cream:#fff8df;
+  --cardoria-danger:#c71f1f;
+}
+.live-pro-page button,
+.live-pro-page .live-pro-live-actions button,
+.live-pro-page .live-pro-shortcuts button,
+.live-pro-page .live-studio-quick button,
+.live-pro-page .live-studio-game-picker button,
+.live-pro-page .live-studio-file button,
+.live-pro-page .live-sender-form button{
+  background:linear-gradient(145deg,var(--cardoria-black-soft),var(--cardoria-black));
+  color:var(--cardoria-gold-light)!important;
+  border:1px solid rgba(199,163,60,.58)!important;
+  box-shadow:none;
+}
+.live-pro-page button:hover,
+.live-pro-page .live-pro-live-actions button:hover,
+.live-pro-page .live-pro-shortcuts button:hover,
+.live-pro-page .live-studio-quick button:hover,
+.live-pro-page .live-studio-game-picker button:hover,
+.live-pro-page .live-studio-file button:hover,
+.live-pro-page .live-sender-form button:hover{
+  background:linear-gradient(145deg,#242017,#11100c);
+  border-color:var(--cardoria-gold-strong)!important;
+  color:#ffe89a!important;
+}
+.live-pro-page button.is-primary,
+.live-pro-page .live-pro-action-primary,
+.live-pro-page .live-studio-btn--go,
+.live-pro-page #lasLaunchPreset,
+.live-pro-page #lasSheetGo,
+.live-pro-page #lasNext{
+  background:linear-gradient(145deg,var(--cardoria-gold-strong),#a97f18)!important;
+  color:var(--cardoria-black)!important;
+  border-color:#9b761d!important;
+}
+.live-pro-page button.is-primary:hover,
+.live-pro-page .live-pro-action-primary:hover,
+.live-pro-page .live-studio-btn--go:hover,
+.live-pro-page #lasLaunchPreset:hover,
+.live-pro-page #lasSheetGo:hover,
+.live-pro-page #lasNext:hover{
+  background:linear-gradient(145deg,#e5c65a,#b98f22)!important;
+  color:#050505!important;
+}
+.live-pro-page .live-studio-btn--pause{
+  background:var(--cardoria-cream)!important;
+  color:#735711!important;
+  border-color:#d7bd70!important;
+}
+.live-pro-page .live-studio-btn--end,
+.live-pro-page .live-action-danger{
+  background:var(--cardoria-danger)!important;
+  color:#fff!important;
+  border-color:#9f1717!important;
+}
+.live-pro-page .live-game-launch-arrow,
+.live-pro-page .live-booster-arrow{
+  background:var(--cardoria-black)!important;
+  color:var(--cardoria-gold-light)!important;
+  border:1px solid var(--cardoria-gold)!important;
+}
+.live-pro-page .live-game-launch-arrow:hover,
+.live-pro-page .live-booster-arrow:hover{
+  background:#1a1710!important;
+  color:#ffe99a!important;
+}
+.live-pro-page button:disabled{
+  background:#e9e4d5!important;
+  color:#9b927d!important;
+  border-color:#d8d0bd!important;
+  opacity:.62;
+}
