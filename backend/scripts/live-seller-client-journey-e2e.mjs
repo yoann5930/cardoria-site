@@ -114,7 +114,8 @@ assert(String(group.relay?.id)==="12345","Shipment relay is missing");
 
 const stopped=await auth(sellerAccount.token,`/api/live/seller/sessions/${liveId}/stop`,{method:"POST",body:"{}"});
 assert(stopped.response.status===200&&stopped.body.session?.status==="ended","Seller Live did not stop");
-assert(stopped.body.shipping?.errors?.some(e=>e.code==="LIVE_LABELS_NOT_ACTIVATED"),"Test environment unexpectedly attempted a real label purchase");
+assert(Array.isArray(stopped.body.shipping?.created)&&stopped.body.shipping.created.length===0,"Preflight must never create a real shipment label");
+assert((stopped.body.shipping?.errors||[]).some(e=>["LIVE_LABELS_NOT_ACTIVATED","MONDIAL_RELAY_LABELS_NOT_ACTIVATED"].includes(e.code)),"Preflight must stop before any real carrier purchase");
 const ended=await json(`/api/live/sessions/${liveId}`);
 assert(ended.response.status===404,"Ended Live is still public");
 console.log(JSON.stringify({
