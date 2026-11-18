@@ -1,5 +1,5 @@
 /**
- * Routage paiement Cardoria — déterminé uniquement côté serveur.
+ * Routage paiement Cardiashop — déterminé uniquement côté serveur.
  * Le fournisseur éventuel envoyé par le client n'est jamais honoré.
  */
 export const PAYMENT_MATRIX = Object.freeze({
@@ -29,7 +29,7 @@ export function resolvePaymentRoute({ channel, ownerRole } = {}) {
   }
   if (rawChannel === "live_seller") key = "live_seller";
   const provider = PAYMENT_MATRIX[key];
-  if (!provider) throw Object.assign(new Error("Canal de paiement Cardoria inconnu."), { status: 400 });
+  if (!provider) throw Object.assign(new Error("Canal de paiement Cardiashop inconnu."), { status: 400 });
   return { channel: key, provider };
 }
 
@@ -38,7 +38,7 @@ export function assertSaleProvider({ channel, ownerRole, requestedProvider } = {
   const requested = normalizeProvider(requestedProvider);
   if (!requested) return { ...resolved, requestedProvider: "" };
   if (RETIRED_PROVIDERS.includes(requested)) {
-    const error = new Error("Revolut n'est plus utilisé sur Cardoria.");
+    const error = new Error("Revolut n'est plus utilisé sur Cardiashop.");
     error.status = 410;
     error.provider = resolved.provider;
     error.expectedProvider = resolved.provider;

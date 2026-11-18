@@ -1,4 +1,4 @@
-/* Cardoria — ajustements finaux pour coller a la maquette de reference. */
+/* Cardiashop — ajustements finaux pour coller a la maquette de reference. */
 body.home-premium{
   font-family:"Montserrat",Inter,Arial,sans-serif!important;
   background:#030609!important;
@@ -164,7 +164,7 @@ body.home-premium{
 
 .premium-footer{background:#030609!important}
 
-/* Ecran de demarrage : même typographie que la signature Cardoria. */
+/* Ecran de demarrage : même typographie que la signature Cardiashop. */
 .cardoria-loader__wordmark{
   font-family:"Cinzel",Georgia,serif!important;
   font-size:clamp(2rem,4.2vw,3rem)!important;

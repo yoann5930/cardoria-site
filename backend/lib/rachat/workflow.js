@@ -134,7 +134,7 @@ function assertStatus(proposal, allowed) {
 }
 
 export function createRachatProposal({ estimate, customerName, customerEmail, cardName, cardGame, cardId, condition, message } = {}) {
-  if (!estimate) throw Object.assign(new Error("Estimation Cardoria vérifiée requise."), { status: 403 });
+  if (!estimate) throw Object.assign(new Error("Estimation Cardiashop vérifiée requise."), { status: 403 });
   const email = clean(estimate.customerEmail || customerEmail, 200).toLowerCase();
   const name = clean(estimate.cardName || cardName, 250);
   if (!email || !name) throw Object.assign(new Error("Email et carte requis."), { status: 400 });
@@ -156,7 +156,7 @@ export function createRachatProposal({ estimate, customerName, customerEmail, ca
     detection: estimate.detection || null,
     estimationResult: estimate.result || "",
     message: clean(message, 1200),
-    history: [{ at: createdAt, status: "Proposition reçue", user: "client", note: "Proposition issue d’une estimation Cardoria vérifiée." }],
+    history: [{ at: createdAt, status: "Proposition reçue", user: "client", note: "Proposition issue d’une estimation Cardiashop vérifiée." }],
     offer: null,
     customerDecision: null,
     received: null,
@@ -199,13 +199,13 @@ export async function sendRachatOffer(id, { amount, note = "", expiresDays = DEC
   const emailSent = await sendEmail({
     kind: "rachat_offer",
     to: proposal.customerEmail,
-    subject: `[Cardoria] Offre de rachat — ${proposal.cardName}`,
+    subject: `[Cardiashop] Offre de rachat — ${proposal.cardName}`,
     text: [
       `Bonjour${proposal.customerName ? ` ${proposal.customerName}` : ""},`,
       "",
-      `Cardoria vous propose ${offerAmount.toFixed(2).replace(".", ",")} € pour votre carte ${proposal.cardName}.`,
+      `Cardiashop vous propose ${offerAmount.toFixed(2).replace(".", ",")} € pour votre carte ${proposal.cardName}.`,
       proposal.condition ? `État indiqué : ${proposal.condition}` : "",
-      note ? `Message Cardoria : ${clean(note, 1200)}` : "",
+      note ? `Message Cardiashop : ${clean(note, 1200)}` : "",
       "",
       `Offre valable jusqu’au ${new Date(expiresAt).toLocaleDateString("fr-FR")}.`
     ].filter(Boolean).join("\n"),
@@ -378,7 +378,7 @@ export async function markRachatPaid(id, { amount, method = "", reference = "", 
   const emailed = await sendEmail({
     kind: "rachat_paid",
     to: proposal.customerEmail,
-    subject: `[Cardoria] Rachat finalisé — ${proposal.cardName}`,
+    subject: `[Cardiashop] Rachat finalisé — ${proposal.cardName}`,
     text: [
       `Bonjour${proposal.customerName ? ` ${proposal.customerName}` : ""},`,
       "",

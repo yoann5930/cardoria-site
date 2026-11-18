@@ -2,8 +2,8 @@ import fs from 'node:fs/promises';
 
 // Public GET requests only: no credentials, administration endpoints or mutations.
 // These checks do not query Search Console or prove Google indexing.
-const BASE = 'https://www.cardoriashop.fr';
-const ALLOWED = new Set(['www.cardoriashop.fr', 'cardoriashop.fr']);
+const BASE = 'https://www.cardiashop.fr';
+const ALLOWED = new Set(['www.cardiashop.fr', 'cardiashop.fr', 'www.cardoriashop.fr', 'cardoriashop.fr']);
 const report = { checkedAt: new Date().toISOString(), checks: [], warnings: [], indexingVerified: false };
 
 function allowedUrl(value) {

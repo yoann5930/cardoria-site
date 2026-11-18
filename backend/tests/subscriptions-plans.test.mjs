@@ -25,7 +25,7 @@ test("canonical plan prices and commissions are exact", () => {
   assert.equal(getLiveCommissionAmount("elite", 100), 3);
 });
 
-test("Starter has no Cardoria-paid Live shipping, waiver, priority or badge", () => {
+test("Starter has no Cardiashop-paid Live shipping, waiver, priority or badge", () => {
   const plan = getSellerPlan("starter");
   assert.equal(plan.liveCardoriaShippingBuyerLimit, 0);
   assert.equal(plan.marketplaceFreeCapturedSalesPerMonth, 0);

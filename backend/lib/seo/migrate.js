@@ -1,5 +1,5 @@
 /**
- * Schéma SEO Cardoria — blog administrable et pages générées.
+ * Schéma SEO Cardiashop — blog administrable et pages générées.
  */
 import { getDb } from "../engine/database.js";
 
@@ -17,7 +17,7 @@ export function migrateSeo() {
       cover_image TEXT DEFAULT '',
       tags TEXT DEFAULT '[]',
       published INTEGER DEFAULT 1,
-      author TEXT DEFAULT 'Cardoria',
+      author TEXT DEFAULT 'Cardiashop',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );

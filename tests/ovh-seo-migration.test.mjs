@@ -7,7 +7,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 test("production sitemap generators default to the canonical OVH domain", () => {
   for (const path of ["scripts/generate-sitemap.mjs", "scripts/generate-launch-sitemap.mjs"]) {
     const source = read(path);
-    assert.match(source, /https:\/\/www\.cardoriashop\.fr/);
+    assert.match(source, /https:\/\/www\.cardiashop\.fr/);
     assert.doesNotMatch(source, /onrender\.com|cardoria\.vercel\.app/);
   }
 });
@@ -18,11 +18,11 @@ test("public SEO files use canonical HTTPS URLs without a global crawl block", (
   const sitemapIndex = read("sitemap-index.xml");
 
   assert.doesNotMatch(robots, /^Disallow:\s*\/$/m);
-  assert.match(robots, /Sitemap: https:\/\/www\.cardoriashop\.fr\/sitemap\.xml/);
+  assert.match(robots, /Sitemap: https:\/\/www\.cardiashop\.fr\/sitemap\.xml/);
   const locations = [...`${sitemap}\n${sitemapIndex}`.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
   assert.ok(locations.length > 0);
   for (const location of locations) {
-    assert.match(location, /^https:\/\/www\.cardoriashop\.fr\//);
+    assert.match(location, /^https:\/\/www\.cardiashop\.fr\//);
     assert.doesNotMatch(location, /onrender\.com|vercel\.app/);
   }
 });

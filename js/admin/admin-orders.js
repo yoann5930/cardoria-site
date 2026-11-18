@@ -93,7 +93,7 @@
       var creationState = o.shipmentCreation && o.shipmentCreation.status || "";
       var creationCode = o.shipmentCreation && o.shipmentCreation.code || "";
       var waitNote = tracking
-        ? '<p class="small">Étiquette créée · numéro de suivi intégré à Cardoria.</p>'
+        ? '<p class="small">Étiquette créée · numéro de suivi intégré à Cardiashop.</p>'
         : creationState === "reconciliation_required"
           ? '<p class="small" style="color:#ffb36b">Expédition à rapprocher chez le transporteur avant tout nouvel essai.</p>'
           : '<p class="small">Le passage à <strong>En préparation</strong> crée automatiquement l’étiquette réelle et enregistre le numéro de suivi.</p>';

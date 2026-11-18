@@ -86,6 +86,8 @@ export function applySecurityMiddleware(app) {
   });
 
   const allowedOrigins = [...new Set([
+    "https://www.cardiashop.fr",
+    "https://cardiashop.fr",
     "https://www.cardoriashop.fr",
     "https://cardoriashop.fr",
     ...((process.env.CORS_ORIGINS || process.env.SITE_URL || "").split(",").map((s) => s.trim()).filter(Boolean))

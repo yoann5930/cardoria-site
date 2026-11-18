@@ -480,7 +480,7 @@
     card.dataset.livePlan = planId;
     if (selectable) card.dataset.liveOpen = "true";
     card.dataset.selected = selected ? "true" : "false";
-    const host = session.hostName || (session.ownerRole === "admin" ? "Cardoria" : "Liveur Cardoria");
+    const host = session.hostName || (session.ownerRole === "admin" ? "Cardiashop" : "Liveur Cardiashop");
     const live = session.status === "live";
     const statusLabel = live
       ? (session.streamPublished ? "En direct · vidéo en cours" : "En direct · en attente de diffusion")
@@ -491,7 +491,7 @@
     const viewers = live ? `${Math.max(0, Number(session.viewerCount || 0))} spectateur${Number(session.viewerCount || 0) > 1 ? "s" : ""}` : "";
     const planLabel = session.planLabel || (planId === "elite" ? "Elite" : planId === "pro" ? "Pro" : planId === "cardoria" ? "Officiel" : "Starter");
     const categoryLabel = CATEGORY_LABELS[session.category] || "";
-    card.innerHTML = `<span class="live-card-thumb"><img src="${esc(safeCover(session))}" alt=""></span><span><strong>${esc(session.title || "Live Cardoria")}</strong><small>${esc(host)}</small><small>${esc(statusLabel)} · ${esc(when)}${viewers ? " · " + esc(viewers) : ""}</small><span class="live-plan-badge ${PLAN_BADGE_CLASS[planId] || "is-starter"}">${esc(planLabel)}</span>${categoryLabel ? `<span class="live-cat-badge">${esc(categoryLabel)}</span>` : ""}</span><button type="button" class="live-card-cta${selectable ? "" : " is-soon"}">${selectable ? "Regarder" : "À venir"}</button>`;
+    card.innerHTML = `<span class="live-card-thumb"><img src="${esc(safeCover(session))}" alt=""></span><span><strong>${esc(session.title || "Live Cardiashop")}</strong><small>${esc(host)}</small><small>${esc(statusLabel)} · ${esc(when)}${viewers ? " · " + esc(viewers) : ""}</small><span class="live-plan-badge ${PLAN_BADGE_CLASS[planId] || "is-starter"}">${esc(planLabel)}</span>${categoryLabel ? `<span class="live-cat-badge">${esc(categoryLabel)}</span>` : ""}</span><button type="button" class="live-card-cta${selectable ? "" : " is-soon"}">${selectable ? "Regarder" : "À venir"}</button>`;
     if (selectable) {
       card.addEventListener("click", () => {
         location.assign(`/live.html?session=${encodeURIComponent(session.id)}`);
@@ -627,7 +627,7 @@
       const response = await fetch(`/api/live/sessions/${encodeURIComponent(focusLiveId)}`, { cache: "no-store" });
       const payload = await response.json().catch(() => ({}));
       if (response.ok && payload?.session?.id) {
-        if (payload.session.title) document.title = payload.session.title + " — Live Cardoria";
+        if (payload.session.title) document.title = payload.session.title + " — Live Cardiashop";
         await connectSession(payload.session.id);
         return;
       }

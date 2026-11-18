@@ -14,7 +14,7 @@ export function buildScannerPrompt(data, trainingExamples) {
   if (data.versoBase64) sides.push("verso");
   (data.extraImages || []).forEach((_, i) => sides.push("photo_" + (i + 1)));
 
-  return `Tu es le Scanner Intelligent Cardoria (mobile) pour cartes TCG.
+  return `Tu es le Scanner Intelligent Cardiashop (mobile) pour cartes TCG.
 Analyse les photos (${sides.join(", ") || "fournies"}) et identifie chaque carte visible.
 Licences : Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, Dragon Ball Super, Star Wars Unlimited, Sports.
 

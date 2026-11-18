@@ -1,5 +1,5 @@
 /**
- * Blog SEO administrable Cardoria.
+ * Blog SEO administrable Cardiashop.
  */
 import { getDb } from "../engine/database.js";
 
@@ -47,7 +47,7 @@ export function saveBlogPost(data) {
     id, slug, data.title, data.metaTitle || data.title, data.metaDescription || "",
     data.excerpt || "", data.contentHtml || "", data.coverImage || "",
     JSON.stringify(data.tags || []), data.published !== false ? 1 : 0,
-    data.author || "Cardoria", data.createdAt || now, now
+    data.author || "Cardiashop", data.createdAt || now, now
   );
   return getBlogPost(id);
 }
@@ -83,15 +83,15 @@ export function seedBlogIfEmpty() {
   saveBlogPost({
     title: "Comment estimer une carte Pokémon en 2026",
     metaDescription: "Guide complet pour estimer vos cartes Pokémon : état, rareté, édition et tendances du marché TCG en France.",
-    excerpt: "Découvrez la méthode Cardoria pour obtenir une estimation fiable de vos cartes Pokémon.",
-    contentHtml: "<h2>Pourquoi faire estimer sa carte ?</h2><p>Le marché Pokémon évolue rapidement. Une estimation professionnelle tient compte de l'état, de la rareté et des ventes récentes.</p><h2>Les critères clés</h2><ul><li>État (Mint à Poor)</li><li>Extension et numéro</li><li>Langue et version</li><li>Tendance du marché</li></ul><p><a href='/pages/estimation/'>Demander une estimation Cardoria</a></p>",
+    excerpt: "Découvrez la méthode Cardiashop pour obtenir une estimation fiable de vos cartes Pokémon.",
+    contentHtml: "<h2>Pourquoi faire estimer sa carte ?</h2><p>Le marché Pokémon évolue rapidement. Une estimation professionnelle tient compte de l'état, de la rareté et des ventes récentes.</p><h2>Les critères clés</h2><ul><li>État (Mint à Poor)</li><li>Extension et numéro</li><li>Langue et version</li><li>Tendance du marché</li></ul><p><a href='/pages/estimation/'>Demander une estimation Cardiashop</a></p>",
     tags: ["pokemon", "estimation", "guide"]
   });
   saveBlogPost({
     title: "Yu-Gi-Oh! : cartes qui montent en 2026",
-    metaDescription: "Analyse des tendances Yu-Gi-Oh! : cartes recherchées, prix et conseils pour vendre ou acheter sur Cardoria.",
+    metaDescription: "Analyse des tendances Yu-Gi-Oh! : cartes recherchées, prix et conseils pour vendre ou acheter sur Cardiashop.",
     excerpt: "Tour d'horizon du marché Yu-Gi-Oh! et des cartes en forte demande.",
-    contentHtml: "<h2>Marché Yu-Gi-Oh! en France</h2><p>Les cartes iconiques et les éditions limitées restent très recherchées par les collectionneurs.</p><h2>Conseils Cardoria</h2><p>Photographiez vos cartes sous bonne lumière et comparez les prix sur notre marketplace.</p>",
+    contentHtml: "<h2>Marché Yu-Gi-Oh! en France</h2><p>Les cartes iconiques et les éditions limitées restent très recherchées par les collectionneurs.</p><h2>Conseils Cardiashop</h2><p>Photographiez vos cartes sous bonne lumière et comparez les prix sur notre marketplace.</p>",
     tags: ["yugioh", "tendances"]
   });
 }

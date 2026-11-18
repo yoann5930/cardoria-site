@@ -34,7 +34,7 @@
       "<tr><th>Rachat conseillé</th><td>" + A.euro(a.buybackRecommended) + "</td></tr>" +
       "<tr><th>Revente conseillée</th><td>" + A.euro(a.resellRecommended) + "</td></tr>" +
       "<tr><th>Marge</th><td>" + (a.margin != null ? A.euro(a.margin) + " (" + (a.marginPercent || "—") + " %)" : "—") + "</td></tr>" +
-      "<tr><th>Score Cardoria</th><td>" + (a.cardoriaScore ?? "—") + " / 100</td></tr>" +
+      "<tr><th>Score Cardiashop</th><td>" + (a.cardoriaScore ?? "—") + " / 100</td></tr>" +
       "<tr><th>Grade probable</th><td>" + (a.probableGrade || "—") + "</td></tr>" +
       "</table>" +
       (a.adminRecommendation?.primary

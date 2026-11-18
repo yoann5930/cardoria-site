@@ -11,7 +11,7 @@ const sourceUrl = process.env.SEO_SITEMAP_SOURCE
   ? new URL(process.env.SEO_SITEMAP_SOURCE)
   : new URL('../backend/lib/seo/sitemap.js', import.meta.url);
 const source = await fs.readFile(sourceUrl, 'utf8');
-const SITE = 'https://www.cardoriashop.fr';
+const SITE = 'https://www.cardiashop.fr';
 
 async function load({ cards = [], posts = [], licenses = [], extensions = [], count = cards.length } = {}) {
   const calls = [];
@@ -229,7 +229,7 @@ test('known 404 licences, empty licences and incomplete extension paths are neve
   assert.match(xml, /^<\?xml version="1.0" encoding="UTF-8"\?>/);
   assert.match(xml, /<urlset xmlns="http:\/\/www.sitemaps.org\/schemas\/sitemap\/0.9">/);
   for (const loc of locs) {
-    assert.match(loc, /^https:\/\/www\.cardoriashop\.fr\//);
+    assert.match(loc, /^https:\/\/www\.cardiashop\.fr\//);
     assert.doesNotMatch(loc, /onrender\.com|vercel\.app|localhost|http:\/\//);
     const path = new URL(loc).pathname.replace(/\/$/, '');
     if (path.startsWith('/extensions/')) {
@@ -258,6 +258,6 @@ test('sitemap index stays valid XML on the canonical host', async () => {
   const locs = tags(xml, 'loc');
   assert.ok(locs.includes(`${SITE}/api/seo/core.xml`));
   assert.ok(locs.includes(`${SITE}/api/seo/cards-1.xml`));
-  for (const loc of locs) assert.match(loc, /^https:\/\/www\.cardoriashop\.fr\//);
+  for (const loc of locs) assert.match(loc, /^https:\/\/www\.cardiashop\.fr\//);
 });
 

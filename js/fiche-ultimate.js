@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardiashop.fr";
   var params = new URLSearchParams(location.search);
   var cardId = params.get("id");
   var root = document.getElementById("ultimatePage");
@@ -66,7 +66,7 @@
     if (!u) { root.innerHTML = "<p>Carte introuvable.</p>"; return; }
     var card = u.card;
     var alert = u.exceptionalAlert;
-    document.title = card.name + " — Cardoria Ultimate";
+    document.title = card.name + " — Cardiashop Ultimate";
     var classic = document.getElementById("classicLink");
     if (classic) classic.href = "carte.html?id=" + encodeURIComponent(card.id);
 
@@ -76,7 +76,7 @@
       (alert ? "<div class='ultimate-alert ult-alert--" + alert.severity + "'><strong>" + alert.title + "</strong><p>" + alert.message + "</p></div>" : "") +
       "<section class='ultimate-section'><h2>Comparateur de prix</h2>" +
       (u.priceComparison && u.priceComparison.globalIndex
-        ? "<p>Cardoria Global Index : <strong>" + u.priceComparison.globalIndex.score + "/100</strong> — " + (u.priceComparison.globalIndex.label || "") + "</p>"
+        ? "<p>Cardiashop Global Index : <strong>" + u.priceComparison.globalIndex.score + "/100</strong> — " + (u.priceComparison.globalIndex.label || "") + "</p>"
         : "") +
       renderPrices(u.priceComparison) + "</section>" +
       "<section class='ultimate-section'><h2>Conseiller investissement</h2>" + renderAdvice(u.investment) + "</section>" +

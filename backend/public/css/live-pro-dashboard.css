@@ -132,7 +132,7 @@ body.live-pro-page{
 .live-pro-page .live-booster-complete{margin-top:10px;padding:10px 12px;border-radius:12px;background:#eef8f0;color:#26713a;font-weight:900}
 
 
-/* Cardoria identity: clear operator UI with black/gold brand accents. */
+/* Cardiashop identity: clear operator UI with black/gold brand accents. */
 .live-pro-page{background:linear-gradient(180deg,#f4f4f5 0,#f7f7f8 52%,#f1f1f2 100%)}
 .live-pro-page .live-pro-sidebar{background:#080a0d;border-right-color:#1d2025;box-shadow:8px 0 26px rgba(0,0,0,.08)}
 .live-pro-page .live-pro-sidebar nav a{color:#8e9299}
@@ -169,7 +169,7 @@ body.live-pro-page{
 @media(max-width:980px){.live-preflight-grid{grid-template-columns:1fr}.live-sender-form{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.live-sender-form{grid-template-columns:1fr}}
 
-/* Unified Cardoria button palette */
+/* Unified Cardiashop button palette */
 .live-pro-page{
   --cardoria-black:#080a0d;
   --cardoria-black-soft:#171a1f;

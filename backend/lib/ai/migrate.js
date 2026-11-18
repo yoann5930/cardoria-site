@@ -1,5 +1,5 @@
 /**
- * Schéma IA Premium Cardoria — analyses, validations, historique, tendances.
+ * Schéma IA Premium Cardiashop — analyses, validations, historique, tendances.
  */
 import { getDb } from "../engine/database.js";
 

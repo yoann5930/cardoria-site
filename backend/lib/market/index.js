@@ -1,5 +1,5 @@
 /**
- * Moteur de données de marché Cardoria — init & exports.
+ * Moteur de données de marché Cardiashop — init & exports.
  */
 import { migrateMarketData, purgeEstimatedMarketPollution } from "./migrate.js";
 import { importLegacySalesHistory } from "./record.js";

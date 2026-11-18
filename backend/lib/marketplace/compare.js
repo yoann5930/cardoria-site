@@ -24,7 +24,7 @@ export function comparePrices({ listingId, cardId, q }) {
   const prices = [];
   if (listing) prices.push({ source: "Cette annonce", price: listing.price, type: "listing", id: listing.id });
   if (catalog) {
-    prices.push({ source: "Prix moteur Cardoria (conseillé)", price: catalog.prices.recommended, type: "engine" });
+    prices.push({ source: "Prix moteur Cardiashop (conseillé)", price: catalog.prices.recommended, type: "engine" });
     prices.push({ source: "Prix bas marché (moteur)", price: catalog.prices.low, type: "engine_low" });
     prices.push({ source: "Prix haut marché (moteur)", price: catalog.prices.high, type: "engine_high" });
   }
@@ -51,7 +51,7 @@ export function comparePrices({ listingId, cardId, q }) {
       highest: worst,
       average: sorted.length ? Math.round(sorted.reduce((s, p) => s + p.price, 0) / sorted.length * 100) / 100 : 0,
       potentialSavings: savings > 0 ? savings : 0,
-      recommendation: savings > 5 ? "Meilleur prix détecté ailleurs sur Cardoria" : "Prix compétitif"
+      recommendation: savings > 5 ? "Meilleur prix détecté ailleurs sur Cardiashop" : "Prix compétitif"
     }
   };
 }

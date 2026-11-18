@@ -1,5 +1,5 @@
 /**
- * Mode de démonstration Marketplace Cardoria.
+ * Mode de démonstration Marketplace Cardiashop.
  *
  * En production le mode demo est DESACTIVE par defaut. Il ne peut etre active
  * que par une variable d'environnement explicite hors production, afin qu'un

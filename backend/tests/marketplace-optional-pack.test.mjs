@@ -12,7 +12,7 @@ const runtime = fs.readFileSync("backend/public/js/marketplace-sell.js", "utf8")
 
 test("Marketplace publication does not require a professional pack", () => {
   assert.doesNotMatch(route, /assertActiveSellerPlan/);
-  assert.doesNotMatch(paypal, /doit avoir un abonnement Cardoria actif avant la vente/);
+  assert.doesNotMatch(paypal, /doit avoir un abonnement Cardiashop actif avant la vente/);
 });
 
 test("Active seller packs are linked to Marketplace benefits", () => {

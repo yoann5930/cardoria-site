@@ -1,5 +1,5 @@
 /**
- * Cache ultra-rapide Big Data Cardoria.
+ * Cache ultra-rapide Big Data Cardiashop.
  */
 import { getDb } from "../engine/database.js";
 

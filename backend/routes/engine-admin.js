@@ -1,5 +1,5 @@
 /**
- * Administration du moteur Cardoria — licences, cartes et suivi marché.
+ * Administration du moteur Cardiashop — licences, cartes et suivi marché.
  */
 import { Router } from "express";
 import { requireAdmin } from "../lib/auth.js";

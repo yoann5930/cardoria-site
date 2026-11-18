@@ -4,7 +4,13 @@ import { renderCardoriaEmail } from "./email-templates.js";
 
 export const ALERT_EMAIL = process.env.MAIL_TO || "Cardoria59330@gmail.com";
 export const CONFIDENCE_THRESHOLD = Number(process.env.CONFIDENCE_THRESHOLD || 95);
-export const PUBLIC_SITE_ORIGIN = "https://www.cardoriashop.fr";
+export const PUBLIC_SITE_ORIGIN = "https://www.cardiashop.fr";
+const CANONICAL_PUBLIC_HOSTS = new Set([
+  "cardiashop.fr",
+  "www.cardiashop.fr",
+  "cardoriashop.fr",
+  "www.cardoriashop.fr"
+]);
 
 function envTrim(name) {
   return String(process.env[name] || "").trim();
@@ -39,7 +45,7 @@ export function getEmailPublicStatus() {
     secure: String(process.env.SMTP_SECURE || "").toLowerCase() === "true" || Number(process.env.SMTP_PORT || 587) === 465,
     smtpUser,
     from,
-    fromName: envTrim("MAIL_FROM_NAME") || "Cardoria",
+    fromName: envTrim("MAIL_FROM_NAME") || "Cardiashop",
     replyTo,
     fromDomain: from.includes("@") ? from.split("@").pop().toLowerCase() : "",
     dkimSelector: envTrim("MAIL_DKIM_SELECTOR"),
@@ -57,7 +63,7 @@ export function publicSiteOrigin() {
       if (url.protocol !== "https:") continue;
       if (host === "localhost" || host === "127.0.0.1") continue;
       if (host.endsWith(".onrender.com") || host.endsWith(".vercel.app") || host === "cardoria.vercel.app") continue;
-      if (host === "cardoriashop.fr" || host === "www.cardoriashop.fr") return PUBLIC_SITE_ORIGIN;
+      if (CANONICAL_PUBLIC_HOSTS.has(host)) return PUBLIC_SITE_ORIGIN;
     } catch {
       continue;
     }

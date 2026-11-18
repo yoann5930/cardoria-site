@@ -1,5 +1,5 @@
 /**
- * Pipeline Scanner Intelligent Cardoria.
+ * Pipeline Scanner Intelligent Cardiashop.
  */
 import OpenAI from "openai";
 import { CONFIDENCE_THRESHOLD, sendCounterfeitAlert, extractSuspicionReasons } from "../email.js";
@@ -348,7 +348,7 @@ function runCatalogFallback(data) {
 
   return {
     clientMessage: link.cardId
-      ? `Carte identifiée dans le catalogue Cardoria : ${detection.name}. Analyse visuelle complète indisponible — estimation basée sur le catalogue.`
+      ? `Carte identifiée dans le catalogue Cardiashop : ${detection.name}. Analyse visuelle complète indisponible — estimation basée sur le catalogue.`
       : "Carte non reconnue automatiquement. Notre équipe peut valider manuellement votre scan.",
     detection,
     condition: "Near Mint",

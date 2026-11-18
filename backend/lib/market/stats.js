@@ -87,7 +87,7 @@ export function recomputeCardStats(cardId) {
   const internalRows = db.prepare(`
     SELECT sale_price, buyback_price FROM market_transactions
     WHERE card_id = ?
-      AND channel = 'Cardoria'
+      AND channel = 'Cardiashop'
       AND transaction_type IN (${placeholders(internalTypes)})
       AND notes NOT IN ('Prix revente estimé validé', 'Offre rachat estimation IA')
       AND transaction_at >= date('now', '-365 day')

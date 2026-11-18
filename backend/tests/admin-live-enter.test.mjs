@@ -35,7 +35,7 @@ function seedEnterLives() {
     sessions: [
       {
         id: "LIVE-ENTER-ADMIN",
-        title: "Live Cardoria Admin Enter",
+        title: "Live Cardiashop Admin Enter",
         ownerRole: "admin",
         ownerId: "cardoria",
         status: "live",
@@ -162,7 +162,7 @@ test("admin authentifié entre dans le Live sans paiement ni commission", async 
       assert.equal(entered.data.access.role, "admin");
       assert.equal(entered.data.access.context, "cardoria");
       assert.equal(entered.data.access.liveId, "LIVE-ENTER-ADMIN");
-      assert.equal(entered.data.access.title, "Live Cardoria Admin Enter");
+      assert.equal(entered.data.access.title, "Live Cardiashop Admin Enter");
       assert.equal(entered.data.access.ownerRole, "admin");
       assert.match(entered.data.access.url, /\/live\.html\?session=LIVE-ENTER-ADMIN/);
       assert.ok(entered.data.access.grantToken);

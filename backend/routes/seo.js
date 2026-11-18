@@ -1,5 +1,5 @@
 /**
- * API publique SEO Cardoria — sitemap, robots, blog, pages générées.
+ * API publique SEO Cardiashop — sitemap, robots, blog, pages générées.
  */
 import { Router } from "express";
 import {
@@ -15,7 +15,7 @@ import { getLicenseSeoContent, listExtensions, getGeneratedPage } from "../lib/s
 import { readJson } from "../lib/storage.js";
 
 const router = Router();
-const SITE = "https://www.cardoriashop.fr";
+const SITE = "https://www.cardiashop.fr";
 
 function sendXml(res, xml, maxAge = 3600) {
   res.setHeader("Content-Type", "application/xml; charset=utf-8");

@@ -58,7 +58,7 @@ const hidden = await json(`/api/marketplace/v1/listings/${listing.id}`);
 assert(hidden.response.status === 404, "Suspended listing remains publicly accessible");
 let sellerBypassBlocked = false;
 try { updateListingV1(listing.id, seller.id, { status: "active" }); } catch (error) { sellerBypassBlocked = error?.status === 409; }
-assert(sellerBypassBlocked, "Seller can bypass Cardoria moderation lock");
+assert(sellerBypassBlocked, "Seller can bypass Cardiashop moderation lock");
 
 const reactivated = await admin(`/api/admin/marketplace/listings/${listing.id}/moderation`, token, { method: "PUT", body: JSON.stringify({ status: "active" }) });
 assert(reactivated.response.status === 200 && reactivated.body.listing?.status === "active" && reactivated.body.listing?.moderationLocked === false, "Admin reactivation failed");

@@ -1,5 +1,5 @@
 /**
- * Cardoria Big Data Engine — point d'entrée.
+ * Cardiashop Big Data Engine — point d'entrée.
  */
 import { migrateBigData } from "./migrate.js";
 import {

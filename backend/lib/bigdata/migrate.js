@@ -1,5 +1,5 @@
 /**
- * Schéma Big Data Cardoria — référence mondiale TCG.
+ * Schéma Big Data Cardiashop — référence mondiale TCG.
  * Compatible SQLite aujourd'hui, PostgreSQL ready.
  */
 import { getDb } from "../engine/database.js";

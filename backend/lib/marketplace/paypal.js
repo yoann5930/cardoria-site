@@ -1,5 +1,5 @@
 /**
- * PayPal Marketplace Cardoria — onboarding vendeurs, commissions et checkout multi-vendeurs.
+ * PayPal Marketplace Cardiashop — onboarding vendeurs, commissions et checkout multi-vendeurs.
  * Les secrets PayPal restent exclusivement côté serveur via variables d'environnement.
  */
 import { applyVerifiedLiveCapture } from "../live/paypal-capture-validation.js";
@@ -127,7 +127,7 @@ export async function createSellerOnboarding({ sellerId, returnUrl }) {
       }
     }],
     products: ["EXPRESS_CHECKOUT"],
-    partner_config_override: { return_url: returnUrl, return_url_description: "Retour vers Cardoria Marketplace" },
+    partner_config_override: { return_url: returnUrl, return_url_description: "Retour vers Cardiashop Marketplace" },
     legal_consents: [{ type: "SHARE_DATA_CONSENT", granted: true }]
   };
 
@@ -252,7 +252,7 @@ export async function createMarketplacePayPalOrder(orders, { successUrl, cancelU
     return {
       reference_id: order.id,
       custom_id: order.id,
-      description: `Cardoria Marketplace - ${String(order.listingTitle || "Achat de carte").slice(0, 110)}`,
+      description: `Cardiashop Marketplace - ${String(order.listingTitle || "Achat de carte").slice(0, 110)}`,
       payee: { merchant_id: seller.paypalMerchantId },
       amount: { currency_code: "EUR", value: Number(order.total).toFixed(2) },
       payment_instruction: {
@@ -300,7 +300,7 @@ export async function createLivePayPalOrder({ checkoutId, amount, sellerId, desc
     purchase_units: [{
       reference_id: checkoutId,
       custom_id: checkoutId,
-      description: String(description || "Live vendeur Cardoria").slice(0, 110),
+      description: String(description || "Live vendeur Cardiashop").slice(0, 110),
       payee: { merchant_id: seller.paypalMerchantId },
       amount: { currency_code: "EUR", value: round2(amount).toFixed(2) },
       payment_instruction: {

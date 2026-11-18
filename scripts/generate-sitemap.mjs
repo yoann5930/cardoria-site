@@ -1,5 +1,5 @@
 /**
- * Génère sitemap.xml depuis l'API Cardoria ou liste statique de secours.
+ * Génère sitemap.xml depuis l'API Cardiashop ou liste statique de secours.
  * Usage : node scripts/generate-sitemap.mjs
  */
 import { writeFileSync } from "fs";

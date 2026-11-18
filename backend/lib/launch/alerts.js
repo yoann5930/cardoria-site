@@ -26,8 +26,8 @@ export async function checkAndAlert() {
     return { ok: true, alerted: false, failures, note: "ALERT_EMAIL non activé" };
   }
 
-  const subject = `[Cardoria] Alerte santé — ${failures.join(", ")}`;
-  const body = `Alerte automatique Cardoria V1\n\nServices en échec : ${failures.join(", ")}\n\nTimestamp : ${report.timestamp}\nVersion : ${report.version}`;
+  const subject = `[Cardiashop] Alerte santé — ${failures.join(", ")}`;
+  const body = `Alerte automatique Cardiashop V1\n\nServices en échec : ${failures.join(", ")}\n\nTimestamp : ${report.timestamp}\nVersion : ${report.version}`;
 
   try {
     await sendEmail({ to, subject, text: body });

@@ -1,5 +1,5 @@
 /**
- * API système Cardoria — santé, sauvegardes durables, restauration et erreurs.
+ * API système Cardiashop — santé, sauvegardes durables, restauration et erreurs.
  */
 import { Router } from "express";
 import { requireAuth } from "../lib/auth.js";
@@ -146,7 +146,7 @@ router.post("/backups/:id/restore", requireAuth({ roles: ["super_admin"], action
 router.put("/maintenance", requireAuth({ roles: ["super_admin"], action: "security" }), (req, res) => {
   const active = req.body?.active === true;
   const info = setMaintenanceMode(active, {
-    message: req.body?.message || "Maintenance planifiee Cardoria",
+    message: req.body?.message || "Maintenance planifiee Cardiashop",
     by: req.authUser?.email || "admin"
   });
   res.json({ ok: true, maintenance: info });

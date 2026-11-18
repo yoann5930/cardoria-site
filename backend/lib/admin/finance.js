@@ -262,9 +262,9 @@ export function getFinanceSummary({ period = "month" } = {}) {
     byPurchaseCategory,
     notes: {
       cardoriaRevenue: "CA Boutique payé + commissions Marketplace payées",
-      marketplaceGmv: "Volume Marketplace encaissé pour les vendeurs, hors CA Cardoria",
-      commercialMargin: "Revenus Cardoria - coût moyen des articles Boutique vendus, avant frais PSP/charges",
-      cashCommercialBalance: "Revenus Cardoria - achats Cardoria payés sur la période ; indicateur de trésorerie, pas résultat fiscal"
+      marketplaceGmv: "Volume Marketplace encaissé pour les vendeurs, hors CA Cardiashop",
+      commercialMargin: "Revenus Cardiashop - coût moyen des articles Boutique vendus, avant frais PSP/charges",
+      cashCommercialBalance: "Revenus Cardiashop - achats Cardiashop payés sur la période ; indicateur de trésorerie, pas résultat fiscal"
     }
   };
 }

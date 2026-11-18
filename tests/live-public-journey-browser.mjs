@@ -186,7 +186,7 @@ try {
   const directory = await json(base, "/api/live/sessions?status=all");
   assert.ok((directory.data.sessions || []).some((session) => session.id === liveId && session.status === "live"), "Started Live missing from public directory");
   assert.ok((directory.data.sessions || []).some((session) => session.id === scheduledId && session.status === "scheduled"), "Scheduled Live missing from public directory");
-  assert.equal((directory.data.sessions || []).find((session) => session.id === liveId)?.hostName, "Cardoria");
+  assert.equal((directory.data.sessions || []).find((session) => session.id === liveId)?.hostName, "Cardiashop");
 
   const popupPromise = adminPage.waitForEvent("popup");
   await adminPage.click("#liveGoWatch");
@@ -201,7 +201,7 @@ try {
   assert.equal(await spectatorFromAdmin.locator("#cardoriaLiveScheduledWrap").isVisible(), false, "Scheduled directory must be hidden inside a spectator room");
   assert.equal(await spectatorFromAdmin.locator("#cardoriaLiveFilterWrap").isVisible(), false, "Directory filters must be hidden inside a spectator room");
   const adminSpectatorHtml = await spectatorFromAdmin.content();
-  assert.doesNotMatch(adminSpectatorHtml, /Mode Admin \/ Cardoria/);
+  assert.doesNotMatch(adminSpectatorHtml, /Mode Admin \/ Cardiashop/);
   assert.equal(await spectatorFromAdmin.locator("#cardoriaLiveAdminBar").count(), 0);
   assert.equal(await spectatorFromAdmin.locator("#claName").count(), 0);
   assert.equal(await spectatorFromAdmin.locator('input[placeholder="Votre nom"]').count(), 0);
@@ -240,9 +240,9 @@ try {
   await frame.locator("#clientRegisterPassword").fill(clientPassword);
   await frame.locator("#clientRegisterForm button[type='submit']").click();
   await anonPage.waitForFunction((name) => (document.querySelector("#claChatIdentity")?.textContent || "").includes(name), clientName, { timeout: 20000 });
-  await anonPage.fill("#claMessage", "Message depuis le compte Cardoria");
+  await anonPage.fill("#claMessage", "Message depuis le compte Cardiashop");
   await anonPage.press("#claMessage", "Enter");
-  await anonPage.waitForFunction(() => document.querySelector("#claChat")?.innerText.includes("Message depuis le compte Cardoria"), null, { timeout: 15000 });
+  await anonPage.waitForFunction(() => document.querySelector("#claChat")?.innerText.includes("Message depuis le compte Cardiashop"), null, { timeout: 15000 });
   const chatText = await anonPage.locator("#claChat").innerText();
   assert.match(chatText, new RegExp(clientName));
   assert.doesNotMatch(chatText, /Forged nickname/);
@@ -287,7 +287,7 @@ try {
   assert.equal(await landingPage.locator("#cardoriaLiveStage").isVisible(), false, "Video player must not be visible on the Live directory");
   assert.equal(await landingPage.locator("#claChatDock").isVisible(), false, "Chat must not be visible on the Live directory");
   assert.equal(await landingPage.locator("#cardoriaLiveActionPanel").count(), 0, "Action panel must not be created on the Live directory");
-  assert.match(await landingPage.locator(`[data-session-id="${liveId}"]`).innerText(), /Cardoria/);
+  assert.match(await landingPage.locator(`[data-session-id="${liveId}"]`).innerText(), /Cardiashop/);
   assert.match(await landingPage.locator(`[data-session-id="${liveId}"]`).innerText(), /Officiel/);
   await landingPage.selectOption("#cardoriaLiveCategoryFilter", "pokemon");
   await landingPage.waitForFunction((id) => !document.querySelector(`#cardoriaLiveDirectory [data-session-id="${id}"]`), liveId, { timeout: 10000 });

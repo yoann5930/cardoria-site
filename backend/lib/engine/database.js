@@ -1,5 +1,5 @@
 /**
- * Cardoria Engine — couche SQLite indexée (FTS5).
+ * Cardiashop Engine — couche SQLite indexée (FTS5).
  * Conçue pour migrer vers PostgreSQL sans changer l'API publique.
  */
 import Database from "better-sqlite3";
@@ -110,7 +110,7 @@ function migrate(database) {
       sold_at TEXT NOT NULL,
       price REAL NOT NULL,
       condition TEXT DEFAULT 'NM',
-      channel TEXT DEFAULT 'Cardoria',
+      channel TEXT DEFAULT 'Cardiashop',
       FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
     );
 

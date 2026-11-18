@@ -1,5 +1,5 @@
 /**
- * API publique IA Premium Cardoria.
+ * API publique IA Premium Cardiashop.
  */
 import { Router } from "express";
 import { analyzeCardPremium, getPriceHistory, getTrends, buildIntelligenceForCard, toClientIntelligence } from "../lib/ai/analyze.js";

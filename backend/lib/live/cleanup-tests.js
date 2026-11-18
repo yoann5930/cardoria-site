@@ -10,7 +10,7 @@ export function cleanupLegacyLiveTestsOnce() {
   if (marker?.done) return { ...marker, skipped: true };
   const store = readJson(SESSION_KEY, { sessions: [], checkouts: [], adminAccess: [] });
   const sessions = Array.isArray(store.sessions) ? store.sessions : [];
-  const removable = sessions.filter((s) => String(s?.ownerRole || "") === "admin" && String(s?.ownerId || "") === "cardoria" && String(s?.title || "").trim() === "Live Cardoria" && ["ended", "cancelled"].includes(String(s?.status || "").toLowerCase()));
+  const removable = sessions.filter((s) => String(s?.ownerRole || "") === "admin" && String(s?.ownerId || "") === "cardoria" && String(s?.title || "").trim() === "Live Cardiashop" && ["ended", "cancelled"].includes(String(s?.status || "").toLowerCase()));
   const ids = new Set(removable.map((s) => String(s.id)));
   if (ids.size) {
     store.sessions = sessions.filter((s) => !ids.has(String(s.id)));

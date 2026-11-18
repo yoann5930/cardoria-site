@@ -17,7 +17,7 @@ const source = fs.readFileSync(path.join(ROOT, 'backend/server.js'), 'utf8');
 const start = source.indexOf('function escapeHtml(');
 const end = source.indexOf('function sendPublicFile(', start);
 assert.ok(start >= 0 && end > start);
-const SITE = 'https://www.cardoriashop.fr';
+const SITE = 'https://www.cardiashop.fr';
 const card = { id: 'seo-fixture', slug: 'pikachu-test', license: 'pokemon', licenseName: 'Pokémon', language: 'fr', name: 'Pikachu', extension: 'Extension test', number: '25', rarity: 'Commune', imageThumb: 'https://images.example.test/card.png', prices: { avg: 0, low: 0, high: 0, recommended: 0 }, salesHistory: [] };
 const CARD_PATH = '/cartes/pokemon/' + card.slug;
 
@@ -31,7 +31,7 @@ function renderers(publicRoot = ROOT, { licenseCardCount = 1 } = {}) {
       { slug: 'magic', name: 'Magic', icon: '🔮', cardCount: 0 },
       { slug: 'lorcana', name: 'Lorcana', icon: '✨', cardCount: 0 }
     ],
-    getLicenseSeoContent: () => ({ title: 'Catalogue Pokémon | Cardoria', metaDescription: 'Catalogue de cartes Pokémon.', h1: 'Cartes Pokémon', content: { intro: 'Retrouvez les cartes et leurs extensions.' } }),
+    getLicenseSeoContent: () => ({ title: 'Catalogue Pokémon | Cardiashop', metaDescription: 'Catalogue de cartes Pokémon.', h1: 'Cartes Pokémon', content: { intro: 'Retrouvez les cartes et leurs extensions.' } }),
     listExtensions: () => hasCards ? [{ slug: 'extension-test', extension: 'Extension test', cardCount: licenseCardCount }] : [],
     searchCards: () => ({ cards: hasCards ? [card] : [] })
   });
@@ -77,7 +77,7 @@ test('card without a real image stays indexable without inventing structured pro
   assert.equal(pageSchema.image, undefined);
   assert.equal(schemas(output).some((item) => item['@type'] === 'Product'), false);
   assert.match(output, /Visuel indisponible/);
-  assert.match(output, /<meta property="og:image" content="https:\/\/www\.cardoriashop\.fr\/assets\/logo\/cardoria-premium\.png">/);
+  assert.match(output, /<meta property="og:image" content="https:\/\/www\.cardiashop\.fr\/assets\/logo\/cardoria-premium\.png">/);
 });
 
 test('canonical, description and robots are unique in the real card response', () => {
@@ -126,14 +126,14 @@ test('card SSR title and description include identity, extension, language and l
     language: 'fr'
   };
   const output = html(jirachi);
-  assert.match(output, /<title>Jirachi 9 EX Deoxys FR – Carte Pokémon, prix &amp; cote \| Cardoria<\/title>/);
-  assert.match(output, /<meta name="description" content="Jirachi 9, carte Pokémon de l&#39;extension EX Deoxys, version FR, rareté Rare\. Consultez son visuel, son prix et sa cote sur Cardoria\.">/);
+  assert.match(output, /<title>Jirachi 9 EX Deoxys FR – Carte Pokémon, prix &amp; cote \| Cardiashop<\/title>/);
+  assert.match(output, /<meta name="description" content="Jirachi 9, carte Pokémon de l&#39;extension EX Deoxys, version FR, rareté Rare\. Consultez son visuel, son prix et sa cote sur Cardiashop\.">/);
 });
 
 test('card SEO language codes are explicit and metadata stays compact', () => {
   for (const [language, code] of [['fr', 'FR'], ['en', 'EN'], ['ja', 'JP'], ['ko', 'KR']]) {
     const meta = buildCardSeoMeta({ ...card, language });
-    assert.ok(meta.title.includes(' ' + code + ' – Carte Pokémon, prix & cote | Cardoria'), meta.title);
+    assert.ok(meta.title.includes(' ' + code + ' – Carte Pokémon, prix & cote | Cardiashop'), meta.title);
     assert.ok(meta.title.length <= 95, meta.title);
     assert.ok(meta.description.length <= 158, meta.description);
     assert.ok(meta.description.includes('version ' + code), meta.description);
@@ -196,7 +196,7 @@ test('card without a real image stays indexable without inventing product imager
   assert.ok(pageSchema);
   assert.equal(pageSchema.image, undefined);
   assert.equal(schemas(output).some((item) => item['@type'] === 'Product'), false);
-  assert.match(output, /property="og:image" content="https:\/\/www\.cardoriashop\.fr\/assets\/logo\/cardoria-premium\.png"/);
+  assert.match(output, /property="og:image" content="https:\/\/www\.cardiashop\.fr\/assets\/logo\/cardoria-premium\.png"/);
   assert.doesNotMatch(output, /name="robots" content="noindex/);
 });
 
@@ -222,7 +222,7 @@ test('licence hub only links licences with real active cards', () => {
   assert.match(output, />Pokémon<\/strong><small>1 cartes<\/small>/);
   assert.doesNotMatch(output, /href="\/pages\/licences\/magic\//);
   assert.doesNotMatch(output, /href="\/pages\/licences\/lorcana\//);
-  assert.match(output, /<link rel="canonical" href="https:\/\/www\.cardoriashop\.fr\/pages\/licences\/">/);
+  assert.match(output, /<link rel="canonical" href="https:\/\/www\.cardiashop\.fr\/pages\/licences\/">/);
   assert.equal(count(output, /<h1\b/g), 1);
 });
 
@@ -252,7 +252,7 @@ test('real license and extension renderers retain their own metadata and card li
   assert.ok(extension.includes(`href="${SITE}/extensions/pokemon/extension-test"`));
   assert.match(
     extension,
-    /<meta name="description" content="Découvrez les cartes Extension test \(Pokémon\) : liste, numéros, raretés et données de prix\. 1 cartes référencées sur Cardoria\.">/
+    /<meta name="description" content="Découvrez les cartes Extension test \(Pokémon\) : liste, numéros, raretés et données de prix\. 1 cartes référencées sur Cardiashop\.">/
   );
 });
 

@@ -7,21 +7,21 @@ function auth(token,path,options={}){return json(path,{...options,headers:{Accep
 async function register(label){const email=`${label}-${suffix}@cardoria.invalid`;const result=await json("/api/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password,name:label})});assert(result.response.status===201&&result.body.token&&result.body.user?.id,`Registration failed for ${label}`);return{email,token:result.body.token,user:result.body.user};}
 const sellerAccount=await register("liveur-test");
 const buyer=await register("client-test");
-const sellerRegistration=await auth(sellerAccount.token,"/api/marketplace/v1/paypal/sellers/register",{method:"POST",body:JSON.stringify({displayName:"Liveur Test Cardoria",sellerType:"individual"})});
+const sellerRegistration=await auth(sellerAccount.token,"/api/marketplace/v1/paypal/sellers/register",{method:"POST",body:JSON.stringify({displayName:"Liveur Test Cardiashop",sellerType:"individual"})});
 assert(sellerRegistration.response.status===200&&sellerRegistration.body.seller?.id,"Seller registration failed");
 let seller=sellerRegistration.body.seller;
-updateSellerProfessionalVerification(seller.id,{verified:true,siret:"55555555555555",legalName:"Liveur Test Cardoria Pro",source:"live-seller-client-journey-e2e",verifiedAt:new Date().toISOString()});
+updateSellerProfessionalVerification(seller.id,{verified:true,siret:"55555555555555",legalName:"Liveur Test Cardiashop Pro",source:"live-seller-client-journey-e2e",verifiedAt:new Date().toISOString()});
 const sellerProfile=await auth(sellerAccount.token,"/api/auth/profile",{method:"PATCH",body:JSON.stringify({accountType:"professional"})});
 assert(sellerProfile.response.status===200&&sellerProfile.body.user?.accountType==="professional","Seller client account is not Professional");
 const sellerMe=await auth(sellerAccount.token,"/api/marketplace/v1/paypal/sellers/me");
 assert(sellerMe.response.status===200&&sellerMe.body.seller?.professionalVerified===true,"Seller SIRET professional verification missing");
 seller=sellerMe.body.seller;
-const sender=await auth(sellerAccount.token,`/api/marketplace/v1/sellers/${seller.id}/sender-profile`,{method:"PUT",body:JSON.stringify({name:"Liveur Test Cardoria",addressLine1:"1 rue Test",postalCode:"59330",city:"Hautmont",countryCode:"FR",phone:"0600000000"})});
+const sender=await auth(sellerAccount.token,`/api/marketplace/v1/sellers/${seller.id}/sender-profile`,{method:"PUT",body:JSON.stringify({name:"Liveur Test Cardiashop",addressLine1:"1 rue Test",postalCode:"59330",city:"Hautmont",countryCode:"FR",phone:"0600000000"})});
 assert(sender.response.status===200&&sender.body.ready===true,"Seller sender address is not ready");
 
 const relay={id:"12345",carrierServicePointId:"TEST-MR-12345",name:"Point Relais Test",address:"2 rue Test",postalCode:"59330",city:"Hautmont",countryCode:"FR",carrierCode:"mondial_relay"};
-const buyerAddress={recipientName:"Client Test Cardoria",addressLine1:"3 rue Test",addressLine2:"",postalCode:"59330",city:"Hautmont",countryCode:"FR",phone:"0600000001"};
-const profile=await auth(buyer.token,"/api/auth/profile",{method:"PATCH",body:JSON.stringify({name:"Client Test Cardoria",firstName:"Client",lastName:"Test",phone:buyerAddress.phone,addressLine1:buyerAddress.addressLine1,postalCode:buyerAddress.postalCode,city:buyerAddress.city,country:"FR",shippingPreference:"mondial_relay",relay})});
+const buyerAddress={recipientName:"Client Test Cardiashop",addressLine1:"3 rue Test",addressLine2:"",postalCode:"59330",city:"Hautmont",countryCode:"FR",phone:"0600000001"};
+const profile=await auth(buyer.token,"/api/auth/profile",{method:"PATCH",body:JSON.stringify({name:"Client Test Cardiashop",firstName:"Client",lastName:"Test",phone:buyerAddress.phone,addressLine1:buyerAddress.addressLine1,postalCode:buyerAddress.postalCode,city:buyerAddress.city,country:"FR",shippingPreference:"mondial_relay",relay})});
 assert(profile.response.status===200&&profile.body.user?.profileReady===true&&profile.body.user?.relayReady===true,"Client shipping profile is not ready");
 
 const products=[
@@ -45,7 +45,7 @@ assert(beforeFollow.response.status===403&&beforeFollow.body.code==="FOLLOW_REQU
 const follow=await auth(buyer.token,`/api/live/actions/${liveId}/follow`,{method:"POST",body:"{}"});
 assert(follow.response.status===200&&follow.body.following===true,"Buyer could not follow seller");
 const entered=await auth(buyer.token,`/api/live/actions/${liveId}/giveaway/enter`,{method:"POST",body:JSON.stringify({name:"Fake",email:"fake@example.invalid"})});
-assert(entered.response.status===200&&entered.body.entry?.name==="Client Test Cardoria","Follower did not enter subscriber giveaway with authenticated identity");
+assert(entered.response.status===200&&entered.body.entry?.name==="Client Test Cardiashop","Follower did not enter subscriber giveaway with authenticated identity");
 const subDraw=await auth(sellerAccount.token,`/api/live/actions/seller/${liveId}/giveaway/draw`,{method:"POST",body:"{}"});
 assert(subDraw.response.status===200&&subDraw.body.giveaway?.winner,"Subscriber giveaway draw failed");
 
@@ -109,7 +109,7 @@ assert(group.gifts.length===2,"Shipment did not group both giveaway prizes");
 assert(group.weight===560,"Grouped shipment weight should be 560 g");
 assert(group.pack?.id==="PACK-MR-1000","560 g shipment should select PACK-MR-1000");
 assert(group.payer==="buyer"&&group.buyerPostagePaid===4.09,"Shipment financing is inconsistent with paid postage");
-assert(group.recipient.recipientName==="Client Test Cardoria","Shipment recipient identity is wrong");
+assert(group.recipient.recipientName==="Client Test Cardiashop","Shipment recipient identity is wrong");
 assert(String(group.relay?.id)==="12345","Shipment relay is missing");
 
 const stopped=await auth(sellerAccount.token,`/api/live/seller/sessions/${liveId}/stop`,{method:"POST",body:"{}"});

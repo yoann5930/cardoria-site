@@ -1,5 +1,5 @@
 /**
- * Initialisation du moteur Cardoria sans contenu de démonstration.
+ * Initialisation du moteur Cardiashop sans contenu de démonstration.
  * Les licences restent disponibles, mais aucune carte n'est créée automatiquement.
  */
 import { ensureDefaultLicenses } from "./licenses.js";

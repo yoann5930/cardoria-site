@@ -1,5 +1,5 @@
 /**
- * API publique du moteur Cardoria — catalogue, recherche, estimation prix.
+ * API publique du moteur Cardiashop — catalogue, recherche, estimation prix.
  */
 import { Router } from "express";
 import { listLicenses, getLicense } from "../lib/engine/licenses.js";

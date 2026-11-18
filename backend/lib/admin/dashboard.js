@@ -186,7 +186,7 @@ export function buildAdminDashboard({ period = "month", estimations = [], users 
     sources: {
       revenue: "Boutique Revolut payée + commissions Marketplace PayPal enregistrées",
       marketplace: "Commandes Marketplace payées",
-      purchases: "Achats Cardoria payés uniquement",
+      purchases: "Achats Cardiashop payés uniquement",
       stock: "Inventaire Boutique serveur unique",
       visitors: "Analytics site"
     }

@@ -88,7 +88,7 @@
     });
   }
 
-  A.renderShell("performance", "Performance IA Cardoria", "Apprentissage continu — métriques admin uniquement",
+  A.renderShell("performance", "Performance IA Cardiashop", "Apprentissage continu — métriques admin uniquement",
     '<div class="admin-filters"><button class="btn btn-primary" type="button" id="reloadPerf">Actualiser</button></div>' +
     '<div id="perfRoot"></div>');
 

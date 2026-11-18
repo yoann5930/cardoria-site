@@ -1,5 +1,5 @@
 /**
- * Cardoria Intelligence Premium — moteur d'intelligence de marché.
+ * Cardiashop Intelligence Premium — moteur d'intelligence de marché.
  * Compatible toutes licences TCG (Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, DBS, SWU, futures).
  */
 import { getPriceHistory, seedPriceHistoryIfEmpty } from "./history.js";
@@ -18,7 +18,7 @@ const CONDITION_SCORE = {
 };
 
 const RECOMMENDATIONS = {
-  BUY: { code: "ACHETER", label: "ACHETER", clientHint: "Marché favorable — bonne opportunité d'acquisition ou de vente à Cardoria." },
+  BUY: { code: "ACHETER", label: "ACHETER", clientHint: "Marché favorable — bonne opportunité d'acquisition ou de vente à Cardiashop." },
   HOLD: { code: "CONSERVER", label: "CONSERVER", clientHint: "Valeur stable — conserver la carte est pertinent." },
   WAIT: { code: "ATTENDRE", label: "ATTENDRE", clientHint: "Marché incertain — patientez avant de vendre ou d'investir." },
   SELL: { code: "VENDRE", label: "VENDRE", clientHint: "Conditions favorables pour vendre maintenant." }
@@ -115,7 +115,7 @@ function computeClientRecommendation(ctx) {
   }
 
   if (overallScore >= 65 && trendDirection === "up" && futurePotential >= 60) {
-    return { ...RECOMMENDATIONS.BUY, detail: "Marché en hausse avec bon score Cardoria." };
+    return { ...RECOMMENDATIONS.BUY, detail: "Marché en hausse avec bon score Cardiashop." };
   }
 
   if (trendDirection === "down" || futurePotential < 42 || overallScore < 38) {
@@ -384,11 +384,11 @@ export function formatClientIntelligenceBlock(intelligence) {
 
   const lines = [
     "",
-    "── Intelligence Cardoria ──",
+    "── Intelligence Cardiashop ──",
     `Prix conseillé : ${fmt(c.recommendedPrice)}`,
     `Prix de vente conseillé : ${fmt(c.salePrice)}`,
-    c.buybackPrice != null ? `Prix de rachat Cardoria : ${fmt(c.buybackPrice)}` : "Prix de rachat Cardoria : sur examen expert",
-    c.cardoriaScore != null ? `Score Cardoria : ${c.cardoriaScore} / 100` : "",
+    c.buybackPrice != null ? `Prix de rachat Cardiashop : ${fmt(c.buybackPrice)}` : "Prix de rachat Cardiashop : sur examen expert",
+    c.cardoriaScore != null ? `Score Cardiashop : ${c.cardoriaScore} / 100` : "",
     c.recommendation ? `Recommandation : ${c.recommendation.label}` : ""
   ];
   if (c.recommendation?.hint) lines.push(c.recommendation.hint);

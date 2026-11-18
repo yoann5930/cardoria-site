@@ -67,7 +67,7 @@ test("Cloudflare publication is hidden until the publisher is really ready",()=>
   assert.match(publisher,/publisherKey:\s*publisherKey/);
 });
 
-test("Realtime provider can use Cloudflare and safely fall back to Cardoria P2P",()=>{
+test("Realtime provider can use Cloudflare and safely fall back to Cardiashop P2P",()=>{
   assert.match(registry,/"cardoria-p2p"/);
   assert.match(registry,/isCloudflareRealtimeConfigured\(\)\s*\?\s*"cloudflare-realtime"\s*:\s*"cardoria-p2p"/);
   assert.match(route,/configured:true/);
@@ -127,7 +127,7 @@ test("Live P2P signaling and playout stay tuned for low latency",()=>{
   assert.match(viewer,/startHeartbeat\(sessionId, 1000\)/);
 });
 
-test("Cardoria admin roles can publish Admin Live; sellers cannot",async()=>{
+test("Cardiashop admin roles can publish Admin Live; sellers cannot",async()=>{
   const{isLivePublisher}=await import("../lib/live/realtime-sessions.js");
   const adminLive={ownerRole:"admin",ownerId:"cardoria",status:"live"};
   assert.equal(isLivePublisher(adminLive,{role:"super_admin",id:"u1"}),true);

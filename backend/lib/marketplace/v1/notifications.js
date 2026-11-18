@@ -19,7 +19,7 @@ export async function notifyOrderCreated(order) {
   await sendEmail({
     kind: "marketplace_order_created",
     to: order.buyerEmail,
-    subject: `Cardoria — Commande ${order.id} enregistrée`,
+    subject: `Cardiashop — Commande ${order.id} enregistrée`,
     text: `Bonjour ${order.buyerName || ""},\n\nVotre commande ${order.id} est en attente de paiement.\nMontant : ${fmt(order.total)}\n\nFinalisez le paiement pour valider votre achat.`,
     actionUrl: ordersUrl(),
     actionLabel: "Voir ma commande",
@@ -35,7 +35,7 @@ export async function notifyPaymentConfirmed(order) {
   await sendEmail({
     kind: "marketplace_payment_confirmed",
     to: order.buyerEmail,
-    subject: `Cardoria — Paiement confirmé ${order.id}`,
+    subject: `Cardiashop — Paiement confirmé ${order.id}`,
     text: `Paiement reçu pour la commande ${order.id}.\nMontant : ${fmt(order.total)}\nStatut : payé.\n\nMerci pour votre confiance.`,
     actionUrl: ordersUrl(),
     actionLabel: "Suivre ma commande",
@@ -49,7 +49,7 @@ export async function notifyPaymentConfirmed(order) {
     await sendEmail({
       kind: "marketplace_seller_sale",
       to: seller.email,
-      subject: `Cardoria — Nouvelle vente ${order.id}`,
+      subject: `Cardiashop — Nouvelle vente ${order.id}`,
       text: `Vous avez une nouvelle commande payée : ${order.listingTitle}\nMontant : ${fmt(order.total)}\nPréparez l'expédition depuis votre espace vendeur.`,
       actionUrl: `${publicSiteOrigin()}/marketplace.html`,
       actionLabel: "Ouvrir la marketplace",
@@ -66,7 +66,7 @@ export async function notifyShipped(order) {
   await sendEmail({
     kind: "marketplace_shipped",
     to: order.buyerEmail,
-    subject: `Cardoria — Commande expédiée ${order.id}`,
+    subject: `Cardiashop — Commande expédiée ${order.id}`,
     text: `Votre commande ${order.id} a été expédiée.\nTransporteur : ${order.shippingCarrier || "—"}\nSuivi : ${tracking}`,
     actionUrl: ordersUrl(),
     actionLabel: "Voir le suivi",
@@ -82,8 +82,8 @@ export async function notifyDelivered(order) {
   await sendEmail({
     kind: "marketplace_delivered",
     to: order.buyerEmail,
-    subject: `Cardoria — Commande livrée ${order.id}`,
-    text: `Votre commande ${order.id} est marquée comme livrée.\nMerci d'avoir choisi Cardoria !`,
+    subject: `Cardiashop — Commande livrée ${order.id}`,
+    text: `Votre commande ${order.id} est marquée comme livrée.\nMerci d'avoir choisi Cardiashop !`,
     actionUrl: ordersUrl(),
     actionLabel: "Voir mes commandes",
     details: [{ label: "Commande", value: order.id }]
@@ -94,7 +94,7 @@ export async function notifyCancelled(order, reason = "") {
   await sendEmail({
     kind: reason ? "marketplace_refunded" : "marketplace_cancelled",
     to: order.buyerEmail,
-    subject: `Cardoria — Commande ${reason ? "remboursée" : "annulée"} ${order.id}`,
+    subject: `Cardiashop — Commande ${reason ? "remboursée" : "annulée"} ${order.id}`,
     text: `Votre commande ${order.id} a été ${reason ? "remboursée" : "annulée"}.${reason ? "\nMotif : " + reason : ""}`,
     actionUrl: ordersUrl(),
     actionLabel: "Voir mes commandes",

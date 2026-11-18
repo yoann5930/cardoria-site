@@ -1,5 +1,5 @@
 /**
- * Facture PDF/HTML marketplace Cardoria.
+ * Facture PDF/HTML marketplace Cardiashop.
  */
 export function generateInvoiceHtml(order) {
   const date = new Date(order.createdAt).toLocaleDateString("fr-FR");
@@ -19,14 +19,14 @@ th,td{border:1px solid #ddd;padding:10px;text-align:left}th{background:#111;colo
 <div style="display:flex;justify-content:space-between;align-items:flex-start">
 <div><h1>FACTURE</h1><p><strong>${order.id}</strong><br>Date : ${date}<br>
 <span class="badge">Statut : ${order.status}</span></p></div>
-<div style="text-align:right"><h2 style="color:#b8860b;margin:0">CARDORIA</h2>
+<div style="text-align:right"><h2 style="color:#b8860b;margin:0">CARDIASHOP</h2>
 <p>Cardoria59330@gmail.com<br>Marketplace TCG premium</p></div></div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:24px 0">
 <div><h3>Client</h3><p>${order.buyerName || "—"}<br>${order.buyerEmail}<br>${order.shippingAddress || ""}</p></div>
 <div><h3>Paiement SumUp</h3><p>Statut : ${order.paymentStatus || order.status || "En attente"}<br>Méthode : ${order.paymentMethod || "Carte bancaire SumUp"}<br>Réf. : ${order.paymentReference || order.sumupCheckoutId || order.stripeSessionId || "—"}</p></div></div>
 <table><thead><tr><th>Réf.</th><th>Désignation</th><th>Qté</th><th>P.U.</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
 <p class="total">Total TTC : ${fmt(order.total)}</p>
-<p style="font-size:12px;color:#666">Document généré automatiquement par Cardoria Marketplace.</p>
+<p style="font-size:12px;color:#666">Document généré automatiquement par Cardiashop Marketplace.</p>
 <button class="no-print" onclick="window.print()" style="padding:12px 24px;background:#b8860b;color:#fff;border:none;border-radius:8px;cursor:pointer">Imprimer / PDF</button>
 </body></html>`;
 }

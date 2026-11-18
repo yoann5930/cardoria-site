@@ -1,5 +1,5 @@
 /**
- * Administration Big Data Cardoria.
+ * Administration Big Data Cardiashop.
  */
 import { Router } from "express";
 import { requireAdmin } from "../lib/auth.js";

@@ -51,7 +51,7 @@ test("a cancelled crossing purchase does not unlock free postage",()=>{
   const q=quoteLivePostage({...base,giveawayWinner:true,currentItemAmount:1,checkouts:[paid("C1",6),paid("C2",5,{status:"cancelled",shippingAmount:4.09})]});
   assert.equal(q.cumulativeItems,7);assert.equal(q.locked,false);assert.equal(q.payer,"streamer");
 });
-test("Cardoria seller-pack coverage remains distinct from a buyer payment",()=>{
+test("Cardiashop seller-pack coverage remains distinct from a buyer payment",()=>{
   const q=quoteLivePostage({...base,planCovered:true,currentItemAmount:6});
   assert.equal(q.buyerAmount,0);assert.equal(q.payer,"cardoria");assert.equal(q.buyerPostageAlreadyPaid,0);
   const later=quoteLivePostage({...base,currentItemAmount:1,checkouts:[paid("C1",6,{shippingCoveredBySellerPlan:true})]});assert.equal(later.payer,"cardoria");

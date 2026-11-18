@@ -1,4 +1,4 @@
-/** Admin Marketplace Cardoria. L'ancien webhook SumUp répond 410. */
+/** Admin Marketplace Cardiashop. L'ancien webhook SumUp répond 410. */
 import { Router } from "express";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logAudit } from "../lib/audit.js";
@@ -49,7 +49,7 @@ router.post("/orders/:id/shipping-label", WRITE_ADMIN, (req, res) => {
   res.status(410).json({
     ok: false,
     code: "ADMIN_SHIPPING_READ_ONLY",
-    error: "La création d’étiquette est désactivée dans l’Admin Cardoria."
+    error: "La création d’étiquette est désactivée dans l’Admin Cardiashop."
   });
 });
 router.get("/listings", (req, res) => res.json({ ok: true, listings: listAllListingsAdmin(req.query) }));
@@ -70,7 +70,7 @@ router.put("/orders/:id/tracking", WRITE_ADMIN, (req, res) => {
   res.status(410).json({
     ok: false,
     code: "ADMIN_SHIPPING_READ_ONLY",
-    error: "Le numéro de suivi est géré par le parcours d’expédition et n’est pas récupéré ni modifié depuis l’Admin Cardoria."
+    error: "Le numéro de suivi est géré par le parcours d’expédition et n’est pas récupéré ni modifié depuis l’Admin Cardiashop."
   });
 });
 router.post("/orders/:id/refund", FINANCE_ADMIN, async (req, res) => {

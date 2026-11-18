@@ -1,5 +1,5 @@
 /**
- * Grades d'état Cardoria — normalisation IA → standard.
+ * Grades d'état Cardiashop — normalisation IA → standard.
  */
 export const CONDITION_GRADES = [
   { key: "mint", label: "Mint", aliases: ["mint", "mt", "gem mint", "gem"] },

@@ -46,6 +46,17 @@ Conserver les chemins de code, identifiants de stockage, variables historiques e
 
 Préparation uniquement. Aucun changement DNS, paiement, HTTPS ou déploiement OVH réalisé par ce document.
 
+## Diagnostic du 19 novembre 2026
+
+Contrôles effectués depuis le réseau, sans connexion SSH et sans `curl -k`.
+
+- DNS : `cardoriashop.fr` pointe vers `51.89.174.191` (A). `www.cardoriashop.fr` est un CNAME vers cet apex. `cardiashop.fr` et `www.cardiashop.fr` pointent vers `213.186.33.5`, page OVH « Site en construction » en HTTP, port 443 refusé. Le nouveau domaine n'atteint pas le VPS.
+- HTTP sur `51.89.174.191` répond Nginx et redirige en 301 vers `https://` du même hôte, y compris pour des noms qui ne sont pas le site. Ce comportement ne prouve pas que le vhost Cardiashop est configuré.
+- TLS avec SNI pour `cardoriashop.fr` et `www.cardoriashop.fr` présente un certificat Let's Encrypt `CN=nexinfra.de`, SAN `DNS:*.nexinfra.de, DNS:nexinfra.de`, valide du 10 novembre 2026 au 8 février 2027. Le nom Cardiashop / CardoriaShop n'est pas couvert. C'est la cause de l'erreur curl 60.
+- SSH port 22 est ouvert. L'empreinte ED25519 actuellement annoncée par `51.89.174.191` est `SHA256:uy7CZSoVxsarpHF8rcSoa8PzX4rKbKkUODwPxhHLG1o`. L'empreinte précédemment enregistrée dans le known_hosts de la machine de travail, daté du 3 septembre 2026, est `SHA256:6s4J7Tr95vrzAKf8bZRVcmMSePaOENEuGl7VPdTvhg8`. OpenSSH refuse la connexion avec StrictHostKeyChecking. **Ne pas mettre à jour `OVH_VPS_HOST_FINGERPRINT` et ne pas se connecter tant que la console OVH authentifiée n'a pas confirmé que la nouvelle empreinte appartient bien à ce VPS.**
+- Les logos servis restent `assets/logo/cardoria-premium.png` et `logo-cardoria.jpg`. Aucun nouveau logo n'a été inventé.
+- Tant que la console OVH n'a pas authentifié l'hôte, aucun certificat, aucune sauvegarde et aucun déploiement ne peuvent être réalisés par le pipeline GitHub.
+
 ## Diagnostic du 18 novembre 2026
 
 - L'action owner-only OVH Status Issue, déclenchée par l'issue #509, a échoué sur `Host fingerprint mismatch`. **Ne pas désactiver StrictHostKeyChecking et ne pas remplacer le secret par la clé annoncée par un réseau non vérifié.** Comparer l'empreinte ED25519 actuelle depuis une console serveur OVH authentifiée à la valeur du secret GitHub `OVH_VPS_HOST_FINGERPRINT` par un canal sûr. Vérifier aussi `OVH_VPS_HOST` et l'éventuelle réinstallation du VPS.

@@ -1,5 +1,5 @@
 /**
- * Régions & pays — HeatMap mondiale Cardoria.
+ * Régions & pays — HeatMap mondiale Cardiashop.
  */
 const REGION_BUCKETS = ["france", "belgium", "switzerland", "canada", "usa", "japan", "europe", "world"];
 

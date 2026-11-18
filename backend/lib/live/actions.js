@@ -1,4 +1,4 @@
-/** Actions temps reel du Studio Live Cardoria (sans dependance Render). */
+/** Actions temps reel du Studio Live Cardiashop (sans dependance Render). */
 import crypto from "crypto";
 import { readJson, writeJson } from "../storage.js";
 import { decrementLiveStock, getLiveSession, listLiveCheckouts } from "./sessions.js";
@@ -175,7 +175,7 @@ export async function launchPreparedGame(liveId){
     result=startBreak(liveId,{productId,...cfg,breakType:type});
     // Box Break / Hit & Run are prepared first. The liveur explicitly starts
     // Booster #1 (then every following booster) with the small round arrow.
-    // Cardoria must never auto-start an auction when the game is launched.
+    // Cardiashop must never auto-start an auction when the game is launched.
   }
   const current=stateFor(liveId,true);current.state.preparedGame={...prepared,status:"launched",launchedAt:nowIso()};current.state.updatedAt=nowIso();save(current.d);
   return{prepared:structuredClone(current.state.preparedGame),result};

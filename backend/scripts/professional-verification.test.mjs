@@ -32,7 +32,7 @@ try {
 
   global.fetch = async (url, options) => {
     assert(String(url).includes("q=94146638500015"), "SIRET not sent to official lookup");
-    assert(String(options?.headers?.["User-Agent"] || "").includes("Cardoria"), "User-Agent missing");
+    assert(String(options?.headers?.["User-Agent"] || "").includes("Cardiashop"), "User-Agent missing");
     return new Response(JSON.stringify({
       results: [{
         siren: "941466385",

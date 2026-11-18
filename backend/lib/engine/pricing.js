@@ -1,5 +1,5 @@
 /**
- * Moteur de prix Cardoria — agrégation multi-sources et tendances marché.
+ * Moteur de prix Cardiashop — agrégation multi-sources et tendances marché.
  */
 import { getDb } from "./database.js";
 import { ingestAdminManualSale } from "../market/ingest.js";

@@ -68,7 +68,7 @@
     });
   }
 
-  A.renderShell("bigdata", "Big Data Engine Cardoria",
+  A.renderShell("bigdata", "Big Data Engine Cardiashop",
     "Base de données mondiale TCG — indices, heatmap, tendances, stats IA",
     "<div id='bdKpi'></div>" +
     "<div class='admin-filters' style='margin:12px 0'>" +

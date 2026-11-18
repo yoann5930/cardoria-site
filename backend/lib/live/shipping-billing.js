@@ -1,4 +1,4 @@
-/** Buyer postage policy confirmed by Cardoria: 10 EUR of cumulative paid items per live. */
+/** Buyer postage policy confirmed by Cardiashop: 10 EUR of cumulative paid items per live. */
 import { isSameLiveBuyer, SETTLED_LIVE_PAYMENT_STATUSES } from "./checkout-lifecycle.js";
 
 export const LIVE_POSTAGE_THRESHOLD_CENTS = 1000;

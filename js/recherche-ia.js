@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardiashop.fr";
 
   function euro(n) {
     if (n == null) return "—";

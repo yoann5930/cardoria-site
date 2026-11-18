@@ -1,5 +1,5 @@
 /**
- * Comparateur de prix multi-sources + Cardoria Global Index.
+ * Comparateur de prix multi-sources + Cardiashop Global Index.
  */
 import { getDb } from "../engine/database.js";
 import { getCardById } from "../engine/cards.js";

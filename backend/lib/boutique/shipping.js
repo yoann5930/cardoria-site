@@ -1,5 +1,5 @@
 /**
- * Expédition Boutique Cardoria — transporteurs, Point Relais, poids, suivi.
+ * Expédition Boutique Cardiashop — transporteurs, Point Relais, poids, suivi.
  * Ne crée jamais d'étiquette payante. Colissimo reste gated ailleurs.
  */
 const clean = (value, max = 240) => String(value == null ? "" : value).trim().slice(0, max);

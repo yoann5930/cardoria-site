@@ -31,7 +31,7 @@ async function fetchCard(language, rawId) {
   const timer = setTimeout(() => controller.abort(), 15000);
   try {
     const response = await fetch(`${API_ROOT}/${language}/cards/${encodeURIComponent(rawId)}`, {
-      headers: { Accept: "application/json", "User-Agent": "Cardoria/6.0 image-repair" },
+      headers: { Accept: "application/json", "User-Agent": "Cardiashop/6.0 image-repair" },
       signal: controller.signal
     });
     if (!response.ok) return null;

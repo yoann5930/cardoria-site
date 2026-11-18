@@ -1,5 +1,5 @@
 /**
- * Gestion utilisateurs et rôles Cardoria.
+ * Gestion utilisateurs et rôles Cardiashop.
  */
 import { getDb } from "../engine/database.js";
 import { hashPassword, verifyPassword } from "./password.js";

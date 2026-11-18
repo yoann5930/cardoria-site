@@ -50,7 +50,7 @@
 
   function renderListings(listings) {
     A.qs("#mkListingsBody").innerHTML = (listings || []).slice(0, 100).map(function (l) {
-      var note = l.moderationLocked ? "<div class='small'>🔒 " + esc(l.moderationReason || "Verrouillé par Cardoria") + "</div>" : "";
+      var note = l.moderationLocked ? "<div class='small'>🔒 " + esc(l.moderationReason || "Verrouillé par Cardiashop") + "</div>" : "";
       var actions = l.status === "sold" ? "—" :
         '<button type="button" data-mod="active" data-id="' + esc(l.id) + '">Réactiver</button> ' +
         '<button type="button" class="btn btn-secondary" data-mod="suspended" data-id="' + esc(l.id) + '">Suspendre</button> ' +

@@ -1,5 +1,5 @@
 /**
- * Cardoria Ultimate Enterprise — point d'entrée.
+ * Cardiashop Ultimate Enterprise — point d'entrée.
  */
 import { migrateUltimate } from "./migrate.js";
 import { computePriceComparison, getPriceComparison } from "./comparator.js";

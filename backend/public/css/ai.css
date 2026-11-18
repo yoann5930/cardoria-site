@@ -1,4 +1,4 @@
-/* Cardoria IA Premium — résultats estimation */
+/* Cardiashop IA Premium — résultats estimation */
 .ai-result{margin-top:20px;padding:0}
 .ai-detection{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
 .ai-detection div{padding:12px;background:rgba(255,255,255,.04);border:1px solid rgba(212,175,55,.18);border-radius:10px;font-size:13px}

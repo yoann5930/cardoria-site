@@ -33,7 +33,7 @@ async function fetchJson(url) {
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
   try {
     const response = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": "Cardoria/6.0 jpn-image-repair" },
+      headers: { Accept: "application/json", "User-Agent": "Cardiashop/6.0 jpn-image-repair" },
       signal: controller.signal
     });
     if (!response.ok) return null;

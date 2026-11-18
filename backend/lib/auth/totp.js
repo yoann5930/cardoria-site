@@ -1,5 +1,5 @@
 /**
- * 2FA TOTP Cardoria — RFC 6238, sans dépendance externe.
+ * 2FA TOTP Cardiashop — RFC 6238, sans dépendance externe.
  */
 import crypto from "crypto";
 
@@ -55,6 +55,6 @@ export function verifyTotp(secret, token, window = 1) {
 }
 
 export function getTotpUri(secret, email) {
-  const label = encodeURIComponent("Cardoria:" + email);
-  return `otpauth://totp/${label}?secret=${encodeURIComponent(secret)}&issuer=Cardoria&algorithm=SHA1&digits=6&period=30`;
+  const label = encodeURIComponent("Cardiashop:" + email);
+  return `otpauth://totp/${label}?secret=${encodeURIComponent(secret)}&issuer=Cardiashop&algorithm=SHA1&digits=6&period=30`;
 }

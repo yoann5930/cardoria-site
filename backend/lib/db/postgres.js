@@ -18,7 +18,7 @@ export async function getPgPool() {
     });
     return pool;
   } catch (e) {
-    console.warn("[Cardoria] PostgreSQL non disponible — SQLite actif.", e.message);
+    console.warn("[Cardiashop] PostgreSQL non disponible — SQLite actif.", e.message);
     return null;
   }
 }

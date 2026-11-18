@@ -97,7 +97,7 @@ export async function processPriceAlerts() {
       await sendEmail({
         kind: "marketplace_price_alert",
         to: alert.user_email,
-        subject: `[Cardoria] Alerte prix — ${title || "Carte souhaitée"}`,
+        subject: `[Cardiashop] Alerte prix — ${title || "Carte souhaitée"}`,
         text: `Bonne nouvelle ! Le prix est descendu à ${currentPrice.toFixed(2)} € (seuil : ${alert.target_price} €).`,
         actionUrl: `${publicSiteOrigin()}/marketplace.html`,
         actionLabel: "Voir la marketplace"

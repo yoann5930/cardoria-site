@@ -448,7 +448,7 @@ router.post("/boutique-orders/:id/colissimo-label", WRITE_ADMIN, (req, res) => {
   res.status(410).json({
     ok: false,
     code: "ADMIN_SHIPPING_READ_ONLY",
-    error: "La création d’étiquette est désactivée dans l’Admin Cardoria. L’expédition doit être créée par le parcours de commande prévu."
+    error: "La création d’étiquette est désactivée dans l’Admin Cardiashop. L’expédition doit être créée par le parcours de commande prévu."
   });
 });
 

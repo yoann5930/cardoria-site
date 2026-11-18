@@ -109,7 +109,7 @@ async function probeImage(url) {
       headers: {
         Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
         Range: "bytes=0-256",
-        "User-Agent": "Cardoria/6.0 Pokemon-Korea-catalog-audit"
+        "User-Agent": "Cardiashop/6.0 Pokemon-Korea-catalog-audit"
       },
       signal: controller.signal
     });
@@ -199,8 +199,8 @@ function insertKoreanFromReference(db, ja, verified, imageUrl, now) {
     market_checked_at: recommended > 0 ? now : "",
     market_trend: ja?.market_trend || "stable",
     trend_percent: Number(ja?.trend_percent || 0),
-    meta_title: `${name} — ${extension} · version coréenne | Cardoria`,
-    meta_description: `Référence Cardoria en français pour ${name}, ${extension}, carte coréenne ${number}.`,
+    meta_title: `${name} — ${extension} · version coréenne | Cardiashop`,
+    meta_description: `Référence Cardiashop en français pour ${name}, ${extension}, carte coréenne ${number}.`,
     source_name: verified.sourceName || "",
     source_extension: verified.sourceExtension || ja?.source_extension || "",
     source_rarity: verified.sourceRarity || ja?.source_rarity || ja?.rarity || "",

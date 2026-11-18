@@ -57,7 +57,7 @@ function normalizePlanId(planId) {
 export function assertSellerPlan(planId) {
   const id = normalizePlanId(planId);
   const plan = PLAN_DEFINITIONS[id];
-  if (!plan) throw Object.assign(new Error("Abonnement vendeur Cardoria inconnu."), { code: 400, status: 400 });
+  if (!plan) throw Object.assign(new Error("Abonnement vendeur Cardiashop inconnu."), { code: 400, status: 400 });
   return plan;
 }
 

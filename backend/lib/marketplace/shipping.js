@@ -1,4 +1,4 @@
-/** Expedition Marketplace Cardoria. */
+/** Expedition Marketplace Cardiashop. */
 import { getOrder, updateOrderStatus } from "./orders.js";
 import { logAudit } from "../audit.js";
 

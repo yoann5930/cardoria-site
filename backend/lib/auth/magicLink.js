@@ -40,8 +40,8 @@ export async function requestMagicLogin(email) {
     sent = await sendEmail({
       kind: "magic_login",
       to: user.email,
-      subject: "Connexion administrateur Cardoria",
-      text: `Bonjour,\n\nVoici votre lien de connexion sécurisé au back-office Cardoria.\nIl est valable ${MAGIC_LINK_MINUTES} minutes et ne peut être utilisé qu'une fois.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`,
+      subject: "Connexion administrateur Cardiashop",
+      text: `Bonjour,\n\nVoici votre lien de connexion sécurisé au back-office Cardiashop.\nIl est valable ${MAGIC_LINK_MINUTES} minutes et ne peut être utilisé qu'une fois.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`,
       actionUrl: link,
       actionLabel: "Ouvrir le back-office"
     });

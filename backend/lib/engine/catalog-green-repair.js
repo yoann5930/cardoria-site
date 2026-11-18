@@ -66,8 +66,8 @@ function restoreOfficialSourceNames() {
           AND source_extension NOT LIKE 'Extension coréenne%'
         THEN source_extension ELSE extension END,
       translation_source='source-officielle-verifiee',
-      meta_title=source_name || ' — ' || CASE WHEN COALESCE(source_extension,'')<>'' THEN source_extension ELSE extension END || ' | Cardoria',
-      meta_description='Référence Cardoria ' || source_name || ', numéro ' || COALESCE(number,'') || '.',
+      meta_title=source_name || ' — ' || CASE WHEN COALESCE(source_extension,'')<>'' THEN source_extension ELSE extension END || ' | Cardiashop',
+      meta_description='Référence Cardiashop ' || source_name || ', numéro ' || COALESCE(number,'') || '.',
       updated_at=?
     WHERE license_slug='pokemon' AND language IN ('en','ja','ko') AND active=1
       AND COALESCE(source_name,'')<>''

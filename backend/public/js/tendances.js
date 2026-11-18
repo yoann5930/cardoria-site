@@ -13,7 +13,7 @@
 
         root.innerHTML =
           "<h1>Tendances du marché TCG</h1>" +
-          "<p style='color:#baaf97'>Cartes identifiées en hausse ou en baisse par l'IA Cardoria (30 derniers jours).</p>" +
+          "<p style='color:#baaf97'>Cartes identifiées en hausse ou en baisse par l'IA Cardiashop (30 derniers jours).</p>" +
           '<div class="admin-periods" style="margin:20px 0">' +
           '<button type="button" data-f="">Toutes</button>' +
           '<button type="button" data-f="up">En hausse</button>' +

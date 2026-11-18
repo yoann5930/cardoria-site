@@ -17,12 +17,12 @@ function cleanupExpiredSessions(now = Date.now()) {
   }
 }
 
-export function createCaptureSession({ origin = "https://www.cardoriashop.fr" } = {}) {
+export function createCaptureSession({ origin = "https://www.cardiashop.fr" } = {}) {
   cleanupExpiredSessions();
   const id = crypto.randomBytes(24).toString("base64url");
   const now = Date.now();
   const expiresAtMs = now + SESSION_TTL_MS;
-  const safeOrigin = String(origin || "https://www.cardoriashop.fr").replace(/\/$/, "");
+  const safeOrigin = String(origin || "https://www.cardiashop.fr").replace(/\/$/, "");
   const session = {
     id,
     createdAt: new Date(now).toISOString(),

@@ -7,42 +7,42 @@ import { getSitemapCards, getCardCount } from "../engine/cards.js";
 import { extensionSitemapEntry, slugifyExtensionName } from "./sitemap-urls.js";
 
 const SITE = "https://www.cardiashop.fr";
-const SITE_NAME = "CardoriaShop";
+const SITE_NAME = "Cardiashop";
 
 const LICENSE_SEO = {
   pokemon: {
     h1: "Cartes Pokémon TCG — Prix, cote, estimation, achat & vente",
-    intro: "Explorez le catalogue Pokémon TCG sur CardoriaShop : cartes françaises, anglaises, japonaises ou coréennes selon disponibilité, extensions, raretés, prix, cote et estimation.",
+    intro: "Explorez le catalogue Pokémon TCG sur Cardiashop : cartes françaises, anglaises, japonaises ou coréennes selon disponibilité, extensions, raretés, prix, cote et estimation.",
     keywords: ["cartes pokemon", "prix carte pokemon", "cote carte pokemon", "estimation carte pokemon", "pokemon tcg france"]
   },
   yugioh: {
     h1: "Cartes Yu-Gi-Oh! — Catalogue, cote & prix du marché",
-    intro: "Explorez les cartes Yu-Gi-Oh! référencées sur CardoriaShop, leurs extensions et leurs données de prix pour identifier, estimer et collectionner vos cartes.",
+    intro: "Explorez les cartes Yu-Gi-Oh! référencées sur Cardiashop, leurs extensions et leurs données de prix pour identifier, estimer et collectionner vos cartes.",
     keywords: ["yu-gi-oh france", "cartes yugioh prix", "cote carte yugioh"]
   },
   onepiece: {
     h1: "One Piece Card Game — Catalogue, prix & estimation",
-    intro: "Explorez le One Piece Card Game sur CardoriaShop : cartes, extensions, raretés et informations de prix pour suivre votre collection et préparer vos achats ou ventes.",
+    intro: "Explorez le One Piece Card Game sur Cardiashop : cartes, extensions, raretés et informations de prix pour suivre votre collection et préparer vos achats ou ventes.",
     keywords: ["one piece tcg", "cartes one piece", "prix carte one piece"]
   },
   lorcana: {
     h1: "Disney Lorcana — Catalogue, cartes, prix & estimation",
-    intro: "Explorez le catalogue Disney Lorcana sur CardoriaShop : cartes, extensions, tendances et données de prix pour les collectionneurs en France.",
+    intro: "Explorez le catalogue Disney Lorcana sur Cardiashop : cartes, extensions, tendances et données de prix pour les collectionneurs en France.",
     keywords: ["lorcana france", "cartes disney lorcana", "prix carte lorcana"]
   },
   magic: {
     h1: "Magic: The Gathering — Catalogue de cartes & prix",
-    intro: "Retrouvez les cartes Magic: The Gathering référencées sur CardoriaShop avec leurs extensions, informations de collection et données de prix disponibles.",
+    intro: "Retrouvez les cartes Magic: The Gathering référencées sur Cardiashop avec leurs extensions, informations de collection et données de prix disponibles.",
     keywords: ["magic the gathering france", "cartes magic prix", "cote carte magic"]
   },
   dragonball: {
     h1: "Dragon Ball Card Game — Cartes, extensions & prix",
-    intro: "CardoriaShop référence les cartes Dragon Ball : extensions, raretés, informations de collection et données de prix disponibles.",
+    intro: "Cardiashop référence les cartes Dragon Ball : extensions, raretés, informations de collection et données de prix disponibles.",
     keywords: ["dragon ball card game", "cartes dragon ball", "prix carte dragon ball"]
   },
   sports: {
     h1: "Cartes sportives — Panini, Topps & collectibles",
-    intro: "Football, NBA, F1 : explorez les cartes sportives référencées sur CardoriaShop, notamment Panini et Topps, avec leurs informations de collection et de prix.",
+    intro: "Football, NBA, F1 : explorez les cartes sportives référencées sur Cardiashop, notamment Panini et Topps, avec leurs informations de collection et de prix.",
     keywords: ["cartes sportives", "panini prizm france", "topps france"]
   }
 };

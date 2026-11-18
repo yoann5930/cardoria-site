@@ -27,7 +27,7 @@ export function ingestMarketplaceOrder(order) {
     number: listing.cardNumber || "",
     seller: seller?.displayName || seller?.email || order.sellerId,
     buyer: order.buyerName || order.buyerEmail,
-    channel: "Marketplace Cardoria",
+    channel: "Marketplace Cardiashop",
     sourceRef: order.id,
     transactionAt: (order.updatedAt || order.createdAt || new Date().toISOString()).slice(0, 10),
     notes: order.listingTitle
@@ -82,8 +82,8 @@ export function ingestAdminFeedbackOutcome({
       license: detection.license,
       extension: detection.extension,
       number: detection.number,
-      buyer: "Cardoria",
-      channel: "Cardoria",
+      buyer: "Cardiashop",
+      channel: "Cardiashop",
       sourceRef: analysisId,
       notes: "Rachat réel admin"
     }));
@@ -100,7 +100,7 @@ export function ingestAdminFeedbackOutcome({
       extension: detection.extension,
       number: detection.number,
       daysToSell: resaleDelayDays,
-      channel: "Cardoria",
+      channel: "Cardiashop",
       sourceRef: analysisId,
       notes: "Revente réelle admin"
     }));
@@ -128,7 +128,7 @@ export function ingestAdminManualSale(cardId, body) {
     seller: body.seller,
     buyer: body.buyer,
     daysToSell: body.daysToSell,
-    channel: body.channel || "Cardoria",
+    channel: body.channel || "Cardiashop",
     transactionAt: body.soldAt || body.transactionAt,
     notes: body.notes
   });

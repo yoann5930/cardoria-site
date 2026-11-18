@@ -28,9 +28,9 @@ export function getListingBySlug(slug) {
 }
 
 export function buildListingSeoMeta(listing) {
-  const title = listing.seo_title || `${listing.title} — Cardoria Marketplace`;
+  const title = listing.seo_title || `${listing.title} — Cardiashop Marketplace`;
   const desc = listing.seo_description || (listing.description || "").slice(0, 155) ||
-    `Achetez ${listing.title} (${listing.card_condition || "NM"}) sur Cardoria Marketplace.`;
+    `Achetez ${listing.title} (${listing.card_condition || "NM"}) sur Cardiashop Marketplace.`;
   const image = (JSON.parse(listing.photos || "[]")[0]) || "";
   return { title, description: desc, image, slug: listing.slug };
 }

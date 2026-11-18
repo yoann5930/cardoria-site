@@ -88,8 +88,8 @@ const SERVED_SITE_HOSTS = [
   "https://cardoria.vercel.app",
   "https://www.cardiashop.fr",
   "https://cardiashop.fr",
-  "https://www.cardoriashop.fr",
-  "https://cardoriashop.fr"
+  "https://www.cardiashop.fr",
+  "https://cardiashop.fr"
 ];
 const liveTestCleanup = cleanupLegacyLiveTestsOnce();
 const app = express();
@@ -106,7 +106,7 @@ process.on("uncaughtException", (error) => console.error("[process] uncaughtExce
 applySecurityMiddleware(app);
 app.use("/api/marketplace/webhooks", marketplacePersistenceMiddleware, webhookRouter);
 app.use(express.json({ limit: process.env.BODY_LIMIT || "15mb" }));
-app.get("/api", (req, res) => res.json({ ok: true, service: "Cardoria API", version: "6.0.0", ready: startup.ready }));
+app.get("/api", (req, res) => res.json({ ok: true, service: "Cardiashop API", version: "6.0.0", ready: startup.ready }));
 app.get("/api/health/startup", (req, res) => res.status(200).json({ ok: startup.ok, ready: startup.ready, status: startup.ready ? (startup.ok ? "healthy" : "degraded") : "starting", startedAt: startup.startedAt, degraded: startup.degraded.map((item) => item.name) }));
 app.use(maintenanceMiddleware);
 app.use(connectionJournalMiddleware());
@@ -160,7 +160,7 @@ function seoHead({ title, description, canonical, image, type = "website", jsonL
     `<link rel="canonical" href="${escapeHtml(canonical)}">`,
     `<meta name="robots" content="${escapeHtml(robots)}">`,
     `<meta property="og:type" content="${escapeHtml(type)}">`,
-    `<meta property="og:site_name" content="Cardoria">`,
+    `<meta property="og:site_name" content="Cardiashop">`,
     `<meta property="og:locale" content="fr_FR">`,
     `<meta property="og:title" content="${escapeHtml(title)}">`,
     `<meta property="og:description" content="${escapeHtml(description)}">`,
@@ -205,7 +205,7 @@ function buildCardSeoHtml(req, card) {
   const productImage = safeImage(card.imageHd) || safeImage(card.imageThumb);
   const socialImage = productImage || `${siteUrl}/assets/logo/cardoria-premium.png`;
   // Reference catalogue page: do not advertise Google Product rich-result
-  // eligibility unless Cardoria is actually selling this specific item.
+  // eligibility unless Cardiashop is actually selling this specific item.
   const referencePage = {
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -250,7 +250,7 @@ function buildCardSeoHtml(req, card) {
 function sendCardSeoPage(req, res, next) {
   try {
     const card = getCardBySlug(req.params.license, req.params.slug);
-    if (!card) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Carte introuvable | Cardoria</title></head><body><h1>Carte introuvable</h1><p><a href=\"/pages/licences/\">Retour au catalogue</a></p></body></html>");
+    if (!card) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Carte introuvable | Cardiashop</title></head><body><h1>Carte introuvable</h1><p><a href=\"/pages/licences/\">Retour au catalogue</a></p></body></html>");
     return res
       .status(200)
       .set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600")
@@ -269,22 +269,22 @@ function buildLicenseHubSeoHtml(req) {
   const licenses = listLicenses().filter((license) => Number(license.cardCount || 0) > 0);
   const names = licenses.map((license) => license.name).filter(Boolean);
   const title = names.length
-    ? `Catalogues ${names.slice(0, 4).join(", ")} | Cardoria`
-    : "Catalogues cartes à collectionner | Cardoria";
+    ? `Catalogues ${names.slice(0, 4).join(", ")} | Cardiashop`
+    : "Catalogues cartes à collectionner | Cardiashop";
   const description = names.length
-    ? `Explorez les licences réellement référencées sur Cardoria : ${names.join(", ")}. Accédez aux extensions, fiches cartes, prix et cotes.`
-    : "Explorez les catalogues de cartes à collectionner référencés sur Cardoria.";
+    ? `Explorez les licences réellement référencées sur Cardiashop : ${names.join(", ")}. Accédez aux extensions, fiches cartes, prix et cotes.`
+    : "Explorez les catalogues de cartes à collectionner référencés sur Cardiashop.";
   const cards = licenses.map((license) => `<a href="/pages/licences/${encodeURIComponent(license.slug)}/"><span class="icon">${escapeHtml(license.icon || "🃏")}</span><strong>${escapeHtml(license.name)}</strong><small>${Number(license.cardCount || 0)} cartes</small></a>`).join("");
   const mainHtml = `<main class="container seo-page" id="licenceHubSeoRoot">
     <span class="badge">LICENCES TCG</span>
-    <h1>Licences de cartes référencées sur Cardoria</h1>
+    <h1>Licences de cartes référencées sur Cardiashop</h1>
     <p class="seo-lead">Accédez aux licences contenant actuellement des cartes actives, puis parcourez leurs extensions et fiches détaillées.</p>
     <div class="seo-catalog" id="licenceGrid">${cards || "<p>Catalogue en cours de référencement.</p>"}</div>
   </main>`;
   const collection = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: "Licences de cartes référencées sur Cardoria",
+    name: "Licences de cartes référencées sur Cardiashop",
     description,
     url: canonical,
     inLanguage: "fr-FR",
@@ -334,8 +334,8 @@ function buildLicenseSeoHtml(req, licenseSlug) {
   const siteUrl = absoluteSiteUrl(req);
   const canonical = `${siteUrl}/pages/licences/${encodeURIComponent(licenseSlug)}/`;
   const page = getLicenseSeoContent(licenseSlug);
-  const title = page.title || `${license.name} TCG — Prix, cote & catalogue | Cardoria`;
-  const description = page.metaDescription || `Catalogue ${license.name} : cartes, extensions, prix, cote et estimation sur Cardoria.`;
+  const title = page.title || `${license.name} TCG — Prix, cote & catalogue | Cardiashop`;
+  const description = page.metaDescription || `Catalogue ${license.name} : cartes, extensions, prix, cote et estimation sur Cardiashop.`;
   const image = `${siteUrl}/assets/logo/cardoria-premium.png`;
   const cards = searchCards({ license: licenseSlug, page: 1, limit: 12, sort: "views", maxLimit: 50 }).cards;
   const extensions = listExtensions(licenseSlug).slice(0, 40);
@@ -349,10 +349,10 @@ function buildLicenseSeoHtml(req, licenseSlug) {
     <nav class="engine-breadcrumb" aria-label="Fil d'Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/">Licences</a> › ${escapeHtml(license.name)}</nav>
     <h1>${escapeHtml(page.h1 || `Cartes ${license.name}`)}</h1>
     <p class="seo-lead">${escapeHtml(page.content?.intro || description)}</p>
-    <div class="seo-links"><a href="/estimation.html">Estimer une carte ${escapeHtml(license.name)}</a><a href="/rachat-cartes.html">Vendre à Cardoria</a><a href="/marketplace.html">Marketplace</a></div>
+    <div class="seo-links"><a href="/estimation.html">Estimer une carte ${escapeHtml(license.name)}</a><a href="/rachat-cartes.html">Vendre à Cardiashop</a><a href="/marketplace.html">Marketplace</a></div>
     <section class="seo-section"><h2>Extensions ${escapeHtml(license.name)}</h2><p>Parcourez les extensions pour accéder aux listes de cartes, numéros, raretés et fiches détaillées.</p><div class="seo-links">${extensionLinks || "<span>Catalogue en cours de référencement.</span>"}</div></section>
     <section class="seo-section"><h2>Cartes ${escapeHtml(license.name)} référencées</h2><div class="seo-grid">${cardLinks || "<p>Catalogue en cours de synchronisation.</p>"}</div></section>
-    <section class="seo-section"><h2>Prix, cote et estimation</h2><p>Les fiches Cardoria regroupent les informations disponibles pour identifier une carte, son extension, son numéro, sa rareté et ses données de prix. Utilisez ensuite l'espace estimation pour analyser une carte que vous possédez.</p></section>
+    <section class="seo-section"><h2>Prix, cote et estimation</h2><p>Les fiches Cardiashop regroupent les informations disponibles pour identifier une carte, son extension, son numéro, sa rareté et ses données de prix. Utilisez ensuite l'espace estimation pour analyser une carte que vous possédez.</p></section>
   </main>`;
   const breadcrumbs = {
     "@context": "https://schema.org",
@@ -370,7 +370,7 @@ function buildLicenseSeoHtml(req, licenseSlug) {
     description,
     url: canonical,
     inLanguage: "fr-FR",
-    isPartOf: { "@type": "WebSite", name: "Cardoria", url: siteUrl }
+    isPartOf: { "@type": "WebSite", name: "Cardiashop", url: siteUrl }
   };
   const head = seoHead({
     title,
@@ -392,7 +392,7 @@ function buildLicenseSeoHtml(req, licenseSlug) {
 function sendLicenseSeoPage(req, res, next) {
   try {
     const html = buildLicenseSeoHtml(req, req.params.license);
-    if (!html) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Licence introuvable | Cardoria</title></head><body><h1>Licence introuvable</h1></body></html>");
+    if (!html) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Licence introuvable | Cardiashop</title></head><body><h1>Licence introuvable</h1></body></html>");
     const license = getLicense(req.params.license);
     const response = res.status(200).set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
     if (Number(license?.cardCount || 0) <= 0) response.set("X-Robots-Tag", "noindex, follow");
@@ -413,8 +413,8 @@ function buildExtensionSeoHtml(req, licenseSlug, extensionSlug) {
   const template = fs.readFileSync(templatePath, "utf8");
   const siteUrl = absoluteSiteUrl(req);
   const canonical = `${siteUrl}/extensions/${encodeURIComponent(licenseSlug)}/${encodeURIComponent(extensionSlug)}`;
-  const title = `${extension.extension} — cartes, prix & liste ${license.name} | Cardoria`;
-  const description = `Découvrez les cartes ${extension.extension} (${license.name}) : liste, numéros, raretés et données de prix. ${extension.cardCount} cartes référencées sur Cardoria.`;
+  const title = `${extension.extension} — cartes, prix & liste ${license.name} | Cardiashop`;
+  const description = `Découvrez les cartes ${extension.extension} (${license.name}) : liste, numéros, raretés et données de prix. ${extension.cardCount} cartes référencées sur Cardiashop.`;
   const image = `${siteUrl}/assets/logo/cardoria-premium.png`;
   const cards = searchCards({ license: licenseSlug, extension: extension.extension, page: 1, limit: 36, sort: "extension", maxLimit: 50 }).cards;
   const cardLinks = cards.map((card) => {
@@ -425,7 +425,7 @@ function buildExtensionSeoHtml(req, licenseSlug, extensionSlug) {
   const mainHtml = `<main class="container seo-page" id="extensionRoot">
     <nav class="engine-breadcrumb" aria-label="Fil d'Ariane"><a href="/">Accueil</a> › <a href="/pages/licences/${encodeURIComponent(licenseSlug)}/">${escapeHtml(license.name)}</a> › ${escapeHtml(extension.extension)}</nav>
     <h1>Cartes ${escapeHtml(extension.extension)} — ${escapeHtml(license.name)}</h1>
-    <p class="seo-lead">Liste des cartes de l'extension ${escapeHtml(extension.extension)} : numéros, raretés, visuels et données de prix disponibles sur Cardoria. ${Number(extension.cardCount || 0)} cartes sont actuellement référencées.</p>
+    <p class="seo-lead">Liste des cartes de l'extension ${escapeHtml(extension.extension)} : numéros, raretés, visuels et données de prix disponibles sur Cardiashop. ${Number(extension.cardCount || 0)} cartes sont actuellement référencées.</p>
     <div class="seo-links"><a href="/pages/licences/${encodeURIComponent(licenseSlug)}/">Toutes les extensions ${escapeHtml(license.name)}</a><a href="/estimation.html">Estimer une carte</a><a href="/marketplace.html">Marketplace</a></div>
     <section class="seo-section"><h2>Liste des cartes ${escapeHtml(extension.extension)}</h2><div class="seo-grid">${cardLinks || "<p>Catalogue en cours de synchronisation.</p>"}</div></section>
     <section class="seo-section"><h2>Prix et cote de l'extension ${escapeHtml(extension.extension)}</h2><p>Ouvrez une fiche carte pour consulter les informations disponibles sur son numéro, sa rareté, son image et ses données de prix. Les valeurs peuvent évoluer avec le marché et l'état réel de la carte.</p></section>
@@ -447,7 +447,7 @@ function buildExtensionSeoHtml(req, licenseSlug, extensionSlug) {
     url: canonical,
     inLanguage: "fr-FR",
     numberOfItems: Number(extension.cardCount || cards.length),
-    isPartOf: { "@type": "WebSite", name: "Cardoria", url: siteUrl }
+    isPartOf: { "@type": "WebSite", name: "Cardiashop", url: siteUrl }
   };
   const itemList = {
     "@context": "https://schema.org",
@@ -481,7 +481,7 @@ function buildExtensionSeoHtml(req, licenseSlug, extensionSlug) {
 function sendExtensionSeoPage(req, res, next) {
   try {
     const html = buildExtensionSeoHtml(req, req.params.license, req.params.slug);
-    if (!html) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Extension introuvable | Cardoria</title></head><body><h1>Extension introuvable</h1></body></html>");
+    if (!html) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Extension introuvable | Cardiashop</title></head><body><h1>Extension introuvable</h1></body></html>");
     return res.status(200).set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600").type("text/html; charset=utf-8").send(html);
   } catch (error) {
     return next(error);
@@ -500,10 +500,10 @@ function buildMarketplaceListingSeoHtml(req, slug) {
   const canonical = `${siteUrl}/annonces/${encodeURIComponent(slug)}`;
   const price = positivePrice(listing.price);
   const priceLabel = price == null ? "" : new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(price);
-  const title = listing.seo?.title || `${listing.title}${priceLabel ? " — " + priceLabel : ""} | Cardoria Marketplace`;
-  const description = listing.seo?.description || `${listing.title} en état ${listing.condition || "non précisé"} sur Cardoria Marketplace.`;
+  const title = listing.seo?.title || `${listing.title}${priceLabel ? " — " + priceLabel : ""} | Cardiashop Marketplace`;
+  const description = listing.seo?.description || `${listing.title} en état ${listing.condition || "non précisé"} sur Cardiashop Marketplace.`;
   const image = safeImage(listing.photos?.[0]) || `${siteUrl}/assets/logo/cardoria-premium.png`;
-  const sellerName = listing.seller?.displayName || "Vendeur Cardoria";
+  const sellerName = listing.seller?.displayName || "Vendeur Cardiashop";
   const availability = Number(listing.stock || 0) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock";
 
   const product = {
@@ -542,7 +542,7 @@ function buildMarketplaceListingSeoHtml(req, slug) {
         <p><strong>État :</strong> ${escapeHtml(listing.condition || "—")} · <strong>Licence :</strong> ${escapeHtml(listing.license || "—")} · <strong>Stock :</strong> ${Number(listing.stock || 0)}</p>
         ${priceLabel ? `<div class="mk-buy-box"><div class="mk-price-big">${escapeHtml(priceLabel)}</div></div>` : ""}
         <p><strong>Vendeur :</strong> ${escapeHtml(sellerName)}</p>
-        <p><a href="/marketplace.html">Voir les autres annonces Cardoria Marketplace</a></p>
+        <p><a href="/marketplace.html">Voir les autres annonces Cardiashop Marketplace</a></p>
       </div>
     </div>
   </main>`;
@@ -559,7 +559,7 @@ function buildMarketplaceListingSeoHtml(req, slug) {
 function sendMarketplaceListingSeoPage(req, res, next) {
   try {
     const html = buildMarketplaceListingSeoHtml(req, req.params.slug);
-    if (!html) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Annonce introuvable | Cardoria</title></head><body><h1>Annonce introuvable</h1><p><a href=\"/marketplace.html\">Retour à la Marketplace</a></p></body></html>");
+    if (!html) return res.status(404).type("text/html; charset=utf-8").send("<!doctype html><html lang=\"fr\"><head><meta name=\"robots\" content=\"noindex\"><title>Annonce introuvable | Cardiashop</title></head><body><h1>Annonce introuvable</h1><p><a href=\"/marketplace.html\">Retour à la Marketplace</a></p></body></html>");
     return res.status(200).set("Cache-Control", "public, max-age=180, stale-while-revalidate=900").type("text/html; charset=utf-8").send(html);
   } catch (error) {
     return next(error);
@@ -651,7 +651,7 @@ app.use((req, res, next) => {
 
 const port = process.env.PORT || 10000;
 const server = app.listen(port, "0.0.0.0", () => {
-  console.log(`Cardoria V6 port ${port} bound — initialization in progress`);
+  console.log(`Cardiashop V6 port ${port} bound — initialization in progress`);
   console.log(`[startup] public root: ${PUBLIC_ROOT}`);
 });
 
@@ -827,7 +827,7 @@ app.use("/api/admin/bigdata", bigdataAdminRoutes);
 app.use(errorHandler);
 
 startup.ready = true;
-console.log(`Cardoria V6 single-host ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`);
+console.log(`Cardiashop V6 single-host ready — port ${port} — ${startup.ok ? "healthy" : "degraded"}`);
 
 function shutdown(signal) {
   console.log(`[process] ${signal} received, closing HTTP server`);

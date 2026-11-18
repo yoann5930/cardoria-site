@@ -40,7 +40,7 @@ export function buildGetUserMediaAttempts({ isMobile = false, cameraId = "", mic
   return attempts;
 }
 
-export function explainGetUserMediaError(error, { host = "cardoriashop.fr" } = {}) {
+export function explainGetUserMediaError(error, { host = "cardiashop.fr" } = {}) {
   const name = String(error?.name || "");
   const message = String(error?.message || "");
   const denied = name === "NotAllowedError" || /permission denied/i.test(message);

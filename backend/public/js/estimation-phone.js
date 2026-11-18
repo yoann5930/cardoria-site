@@ -73,7 +73,7 @@
   function cameraErrorMessage(error) {
     var name = String(error && error.name || "");
     if (name === "NotAllowedError" || name === "SecurityError") {
-      return "Autorisez la caméra pour cardoriashop.fr puis appuyez sur « Activer la caméra ».";
+      return "Autorisez la caméra pour " + (location.hostname || "cardiashop.fr") + " puis appuyez sur « Activer la caméra ».";
     }
     if (name === "NotFoundError" || name === "DevicesNotFoundError") {
       return "Aucune caméra n'a été détectée sur ce téléphone.";
@@ -240,7 +240,7 @@
       sendEvent("session_ready", String(data.count || 0));
       return true;
     } catch (e) {
-      setStatus("Connexion Cardoria impossible.", true);
+      setStatus("Connexion Cardiashop impossible.", true);
       sendEvent("session_error", e && e.name || "fetch");
       return false;
     }

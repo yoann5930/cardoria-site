@@ -1,5 +1,5 @@
 /**
- * Générateurs de sitemaps Cardoria.
+ * Générateurs de sitemaps Cardiashop.
  * Le catalogue est découpé afin de rester largement sous la limite de 50 000 URL.
  */
 import { URL } from "node:url";

@@ -59,7 +59,7 @@ function normalizePhone(value) {
 }
 
 function senderAddress() {
-  const name = clean(process.env.CARDORIA_SENDER_NAME || "Cardoria", 35);
+  const name = clean(process.env.CARDORIA_SENDER_NAME || "Cardiashop", 35);
   const line2 = clean(process.env.CARDORIA_SENDER_ADDRESS_LINE1, 35);
   const line3 = clean(process.env.CARDORIA_SENDER_ADDRESS_LINE2, 35);
   const zipCode = clean(process.env.CARDORIA_SENDER_POSTAL_CODE, 10);
@@ -68,7 +68,7 @@ function senderAddress() {
   const phoneNumber = normalizePhone(process.env.CARDORIA_SENDER_PHONE);
   const email = clean(process.env.CARDORIA_SENDER_EMAIL, 80);
   if (!name || !line2 || !zipCode || !city) {
-    throw failure("COLISSIMO_SENDER_NOT_CONFIGURED", "Adresse expéditeur Cardoria incomplète pour Colissimo.", 503);
+    throw failure("COLISSIMO_SENDER_NOT_CONFIGURED", "Adresse expéditeur Cardiashop incomplète pour Colissimo.", 503);
   }
   return {
     companyName: name,
@@ -126,7 +126,7 @@ export function isColissimoConfigured() {
 
 export function isColissimoSenderConfigured() {
   return Boolean(
-    clean(process.env.CARDORIA_SENDER_NAME || "Cardoria") &&
+    clean(process.env.CARDORIA_SENDER_NAME || "Cardiashop") &&
     clean(process.env.CARDORIA_SENDER_ADDRESS_LINE1) &&
     clean(process.env.CARDORIA_SENDER_POSTAL_CODE) &&
     clean(process.env.CARDORIA_SENDER_CITY)
@@ -177,7 +177,7 @@ export function buildColissimoLabelRequest({ order, weightGrams, depositDate = n
         productCode: productCode(),
         depositDate: date,
         orderNumber,
-        commercialName: clean(process.env.CARDORIA_SENDER_NAME || "Cardoria", 35)
+        commercialName: clean(process.env.CARDORIA_SENDER_NAME || "Cardiashop", 35)
       },
       parcel: {
         weight: Number((grams / 1000).toFixed(3)),

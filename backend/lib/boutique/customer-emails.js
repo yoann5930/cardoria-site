@@ -35,7 +35,7 @@ export function buildBoutiquePurchaseEmail(order) {
   const client = firstNameFromClient(order?.client);
   const ordersUrl = SITE_URL() + "/client-orders.html";
   const rendered = renderCardoriaEmail({
-    preheader: "Votre paiement Cardoria a bien été confirmé.",
+    preheader: "Votre paiement Cardiashop a bien été confirmé.",
     title: "Commande confirmée",
     bodyText: "Bonjour " + client + ",\n\nVotre paiement a bien été confirmé.\n\n" + itemText(order),
     actionUrl: ordersUrl,
@@ -47,7 +47,7 @@ export function buildBoutiquePurchaseEmail(order) {
   });
   return {
     to: clean(order?.email, 254),
-    subject: "Cardoria — Confirmation de votre commande " + id,
+    subject: "Cardiashop — Confirmation de votre commande " + id,
     text: rendered.text,
     html: rendered.html
   };
@@ -64,7 +64,7 @@ export function buildBoutiqueTrackingEmail(order) {
   const rendered = renderCardoriaEmail({
     preheader: "Votre commande " + id + " a été expédiée.",
     title: "Commande expédiée",
-    bodyText: "Bonjour " + client + ",\n\nVotre commande " + id + " a bien été expédiée par Cardoria.",
+    bodyText: "Bonjour " + client + ",\n\nVotre commande " + id + " a bien été expédiée par Cardiashop.",
     actionUrl: url || ordersUrl,
     actionLabel: "Suivre mon colis",
     details: [
@@ -77,7 +77,7 @@ export function buildBoutiqueTrackingEmail(order) {
   });
   return {
     to: clean(order?.email, 254),
-    subject: "Cardoria — Votre commande " + id + " a été expédiée",
+    subject: "Cardiashop — Votre commande " + id + " a été expédiée",
     text: rendered.text,
     html: rendered.html
   };

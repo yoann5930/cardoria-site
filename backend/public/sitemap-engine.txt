@@ -1,4 +1,4 @@
-# Cardoria Engine — sitemap dynamique
+# Cardiashop Engine — sitemap dynamique
 # Les fiches cartes sont générées via GET /api/engine/sitemap?page=1&limit=500
 # En production : tâche planifiée OVH → fusionner les URLs dans sitemap-index.xml
 

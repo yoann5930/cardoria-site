@@ -1,5 +1,5 @@
 /**
- * Historique unifié des paiements Cardoria.
+ * Historique unifié des paiements Cardiashop.
  * Les champs SumUp restent lisibles pour l'historique, les nouveaux paiements utilisent provider_*.
  */
 import { getDb } from "../engine/database.js";

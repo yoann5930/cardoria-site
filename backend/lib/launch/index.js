@@ -1,5 +1,5 @@
 /**
- * Module lancement Cardoria V1.0 — sans modifier les modules métier existants.
+ * Module lancement Cardiashop V1.0 — sans modifier les modules métier existants.
  */
 import { rotateBackups } from "./backup-rotation.js";
 import { logConnection, logPayment, logEstimation } from "./journals.js";
@@ -52,5 +52,5 @@ export function connectionJournalMiddleware() {
 export function initLaunch() {
   rotateBackups();
   startAlertScheduler();
-  console.log("[Launch] Cardoria V1.0 Ready — journaux, rotation backups, alertes actifs");
+  console.log("[Launch] Cardiashop V1.0 Ready — journaux, rotation backups, alertes actifs");
 }

@@ -26,11 +26,11 @@ function restoreEnv() {
   }
 }
 function configure() {
-  process.env.MONDIAL_RELAY_ENSEIGNE = "CARDORIA";
+  process.env.MONDIAL_RELAY_ENSEIGNE = "CARDIASHOP";
   process.env.MONDIAL_RELAY_PRIVATE_KEY = "PRIVATEKEY";
   process.env.MONDIAL_RELAY_API_V2_LOGIN = "api@cardoria.test";
   process.env.MONDIAL_RELAY_API_V2_PASSWORD = "secret-test";
-  process.env.MONDIAL_RELAY_API_V2_CUSTOMER_ID = "CARDORIA";
+  process.env.MONDIAL_RELAY_API_V2_CUSTOMER_ID = "CARDIASHOP";
   process.env.MONDIAL_RELAY_API_V2_ENV = "sandbox";
   process.env.MONDIAL_RELAY_LABEL_FORMAT = "10x15";
   process.env.MONDIAL_RELAY_LIVE_LABELS_ENABLED = "false";
@@ -44,7 +44,7 @@ test("WSI4 security follows the documented concatenation order and SOAP request"
   configure();
   assert.equal(mondialRelaySecurity(["AB","12"], "KEY"), "94DFB179FFD1C7B2B2D304FBAB4F962E");
   const request = buildServicePointSearchRequest({ countryCode:"FR", postalCode:"59330", city:"Hautmont", radius:15000, limit:10 });
-  assert.match(request.xml, /<Enseigne>CARDORIA<\/Enseigne>/);
+  assert.match(request.xml, /<Enseigne>CARDIASHOP<\/Enseigne>/);
   assert.match(request.xml, /<Pays>FR<\/Pays>/);
   assert.match(request.xml, /<CP>59330<\/CP>/);
   assert.match(request.xml, /<Action>24R<\/Action>/);
@@ -72,7 +72,7 @@ test("API V2 XML creates one 24R parcel to the selected Point Relais", () => {
   const xml = buildShipmentCreationXml({
     orderNumber:"LSH-12345678-1234-1234-1234-123456789012",
     reference:"LSH-12345678-1234-1234-1234-123456789012",
-    fromAddress:sender,fromEmail:"sender@cardoria.test",fromCompanyName:"Cardoria",
+    fromAddress:sender,fromEmail:"sender@cardoria.test",fromCompanyName:"Cardiashop",
     toAddress:recipient,toEmail:"buyer@cardoria.test",weightGrams:560,totalOrderValue:15,
     servicePointId:"001234"
   });

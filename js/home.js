@@ -19,7 +19,7 @@
     loader.className = "cardoria-loader";
     loader.setAttribute("role", "status");
     loader.setAttribute("aria-live", "polite");
-    loader.setAttribute("aria-label", "Chargement de Cardoria");
+    loader.setAttribute("aria-label", "Chargement de Cardiashop");
     loader.innerHTML =
       '<span class="cardoria-loader__corner cardoria-loader__corner--tl" aria-hidden="true"></span>' +
       '<span class="cardoria-loader__corner cardoria-loader__corner--br" aria-hidden="true"></span>' +
@@ -28,7 +28,7 @@
           '<span class="cardoria-loader__orbit"></span>' +
           '<span class="cardoria-loader__logo-shell">' +
             '<img class="cardoria-loader__logo" src="/assets/logo/cardoria-header-mark.svg?v=5" alt="">' +
-            '<span class="cardoria-loader__wordmark">CARDORIA</span>' +
+            '<span class="cardoria-loader__wordmark">CARDIASHOP</span>' +
           '</span>' +
         '</div>' +
         '<p class="cardoria-loader__eyebrow">Le Royaume des Collectionneurs</p>' +

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { LIVE_SHIPPING_PACKS, shippingPackForWeight, productShippingWeight, giveawayShippingPolicy } from "../backend/lib/live/shipping.js";
 
-test("Cardoria shipping packs stay monotone and slightly above source carrier baseline",()=>{
+test("Cardiashop shipping packs stay monotone and slightly above source carrier baseline",()=>{
   let previous=0;
   for(const pack of LIVE_SHIPPING_PACKS){assert.ok(pack.price>=previous);previous=pack.price;assert.ok(pack.maxGrams>0);}
   assert.equal(shippingPackForWeight(20).id,"PACK-LS-20");

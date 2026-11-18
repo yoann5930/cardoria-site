@@ -22,13 +22,13 @@
     root.querySelectorAll(".mk-thumbs img").forEach(function (t) { t.onclick = function () { var p = safeUrl(t.dataset.src); if (p && document.getElementById("mainPhoto")) document.getElementById("mainPhoto").src = p; root.querySelectorAll(".mk-thumbs img").forEach(function (x) { x.classList.remove("active"); }); t.classList.add("active"); }; });
     document.getElementById("buyBtn").onclick = function () { addToCart(listing, true).catch(function (e) { alert(e.message); }); };
     document.getElementById("cartBtn").onclick = function () { addToCart(listing, false).catch(function (e) { alert(e.message); }); };
-    document.getElementById("favBtn").onclick = function () { alert("Les favoris nécessiteront votre compte Cardoria dans une prochaine mise à jour."); };
+    document.getElementById("favBtn").onclick = function () { alert("Les favoris nécessiteront votre compte Cardiashop dans une prochaine mise à jour."); };
   }
 
   function applySeo(l) {
     var seo = l.seo || {};
-    document.title = seo.title || (l.title + " — " + M.euro(l.price) + " | Marketplace Cardoria");
-    setMeta("description", seo.description || (l.title + " en " + l.condition + ". " + M.euro(l.price) + " sur la marketplace Cardoria."));
+    document.title = seo.title || (l.title + " — " + M.euro(l.price) + " | Marketplace Cardiashop");
+    setMeta("description", seo.description || (l.title + " en " + l.condition + ". " + M.euro(l.price) + " sur la marketplace Cardiashop."));
     var link = document.querySelector('link[rel="canonical"]') || document.createElement("link"); link.rel = "canonical"; link.href = location.origin + (l.publicUrl || ("/annonce.html?id=" + encodeURIComponent(l.id))); if (!link.parentNode) document.head.appendChild(link);
     var img = safeUrl((l.photos && l.photos[0]) || seo.image); if (img) setMeta("og:image", img, "property");
     var ld = document.createElement("script"); ld.type = "application/ld+json"; ld.textContent = JSON.stringify({ "@context": "https://schema.org", "@type": "Product", name: l.title, description: l.description || l.title, image: img || undefined, offers: { "@type": "Offer", price: l.price, priceCurrency: "EUR", availability: Number(l.stock) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock" } }); document.head.appendChild(ld);

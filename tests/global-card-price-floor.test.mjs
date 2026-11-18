@@ -76,6 +76,6 @@ test("catalogue intelligence never invents fallback pricing when market data is 
   assert.doesNotMatch(intelligence,/card\.prices\?\.recommended \|\| card\.avgPrice \|\| 10/);
   assert.match(intelligence,/if \(seedPrice\) seedPriceHistoryIfEmpty\(cardId, seedPrice\)/);
   assert.match(intelligence,/recommendedPrice <= 0\) return null/);
-  assert.match(cardUi,/Données de prix insuffisantes pour générer un conseil Cardoria fiable/);
+  assert.match(cardUi,/Données de prix insuffisantes pour générer un conseil Cardiashop fiable/);
   assert.equal(cardUiRuntime,cardUi);
 });

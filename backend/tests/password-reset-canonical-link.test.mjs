@@ -27,7 +27,9 @@ test("magic login links use the same public HTTPS origin helper", () => {
   assert.doesNotMatch(magic, /process\.env\.SITE_URL/);
 });
 
-test("production CORS always allows the Cardoria HTTPS origins", () => {
+test("production CORS always allows the Cardiashop and legacy HTTPS origins", () => {
+  assert.match(cors, /https:\/\/www\.cardiashop\.fr/);
+  assert.match(cors, /https:\/\/cardiashop\.fr/);
   assert.match(cors, /https:\/\/www\.cardoriashop\.fr/);
   assert.match(cors, /https:\/\/cardoriashop\.fr/);
   assert.doesNotMatch(cors, /else if \(!origin && allowedOrigins\[0\]\)/);
@@ -35,7 +37,7 @@ test("production CORS always allows the Cardoria HTTPS origins", () => {
 
 test("client reset maps network failures instead of showing Failed to fetch", () => {
   assert.match(client, /AbortController/);
-  assert.match(client, /Connexion au serveur Cardoria impossible/);
+  assert.match(client, /Connexion au serveur Cardiashop impossible/);
   assert.doesNotMatch(client, /CARDORIA_BACKEND/);
   assert.match(client, /\/api\/auth\/password\/request/);
   assert.match(client, /\/api\/auth\/password\/confirm/);

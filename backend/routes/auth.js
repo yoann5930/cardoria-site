@@ -1,5 +1,5 @@
 /**
- * Authentification Cardoria — comptes clients/admin, sessions et 2FA facultatif.
+ * Authentification Cardiashop — comptes clients/admin, sessions et 2FA facultatif.
  */
 import { Router } from "express";
 import { getUserById, getUserByEmail, createUser, authenticateUser, setTotpSecret, getTotpSecret, updateClientProfile, ADMIN_ROLES } from "../lib/auth/users.js";
@@ -124,10 +124,10 @@ router.post("/register", authRateLimit, async (req, res) => {
     notifySafely(sendEmail({
       kind: "welcome",
       to: email,
-      subject: "Bienvenue chez Cardoria",
+      subject: "Bienvenue chez Cardiashop",
       text: accountType === "professional"
-        ? `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte professionnel Cardoria est créé et lié à votre profil Liveur.\nVotre SIRET a été enregistré pour l’accès au Studio Live.`
-        : `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte particulier Cardoria est créé.\nLa Boutique et la Marketplace sont accessibles avec ce compte.`,
+        ? `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte professionnel Cardiashop est créé et lié à votre profil Liveur.\nVotre SIRET a été enregistré pour l’accès au Studio Live.`
+        : `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte particulier Cardiashop est créé.\nLa Boutique et la Marketplace sont accessibles avec ce compte.`,
       actionUrl: `${publicSiteOrigin()}/client-login.html`,
       actionLabel: "Accéder à mon espace"
     }), "welcome");
