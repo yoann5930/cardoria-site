@@ -153,7 +153,7 @@ jobs:
             echo "SMTP connection timeout is missing"
             exit 1
           fi
-          if ! grep -q 'Connexion au serveur Cardoria impossible' js/client-password-reset.js; then
+          if ! grep -q 'Connexion au serveur Cardiashop impossible' js/client-password-reset.js; then
             echo "Client reset must map Failed to fetch"
             exit 1
           fi
@@ -185,7 +185,7 @@ jobs:
       - name: Verify admin login page
         run: |
           curl -fsS http://127.0.0.1:10000/admin-login.html > /tmp/cardoria-admin-login.html
-          grep -q "Admin Cardoria" /tmp/cardoria-admin-login.html
+          grep -q "Admin Cardiashop" /tmp/cardoria-admin-login.html
           grep -q "adminPasswordLoginForm" /tmp/cardoria-admin-login.html
           if grep -qi "double authentification" /tmp/cardoria-admin-login.html; then
             echo "Obsolete 2FA marker detected"

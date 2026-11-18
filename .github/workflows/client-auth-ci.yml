@@ -53,7 +53,7 @@ jobs:
           if grep -q 'window.prompt' js/client-auth.js; then echo 'Point Relais prompt must not be used'; exit 1; fi
           grep -q '/api/auth/password/request' js/client-password-reset.js
           grep -q '/api/auth/password/confirm' js/client-password-reset.js
-          grep -q 'Connexion au serveur Cardoria impossible' js/client-password-reset.js
+          grep -q 'Connexion au serveur Cardiashop impossible' js/client-password-reset.js
           grep -q 'AbortController' js/client-password-reset.js
           grep -q '/reset-password.html' client-login.html
           grep -q '/api/auth/me' js/estimation-account-prefill.js
