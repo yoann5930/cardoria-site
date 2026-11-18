@@ -59,7 +59,7 @@ permissions:
 
 jobs:
   live-public-e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       NODE_ENV: test
@@ -165,7 +165,7 @@ jobs:
           cat /tmp/cardoria-live-public.log || true
 
   live-public-browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       NODE_ENV: test

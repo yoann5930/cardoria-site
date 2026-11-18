@@ -47,7 +47,7 @@ permissions:
 
 jobs:
   seo-sitemap-dates:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
@@ -84,7 +84,7 @@ jobs:
           SEO_BROWSER_TESTS: '1'
         run: node --experimental-vm-modules --test tests/seo-sitemap-lastmod.test.mjs tests/seo-license-redirect.test.mjs tests/seo-card-render.test.mjs tests/seo-canonical-navigation.test.mjs tests/seo-private-technical-pages.test.mjs tests/seo-marketplace-sitemap.test.mjs tests/sitemap-404-indexing.test.mjs
   public-seo-diagnostic:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
