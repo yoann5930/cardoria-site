@@ -87,7 +87,9 @@ const SERVED_SITE_HOSTS = [
   "https://cardoria-site-f2cy.onrender.com",
   "https://cardoria.vercel.app",
   "https://www.cardiashop.fr",
-  "https://cardiashop.fr"
+  "https://cardiashop.fr",
+  "https://www.cardoriashop.fr",
+  "https://cardoriashop.fr"
 ];
 const liveTestCleanup = cleanupLegacyLiveTestsOnce();
 const app = express();
