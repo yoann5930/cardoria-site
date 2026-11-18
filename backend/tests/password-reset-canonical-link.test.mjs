@@ -14,7 +14,7 @@ const authRoute = fs.readFileSync(path.join(__dirname, "../routes/auth.js"), "ut
 const rateLimit = fs.readFileSync(path.join(__dirname, "../lib/security/rateLimit.js"), "utf8");
 
 test("password reset email always uses the canonical public HTTPS origin", () => {
-  assert.match(source, /const RESET_PUBLIC_ORIGIN = "https:\/\/www\.cardoriashop\.fr";/);
+  assert.match(source, /const RESET_PUBLIC_ORIGIN = "https:\/\/www\.cardiashop\.fr";/);
   assert.match(source, /publicSiteOrigin\(\)/);
   assert.match(source, /admin-reset-password\.html/);
   assert.match(source, /reset-password\.html/);
