@@ -45,3 +45,12 @@ Conserver les chemins de code, identifiants de stockage, variables historiques e
 ## État
 
 Préparation uniquement. Aucun changement DNS, paiement, HTTPS ou déploiement OVH réalisé par ce document.
+
+## Diagnostic du 18 novembre 2026
+
+- L'action owner-only OVH Status Issue, déclenchée par l'issue #509, a échoué sur `Host fingerprint mismatch`. **Ne pas désactiver StrictHostKeyChecking et ne pas remplacer le secret par la clé annoncée par un réseau non vérifié.** Comparer l'empreinte ED25519 actuelle depuis une console serveur OVH authentifiée à la valeur du secret GitHub `OVH_VPS_HOST_FINGERPRINT` par un canal sûr. Vérifier aussi `OVH_VPS_HOST` et l'éventuelle réinstallation du VPS.
+- Des tests HTTPS sur le domaine historique échouent avec `SSL: no alternative certificate subject name matches target hostname 'www.cardoriashop.fr'` (erreur curl 60). Vérifier en priorité la configuration Nginx effective et le certificat servi avec SNI ; ne pas masquer l'erreur avec `curl -k`.
+- Le site nouveau domaine n'est pas encore vérifié ; les pages publiques doivent rester servies depuis l'ancien domaine jusqu'à certificat valide sur les quatre noms.
+- Le fichier `oracle/nginx-cardiashop-ssl.conf.example` est un **modèle non activé** pour la migration. Il nécessite **avant utilisation** un certificat unique couvrant les quatre domaines, un test `nginx -t`, une sauvegarde de la configuration effective et un rollback possible.
+- Procédure TLS suggérée, après vérification DNS + console SSH authentifiée : faire servir les challenges ACME sur les 4 noms ; étendre avec Certbot le certificat nommé `cardoriashop.fr` pour `cardoriashop.fr`, `www.cardoriashop.fr`, `cardiashop.fr`, `www.cardiashop.fr` ; contrôler les SAN avec `openssl x509 -in /etc/letsencrypt/live/cardoriashop.fr/fullchain.pem -noout -ext subjectAltName` ; seulement ensuite installer le modèle et tester les 4 domaines et l'API.
+- N'effectuer aucune fusion ou redirection permanente tant que les tests CI spécialisés, les contrôles DNS/TLS, les paiements et l'authentification ne sont pas validés.
