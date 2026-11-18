@@ -55,7 +55,7 @@ test("licence hub exposes crawlable links and explicit metadata without JavaScri
 });
 
 test("scanner exposes complete initial SEO metadata", () => {
-  assert.match(scanner, /<title>Scanner cartes Pokémon & TCG \| CardoriaShop<\/title>/);
+  assert.match(scanner, /<title>Scanner cartes Pokémon & TCG \| Cardiashop<\/title>/);
   assert.match(scanner, /<link rel="canonical" href="https:\/\/www\.cardiashop\.fr\/scanner\.html">/);
   assert.match(scanner, /<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">/);
   assert.match(scanner, /<meta property="og:title"/);
