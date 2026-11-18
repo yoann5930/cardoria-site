@@ -6,7 +6,7 @@ import { listLicenses } from "../engine/licenses.js";
 import { getSitemapCards, getCardCount } from "../engine/cards.js";
 import { extensionSitemapEntry, slugifyExtensionName } from "./sitemap-urls.js";
 
-const SITE = "https://www.cardoriashop.fr";
+const SITE = "https://www.cardiashop.fr";
 const SITE_NAME = "CardoriaShop";
 
 const LICENSE_SEO = {

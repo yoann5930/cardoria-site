@@ -9,7 +9,7 @@ import { revokeAllUserSessions } from "./session.js";
 import { notifySafely, publicSiteOrigin, sendEmail } from "../email.js";
 
 const RESET_HOURS = Number(process.env.RESET_TOKEN_HOURS || 2);
-const RESET_PUBLIC_ORIGIN = "https://www.cardoriashop.fr";
+const RESET_PUBLIC_ORIGIN = "https://www.cardiashop.fr";
 
 export async function requestPasswordReset(email) {
   const user = getUserByEmail(email);

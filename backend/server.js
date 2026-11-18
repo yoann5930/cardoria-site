@@ -86,8 +86,8 @@ const SERVED_SITE_HOSTS = [
   "https://cardoria-site-2.onrender.com",
   "https://cardoria-site-f2cy.onrender.com",
   "https://cardoria.vercel.app",
-  "https://www.cardoriashop.fr",
-  "https://cardoriashop.fr"
+  "https://www.cardiashop.fr",
+  "https://cardiashop.fr"
 ];
 const liveTestCleanup = cleanupLegacyLiveTestsOnce();
 const app = express();
@@ -150,7 +150,7 @@ function safeJson(value) {
 }
 
 function absoluteSiteUrl() {
-  return "https://www.cardoriashop.fr";
+  return "https://www.cardiashop.fr";
 }
 
 function seoHead({ title, description, canonical, image, type = "website", jsonLd = [], bootstrap = "", robots = "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" }) {

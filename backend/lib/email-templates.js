@@ -1,4 +1,4 @@
-const PUBLIC_ORIGIN = "https://www.cardoriashop.fr";
+const PUBLIC_ORIGIN = "https://www.cardiashop.fr";
 const LOGO_URL = `${PUBLIC_ORIGIN}/assets/logo/cardoria-premium.png`;
 const CONTACT = "Cardoria59330@gmail.com";
 
@@ -93,7 +93,7 @@ export function renderCardoriaEmail({
     ...(details || []).filter((row) => row?.label).map((row) => `${row.label} : ${row.value || "—"}`),
     safeActionUrl ? `\n${actionLabel || "Lien"} : ${safeActionUrl}` : "",
     "",
-    "Cardoria — https://www.cardoriashop.fr"
+    "Cardoria — https://www.cardiashop.fr"
   ];
 
   return { html, text: textParts.join("\n").replace(/\n{3,}/g, "\n\n").trim() };
