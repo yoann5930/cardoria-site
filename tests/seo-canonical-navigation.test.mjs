@@ -47,7 +47,7 @@ test("shared navigation uses root-relative canonical URLs", () => {
 });
 
 test("licence hub exposes crawlable links and explicit metadata without JavaScript", () => {
-  assert.match(licences, /<link rel="canonical" href="https:\/\/www\.cardoriashop\.fr\/pages\/licences\/">/);
+  assert.match(licences, /<link rel="canonical" href="https:\/\/www\.cardiashop\.fr\/pages\/licences\/">/);
   assert.match(licences, /<meta name="description"/);
   for (const slug of ["pokemon", "yugioh", "onepiece", "lorcana", "magic", "dragonball", "sports"]) {
     assert.match(licences, new RegExp('href="/pages/licences/' + slug + '/"'));
@@ -56,7 +56,7 @@ test("licence hub exposes crawlable links and explicit metadata without JavaScri
 
 test("scanner exposes complete initial SEO metadata", () => {
   assert.match(scanner, /<title>Scanner cartes Pokémon & TCG \| CardoriaShop<\/title>/);
-  assert.match(scanner, /<link rel="canonical" href="https:\/\/www\.cardoriashop\.fr\/scanner\.html">/);
+  assert.match(scanner, /<link rel="canonical" href="https:\/\/www\.cardiashop\.fr\/scanner\.html">/);
   assert.match(scanner, /<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">/);
   assert.match(scanner, /<meta property="og:title"/);
   assert.match(scanner, /<script src="\/js\/seo\.js"><\/script>/);
@@ -68,7 +68,7 @@ test("private utility surfaces stay out of the search index", () => {
 });
 
 test("marketplace sitemap always emits the canonical production host", () => {
-  assert.match(marketplaceSitemap, /const SITE = "https:\/\/www\.cardoriashop\.fr";/);
+  assert.match(marketplaceSitemap, /const SITE = "https:\/\/www\.cardiashop\.fr";/);
   assert.match(marketplaceRoutes, /generateMarketplaceSitemapXml\(entries\)/);
   assert.doesNotMatch(marketplaceRoutes, /MARKETPLACE_FRONTEND_URL \|\| process\.env\.FRONTEND_URL/);
 });
