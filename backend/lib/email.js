@@ -193,14 +193,14 @@ export function extractSuspicionReasons(text) {
   patterns.forEach((p) => {
     if (lower.includes(p.key)) reasons.push(p.label);
   });
-  if (!reasons.length) reasons.push("Analyse visuelle : confiance inférieure au seuil Cardoria (95 %)");
+  if (!reasons.length) reasons.push("Analyse visuelle : confiance inférieure au seuil Cardiashop (95 %)");
   return [...new Set(reasons)];
 }
 
 export async function sendCounterfeitAlert(request, rawResult, confidenceScore, imagesBase64) {
   const reasons = extractSuspicionReasons(rawResult);
   const text = [
-    "ALERTE CARDORIA — Suspicion de contrefaçon",
+    "ALERTE CARDIASHOP — Suspicion de contrefaçon",
     "",
     `ID : ${request.id}`,
     `Score de confiance : ${confidenceScore}% (seuil : ${CONFIDENCE_THRESHOLD}%)`,
@@ -228,7 +228,7 @@ export async function sendCounterfeitAlert(request, rawResult, confidenceScore, 
   ].join("\n");
 
   await sendEmail({
-    subject: `[Cardoria] Alerte contrefaçon — ${request.id} (${confidenceScore}%)`,
+    subject: `[Cardiashop] Alerte contrefaçon — ${request.id} (${confidenceScore}%)`,
     text,
     attachments: buildAttachments(imagesBase64)
   });
