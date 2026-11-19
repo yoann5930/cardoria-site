@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var A = window.CARDORIA_ASSETS || { logo: "/assets/logo/cardiashop-mark.svg" };
+  var A = window.CARDORIA_ASSETS || { logo: "/assets/logo/cardoria-premium.png" };
 
   function renderHeader() {
     var slot = document.getElementById("site-header");
