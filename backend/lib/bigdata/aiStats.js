@@ -1,5 +1,5 @@
 /**
- * Statistiques IA Cardoria Big Data.
+ * Statistiques IA Cardiashop Big Data.
  */
 import { getDb } from "../engine/database.js";
 

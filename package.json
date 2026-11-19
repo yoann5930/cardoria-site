@@ -1,0 +1,13 @@
+{
+  "name": "cardiashop-render-preview",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Root entrypoint for Render preview; backend remains the app source",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "postinstall": "npm --prefix backend install --omit=dev",
+    "start": "npm --prefix backend start"
+  }
+}

@@ -62,10 +62,10 @@
       '<section class="panel">' +
         '<div class="request-head">' +
           '<div><h1>' + title + '</h1><p>' + esc(order.id) + '</p></div>' +
-          '<img src="/assets/logo/cardoria-premium.png" style="width:130px" alt="Cardoria" onerror="this.onerror=null;this.src=\'/logo-cardoria.jpg\'">' +
+          '<img src="/assets/logo/cardoria-premium.png" style="width:130px" alt="Cardiashop" onerror="this.onerror=null;this.src=\'/logo-cardoria.jpg\'">' +
         '</div>' +
         '<div class="grid">' +
-          '<div><h3>Cardoria</h3><p>Email : Cardoria59330@gmail.com</p></div>' +
+          '<div><h3>Cardiashop</h3><p>Email : Cardoria59330@gmail.com</p></div>' +
           '<div><h3>Client</h3><p>' + esc(order.client || "") + '<br>' + esc(order.email || "") + (clientAddress ? '<br>' + clientAddress : '') + '</p></div>' +
           '<div><h3>Livraison</h3><p>' + esc(shippingLabel(order)) + '<br>' + tracking + '</p></div>' +
         '</div>' +
@@ -74,7 +74,7 @@
         '<button class="primary no-print" type="button" onclick="window.print()">Imprimer / PDF</button>' +
       '</section>';
 
-    document.title = title + " " + order.id + " | Cardoria";
+    document.title = title + " " + order.id + " | Cardiashop";
   }
 
   async function loadDocument() {

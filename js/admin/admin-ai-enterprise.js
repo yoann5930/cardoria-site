@@ -38,7 +38,7 @@
       "<div class='admin-kpi'><label>Ventes enregistrées</label><strong>" + (s.totalSalesRecorded || 0) + "</strong></div>" +
       "<div class='admin-kpi'><label>Ajustements auto</label><strong>" + (s.totalAdjustments || 0) + "</strong></div>" +
       "<div class='admin-kpi'><label>Fiabilité globale</label><strong>" + (d.globalReliability || 0) + "/100</strong></div>" +
-      "<div class='admin-kpi'><label>Cardoria Trend</label><strong>" + (d.cardoriaTrendIndex || 50) + "/100</strong></div>" +
+      "<div class='admin-kpi'><label>Cardiashop Trend</label><strong>" + (d.cardoriaTrendIndex || 50) + "/100</strong></div>" +
       "<div class='admin-kpi'><label>Prédictions</label><strong>" + (s.cardsWithPredictions || 0) + "</strong></div>" +
       "</div>" +
       "<p style='color:#baaf97;font-size:12px;margin-top:8px'>Calculé : " + (d.computedAt || "—") +

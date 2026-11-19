@@ -39,7 +39,7 @@ async function fetchText(url) {
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
   try {
     const response = await fetch(url, {
-      headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "Cardoria/6.0 ZebraDex verified-price-fallback" },
+      headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "Cardiashop/6.0 ZebraDex verified-price-fallback" },
       signal: controller.signal
     });
     if (!response.ok) return "";

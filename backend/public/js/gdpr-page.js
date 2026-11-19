@@ -4,7 +4,7 @@
   var TOKEN_KEY = "cardoria_session_token";
   function token() { return localStorage.getItem(TOKEN_KEY) || ""; }
   function headers() { var h = { "Content-Type": "application/json" }; if (token()) h.Authorization = "Bearer " + token(); return h; }
-  function requireLogin() { if (token()) return true; alert("Connectez-vous à votre compte Cardoria avant une demande RGPD."); return false; }
+  function requireLogin() { if (token()) return true; alert("Connectez-vous à votre compte Cardiashop avant une demande RGPD."); return false; }
 
   document.addEventListener("DOMContentLoaded", function () {
     var exportBtn = document.getElementById("gdprExport");

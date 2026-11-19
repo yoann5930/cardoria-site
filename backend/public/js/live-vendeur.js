@@ -3,7 +3,7 @@
   var M = window.CardoriaMarketplace, root = document.getElementById("root");
   if (!M || !root) return;
   if (!M.getToken()) {
-    root.innerHTML = "<p>Connectez-vous avec votre compte client Cardoria pour accéder au Live. <a href='client-login.html?mode=professional'>Se connecter</a>.</p>";
+    root.innerHTML = "<p>Connectez-vous avec votre compte client Cardiashop pour accéder au Live. <a href='client-login.html?mode=professional'>Se connecter</a>.</p>";
     return;
   }
   var publisherHandle = null, paymentTimer = null, selectedLiveId = "", sellerPlanState = null, sellerPlans = [], sessionFilter = "upcoming";
@@ -32,8 +32,8 @@
         ? "Marketplace : 3 % sur les 5 premières ventes, puis 5 %"
         : "Marketplace : 15 premières ventes/mois à 0 %, puis 3 %";
     var livePerk = plan.liveCardoriaShippingBuyerLimit > 0
-      ? "Port Cardoria : jusqu’à " + plan.liveCardoriaShippingBuyerLimit + " acheteur(s) distinct(s) par Live"
-      : "Port Cardoria : non inclus";
+      ? "Port Cardiashop : jusqu’à " + plan.liveCardoriaShippingBuyerLimit + " acheteur(s) distinct(s) par Live"
+      : "Port Cardiashop : non inclus";
     return "<article class='live-pro-plan" + (isCurrent ? " is-current" : "") + "'>" +
       "<div class='live-pro-plan-head'><strong>" + esc(plan.name) + "</strong><span>" + euro(plan.monthlyPriceEur) + "/mois</span></div>" +
       "<p>Commission Live : <strong>" + esc(percent(plan.liveCommissionRate)) + "</strong></p>" +
@@ -209,7 +209,7 @@
       "<div class='live-seller-studio live-studio'>",
       "<div id='liveProOverview'></div>",
       "<section class='live-pro-lives-panel'><div class='live-pro-lives-head'><div><span class='live-pro-eyebrow'>MES LIVES</span><h2>Gérer mes lives</h2></div><a class='live-pro-new-live' href='#liveCreateZone'>＋ Créer un live</a></div><div class='live-pro-tabs'><button type='button' data-live-filter='upcoming' class='is-active'>À venir</button><button type='button' data-live-filter='live'>En direct</button><button type='button' data-live-filter='past'>Passés</button></div><div id='lvSessions'></div></section>",
-      "<header class='live-studio-controls' id='liveStudioZone'><div><h2>Studio Live vendeur</h2><p id='liveSelectedSession'>Créez un Live pour commencer.</p><p><strong>Paiement des ventes : PayPal.</strong> La commission Cardoria suit votre abonnement.</p></div>",
+      "<header class='live-studio-controls' id='liveStudioZone'><div><h2>Studio Live vendeur</h2><p id='liveSelectedSession'>Créez un Live pour commencer.</p><p><strong>Paiement des ventes : PayPal.</strong> La commission Cardiashop suit votre abonnement.</p></div>",
       "<div class='live-studio-control-btns'>",
       "<button class='live-studio-btn live-studio-btn--go' type='button' id='lvStart'>Démarrer le Live</button>",
       "<button class='live-studio-btn live-studio-btn--pause' type='button' id='lvPause'>Pause</button>",
@@ -271,11 +271,11 @@
   function boot(seller) {
     seller = seller || M.getSeller();
     if (!seller) {
-      root.innerHTML = "<p>Ce compte Cardoria n’est pas encore configuré pour le Live. <a href='/client-login.html?mode=professional'>Ouvrir Mon compte</a> et choisissez Professionnel.</p>";
+      root.innerHTML = "<p>Ce compte Cardiashop n’est pas encore configuré pour le Live. <a href='/client-login.html?mode=professional'>Ouvrir Mon compte</a> et choisissez Professionnel.</p>";
       return;
     }
     if (seller.sellerType !== "professional" || !seller.professionalVerified) {
-      root.innerHTML = "<p>Votre compte Cardoria est connecté, mais le Studio Live nécessite le profil Professionnel avec SIRET vérifié. <a href='/client-login.html?mode=professional'>Ouvrir Mon compte</a>.</p>";
+      root.innerHTML = "<p>Votre compte Cardiashop est connecté, mais le Studio Live nécessite le profil Professionnel avec SIRET vérifié. <a href='/client-login.html?mode=professional'>Ouvrir Mon compte</a>.</p>";
       return;
     }
     shell();

@@ -99,9 +99,9 @@ assert(buyerTracking.response.status === 403, "Buyer can modify seller tracking"
 updateOrderStatus(order.id, "paid", { paymentStatus: "paid", paymentMethod: "paypal" });
 const sellerTracking = await auth(sellerAccountA.token, `/api/marketplace/v1/sellers/${sellerA.id}/orders/${order.id}/tracking`, {
   method: "PUT",
-  body: JSON.stringify({ status: "shipped", tracking: "CARDORIA-E2E-TRACK" })
+  body: JSON.stringify({ status: "shipped", tracking: "CARDIASHOP-E2E-TRACK" })
 });
-assert(sellerTracking.response.status === 200 && sellerTracking.body.order?.shippingTracking === "CARDORIA-E2E-TRACK", "Seller tracking update failed");
+assert(sellerTracking.response.status === 200 && sellerTracking.body.order?.shippingTracking === "CARDIASHOP-E2E-TRACK", "Seller tracking update failed");
 
 const outsiderInvoice = await auth(buyerB.token, `/api/marketplace/v1/orders/${order.id}/invoice`);
 assert(outsiderInvoice.response.status === 403, "Unrelated buyer can access Marketplace invoice");

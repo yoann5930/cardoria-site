@@ -21,7 +21,7 @@
     if (error && error.name === "AbortError") {
       return "Le serveur met trop de temps à répondre. Réessayez.";
     }
-    return "Connexion au serveur Cardoria impossible. Rechargez la page puis réessayez.";
+    return "Connexion au serveur Cardiashop impossible. Rechargez la page puis réessayez.";
   }
 
   async function postJson(path, body) {

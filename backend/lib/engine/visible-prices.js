@@ -32,7 +32,7 @@ function shouldRetryMissing(row) {
 async function fetchJson(language, path) {
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 30000), lang = normalizeLanguage(language);
   try {
-    const response = await fetch(`${API_ROOT}/${lang}${path}`, { headers: { Accept: "application/json", "User-Agent": "Cardoria/6.0" }, signal: controller.signal });
+    const response = await fetch(`${API_ROOT}/${lang}${path}`, { headers: { Accept: "application/json", "User-Agent": "Cardiashop/6.0" }, signal: controller.signal });
     if (!response.ok) throw new Error(`TCGdex ${response.status} ${lang}${path}`);
     return await response.json();
   } finally { clearTimeout(timer); }

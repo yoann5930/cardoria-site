@@ -1,4 +1,4 @@
-/** Profils vendeurs — identite Cardoria, evaluations et statut PayPal. */
+/** Profils vendeurs — identite Cardiashop, evaluations et statut PayPal. */
 import { getDb } from "../engine/database.js";
 import { getSellerPlanState } from "../subscriptions/seller-plans.js";
 import { makeMarketId } from "./migrate.js";
@@ -44,14 +44,14 @@ export function registerSeller({ email, displayName, sellerType, bio, authUserId
   const db = getDb();
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const ownerId = String(authUserId || "").trim();
-  if (!ownerId) throw Object.assign(new Error("Identite Cardoria requise pour creer un vendeur."), { status: 401 });
+  if (!ownerId) throw Object.assign(new Error("Identite Cardiashop requise pour creer un vendeur."), { status: 401 });
   const owned = getSellerByAuthUserId(ownerId);
   if (owned) return owned;
   const existing = getSellerByEmail(normalizedEmail);
   if (existing) {
     if (existing.authUserId === ownerId) return existing;
     // Un profil historique non lie ne peut jamais etre revendique sur la seule preuve d'un email saisi.
-    throw Object.assign(new Error("Ce profil vendeur historique doit etre reactive par Cardoria apres verification d'identite."), { status: 409, code: 409 });
+    throw Object.assign(new Error("Ce profil vendeur historique doit etre reactive par Cardiashop apres verification d'identite."), { status: 409, code: 409 });
   }
   const id = makeMarketId("SLR");
   const now = new Date().toISOString();

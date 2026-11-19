@@ -128,7 +128,7 @@
     });
   }
 
-  A.renderShell("ai", "IA Premium Cardoria", "Validations, feedback et apprentissage continu",
+  A.renderShell("ai", "IA Premium Cardiashop", "Validations, feedback et apprentissage continu",
     '<div class="admin-panel"><p id="aiStats">Chargement…</p></div>' +
     '<div class="admin-grid-2"><div class="admin-panel"><h2>Analyses récentes</h2><div id="aiList"></div></div>' +
     '<div class="admin-panel"><h2>Détail & feedback</h2><div id="aiDetail"><p style="color:#baaf97">Sélectionnez une analyse</p></div></div></div>');

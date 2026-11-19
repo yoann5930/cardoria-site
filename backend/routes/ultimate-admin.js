@@ -1,5 +1,5 @@
 /**
- * Administration Cardoria Ultimate Enterprise.
+ * Administration Cardiashop Ultimate Enterprise.
  */
 import { Router } from "express";
 import { requireAdmin } from "../lib/auth.js";

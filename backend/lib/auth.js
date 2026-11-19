@@ -1,5 +1,5 @@
 /**
- * Authentification Cardoria — sessions serveur uniquement.
+ * Authentification Cardiashop — sessions serveur uniquement.
  */
 import { validateSession } from "./auth/session.js";
 import { roleCan, ADMIN_ROLES } from "./auth/users.js";

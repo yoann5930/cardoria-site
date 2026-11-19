@@ -1,4 +1,4 @@
-# Cardoria — Production
+# Cardiashop — Production
 
 Ce document décrit uniquement l’architecture de production actuelle.
 
@@ -6,10 +6,10 @@ Ce document décrit uniquement l’architecture de production actuelle.
 
 - Dépôt : `yoann5930/cardoria-site`
 - Branche de production : `main`
-- URL publique canonique : `https://www.cardoriashop.fr`
+- URL publique canonique : `https://www.cardiashop.fr`
 - Hébergement de production : VPS OVH
 
-Les anciennes infrastructures Render, Vercel et Oracle ne font plus partie de la production Cardoria.
+Les anciennes infrastructures Render, Vercel et Oracle ne font plus partie de la production Cardiashop.
 
 ## Frontend et backend
 
@@ -37,7 +37,7 @@ Aucun secret, mot de passe, clé SSH ou valeur sensible ne doit être ajouté à
 2. Les contrôles CI doivent être verts avant fusion.
 3. La branche validée est fusionnée dans `main`.
 4. Une opération OVH explicite et autorisée est ensuite nécessaire pour modifier le VPS de production.
-5. La production n’est considérée validée qu’après contrôles réels sur `https://www.cardoriashop.fr`.
+5. La production n’est considérée validée qu’après contrôles réels sur `https://www.cardiashop.fr`.
 
 Une simple modification GitHub ou une fusion de branche ne doit pas être présentée comme un déploiement OVH réussi.
 

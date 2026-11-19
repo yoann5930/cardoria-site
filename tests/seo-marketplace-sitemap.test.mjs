@@ -21,7 +21,7 @@ test("marketplace sitemap emits only clean public listing URLs", () => {
     { url: "/annonces/test?a=1&b=2", lastmod: "invalid" },
     { url: "/admin-secret", lastmod: "2026-09-24" }
   ]);
-  assert.match(xml, /<loc>https:\/\/www\.cardoriashop\.fr\/annonces\/pikachu-ex-123<\/loc>/);
+  assert.match(xml, /<loc>https:\/\/www\.cardiashop\.fr\/annonces\/pikachu-ex-123<\/loc>/);
   assert.match(xml, /<lastmod>2026-09-24<\/lastmod>/);
   assert.match(xml, /test\?a=1&amp;b=2/);
   assert.doesNotMatch(xml, /<lastmod>invalid<\/lastmod>/);

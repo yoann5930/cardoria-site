@@ -26,7 +26,7 @@ function providerFor(order) {
 
 function senderAddress() {
   const address = {
-    recipientName: clean(process.env.CARDORIA_SENDER_NAME || "Cardoria", 120),
+    recipientName: clean(process.env.CARDORIA_SENDER_NAME || "Cardiashop", 120),
     addressLine1: clean(process.env.CARDORIA_SENDER_ADDRESS_LINE1, 160),
     addressLine2: clean(process.env.CARDORIA_SENDER_ADDRESS_LINE2, 160),
     postalCode: clean(process.env.CARDORIA_SENDER_POSTAL_CODE, 24),
@@ -35,12 +35,12 @@ function senderAddress() {
     phone: clean(process.env.CARDORIA_SENDER_PHONE, 32)
   };
   if (!address.recipientName || !address.addressLine1 || !address.postalCode || !address.city) {
-    throw fail("CARDORIA_SENDER_NOT_CONFIGURED", "Adresse expéditeur Cardoria incomplète.", 503);
+    throw fail("CARDORIA_SENDER_NOT_CONFIGURED", "Adresse expéditeur Cardiashop incomplète.", 503);
   }
   return {
     address,
     email: clean(process.env.CARDORIA_SENDER_EMAIL, 254),
-    companyName: clean(process.env.CARDORIA_SENDER_NAME || "Cardoria", 160)
+    companyName: clean(process.env.CARDORIA_SENDER_NAME || "Cardiashop", 160)
   };
 }
 

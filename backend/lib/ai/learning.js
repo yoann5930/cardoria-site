@@ -1,5 +1,5 @@
 /**
- * Système d'apprentissage continu Cardoria — enregistrement, feedback, few-shot.
+ * Système d'apprentissage continu Cardiashop — enregistrement, feedback, few-shot.
  * Architecture normalisée compatible montée en charge (PostgreSQL / object storage).
  */
 import crypto from "crypto";

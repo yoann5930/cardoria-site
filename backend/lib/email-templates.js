@@ -1,4 +1,4 @@
-const PUBLIC_ORIGIN = "https://www.cardoriashop.fr";
+const PUBLIC_ORIGIN = "https://www.cardiashop.fr";
 const LOGO_URL = `${PUBLIC_ORIGIN}/assets/logo/cardoria-premium.png`;
 const CONTACT = "Cardoria59330@gmail.com";
 
@@ -27,7 +27,7 @@ export function renderCardoriaEmail({
   actionLabel = "",
   details = []
 } = {}) {
-  const safeTitle = escapeEmailHtml(title || "Cardoria");
+  const safeTitle = escapeEmailHtml(title || "Cardiashop");
   const safeActionUrl = String(actionUrl || "").trim();
   const button = safeActionUrl && actionLabel
     ? `<p style="margin:28px 0 8px;text-align:center;">
@@ -60,8 +60,8 @@ export function renderCardoriaEmail({
         <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;">
           <tr>
             <td style="background:#030303;padding:22px 28px;text-align:center;">
-              <img src="${LOGO_URL}" alt="Cardoria" width="56" height="56" style="display:block;margin:0 auto 10px;border:0;">
-              <p style="margin:0;font-family:Georgia,serif;letter-spacing:.18em;color:#c9a227;font-size:13px;">CARDORIA</p>
+              <img src="${LOGO_URL}" alt="Cardiashop" width="56" height="56" style="display:block;margin:0 auto 10px;border:0;">
+              <p style="margin:0;font-family:Georgia,serif;letter-spacing:.18em;color:#c9a227;font-size:13px;">CARDIASHOP</p>
             </td>
           </tr>
           <tr>
@@ -74,8 +74,8 @@ export function renderCardoriaEmail({
           </tr>
           <tr>
             <td style="padding:0 28px 28px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#6b6b6b;">
-              Cardoria · Boutique de cartes à collectionner<br>
-              <a href="${PUBLIC_ORIGIN}" style="color:#8a6d1f;text-decoration:none;">www.cardoriashop.fr</a>
+              Cardiashop · Boutique de cartes à collectionner<br>
+              <a href="${PUBLIC_ORIGIN}" style="color:#8a6d1f;text-decoration:none;">www.cardiashop.fr</a>
               · ${escapeEmailHtml(CONTACT)}
             </td>
           </tr>
@@ -93,7 +93,7 @@ export function renderCardoriaEmail({
     ...(details || []).filter((row) => row?.label).map((row) => `${row.label} : ${row.value || "—"}`),
     safeActionUrl ? `\n${actionLabel || "Lien"} : ${safeActionUrl}` : "",
     "",
-    "Cardoria — https://www.cardoriashop.fr"
+    "Cardiashop — https://www.cardiashop.fr"
   ];
 
   return { html, text: textParts.join("\n").replace(/\n{3,}/g, "\n\n").trim() };

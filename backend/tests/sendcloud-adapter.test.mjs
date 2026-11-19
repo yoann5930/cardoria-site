@@ -107,7 +107,7 @@ test("malformed JSON, oversized responses and provider errors fail without expos
 test("network failures are not automatically retried", async () => {
   let calls = 0; await mocked(async () => { calls++; throw new Error("secret internal response"); }, async () => assert.rejects(sc.searchMondialRelayServicePoints({ postalCode: "59330" }), { code: "SENDCLOUD_NETWORK_ERROR" })); assert.equal(calls, 1);
 });
-test("read-only shipment lookup retrieves tracking by exact Cardoria order number", async () => {
+test("read-only shipment lookup retrieves tracking by exact Cardiashop order number", async () => {
   await mocked(async (url, init) => {
     assert.match(url, /\/shipments\?/);
     assert.match(url, /order_number=CMD-123/);

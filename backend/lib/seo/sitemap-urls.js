@@ -2,7 +2,7 @@
  * Rules for URLs that may appear in public sitemaps.
  * Keep this module free of database I/O so tests can import it directly.
  */
-export const SITE = "https://www.cardoriashop.fr";
+export const SITE = "https://www.cardiashop.fr";
 
 // Must match a real public template under pages/licences/<slug>/index.html.
 // Catalog-only licenses (for example starwars) stay out of the sitemap until a page exists.

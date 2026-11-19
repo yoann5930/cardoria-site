@@ -1,5 +1,5 @@
 /**
- * Moteur Cardoria Trend — exploding, falling, undervalued, overvalued, rare_popular.
+ * Moteur Cardiashop Trend — exploding, falling, undervalued, overvalued, rare_popular.
  */
 import { getDb } from "../engine/database.js";
 import { getCardById } from "../engine/cards.js";

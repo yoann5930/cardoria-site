@@ -1,4 +1,4 @@
-/* Cardoria Marketplace — catégories puis annonces */
+/* Cardiashop Marketplace — catégories puis annonces */
 .mk-page{padding:34px 0 64px}
 .mk-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;margin-bottom:42px;padding:34px;border:1px solid rgba(212,175,55,.18);border-radius:22px;background:linear-gradient(145deg,rgba(212,175,55,.06),rgba(255,255,255,.018))}
 .mk-hero h1{margin:10px 0 10px;color:#ffe18a;font-size:clamp(30px,4.5vw,52px);line-height:1.05}

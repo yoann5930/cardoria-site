@@ -68,7 +68,7 @@ export async function verifyFrenchProfessionalSiret(rawSiret) {
     response = await fetch(url, {
       headers: {
         Accept: "application/json",
-        "User-Agent": "Cardoria/6.0 professional-verification (cardoriashop.fr)"
+        "User-Agent": "Cardiashop/6.0 professional-verification (cardiashop.fr)"
       },
       signal: controller.signal
     });

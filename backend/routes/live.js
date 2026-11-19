@@ -1,4 +1,4 @@
-/** Routes publiques et vendeur Live Cardoria. */
+/** Routes publiques et vendeur Live Cardiashop. */
 import { Router } from "express";
 import { logAudit } from "../lib/audit.js";
 import { ADMIN_ROLES } from "../lib/auth.js";
@@ -34,7 +34,7 @@ function sellerActor(req) {
   const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "") || String(req.headers["x-session-token"] || "");
   const user = validateSession(token);
   if (!user || user.role !== "client") {
-    throw Object.assign(new Error("Connexion client Cardoria requise."), { status: 401, code: "CLIENT_SESSION_REQUIRED" });
+    throw Object.assign(new Error("Connexion client Cardiashop requise."), { status: 401, code: "CLIENT_SESSION_REQUIRED" });
   }
   if (user.accountType !== "professional") {
     throw Object.assign(new Error("Activez le profil Professionnel dans Mon compte pour accéder au Studio Live."), { status: 403, code: "CLIENT_PROFESSIONAL_PROFILE_REQUIRED" });
@@ -67,12 +67,12 @@ function sanitizePublicValue(value) {
   return value;
 }
 function publicHostName(session) {
-  if (String(session?.ownerRole || "").toLowerCase() === "admin") return "Cardoria";
+  if (String(session?.ownerRole || "").toLowerCase() === "admin") return "Cardiashop";
   try {
     const name = String(getSeller(session?.ownerId)?.displayName || "").trim();
     if (name) return name.slice(0, 80);
   } catch {}
-  return "Liveur Cardoria";
+  return "Liveur Cardiashop";
 }
 function publicCoverUrl(session) {
   try {

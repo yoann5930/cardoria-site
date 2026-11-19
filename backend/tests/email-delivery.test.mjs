@@ -14,9 +14,13 @@ test("public site origin never leaks localhost, Render or Vercel into customer m
     process.env.SITE_URL = "http://127.0.0.1:10000";
     process.env.FRONTEND_URL = "https://cardoria-site-2.onrender.com";
     process.env.PUBLIC_SITE_URL = "";
-    assert.equal(publicSiteOrigin(), "https://www.cardoriashop.fr");
+    assert.equal(publicSiteOrigin(), "https://www.cardiashop.fr");
     process.env.SITE_URL = "https://cardoriashop.fr";
-    assert.equal(publicSiteOrigin(), "https://www.cardoriashop.fr");
+    assert.equal(publicSiteOrigin(), "https://www.cardiashop.fr");
+    process.env.SITE_URL = "https://www.cardoriashop.fr";
+    assert.equal(publicSiteOrigin(), "https://www.cardiashop.fr");
+    process.env.PUBLIC_SITE_URL = "https://cardiashop.fr";
+    assert.equal(publicSiteOrigin(), "https://www.cardiashop.fr");
   } finally {
     for (const [key, value] of Object.entries(previous)) {
       if (value == null) delete process.env[key];
@@ -25,18 +29,19 @@ test("public site origin never leaks localhost, Render or Vercel into customer m
   }
 });
 
-test("Cardoria email template is branded and has a visible action plus fallback URL", () => {
+test("Cardiashop email template is branded and has a visible action plus fallback URL", () => {
   const rendered = renderCardoriaEmail({
-    title: "Réinitialisez votre mot de passe Cardoria",
+    title: "Réinitialisez votre mot de passe Cardiashop",
     bodyText: "Un lien sécurisé vous a été envoyé.",
-    actionUrl: "https://www.cardoriashop.fr/reset-password.html?token=abc",
+    actionUrl: "https://www.cardiashop.fr/reset-password.html?token=abc",
     actionLabel: "Choisir un nouveau mot de passe",
     details: [{ label: "Commande", value: "CMD-1" }]
   });
-  assert.match(rendered.html, /CARDORIA/);
+  assert.match(rendered.html, /CARDIASHOP/);
   assert.match(rendered.html, /Choisir un nouveau mot de passe/);
   assert.match(rendered.html, /Si le bouton ne fonctionne pas/);
-  assert.match(rendered.html, /www\.cardoriashop\.fr\/reset-password\.html\?token=abc/);
+  assert.match(rendered.html, /www\.cardiashop\.fr\/reset-password\.html\?token=abc/);
+  assert.match(rendered.html, /Cardoria59330@gmail\.com/);
   assert.doesNotMatch(rendered.html + rendered.text, /localhost|127\.0\.0\.1|onrender\.com|vercel\.app/);
 });
 

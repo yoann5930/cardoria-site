@@ -21,7 +21,7 @@ async function fetchJson(language, path, attempt = 0) {
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const response = await fetch(`${API_ROOT}/${language}${path}`, {
-      headers: { Accept: "application/json", "User-Agent": "Cardoria/6.0 rarity-fast-repair" },
+      headers: { Accept: "application/json", "User-Agent": "Cardiashop/6.0 rarity-fast-repair" },
       signal: controller.signal
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);

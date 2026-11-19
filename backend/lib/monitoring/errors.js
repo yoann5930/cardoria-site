@@ -39,11 +39,11 @@ export function logError({ message, stack, route, user, severity = "error", meta
   log.unshift(entry);
   saveLog(log);
 
-  console.error(`[Cardoria ${severity}] ${entry.route} — ${entry.message}`);
+  console.error(`[Cardiashop ${severity}] ${entry.route} — ${entry.message}`);
 
   if (severity === "critical" && process.env.ALERT_EMAIL === "true") {
     sendEmail({
-      subject: `[Cardoria CRITIQUE] ${entry.message.slice(0, 80)}`,
+      subject: `[Cardiashop CRITIQUE] ${entry.message.slice(0, 80)}`,
       text: JSON.stringify(entry, null, 2)
     }).catch(() => {});
   }

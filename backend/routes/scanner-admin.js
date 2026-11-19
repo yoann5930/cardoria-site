@@ -1,5 +1,5 @@
 /**
- * Administration Scanner Intelligent Cardoria.
+ * Administration Scanner Intelligent Cardiashop.
  */
 import { Router } from "express";
 import { requireAdmin } from "../lib/auth.js";

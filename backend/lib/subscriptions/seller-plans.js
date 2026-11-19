@@ -46,7 +46,7 @@ export function getSellerPlanState(sellerId) {
 
 export function assertActiveSellerPlan(sellerId) {
   const state = getSellerPlanState(sellerId);
-  if (!state.active) throw Object.assign(new Error("Un abonnement vendeur Cardoria actif est requis."), { code: 409, status: 409 });
+  if (!state.active) throw Object.assign(new Error("Un abonnement vendeur Cardiashop actif est requis."), { code: 409, status: 409 });
   return state;
 }
 

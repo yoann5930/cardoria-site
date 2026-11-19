@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow,noarchive">
-<title>Paiement confirmé — Cardoria Marketplace</title>
+<title>Paiement confirmé — Cardiashop Marketplace</title>
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/css/marketplace.css?v=3">
 <link rel="stylesheet" href="/css/marketplace-paypal.css?v=1">
@@ -12,7 +12,7 @@
 </head>
 <body>
 <main class="container mk-page" style="text-align:center;padding:60px 20px">
-<span class="mk-eyebrow">MARKETPLACE CARDORIA</span>
+<span class="mk-eyebrow">MARKETPLACE CARDIASHOP</span>
 <h1 style="color:#ffe18a">Confirmation du paiement</h1>
 <p id="msg">Validation de votre paiement PayPal en cours…</p>
 <div id="paymentDetails" class="mk-payment-result"></div>
@@ -33,7 +33,7 @@
     details.className = "mk-payment-result is-error";
   }
   if ((provider === "paypal" || paypalOrderId) && paypalOrderId) {
-    if (!M.getToken()) { fail("Votre session Cardoria a expiré. Reconnectez-vous dans Mes commandes ; le serveur PayPal continue la synchronisation."); return; }
+    if (!M.getToken()) { fail("Votre session Cardiashop a expiré. Reconnectez-vous dans Mes commandes ; le serveur PayPal continue la synchronisation."); return; }
     fetch(M.BACKEND + "/api/marketplace/v1/paypal/orders/" + encodeURIComponent(paypalOrderId) + "/capture", {
       method: "POST",
       headers: M.authHeaders(),

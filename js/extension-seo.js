@@ -4,7 +4,7 @@
   var route = window.CARDORIA_EXTENSION_ROUTE || {};
   var license = route.license || params.get("license") || "pokemon";
   var extSlug = route.ext || params.get("ext") || "";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardiashop.fr";
   var root = document.getElementById("extensionRoot");
   var E = window.CardoriaEngine;
 
@@ -38,10 +38,10 @@
       if (!ext) throw new Error("extension_not_found");
       var name = ext.extension;
       var licName = (window.CARDORIA_SEO.licenses[license] || {}).name || license;
-      var siteUrl = (window.CARDORIA_SEO && CARDORIA_SEO.siteUrl) || "https://www.cardoriashop.fr";
+      var siteUrl = (window.CARDORIA_SEO && CARDORIA_SEO.siteUrl) || "https://www.cardiashop.fr";
       var canonical = siteUrl + "/extensions/" + encodeURIComponent(license) + "/" + encodeURIComponent(extSlug);
-      var title = name + " — cartes, prix & liste " + licName + " | Cardoria";
-      var description = "Découvrez les cartes " + name + " (" + licName + ") : liste, numéros, raretés et données de prix. " + Number(ext.cardCount || 0) + " cartes référencées sur Cardoria.";
+      var title = name + " — cartes, prix & liste " + licName + " | Cardiashop";
+      var description = "Découvrez les cartes " + name + " (" + licName + ") : liste, numéros, raretés et données de prix. " + Number(ext.cardCount || 0) + " cartes référencées sur Cardiashop.";
 
       window.CARDORIA_SEO_PAGE = {
         title: title,
@@ -76,7 +76,7 @@
         root.innerHTML =
           '<nav class="engine-breadcrumb"><a href="/">Accueil</a> › <a href="/pages/licences/' + encodeURIComponent(license) + '/">' + escapeHtml(licName) + '</a> › ' + escapeHtml(name) + "</nav>" +
           "<h1>Cartes " + escapeHtml(name) + " — " + escapeHtml(licName) + "</h1>" +
-          '<p class="seo-lead">Liste des cartes de l\'extension ' + escapeHtml(name) + " : numéros, raretés, visuels et données de prix disponibles sur Cardoria. " + Number(ext.cardCount || 0) + " cartes sont actuellement référencées.</p>" +
+          '<p class="seo-lead">Liste des cartes de l\'extension ' + escapeHtml(name) + " : numéros, raretés, visuels et données de prix disponibles sur Cardiashop. " + Number(ext.cardCount || 0) + " cartes sont actuellement référencées.</p>" +
           '<div class="seo-links"><a href="/pages/licences/' + encodeURIComponent(license) + '/">Toutes les extensions ' + escapeHtml(licName) + '</a><a href="/pages/estimation/">Estimer une carte</a><a href="/marketplace.html">Marketplace</a></div>' +
           '<section class="seo-section"><h2>Liste des cartes ' + escapeHtml(name) + '</h2><div class="seo-grid">' + (grid || "<p>Aucune carte indexée.</p>") + "</div></section>" +
           '<section class="seo-section"><h2>Prix et cote de l\'extension ' + escapeHtml(name) + "</h2><p>Ouvrez une fiche carte pour consulter les informations disponibles sur son numéro, sa rareté, son image et ses données de prix. Les valeurs peuvent évoluer avec le marché et l'état réel de la carte.</p></section>";

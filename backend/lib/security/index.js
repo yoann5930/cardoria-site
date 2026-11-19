@@ -86,6 +86,8 @@ export function applySecurityMiddleware(app) {
   });
 
   const allowedOrigins = [...new Set([
+    "https://www.cardiashop.fr",
+    "https://cardiashop.fr",
     "https://www.cardoriashop.fr",
     "https://cardoriashop.fr",
     ...((process.env.CORS_ORIGINS || process.env.SITE_URL || "").split(",").map((s) => s.trim()).filter(Boolean))
@@ -119,5 +121,5 @@ export function errorHandler(err, req, res, next) {
   const status = err.status || err.statusCode || 500;
   const isProd = process.env.NODE_ENV === "production";
   logError({ message: err.message, stack: err.stack, route: req.method + " " + req.path, user: req.authUser?.email || "anonymous", severity: status >= 500 ? "critical" : "error" });
-  res.status(status).json({ ok: false, error: isProd && status >= 500 ? "Erreur serveur Cardoria." : (err.message || "Erreur serveur"), requestId: req.requestId });
+  res.status(status).json({ ok: false, error: isProd && status >= 500 ? "Erreur serveur Cardiashop." : (err.message || "Erreur serveur"), requestId: req.requestId });
 }

@@ -47,8 +47,8 @@
     }
 
     if (license) {
-      document.title = "Catalogue " + license.name + " — Cardoria";
-      setMeta("description", "Parcourez " + license.cardCount + " cartes " + license.name + " sur Cardoria.");
+      document.title = "Catalogue " + license.name + " — Cardiashop";
+      setMeta("description", "Parcourez " + license.cardCount + " cartes " + license.name + " sur Cardiashop.");
     }
   }
 

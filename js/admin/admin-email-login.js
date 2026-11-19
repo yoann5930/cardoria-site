@@ -4,7 +4,7 @@
   const status = document.getElementById("magicLoginStatus");
   const error = document.getElementById("magicLoginError");
   const token = new URLSearchParams(window.location.search).get("token") || "";
-  const BACKEND = window.CARDORIA_BACKEND || (window.CARDORIA_SEO && window.CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
+  const BACKEND = window.CARDORIA_BACKEND || (window.CARDORIA_SEO && window.CARDORIA_SEO.backendUrl) || "https://www.cardiashop.fr";
   const ADMIN_ROLES = ["super_admin", "admin", "employee"];
   let challengeToken = "";
 

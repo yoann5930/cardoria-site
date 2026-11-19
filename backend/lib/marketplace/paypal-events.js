@@ -1,4 +1,4 @@
-/** PayPal webhooks + remboursements Marketplace Cardoria. */
+/** PayPal webhooks + remboursements Marketplace Cardiashop. */
 import { handleVerifiedLiveFinancialEvent } from "../live/paypal-capture-validation.js";
 import { getDb } from "../engine/database.js";
 import { getSeller } from "./sellers.js";

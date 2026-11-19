@@ -1,10 +1,10 @@
 /**
- * Affichage client IA Premium — Intelligence Cardoria (champs limités).
+ * Affichage client IA Premium — Intelligence Cardiashop (champs limités).
  */
 (function (global) {
   "use strict";
 
-  var BACKEND = (global.CARDORIA_SEO && global.CARDORIA_SEO.backendUrl) || global.CARDORIA_BACKEND || "https://www.cardoriashop.fr";
+  var BACKEND = (global.CARDORIA_SEO && global.CARDORIA_SEO.backendUrl) || global.CARDORIA_BACKEND || "https://www.cardiashop.fr";
 
   function euro(n) {
     if (n == null || n === "") return "—";
@@ -46,7 +46,7 @@
 
     return (
       "<div class='ai-enterprise'>" +
-      "<h3 style='color:#ffe18a;margin:18px 0 10px'>Indice du marché Cardoria</h3>" +
+      "<h3 style='color:#ffe18a;margin:18px 0 10px'>Indice du marché Cardiashop</h3>" +
       "<div class='ai-prices ai-prices--premium'>" +
       "<div class='ai-price-box rec'><label>Prix conseillé</label><strong>" + euro(est.recommendedPrice) + "</strong></div>" +
       "<div class='ai-price-box'><label>Indice marché</label><strong>" + (mi.score != null ? mi.score + "/100" : "—") + "</strong>" +
@@ -89,13 +89,13 @@
     var rec = data.recommendation || {};
     return (
       "<div class='ai-intelligence'>" +
-      "<h3 style='color:#ffe18a;margin:16px 0 10px'>Intelligence Cardoria</h3>" +
+      "<h3 style='color:#ffe18a;margin:16px 0 10px'>Intelligence Cardiashop</h3>" +
       "<div class='ai-prices ai-prices--premium'>" +
       "<div class='ai-price-box rec'><label>Prix conseillé</label><strong>" + euro(data.recommendedPrice) + "</strong></div>" +
       "<div class='ai-price-box'><label>Vente conseillée</label><strong>" + euro(data.salePrice) + "</strong></div>" +
-      "<div class='ai-price-box'><label>Rachat Cardoria</label><strong>" + (data.buybackPrice != null ? euro(data.buybackPrice) : "Sur examen") + "</strong></div>" +
+      "<div class='ai-price-box'><label>Rachat Cardiashop</label><strong>" + (data.buybackPrice != null ? euro(data.buybackPrice) : "Sur examen") + "</strong></div>" +
       (data.cardoriaScore != null
-        ? "<div class='ai-score-ring'><label>Score Cardoria</label><strong>" + data.cardoriaScore + "<span>/100</span></strong></div>"
+        ? "<div class='ai-score-ring'><label>Score Cardiashop</label><strong>" + data.cardoriaScore + "<span>/100</span></strong></div>"
         : "") +
       "</div>" +
       (rec.label
@@ -130,7 +130,7 @@
       (detectionHtml ? "<h3 style='color:#ffe18a;margin:16px 0 8px'>Reconnaissance automatique</h3><div class='ai-detection'>" + detectionHtml + "</div>" : "") +
       renderIntelligencePanel(intel) +
       renderEnterprisePanel(data.enterprise) +
-      "<h3 style='color:#ffe18a;margin:20px 0 8px'>Analyse Cardoria</h3>" +
+      "<h3 style='color:#ffe18a;margin:20px 0 8px'>Analyse Cardiashop</h3>" +
       "<div class='ai-message'>" + safeMultiline(data.clientResult || "") + "</div>" +
       (data.cardId ? "<p style='margin-top:14px'><a href='carte.html?id=" + encodeURIComponent(data.cardId) + "' style='color:#ffe18a'>Voir la fiche catalogue →</a></p>" : "") +
       "</div>";

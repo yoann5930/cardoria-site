@@ -60,7 +60,7 @@
 
   function explainGetUserMediaError(error, opts) {
     opts = opts || {};
-    var host = opts.host || (typeof location !== "undefined" && location.hostname) || "cardoriashop.fr";
+    var host = opts.host || (typeof location !== "undefined" && location.hostname) || "cardiashop.fr";
     var name = String(error && error.name || "");
     var message = String(error && error.message || "");
     if (name === "NotAllowedError" || /permission denied/i.test(message)) {

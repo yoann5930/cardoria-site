@@ -31,7 +31,7 @@
     if (!result) return;
 
     var text = (result.textContent || "").trim();
-    if (!text || /Analyse IA Cardoria en cours|Erreur/i.test(text)) return;
+    if (!text || /Analyse IA Cardiashop en cours|Erreur/i.test(text)) return;
     if (document.getElementById("estimateSellAction")) return;
 
     var box = document.createElement("div");
@@ -40,10 +40,10 @@
     box.innerHTML =
       '<div class="estimate-sell-action__copy">' +
         '<span>Vous souhaitez la vendre ?</span>' +
-        '<strong>Proposez cette carte à Cardoria</strong>' +
+        '<strong>Proposez cette carte à Cardiashop</strong>' +
         '<p>Les informations déjà renseignées sont reprises automatiquement.</p>' +
       '</div>' +
-      '<a class="estimate-sell-action__button" href="' + buildSellUrl() + '">Vendre cette carte à Cardoria</a>';
+      '<a class="estimate-sell-action__button" href="' + buildSellUrl() + '">Vendre cette carte à Cardiashop</a>';
 
     result.insertAdjacentElement("afterend", box);
   }

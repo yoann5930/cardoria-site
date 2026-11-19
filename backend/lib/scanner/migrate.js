@@ -1,5 +1,5 @@
 /**
- * Schéma Scanner Intelligent Cardoria.
+ * Schéma Scanner Intelligent Cardiashop.
  */
 import { getDb } from "../engine/database.js";
 

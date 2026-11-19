@@ -42,7 +42,7 @@ export function buildCardSeoMeta(card = {}) {
   const licenseName = seoLicenseName(card);
   const identity = [name, number].filter(Boolean).join(" ");
 
-  const titleSuffix = `– Carte ${licenseName}, prix & cote | Cardoria`;
+  const titleSuffix = `– Carte ${licenseName}, prix & cote | Cardiashop`;
   const titleContext = [identity, extension, languageCode].filter(Boolean).join(" ");
   const title = compactSeoTitle(titleContext, titleSuffix);
 
@@ -51,10 +51,10 @@ export function buildCardSeoMeta(card = {}) {
   context.push(`version ${languageCode}`);
   if (rarity) context.push(`rareté ${rarity}`);
 
-  let description = `${identity}, carte ${licenseName} ${context.join(", ")}. Consultez son visuel, son prix et sa cote sur Cardoria.`;
+  let description = `${identity}, carte ${licenseName} ${context.join(", ")}. Consultez son visuel, son prix et sa cote sur Cardiashop.`;
   description = description.replace(/\s+/g, " ").trim();
   if (description.length > 158) {
-    description = `${identity}, carte ${licenseName}${extension ? " – " + extension : ""} (${languageCode}${rarity ? ", " + rarity : ""}). Prix, cote, rareté et visuel sur Cardoria.`;
+    description = `${identity}, carte ${licenseName}${extension ? " – " + extension : ""} (${languageCode}${rarity ? ", " + rarity : ""}). Prix, cote, rareté et visuel sur Cardiashop.`;
   }
   if (description.length > 158) description = description.slice(0, 157).trimEnd() + "…";
 

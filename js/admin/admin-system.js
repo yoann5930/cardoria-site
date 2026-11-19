@@ -160,7 +160,7 @@
     var msg = prompt("Message maintenance (vide = désactiver)", "");
     if (msg === null) return;
     var active = msg.length > 0;
-    A.adminFetch("/api/system/maintenance", { method: "PUT", body: JSON.stringify({ active: active, message: msg || "Maintenance Cardoria" }) })
+    A.adminFetch("/api/system/maintenance", { method: "PUT", body: JSON.stringify({ active: active, message: msg || "Maintenance Cardiashop" }) })
       .then(function (d) { alert(d.ok ? (active ? "Maintenance activée" : "Maintenance désactivée") : d.error); load(); });
   };
   A.qs("#restartSvc").onclick = function () {

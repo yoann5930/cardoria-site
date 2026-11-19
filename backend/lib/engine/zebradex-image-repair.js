@@ -51,7 +51,7 @@ async function fetchText(url) {
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
   try {
     const response = await fetch(url, {
-      headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "Cardoria/6.0 ZebraDex exact-image-fallback" },
+      headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "Cardiashop/6.0 ZebraDex exact-image-fallback" },
       signal: controller.signal
     });
     if (!response.ok) return "";
@@ -67,9 +67,9 @@ async function imageExists(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
-    let response = await fetch(url, { method: "HEAD", headers: { "User-Agent": "Cardoria/6.0" }, signal: controller.signal });
+    let response = await fetch(url, { method: "HEAD", headers: { "User-Agent": "Cardiashop/6.0" }, signal: controller.signal });
     if (response.ok && String(response.headers.get("content-type") || "").toLowerCase().startsWith("image/")) return true;
-    response = await fetch(url, { method: "GET", headers: { Range: "bytes=0-128", "User-Agent": "Cardoria/6.0" }, signal: controller.signal });
+    response = await fetch(url, { method: "GET", headers: { Range: "bytes=0-128", "User-Agent": "Cardiashop/6.0" }, signal: controller.signal });
     return (response.ok || response.status === 206) && String(response.headers.get("content-type") || "").toLowerCase().startsWith("image/");
   } catch {
     return false;

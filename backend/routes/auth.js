@@ -1,7 +1,8 @@
 /**
- * Authentification Cardoria — comptes clients/admin, sessions et 2FA facultatif.
+ * Authentification Cardiashop — comptes clients/admin, sessions et 2FA facultatif.
  */
 import { Router } from "express";
+import { getDb as getDbForPokedex } from "../lib/engine/database.js";
 import { getUserById, getUserByEmail, createUser, authenticateUser, setTotpSecret, getTotpSecret, updateClientProfile, ADMIN_ROLES } from "../lib/auth/users.js";
 import { migrateAuth } from "../lib/auth/migrate.js";
 import { createSession, revokeSession, validateSession } from "../lib/auth/session.js";
@@ -124,10 +125,10 @@ router.post("/register", authRateLimit, async (req, res) => {
     notifySafely(sendEmail({
       kind: "welcome",
       to: email,
-      subject: "Bienvenue chez Cardoria",
+      subject: "Bienvenue chez Cardiashop",
       text: accountType === "professional"
-        ? `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte professionnel Cardoria est créé et lié à votre profil Liveur.\nVotre SIRET a été enregistré pour l’accès au Studio Live.`
-        : `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte particulier Cardoria est créé.\nLa Boutique et la Marketplace sont accessibles avec ce compte.`,
+        ? `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte professionnel Cardiashop est créé et lié à votre profil Liveur.\nVotre SIRET a été enregistré pour l’accès au Studio Live.`
+        : `Bonjour${name ? ` ${name}` : ""},\n\nVotre compte particulier Cardiashop est créé.\nLa Boutique et la Marketplace sont accessibles avec ce compte.`,
       actionUrl: `${publicSiteOrigin()}/client-login.html`,
       actionLabel: "Accéder à mon espace"
     }), "welcome");
@@ -310,6 +311,66 @@ router.post("/2fa/enable", (req, res) => {
   setTotpSecret(user.id, totp.secret, true);
   logAudit({ type: "security", action: "2fa_enabled", user: user.email, detail: "session_rotation" });
   res.json({ ok: true, enabled: true });
+});
+
+
+/* Pokédex personnel — isolé par utilisateur authentifié. */
+function requirePokedexClient(req, res, next) {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-session-token"];
+  const user = validateSession(token);
+  if (!user) return res.status(401).json({ ok: false, error: "Connectez-vous pour utiliser votre Pokédex." });
+  if (user.role !== "client") return res.status(403).json({ ok: false, error: "Un compte client est requis." });
+  req.pokedexUserId = user.id;
+  next();
+}
+
+function pokedexDb() {
+  const db = getDbForPokedex();
+  db.exec(`CREATE TABLE IF NOT EXISTS client_pokedex (
+    user_id TEXT NOT NULL,
+    card_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity BETWEEN 1 AND 999),
+    added_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(user_id,card_id),
+    FOREIGN KEY(user_id) REFERENCES auth_users(id) ON DELETE CASCADE
+  );`);
+  return db;
+}
+
+router.get("/pokedex", requirePokedexClient, (req, res) => {
+  try {
+    const db = pokedexDb();
+    const cards = db.prepare(`SELECT p.card_id AS id, p.quantity, p.added_at AS addedAt,
+      c.name, c.language, c.extension, c.extension_code AS extensionCode, c.number,
+      c.rarity, c.image_thumb AS imageThumb, c.image_hd AS imageHd, c.license_slug AS license
+      FROM client_pokedex p LEFT JOIN cards c ON c.id=p.card_id
+      WHERE p.user_id=? ORDER BY p.updated_at DESC LIMIT 5000`).all(req.pokedexUserId);
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({ ok: true, cards, totalUnique: cards.length, totalCopies: cards.reduce((n,c)=>n+c.quantity,0) });
+  } catch (e) { return res.status(500).json({ ok:false,error:"Impossible de charger le Pokédex." }); }
+});
+
+router.put("/pokedex/:cardId", requirePokedexClient, (req, res) => {
+  try {
+    const cardId=String(req.params.cardId||"").trim();
+    const quantity=Number(req.body?.quantity);
+    if (!/^[a-zA-Z0-9_:\-.]{1,140}$/.test(cardId) || !Number.isInteger(quantity) || quantity<0 || quantity>999) {
+      return res.status(400).json({ok:false,error:"Carte ou quantité invalide (0 à 999)."});
+    }
+    const db=pokedexDb();
+    const card=db.prepare("SELECT id FROM cards WHERE id=? AND license_slug='pokemon' AND active=1").get(cardId);
+    if (!card) return res.status(404).json({ok:false,error:"Cette carte Pokémon n'existe pas dans le catalogue."});
+    if (quantity===0) db.prepare("DELETE FROM client_pokedex WHERE user_id=? AND card_id=?").run(req.pokedexUserId,cardId);
+    else {
+      const now=new Date().toISOString();
+      db.prepare(`INSERT INTO client_pokedex (user_id,card_id,quantity,added_at,updated_at)
+       VALUES (?,?,?,?,?) ON CONFLICT(user_id,card_id)
+       DO UPDATE SET quantity=excluded.quantity,updated_at=excluded.updated_at`).run(req.pokedexUserId,cardId,quantity,now,now);
+    }
+    res.setHeader("Cache-Control","no-store");
+    return res.json({ok:true,cardId,quantity});
+  } catch (e) { return res.status(500).json({ok:false,error:"Impossible d'enregistrer cette carte."}); }
 });
 
 export default router;

@@ -1,5 +1,5 @@
 /**
- * Historique et métriques de performance IA Cardoria — admin uniquement.
+ * Historique et métriques de performance IA Cardiashop — admin uniquement.
  */
 import { getDb } from "../engine/database.js";
 import { listLearningRecords, getFeedbackHistory } from "./learning.js";

@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardiashop.fr";
   var base = location.pathname.indexOf("/pages/") !== -1 ? "../../" : "";
   var isArticle = location.pathname.indexOf("article.html") !== -1;
 
@@ -28,7 +28,7 @@
         root.innerHTML =
           '<nav class="engine-breadcrumb"><a href="' + base + 'index.html">Accueil</a> › <a href="' + base + 'pages/blog/">Blog</a> › ' + p.title + "</nav>" +
           "<h1>" + p.title + "</h1>" +
-          '<p class="small" style="color:#baaf97">' + (p.updatedAt || p.createdAt || "").slice(0, 10) + " — " + (p.author || "Cardoria") + "</p>" +
+          '<p class="small" style="color:#baaf97">' + (p.updatedAt || p.createdAt || "").slice(0, 10) + " — " + (p.author || "Cardiashop") + "</p>" +
           '<div class="seo-section">' + p.contentHtml + "</div>" +
           '<p><a class="btn btn-primary" href="' + base + 'pages/estimation/">Estimer une carte</a></p>';
       });

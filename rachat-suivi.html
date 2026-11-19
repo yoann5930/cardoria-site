@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<title>Offre de rachat — Cardoria</title>
+<title>Offre de rachat — Cardiashop</title>
 <link rel="stylesheet" href="/style.css">
 <link rel="icon" href="/assets/logo/cardoria-premium.png">
 <style>
@@ -14,7 +14,7 @@ body{background:#07090d;color:#f5f2e9;min-height:100vh}.wrap{width:min(760px,cal
 </head>
 <body>
 <main class="wrap">
-<a class="brand" href="/"><img src="/assets/logo/cardoria-premium.png" alt="Cardoria"><strong>CARDORIA</strong></a>
+<a class="brand" href="/"><img src="/assets/logo/cardoria-premium.png" alt="Cardiashop"><strong>CARDIASHOP</strong></a>
 <section class="card">
 <p class="kicker">Offre de rachat</p>
 <div id="content"><h1>Chargement de votre offre…</h1></div>
@@ -32,7 +32,7 @@ body{background:#07090d;color:#f5f2e9;min-height:100vh}.wrap{width:min(760px,cal
   function render(o){
     currentOffer=o;
     var decided=o.customerDecision&&o.customerDecision.decision;
-    content.innerHTML='<h1>'+esc(o.cardName||"Votre carte")+'</h1><p>Cardoria vous propose :</p><div class="amount">'+euro(o.offer&&o.offer.amount)+'</div><div class="grid"><div><small>Carte</small><strong>'+esc(o.cardName||"—")+'</strong></div><div><small>Licence</small><strong>'+esc(o.cardGame||"—")+'</strong></div><div><small>État</small><strong>'+esc(o.condition||"—")+'</strong></div><div><small>Offre valable jusqu’au</small><strong>'+esc(date(o.offer&&o.offer.expiresAt))+'</strong></div></div>'+(o.offer&&o.offer.note?'<p><strong>Message Cardoria :</strong><br>'+esc(o.offer.note)+'</p>':'')+(decided?'<p><strong>Votre réponse a été enregistrée : '+(decided==='accepted'?'offre acceptée':'offre refusée')+'.</strong></p>':'<div class="actions"><button class="accept" id="acceptBtn">Accepter l’offre</button><button class="refuse" id="refuseBtn">Refuser l’offre</button></div>');
+    content.innerHTML='<h1>'+esc(o.cardName||"Votre carte")+'</h1><p>Cardiashop vous propose :</p><div class="amount">'+euro(o.offer&&o.offer.amount)+'</div><div class="grid"><div><small>Carte</small><strong>'+esc(o.cardName||"—")+'</strong></div><div><small>Licence</small><strong>'+esc(o.cardGame||"—")+'</strong></div><div><small>État</small><strong>'+esc(o.condition||"—")+'</strong></div><div><small>Offre valable jusqu’au</small><strong>'+esc(date(o.offer&&o.offer.expiresAt))+'</strong></div></div>'+(o.offer&&o.offer.note?'<p><strong>Message Cardiashop :</strong><br>'+esc(o.offer.note)+'</p>':'')+(decided?'<p><strong>Votre réponse a été enregistrée : '+(decided==='accepted'?'offre acceptée':'offre refusée')+'.</strong></p>':'<div class="actions"><button class="accept" id="acceptBtn">Accepter l’offre</button><button class="refuse" id="refuseBtn">Refuser l’offre</button></div>');
     if(!decided){document.getElementById("acceptBtn").onclick=function(){decide("accepted")};document.getElementById("refuseBtn").onclick=function(){decide("refused")};}
   }
   async function load(){
@@ -46,7 +46,7 @@ body{background:#07090d;color:#f5f2e9;min-height:100vh}.wrap{width:min(760px,cal
       var r=await fetch('/api/rachat/offres/'+encodeURIComponent(id)+'/decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,decision:decision})}),d=await r.json();
       if(!r.ok||!d.ok)throw new Error(d.error||'Réponse impossible.');
       status.className='status ok';
-      status.textContent=decision==='accepted'?'Votre acceptation est enregistrée. Cardoria attend maintenant la carte.':'Votre refus est enregistré.';
+      status.textContent=decision==='accepted'?'Votre acceptation est enregistrée. Cardiashop attend maintenant la carte.':'Votre refus est enregistré.';
       if(currentOffer){currentOffer.customerDecision={decision:decision,at:new Date().toISOString()};render(currentOffer)}
     }catch(e){status.className='status error';status.textContent=e.message||'Réponse impossible.';document.querySelectorAll('.actions button').forEach(function(b){b.disabled=false})}
   }

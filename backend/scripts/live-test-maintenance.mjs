@@ -77,7 +77,7 @@ function isCandidate(session) {
   const legacyDefaultTest =
     String(session?.ownerRole || "").toLowerCase() === "admin" &&
     ownerId === "cardoria" &&
-    title === "Live Cardoria" &&
+    title === "Live Cardiashop" &&
     ["draft", "ended", "cancelled"].includes(status);
 
   if (!explicitTest && !legacyDefaultTest) return false;

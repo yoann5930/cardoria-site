@@ -18,8 +18,8 @@ router.get("/test", async (req, res) => {
   const sent = await sendEmail({
     kind: "admin_test",
     to: ALERT_EMAIL,
-    subject: "Cardoria - Test e-mail administrateur",
-    text: "Test de configuration e-mail Cardoria."
+    subject: "Cardiashop - Test e-mail administrateur",
+    text: "Test de configuration e-mail Cardiashop."
   });
 
   if (!sent) return res.status(502).json({ ok: false, configured: true, error: "SMTP configure mais envoi impossible." });

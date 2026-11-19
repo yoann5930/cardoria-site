@@ -1,5 +1,5 @@
 /**
- * Chemins assets Cardoria — racine absolue production.
+ * Chemins assets Cardiashop — racine absolue production.
  * Le logo complet reste disponible pour les grands visuels ; le header utilise son emblème dédié.
  */
 (function (global) {

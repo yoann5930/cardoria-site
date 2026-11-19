@@ -68,7 +68,7 @@ async function fetchJson(url, headers = {}) {
   try {
     const response = await fetch(url, {
       method: "GET",
-      headers: { Accept: "application/json", "User-Agent": "Cardoria/6.0 multisource-catalog", ...headers },
+      headers: { Accept: "application/json", "User-Agent": "Cardiashop/6.0 multisource-catalog", ...headers },
       signal: controller.signal
     });
     if (!response.ok) throw new Error(`HTTP ${response.status} ${url}`);
@@ -190,7 +190,7 @@ function upsertProviderCard(db, providerCard) {
   const slug = slugify(`${providerCard.language}-${name}-${extension}-${number}-${id}`);
   const sourcesJson = safeJson({ [provider]: { ...(providerCard.provenance || {}) } });
   const refsJson = safeJson(providerCard.refs || {});
-  const metaTitle = `${name}${number ? " " + number : ""}${extension ? " — " + extension : ""} | Cardoria`;
+  const metaTitle = `${name}${number ? " " + number : ""}${extension ? " — " + extension : ""} | Cardiashop`;
   const metaDescription = `Référence Pokémon ${name}${extension ? ", extension " + extension : ""}${number ? ", numéro " + number : ""}, langue ${providerCard.language.toUpperCase()}.`;
   db.prepare(`INSERT INTO cards (id,license_slug,language,slug,name,name_normalized,extension,extension_code,number,rarity,hit_family,
     variants_json,illustration,image_hd,image_thumb,condition_note,avg_price,low_price,high_price,recommended_price,market_trend,trend_percent,

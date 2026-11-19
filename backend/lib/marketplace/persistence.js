@@ -1,5 +1,5 @@
 /**
- * Persistance durable Cardoria.
+ * Persistance durable Cardiashop.
  * Marketplace + donnees runtime critiques + moteur leger sont restaures depuis PostgreSQL.
  * Les cartes Pokemon sont persistees separement, ligne par ligne, par multilingual-card-persistence.
  */

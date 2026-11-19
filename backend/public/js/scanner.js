@@ -1,10 +1,10 @@
 /**
- * Scanner Intelligent Cardoria — client mobile.
+ * Scanner Intelligent Cardiashop — client mobile.
  */
 (function () {
   "use strict";
 
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardiashop.fr";
   var MAX_DIM = 1280;
   var JPEG_QUALITY = 0.82;
 
@@ -162,7 +162,7 @@
       html += '<a class="scan-btn" href="' + c.catalogUrl + '" style="text-decoration:none;text-align:center">Voir fiche catalogue</a>';
     }
     if (c.pendingCatalog) {
-      html += '<p style="font-size:12px;color:#baaf97;margin-top:8px">Fiche catalogue en cours de validation par Cardoria.</p>';
+      html += '<p style="font-size:12px;color:#baaf97;margin-top:8px">Fiche catalogue en cours de validation par Cardiashop.</p>';
     }
     html += "</div></div>";
 
@@ -197,7 +197,7 @@
         cardId: c.cardId
       });
       localStorage.setItem("cardoria_collection", JSON.stringify(col.slice(0, 200)));
-      alert("Carte ajoutée à votre collection locale Cardoria.");
+      alert("Carte ajoutée à votre collection locale Cardiashop.");
     };
   }
 
@@ -207,7 +207,7 @@
       return;
     }
 
-    qs("scanResult").innerHTML = '<div class="scanner-loading"><div class="pulse"></div>Analyse Cardoria en cours…</div>';
+    qs("scanResult").innerHTML = '<div class="scanner-loading"><div class="pulse"></div>Analyse Cardiashop en cours…</div>';
 
     var payload = {
       customerName: qs("scanName").value.trim(),

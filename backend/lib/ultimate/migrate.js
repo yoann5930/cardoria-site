@@ -1,5 +1,5 @@
 /**
- * Schéma Cardoria Ultimate Enterprise — SQLite / PostgreSQL ready.
+ * Schéma Cardiashop Ultimate Enterprise — SQLite / PostgreSQL ready.
  * Indexation pour scale : 1M cartes, 100K users, 1M estimations.
  */
 import { getDb } from "../engine/database.js";

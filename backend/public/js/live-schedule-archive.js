@@ -14,7 +14,7 @@
     var controlsSection=controls&&controls.closest("section");
     if(controlsSection&&controlsSection.parentNode)controlsSection.parentNode.insertBefore(panel,controlsSection);else root().insertBefore(panel,root().firstChild);
     document.getElementById("liveCreateNowBtn").onclick=function(){
-      var title=prompt("Titre du Live :","Live Cardoria");
+      var title=prompt("Titre du Live :","Live Cardiashop");
       if(title===null)return;title=String(title||"").trim();if(!title)return alert("Indique le titre du Live.");
       A.adminFetch("/api/admin/live/sessions",{method:"POST",body:JSON.stringify({title:title,ownerRole:"admin",products:[]})}).then(function(d){
         var id=d&&d.session&&d.session.id||d&&d.id||"";

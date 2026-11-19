@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mon Pokédex — Cardiashop</title><meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/css/client-auth.css">
+<style>
+body{background:#090b12;color:#eee7d9;font-family:Arial,sans-serif}
+.dex-wrap{max-width:1150px;margin:35px auto;padding:0 20px}
+.dex-top{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.dex-top a{color:#edce84;text-decoration:none}.dex-title{font-family:Georgia,serif;color:#e8bd62;font-size:clamp(32px,5vw,53px);margin:0}
+.dex-muted{color:#b9b5ad}.dex-stats{display:flex;gap:15px;flex-wrap:wrap;margin:20px 0}
+.dex-stat{border:1px solid #6a5635;border-radius:12px;background:#1a1a20;padding:14px 18px;min-width:150px}
+.dex-stat strong{display:block;color:#f4d27b;font-size:26px}
+.dex-controls{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:20px 0}
+.dex-controls label{flex:1 1 220px;display:flex;flex-direction:column;gap:6px;color:#e0d7c3;font-size:14px}
+.dex-controls input,.dex-controls select{border:1px solid #786342;border-radius:8px;padding:12px;background:#15161d;color:#fff;font:inherit;width:100%}
+.dex-controls button,.dex-action{border:1px solid #d0a650;border-radius:8px;background:#d4ad59;color:#181208;padding:11px 14px;font-weight:700;cursor:pointer}
+.dex-controls button:hover,.dex-action:hover{filter:brightness(1.13)}
+.dex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:14px}
+.dex-card{border:1px solid #51452f;border-radius:12px;background:#171921;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.dex-card img{height:192px;width:100%;object-fit:contain}.dex-card h3{font-size:14px;margin:0;min-height:37px;color:#f3d38b;overflow-wrap:anywhere}
+.dex-card small{color:#c1b7a6;line-height:1.35}.dex-card button{margin-top:auto}
+.dex-count{display:flex;align-items:center;gap:6px;justify-content:space-between}
+.dex-count button{padding:7px 11px;border-radius:6px;border:1px solid #af9050;background:#2c261e;color:#fae9be;cursor:pointer}
+.dex-count span{font-weight:700;color:#f3d38b}
+.dex-note{border-left:3px solid #dab45e;padding:10px 14px;background:#1b1a1c;font-size:13px}
+.dex-message{min-height:24px;color:#f1cf76}.dex-tab{border:1px solid #705936;background:#242016;color:#f0daaf;border-radius:8px;padding:10px 15px;cursor:pointer}.dex-tab.active{background:#d6b167;color:#1a1410}
+.dex-tabs{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0}.dex-empty{padding:27px;text-align:center;color:#c6bda9}
+</style>
+</head><body><main class="dex-wrap">
+<div class="dex-top"><div><p style="color:#e5bf6b;letter-spacing:.16em">ESPACE CLIENT CARDIASHOP</p><h1 class="dex-title">Mon Pokédex</h1></div><a href="/client-login.html">← Retour à mon compte</a></div>
+<p class="dex-muted">Construisez votre collection Pokémon, recherchez une carte et indiquez le nombre d'exemplaires que vous possédez.</p>
+<p class="dex-note">Version de test : sur l'hébergement Render gratuit, la sauvegarde des collections n'est pas garantie après redémarrage. Ne considérez pas cette version comme votre inventaire définitif.</p>
+<section class="dex-stats" aria-label="Statistiques de collection"><div class="dex-stat"><small>Cartes différentes</small><strong id="dexUnique">0</strong></div><div class="dex-stat"><small>Exemplaires possédés</small><strong id="dexCopies">0</strong></div></section>
+<div class="dex-tabs"><button class="dex-tab active" type="button" data-tab="owned">Ma collection</button><button class="dex-tab" type="button" data-tab="search">Ajouter des cartes</button></div>
+<form class="dex-controls" id="dexSearchForm" hidden>
+<label>Nom, numéro ou extension<input id="dexQuery" type="search" maxlength="100" placeholder="Ex. Pikachu, Dracaufeu, 151"></label>
+<label>Langue<select id="dexLanguage"><option value="fr">Français</option><option value="en">Anglais</option><option value="ja">Japonais</option><option value="ko">Coréen</option><option value="">Toutes les langues</option></select></label>
+<button type="submit">Rechercher</button>
+</form>
+<p class="dex-message" id="dexMessage" role="status" aria-live="polite"></p>
+<section class="dex-grid" id="dexGrid" aria-label="Cartes Pokémon"></section>
+<div style="margin:22px 0;text-align:center"><button class="dex-action" type="button" id="dexMore" hidden>Afficher plus de cartes</button></div>
+</main><script src="/js/pokedex.js"></script></body></html>

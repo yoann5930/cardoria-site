@@ -1,5 +1,5 @@
 /**
- * Enregistrement des transactions marché Cardoria.
+ * Enregistrement des transactions marché Cardiashop.
  */
 import { getDb } from "../engine/database.js";
 import { getCardById } from "../engine/cards.js";
@@ -45,7 +45,7 @@ export function recordMarketTransaction(data) {
     data.seller || "",
     data.buyer || "",
     data.daysToSell != null ? Number(data.daysToSell) : null,
-    data.channel || "Cardoria",
+    data.channel || "Cardiashop",
     data.sourceRef || "",
     data.notes || "",
     now
@@ -89,7 +89,7 @@ function syncLegacySaleHistory(cardId, { price, condition, channel, soldAt }) {
   db.prepare(`
     INSERT INTO sales_history (card_id, sold_at, price, condition, channel)
     VALUES (?, ?, ?, ?, ?)
-  `).run(cardId, soldAt, Number(price), condition || "NM", channel || "Cardoria");
+  `).run(cardId, soldAt, Number(price), condition || "NM", channel || "Cardiashop");
 }
 
 export function importLegacySalesHistory() {

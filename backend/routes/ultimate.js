@@ -1,5 +1,5 @@
 /**
- * API publique Cardoria Ultimate Enterprise.
+ * API publique Cardiashop Ultimate Enterprise.
  */
 import { Router } from "express";
 import {

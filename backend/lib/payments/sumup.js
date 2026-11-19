@@ -1,4 +1,4 @@
-/** Paiements SumUp Cardoria — Boutique et Live Admin. */
+/** Paiements SumUp Cardiashop — Boutique et Live Admin. */
 import { logAudit } from "../audit.js";
 import { readJson, writeJson } from "../storage.js";
 import { applyLivePaymentStatus } from "../live/sessions.js";
@@ -53,7 +53,7 @@ export async function createSumUpCheckout({ orderId, amount, description, custom
     amount: money(amount),
     currency: "EUR",
     merchant_code: process.env.SUMUP_MERCHANT_CODE,
-    description: description || `Commande Cardoria ${orderId}`,
+    description: description || `Commande Cardiashop ${orderId}`,
     redirect_url: redirectUrl,
     hosted_checkout: { enabled: true }
   };

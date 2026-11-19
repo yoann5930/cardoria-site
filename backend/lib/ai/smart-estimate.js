@@ -1,5 +1,5 @@
 /**
- * Estimation intelligente Cardoria — marché + logique achat / revente + indice marché.
+ * Estimation intelligente Cardiashop — marché + logique achat / revente + indice marché.
  */
 import { getCardById, searchCards } from "../engine/cards.js";
 import { conditionMultiplierFor, estimatePrice, getPriceSources } from "../engine/pricing.js";
@@ -15,13 +15,13 @@ import { formatClientIntelligenceBlock, toClientIntelligence } from "./intellige
 import { getCardMarketStats } from "../market/stats.js";
 
 const MARKET_SOURCES = [
-  { id: "actual_sales", label: "Ventes réelles Cardoria", weight: 0.65 },
+  { id: "actual_sales", label: "Ventes réelles Cardiashop", weight: 0.65 },
   { id: "cardmarket", label: "Cardmarket", weight: 0.55 },
   { id: "tcgplayer", label: "TCGPlayer", weight: 0.45 },
   { id: "zebradex", label: "ZebraDex", weight: 0.35 },
-  { id: "cardoria", label: "Référence Cardoria", weight: 0.25 },
-  { id: "cardoria_marketplace", label: "Annonces Cardoria", weight: 0.18 },
-  { id: "cardoria_engine", label: "Moteur Cardoria", weight: 0.15 }
+  { id: "cardoria", label: "Référence Cardiashop", weight: 0.25 },
+  { id: "cardoria_marketplace", label: "Annonces Cardiashop", weight: 0.18 },
+  { id: "cardoria_engine", label: "Moteur Cardiashop", weight: 0.15 }
 ];
 
 const CONDITION_BUYBACK_FACTOR = {
@@ -343,7 +343,7 @@ export function buildSmartEstimate({ detection, conditionGrade, cardId, suspicio
         sources.push({
           source: "actual_sales",
           price: saleRef,
-          label: "Ventes réelles Cardoria",
+          label: "Ventes réelles Cardiashop",
           weight: MARKET_SOURCES.find((item) => item.id === "actual_sales").weight
         });
       }
@@ -374,7 +374,7 @@ export function buildSmartEstimate({ detection, conditionGrade, cardId, suspicio
       sources.push({
         source: "cardoria_marketplace",
         price: listingMedian,
-        label: "Annonces Cardoria",
+        label: "Annonces Cardiashop",
         weight: MARKET_SOURCES.find((item) => item.id === "cardoria_marketplace").weight
       });
       rangeCandidates.push(...listingPrices);
@@ -386,7 +386,7 @@ export function buildSmartEstimate({ detection, conditionGrade, cardId, suspicio
         sources.push({
           source: "cardoria_engine",
           price: engine.recommended,
-          label: "Moteur Cardoria",
+          label: "Moteur Cardiashop",
           weight: MARKET_SOURCES.find((item) => item.id === "cardoria_engine").weight
         });
         if (engine.range?.low > 0) rangeCandidates.push(engine.range.low);
@@ -523,7 +523,7 @@ export function formatClientEstimateBlock(estimate, intelligence = null) {
 
   const lines = [
     "",
-    "── Estimation Cardoria ──",
+    "── Estimation Cardiashop ──",
     estimate.card ? `Carte : ${estimate.card.name}${estimate.card.extension ? " (" + estimate.card.extension + ")" : ""}` : "",
     `État analysé : ${estimate.condition}`,
     `Prix marché bas : ${fmt(m.low ?? estimate.prices?.low)}`,

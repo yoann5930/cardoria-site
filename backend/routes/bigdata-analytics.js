@@ -1,5 +1,5 @@
 /**
- * API Analytics Big Data Cardoria — exploitable admin, SEO, IA, Marketplace.
+ * API Analytics Big Data Cardiashop — exploitable admin, SEO, IA, Marketplace.
  */
 import { Router } from "express";
 import {

@@ -28,7 +28,7 @@
       var image = safeImage(listing.photos && listing.photos[0]);
       var photo = image ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(listing.title) + '" loading="lazy" width="240" height="200">' : '<div class="mk-card-placeholder" aria-hidden="true">CARTE</div>';
       var negotiable = listing.negotiable ? '<span class="mk-badge mk-badge-neg">Négociable</span>' : "";
-      var sellerName = listing.seller ? escapeHtml(listing.seller.displayName) : "Vendeur Cardoria";
+      var sellerName = listing.seller ? escapeHtml(listing.seller.displayName) : "Vendeur Cardiashop";
       return '<a class="mk-card" href="' + escapeHtml(listing.publicUrl || M.listingUrl(listing.id)) + '"><div class="mk-card-img">' + photo + '</div><div class="mk-card-body"><h3>' + escapeHtml(listing.title) + '</h3><p class="mk-card-meta">' + escapeHtml(listing.condition) + ' • Stock : ' + Number(listing.stock || 0) + '</p><div class="mk-card-price">' + M.euro(listing.price) + '</div><div class="mk-card-badges">' + negotiable + '</div><div class="mk-seller-row">' + M.sellerBadge(listing.seller) + '<span>' + sellerName + '</span></div></div></a>';
     }).join("") || '<div class="mk-empty"><strong>Aucune annonce dans cette catégorie.</strong><span>Les nouvelles cartes mises en vente apparaîtront ici automatiquement.</span></div>';
     if (ms) ms.textContent = data.ms != null ? data.ms + " ms" : "";

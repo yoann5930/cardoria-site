@@ -81,7 +81,7 @@ try{
   let operatorCalls=JSON.parse(await page.evaluate(()=>localStorage.getItem("__calls")||"[]"));
   assert.ok(operatorCalls.some((x)=>x.path.endsWith("/actions/pin")&&x.method==="POST"),"épinglage envoyé");
 
-  // Box Break: Cardoria calcule automatiquement les boosters depuis la référence scellée.
+  // Box Break: Cardiashop calcule automatiquement les boosters depuis la référence scellée.
   await page.selectOption("#lasGameProduct","LOT-2");
   await page.selectOption("#lasGameType","box_break");
   await page.click("#lasLaunchPreset");

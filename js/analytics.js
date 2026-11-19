@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardiashop.fr";
   var loaded = { ga4: false, clarity: false };
 
   function hasConsent() {

@@ -58,7 +58,7 @@ function totals(ttc) {
   return { subtotal, vatRate, vatAmount, total };
 }
 function invoiceHtml(invoice) {
-  const issuerName = String(process.env.CARDORIA_LEGAL_NAME || "Cardoria").trim();
+  const issuerName = String(process.env.CARDORIA_LEGAL_NAME || "Cardiashop").trim();
   const issuerSiret = String(process.env.CARDORIA_SIRET || "").trim();
   const issuerAddress = String(process.env.CARDORIA_BILLING_ADDRESS || "").trim();
   const date = new Date(invoice.issuedAt).toLocaleDateString("fr-FR");
@@ -71,10 +71,10 @@ function invoiceHtml(invoice) {
 <p><strong>Émetteur :</strong><br>${esc(issuerName)}${issuerSiret ? "<br>SIRET : " + esc(issuerSiret) : ""}${issuerAddress ? "<br>" + esc(issuerAddress) : ""}</p>
 <p><strong>Client professionnel :</strong><br>${esc(invoice.customerName || invoice.email)}<br>${esc(invoice.email)}${invoice.siret ? "<br>SIRET : " + esc(invoice.siret) : ""}</p>
 <table><thead><tr><th>Désignation</th><th>Période</th><th>HT</th><th>TVA</th><th>TTC</th></tr></thead><tbody>
-<tr><td>Pack Cardoria ${esc(invoice.planName)}</td><td>${from} au ${to}</td><td>${money(invoice.subtotal)}</td><td>${invoice.vatRate}% · ${money(invoice.vatAmount)}</td><td>${money(invoice.total)}</td></tr>
+<tr><td>Pack Cardiashop ${esc(invoice.planName)}</td><td>${from} au ${to}</td><td>${money(invoice.subtotal)}</td><td>${invoice.vatRate}% · ${money(invoice.vatAmount)}</td><td>${money(invoice.total)}</td></tr>
 </tbody></table>
 <p class="total">Total TTC : ${money(invoice.total)}</p>
-<p>Facture générée automatiquement pour l’abonnement mensuel actif Cardoria.</p>
+<p>Facture générée automatiquement pour l’abonnement mensuel actif Cardiashop.</p>
 </body></html>`;
 }
 export function listSubscriptionInvoicesForSeller(sellerId) {
@@ -93,8 +93,8 @@ async function sendInvoice(invoice) {
   const sent = await sendEmail({
     kind: "subscription_invoice",
     to: invoice.email,
-    subject: `Cardoria — Facture ${invoice.invoiceNumber} — Pack ${invoice.planName}`,
-    text: `Votre facture mensuelle Cardoria est disponible.\n\nPack : ${invoice.planName}\nPériode : ${new Date(invoice.periodStart).toLocaleDateString("fr-FR")} au ${new Date(new Date(invoice.periodEnd).getTime()-1).toLocaleDateString("fr-FR")}\nTotal TTC : ${money(invoice.total)}\nFacture : ${invoice.invoiceNumber}`,
+    subject: `Cardiashop — Facture ${invoice.invoiceNumber} — Pack ${invoice.planName}`,
+    text: `Votre facture mensuelle Cardiashop est disponible.\n\nPack : ${invoice.planName}\nPériode : ${new Date(invoice.periodStart).toLocaleDateString("fr-FR")} au ${new Date(new Date(invoice.periodEnd).getTime()-1).toLocaleDateString("fr-FR")}\nTotal TTC : ${money(invoice.total)}\nFacture : ${invoice.invoiceNumber}`,
     actionUrl: url,
     actionLabel: "Ouvrir mon compte",
     details: [

@@ -11,7 +11,7 @@ test("current admin shell keeps Live navigation and OVH-safe backend",()=>{asser
 test("client tracking does not invent a URL for Autre transporteur",()=>{assert.match(clientOrders,/if\(c\.includes\("autre"\)\)return "";/);assert.doesNotMatch(clientOrders,/google\.com\/search/);assert.match(clientOrders,/Suivre mon colis/);});
 test("SumUp configuration and retired Revolut routes are explicit",()=>{assert.match(payments,/Paiement SumUp non configuré/);assert.match(payments,/\/sumup\/webhook/);assert.match(payments,/\/revolut\/\*/);assert.match(payments,/Revolut n'est plus utilisé/);assert.doesNotMatch(payments,/REVOLUT_SECRET_KEY/);});
 
-test("client account uses one persistent session across Cardoria",()=>{
+test("client account uses one persistent session across Cardiashop",()=>{
   assert.match(auth,/CLIENT_SESSION_HOURS/);
   assert.match(auth,/CLIENT_SESSION_DAYS \|\| 30/);
   assert.match(session,/ttlHours = SESSION_HOURS/);
@@ -27,7 +27,7 @@ test("boutique checkout attaches authenticated purchases to the client account",
   assert.match(body,/order\?\.userId/);
   assert.match(body,/normalizedEmail\(order\?\.email\) === email/);
 });
-test("client dashboard exposes Cardoria navigation and account data sections",()=>{
+test("client dashboard exposes Cardiashop navigation and account data sections",()=>{
   for(const href of ["/","/boutique.html","/marketplace.html","/estimation.html","/live.html"]) assert.ok(clientLogin.includes('href="'+href+'"'));
   for(const id of ["clientStatBoutique","clientStatMarketplace","clientStatLive","clientProfileForm","clientRecentOrders","clientLiveShipments"]) assert.ok(clientLogin.includes('id="'+id+'"'));
   assert.match(clientAuth,/\/api\/auth\/orders/);

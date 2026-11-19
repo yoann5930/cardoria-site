@@ -1,4 +1,4 @@
-/** Controle d'acces Marketplace Cardoria. */
+/** Controle d'acces Marketplace Cardiashop. */
 import { validateSession } from "../../auth/session.js";
 import { getOrLinkSellerForAuthenticatedUser } from "../sellers.js";
 import { getListing } from "../listings.js";
@@ -22,13 +22,13 @@ export function getMarketplaceUser(req) {
   const header = String(req?.headers?.authorization || "");
   const token = header.replace(/^Bearer\s+/i, "") || String(req?.headers?.["x-session-token"] || "");
   const user = validateSession(token);
-  if (!user) throw new MarketplaceAuthError("Connexion Cardoria requise.", 401);
+  if (!user) throw new MarketplaceAuthError("Connexion Cardiashop requise.", 401);
   return user;
 }
 export function assertSellerSession(req, expectedSellerId = "") {
   const user = getMarketplaceUser(req);
   const seller = getOrLinkSellerForAuthenticatedUser({ authUserId: user.id, email: user.email });
-  if (!seller) throw new MarketplaceAuthError("Aucun profil vendeur n'est associé à ce compte client Cardoria.", 403);
+  if (!seller) throw new MarketplaceAuthError("Aucun profil vendeur n'est associé à ce compte client Cardiashop.", 403);
   if (expectedSellerId && seller.id !== String(expectedSellerId)) throw new MarketplaceAuthError("Ce compte ne possede pas ce profil vendeur.", 403);
   return seller;
 }

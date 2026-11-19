@@ -18,7 +18,7 @@
 
   var preconnect = document.createElement("link");
   preconnect.rel = "preconnect";
-  preconnect.href = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
+  preconnect.href = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardiashop.fr";
   preconnect.crossOrigin = "anonymous";
   if (!document.querySelector('link[rel="preconnect"][href="' + preconnect.href + '"]')) {
     document.head.appendChild(preconnect);

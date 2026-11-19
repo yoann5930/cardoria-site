@@ -1,5 +1,5 @@
 /**
- * Schéma moteur de données de marché Cardoria.
+ * Schéma moteur de données de marché Cardiashop.
  */
 import { getDb } from "../engine/database.js";
 
@@ -22,7 +22,7 @@ export function migrateMarketData() {
       seller TEXT DEFAULT '',
       buyer TEXT DEFAULT '',
       days_to_sell INTEGER,
-      channel TEXT DEFAULT 'Cardoria',
+      channel TEXT DEFAULT 'Cardiashop',
       source_ref TEXT DEFAULT '',
       notes TEXT DEFAULT '',
       created_at TEXT NOT NULL,

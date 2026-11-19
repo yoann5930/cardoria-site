@@ -1,5 +1,5 @@
 /**
- * Indices marché Cardoria — liquidité, demande, rareté.
+ * Indices marché Cardiashop — liquidité, demande, rareté.
  */
 const RARITY_PATTERNS = [
   { pattern: /secret|illustration rare|alternate|gold|prismatic|1st edition|first edition|special/i, score: 92 },

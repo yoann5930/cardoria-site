@@ -92,16 +92,16 @@
     });
   }
 
-  A.renderShell("dashboard", "Tableau de bord", "Pilotage réel de Cardoria — commerce, stock, commandes et activité",
+  A.renderShell("dashboard", "Tableau de bord", "Pilotage réel de Cardiashop — commerce, stock, commandes et activité",
     '<div class="admin-periods" id="dashPeriods">' +
     '<button data-period="day">Jour</button><button data-period="week">Semaine</button><button data-period="month" class="active">Mois</button><button data-period="year">Année</button></div>' +
     '<div class="admin-kpi-grid">' +
-    '<div class="admin-kpi"><label>Revenu Cardoria</label><strong id="kpiRevenue">0 €</strong><small>Boutique + commission Marketplace</small></div>' +
+    '<div class="admin-kpi"><label>Revenu Cardiashop</label><strong id="kpiRevenue">0 €</strong><small>Boutique + commission Marketplace</small></div>' +
     '<div class="admin-kpi"><label>CA Boutique Revolut</label><strong id="kpiBoutiqueRevenue">0 €</strong></div>' +
-    '<div class="admin-kpi"><label>GMV Marketplace</label><strong id="kpiMarketplaceGmv">0 €</strong><small>Volume vendu, pas revenu Cardoria</small></div>' +
+    '<div class="admin-kpi"><label>GMV Marketplace</label><strong id="kpiMarketplaceGmv">0 €</strong><small>Volume vendu, pas revenu Cardiashop</small></div>' +
     '<div class="admin-kpi"><label>Commission Marketplace</label><strong id="kpiMarketplaceCommission">0 €</strong></div>' +
     '<div class="admin-kpi"><label>Ventes payées</label><strong id="kpiSales">0</strong></div>' +
-    '<div class="admin-kpi"><label>Achats Cardoria payés</label><strong id="kpiPurchasesSpend">0 €</strong></div>' +
+    '<div class="admin-kpi"><label>Achats Cardiashop payés</label><strong id="kpiPurchasesSpend">0 €</strong></div>' +
     '<div class="admin-kpi"><label>Contribution de trésorerie</label><strong id="kpiCashContribution">0 €</strong><small>Revenus - achats payés</small></div>' +
     '<div class="admin-kpi"><label>Estimations</label><strong id="kpiEstimations">0</strong></div>' +
     '<div class="admin-kpi"><label>Visiteurs</label><strong id="kpiVisitors">0</strong></div>' +
@@ -127,7 +127,7 @@
     '</div>' +
     '<div class="admin-grid-2">' +
       '<div class="admin-panel"><h2>Visiteurs</h2><canvas class="admin-chart" id="chartVisitors" width="480" height="220"></canvas></div>' +
-      '<div class="admin-panel"><h2>Revenu Cardoria</h2><canvas class="admin-chart" id="chartRevenue" width="480" height="220"></canvas></div>' +
+      '<div class="admin-panel"><h2>Revenu Cardiashop</h2><canvas class="admin-chart" id="chartRevenue" width="480" height="220"></canvas></div>' +
     '</div>' +
     '<div id="witnotPanel"></div>' +
     '<div class="admin-panel" style="margin-top:20px"><div style="display:flex;justify-content:space-between;align-items:center"><h2>Activité récente</h2><a href="admin-journal.html">Journal complet →</a></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Date</th><th>Type</th><th>Action</th><th>Utilisateur</th></tr></thead><tbody id="recentActivity"></tbody></table></div></div>' +

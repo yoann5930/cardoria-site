@@ -479,7 +479,7 @@
         if (!seller) {
           const created = await api("/api/marketplace/v1/paypal/sellers/register", {
             method: "POST",
-            body: JSON.stringify({ displayName: currentUser?.name || currentUser?.email || "Liveur Cardoria", sellerType: "professional", siret })
+            body: JSON.stringify({ displayName: currentUser?.name || currentUser?.email || "Liveur Cardiashop", sellerType: "professional", siret })
           });
           seller = created.seller || null;
         } else if (!seller.professionalVerified || String(seller.siret || "") !== siret || seller.sellerType !== "professional") {
@@ -501,7 +501,7 @@
       showProfessionalSetup({ forceProfessional: accountType === "professional" });
       renderProfessionalAccount(seller);
       if (accountType === "professional") {
-        setMessage("Compte professionnel enregistré. Votre SIRET est lié à ce compte Cardoria et l’accès Liveur est activé.", "success");
+        setMessage("Compte professionnel enregistré. Votre SIRET est lié à ce compte Cardiashop et l’accès Liveur est activé.", "success");
       } else {
         renderSubscriptionInvoices(null, []);
         setMessage("Compte particulier enregistré. La Marketplace reste accessible.", "success");

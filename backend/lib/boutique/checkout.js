@@ -163,7 +163,7 @@ async function attachSumUpCheckout(order, successUrl, createPaymentSession, pick
     const session = await createPaymentSession({
       orderId: order.id,
       amount: order.total,
-      description: `Boutique CardoriaShop — ${(order.items || []).length} article(s)`,
+      description: `Boutique Cardiashop — ${(order.items || []).length} article(s)`,
       customerEmail: order.email,
       redirectUrl: redirect,
       source: "boutique"

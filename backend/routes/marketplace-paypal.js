@@ -1,4 +1,4 @@
-/** Routes PayPal Marketplace Cardoria. */
+/** Routes PayPal Marketplace Cardiashop. */
 import { Router } from "express";
 import { getSeller, getOrLinkSellerForAuthenticatedUser, registerSeller, updateSellerProfessionalVerification } from "../lib/marketplace/sellers.js";
 import { verifyFrenchProfessionalSiret } from "../lib/marketplace/professional-verification.js";

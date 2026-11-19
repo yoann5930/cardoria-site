@@ -3,7 +3,7 @@
 
   var KEY = "cardoria_cookie_consent";
   var PREFS_KEY = "cardoria_cookie_prefs";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardiashop.fr";
 
   function hasConsent() {
     try { return localStorage.getItem(KEY) === "accepted"; } catch (e) { return false; }
@@ -33,7 +33,7 @@
     box.setAttribute("aria-label", "Consentement cookies");
     box.innerHTML =
       '<div class="cookie-consent-inner">' +
-      "<p><strong>Cookies & confidentialité</strong> — Cardoria utilise des cookies analytics (Google Analytics 4, Microsoft Clarity) pour améliorer le site, conformément au RGPD. " +
+      "<p><strong>Cookies & confidentialité</strong> — Cardiashop utilise des cookies analytics (Google Analytics 4, Microsoft Clarity) pour améliorer le site, conformément au RGPD. " +
       '<a href="' + rootPath() + 'pages/confidentialite/">En savoir plus</a></p>' +
       '<div class="cookie-consent-actions">' +
       '<button type="button" class="btn btn-secondary" id="cookiePrefs">Préférences</button>' +

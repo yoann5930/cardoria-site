@@ -9,7 +9,7 @@ import { revokeAllUserSessions } from "./session.js";
 import { notifySafely, publicSiteOrigin, sendEmail } from "../email.js";
 
 const RESET_HOURS = Number(process.env.RESET_TOKEN_HOURS || 2);
-const RESET_PUBLIC_ORIGIN = "https://www.cardoriashop.fr";
+const RESET_PUBLIC_ORIGIN = "https://www.cardiashop.fr";
 
 export async function requestPasswordReset(email) {
   const user = getUserByEmail(email);
@@ -34,8 +34,8 @@ export async function requestPasswordReset(email) {
   const sent = await sendEmail({
     kind: "password_reset",
     to: user.email,
-    subject: "Réinitialisez votre mot de passe Cardoria",
-    text: `Bonjour,\n\nUne demande de réinitialisation de mot de passe a été faite pour votre compte Cardoria.\nCe lien est valable ${RESET_HOURS} h et ne peut être utilisé qu'une fois.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message.`,
+    subject: "Réinitialisez votre mot de passe Cardiashop",
+    text: `Bonjour,\n\nUne demande de réinitialisation de mot de passe a été faite pour votre compte Cardiashop.\nCe lien est valable ${RESET_HOURS} h et ne peut être utilisé qu'une fois.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message.`,
     actionUrl: link,
     actionLabel: "Choisir un nouveau mot de passe"
   });
@@ -74,8 +74,8 @@ export function confirmPasswordReset(token, newPassword) {
     notifySafely(sendEmail({
       kind: "password_changed",
       to: user.email,
-      subject: "Votre mot de passe Cardoria a été modifié",
-      text: "Bonjour,\n\nLe mot de passe de votre compte Cardoria vient d'être modifié.\nSi vous n'êtes pas à l'origine de ce changement, contactez-nous immédiatement.",
+      subject: "Votre mot de passe Cardiashop a été modifié",
+      text: "Bonjour,\n\nLe mot de passe de votre compte Cardiashop vient d'être modifié.\nSi vous n'êtes pas à l'origine de ce changement, contactez-nous immédiatement.",
       actionUrl: `${RESET_PUBLIC_ORIGIN}/${loginPage}`,
       actionLabel: "Se connecter"
     }), "password_changed");

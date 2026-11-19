@@ -5,7 +5,7 @@ const money=v=>Math.round((Number(v)||0)*100)/100;
 const cleanEmail=v=>String(v||"").trim().toLowerCase();
 const ACTIVE_SHIPPING_STATUSES=new Set(["paid","completed"]);
 
-// Cardoria's configured estimates, NOT verified carrier quotes.
+// Cardiashop's configured estimates, NOT verified carrier quotes.
 export const LIVE_SHIPPING_PACKS=Object.freeze([
   {id:"PACK-LS-20",maxGrams:20,price:2.29,carrier:"La Poste Lettre suivie"},
   {id:"PACK-LS-100",maxGrams:100,price:3.89,carrier:"La Poste Lettre suivie"},

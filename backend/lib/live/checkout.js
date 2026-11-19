@@ -1,4 +1,4 @@
-/** Checkout Live Cardoria : Live Admin → SumUp, Live vendeur → PayPal. */
+/** Checkout Live Cardiashop : Live Admin → SumUp, Live vendeur → PayPal. */
 import crypto from "crypto";
 import { assertSaleProvider, assertServerAmount, money } from "../payments/routing.js";
 import { createSumUpCheckout, isSumUpConfigured } from "../payments/sumup.js";
@@ -138,9 +138,9 @@ export async function createLiveCheckout(input){
     try{
       let payment;
       if(current.provider==="sumup"){
-        payment=await createSumUpCheckout({orderId:current.id,amount:current.amount,description:`Live Cardoria — ${current.productName}${current.spotLabel?` — ${current.spotLabel}`:""}${current.shippingAmount?` — port ${current.shippingAmount.toFixed(2)} EUR`:""}`,customerEmail:current.customerEmail,redirectUrl:String(input.successUrl||"/live.html"),source:"live_cardoria"});
+        payment=await createSumUpCheckout({orderId:current.id,amount:current.amount,description:`Live Cardiashop — ${current.productName}${current.spotLabel?` — ${current.spotLabel}`:""}${current.shippingAmount?` — port ${current.shippingAmount.toFixed(2)} EUR`:""}`,customerEmail:current.customerEmail,redirectUrl:String(input.successUrl||"/live.html"),source:"live_cardoria"});
       }else{
-        payment=await createLivePayPalOrder({checkoutId:current.id,amount:current.amount,sellerId:current.ownerId,description:`Live vendeur Cardoria — ${current.productName}${current.spotLabel?` — ${current.spotLabel}`:""}${current.shippingAmount?` — port ${current.shippingAmount.toFixed(2)} EUR`:""}`,successUrl:String(input.successUrl||"/live.html"),cancelUrl:String(input.cancelUrl||"/live.html"),platformFee:current.platformFee});
+        payment=await createLivePayPalOrder({checkoutId:current.id,amount:current.amount,sellerId:current.ownerId,description:`Live vendeur Cardiashop — ${current.productName}${current.spotLabel?` — ${current.spotLabel}`:""}${current.shippingAmount?` — port ${current.shippingAmount.toFixed(2)} EUR`:""}`,successUrl:String(input.successUrl||"/live.html"),cancelUrl:String(input.cancelUrl||"/live.html"),platformFee:current.platformFee});
       }
       const providerId=current.provider==="sumup"?payment.checkoutId:payment.id;
       if(!providerId||!payment.url)throw new Error("Réponse de paiement incomplète.");

@@ -11,7 +11,7 @@
 
   var BACKEND = global.CARDORIA_BACKEND ||
     (global.CARDORIA_SEO && global.CARDORIA_SEO.backendUrl) ||
-    "https://www.cardoriashop.fr";
+    "https://www.cardiashop.fr";
 
   function detectWitnotFromUrl() {
     try {

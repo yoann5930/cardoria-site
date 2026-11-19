@@ -1,5 +1,5 @@
 /**
- * Routes RGPD Cardoria.
+ * Routes RGPD Cardiashop.
  * Export/suppression ne peuvent viser que le compte de la session authentifiee.
  */
 import { Router } from "express";
@@ -13,7 +13,7 @@ function requireUser(req, res) {
   const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "") || String(req.headers["x-session-token"] || "");
   const user = validateSession(token);
   if (!user) {
-    res.status(401).json({ ok: false, error: "Connexion Cardoria requise." });
+    res.status(401).json({ ok: false, error: "Connexion Cardiashop requise." });
     return null;
   }
   return user;

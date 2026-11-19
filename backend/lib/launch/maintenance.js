@@ -44,7 +44,7 @@ export function maintenanceMiddleware(req, res, next) {
     return res.status(503).json({
       ok: false,
       maintenance: true,
-      message: info.message || "Cardoria est en maintenance. Réessayez dans quelques minutes."
+      message: info.message || "Cardiashop est en maintenance. Réessayez dans quelques minutes."
     });
   }
   next();

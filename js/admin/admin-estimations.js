@@ -17,7 +17,7 @@
       var intel = x.prices?.intelligence;
       var idx = x.prices?.marketIndex;
       var scoreBadge = intel?.scores?.overall != null
-        ? " • <b>Score Cardoria :</b> " + Number(intel.scores.overall || 0) + "/100"
+        ? " • <b>Score Cardiashop :</b> " + Number(intel.scores.overall || 0) + "/100"
         : (idx?.cardoriaMarketScore != null ? " • <b>Market Score :</b> " + Number(idx.cardoriaMarketScore || 0) + "/100" : "");
       var clientRec = intel?.recommendation?.label;
       var rec = x.prices?.adminRecommendation?.primary?.label;
@@ -44,7 +44,7 @@
     });
   }
 
-  A.renderShell("estimations", "Estimations Cardoria", "Indice marché, rachat, revente et recommandations — admin uniquement",
+  A.renderShell("estimations", "Estimations Cardiashop", "Indice marché, rachat, revente et recommandations — admin uniquement",
     '<div class="admin-filters"><button class="btn btn-primary" type="button" id="reloadEst">Actualiser</button><a class="btn btn-secondary" href="admin-rachat.html">Gérer les rachats cartes</a></div>' +
     '<div id="estimationsList"></div>');
 

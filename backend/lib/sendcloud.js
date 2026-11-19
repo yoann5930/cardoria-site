@@ -42,7 +42,7 @@ async function request(path, { method = "GET", body, pdf = false } = {}) {
   } finally { clearTimeout(timeout); }
 }
 export function normalizeSendcloudAddress(address = {}, { email = "", fallbackName = "", companyName = "" } = {}) {
-  // These are Cardoria input limits, not a guarantee of carrier acceptance.
+  // These are Cardiashop input limits, not a guarantee of carrier acceptance.
   // Let the carrier reject its own restrictions rather than silently losing data.
   const result = {
     name: text(address.recipientName || address.name || fallbackName, 120, true),

@@ -35,7 +35,7 @@
       if (error && error.name === "AbortError") {
         throw new Error("Le serveur met trop de temps à répondre. Réessayez.");
       }
-      throw new Error("Connexion au serveur Cardoria impossible. Rechargez la page puis réessayez.");
+      throw new Error("Connexion au serveur Cardiashop impossible. Rechargez la page puis réessayez.");
     } finally {
       window.clearTimeout(timeout);
     }

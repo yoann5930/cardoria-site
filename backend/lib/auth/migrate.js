@@ -135,7 +135,7 @@ function seedDefaultAdmin(db) {
   const now = new Date().toISOString();
   db.prepare(`
     INSERT INTO auth_users (id, email, password_hash, role, name, created_at, updated_at)
-    VALUES (?, ?, ?, 'super_admin', 'Admin Cardoria', ?, ?)
+    VALUES (?, ?, ?, 'super_admin', 'Admin Cardiashop', ?, ?)
   `).run(makeId("usr"), email, hashPassword(password), now, now);
 }
 

@@ -37,7 +37,7 @@ async function fetchJson(language, path) {
   const lang = normalizeLanguage(language);
   const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 30000);
   try {
-    const response = await fetch(`${API_ROOT}/${lang}${path}`, { headers: { Accept: "application/json", "User-Agent": "Cardoria/6.0" }, signal: controller.signal });
+    const response = await fetch(`${API_ROOT}/${lang}${path}`, { headers: { Accept: "application/json", "User-Agent": "Cardiashop/6.0" }, signal: controller.signal });
     if (!response.ok) throw new Error(`TCGdex ${response.status} ${lang}${path}`);
     return await response.json();
   } finally { clearTimeout(timer); }
@@ -134,7 +134,7 @@ async function syncLanguageCatalog(db, config, { force = false } = {}) {
       const setId = setIdFromCardId(raw.id), set = setMap.get(setId), extension = String(set?.name || setId || ""), localId = String(raw.localId ?? ""), baseImage = String(raw.image || "");
       if (!baseImage) withoutImage += 1;
       const prefix = language === "fr" ? "" : `${language}-`;
-      const next = { id: catalogCardId(language, raw.id), language, slug: slugify(`${prefix}${raw.name}-${extension}-${localId}-${raw.id}`), name: String(raw.name), name_normalized: normalizeText(raw.name), extension, extension_code: setId, number: localId, image_hd: imageUrl(baseImage, "high"), image_thumb: imageUrl(baseImage, "low"), meta_title: `${raw.name} — ${extension} (${config.label}) | Cardoria`, meta_description: `Fiche de la carte Pokémon ${raw.name}${extension ? `, extension ${extension}` : ""}${localId ? `, numéro ${localId}` : ""}, langue ${config.label}.`, catalog_sources_json: JSON.stringify({ tcgdex: { id: String(raw.id), language } }), external_refs_json: JSON.stringify({ tcgdexId: String(raw.id) }), created_at: now, updated_at: now };
+      const next = { id: catalogCardId(language, raw.id), language, slug: slugify(`${prefix}${raw.name}-${extension}-${localId}-${raw.id}`), name: String(raw.name), name_normalized: normalizeText(raw.name), extension, extension_code: setId, number: localId, image_hd: imageUrl(baseImage, "high"), image_thumb: imageUrl(baseImage, "low"), meta_title: `${raw.name} — ${extension} (${config.label}) | Cardiashop`, meta_description: `Fiche de la carte Pokémon ${raw.name}${extension ? `, extension ${extension}` : ""}${localId ? `, numéro ${localId}` : ""}, langue ${config.label}.`, catalog_sources_json: JSON.stringify({ tcgdex: { id: String(raw.id), language } }), external_refs_json: JSON.stringify({ tcgdexId: String(raw.id) }), created_at: now, updated_at: now };
       const current = existingById.get(next.id);
       if (current) {
         next.catalog_source = current.catalog_source || "tcgdex";

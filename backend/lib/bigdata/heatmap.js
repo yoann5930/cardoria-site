@@ -1,5 +1,5 @@
 /**
- * HeatMap mondiale Cardoria Big Data.
+ * HeatMap mondiale Cardiashop Big Data.
  */
 import { getDb } from "../engine/database.js";
 import { REGION_BUCKETS, getHeatmapRegionLabels, COUNTRY_TO_REGION } from "./regions.js";

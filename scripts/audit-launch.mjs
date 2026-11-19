@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Audit lancement Cardoria V1.0 — liens, JS, CSS, sécurité, SEO.
+ * Audit lancement Cardiashop V1.0 — liens, JS, CSS, sécurité, SEO.
  * Usage : node scripts/audit-launch.mjs [--fix]
  */
 import fs from "fs";
@@ -109,7 +109,7 @@ const outPath = path.join(ROOT, "docs", "AUDIT_LAUNCH_REPORT.json");
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8");
 
-console.log("\n=== Cardoria Launch Audit ===");
+console.log("\n=== Cardiashop Launch Audit ===");
 console.log("Score:", report.score, "/ 100");
 console.log("Liens cassés:", report.brokenLinks.length);
 console.log("Erreurs JS:", report.jsErrors.length);

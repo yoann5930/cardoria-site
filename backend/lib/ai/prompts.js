@@ -13,7 +13,7 @@ export function buildPremiumPrompt(data, trainingExamples) {
     return `Exemple validé admin ${i + 1} (${ex.license || det.license}${ex.extension ? " / " + ex.extension : ""}) : ${JSON.stringify(det)}${cond ? " | État : " + cond : ""}${priceHint}`;
   }).join("\n");
 
-  return `Tu es le système d'analyse premium Cardoria pour cartes TCG (Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, Dragon Ball Super, Star Wars Unlimited, Sports et futures licences).
+  return `Tu es le système d'analyse premium Cardiashop pour cartes TCG (Pokémon, Yu-Gi-Oh!, One Piece, Lorcana, Magic, Dragon Ball Super, Star Wars Unlimited, Sports et futures licences).
 
 Analyse les photos et les informations client. Réponds en français pour le message client.
 Ne certifie JAMAIS officiellement une carte. Analyse uniquement ce qui est visible.
@@ -32,7 +32,7 @@ MESSAGE CLIENT (texte naturel, sans score d'authenticité, sans SCORE_CONFIANCE 
 - Identification probable de la carte
 - État visible (Mint / Near Mint / Excellent / Good / Played / Poor)
 - Défauts visibles, points à vérifier
-- Recommandation Cardoria prudente
+- Recommandation Cardiashop prudente
 
 À la fin de ta réponse, sur des lignes séparées, ajoute EXACTEMENT :
 

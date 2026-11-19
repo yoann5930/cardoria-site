@@ -1,5 +1,5 @@
 /**
- * IA Conseiller d'investissement Cardoria Ultimate.
+ * IA Conseiller d'investissement Cardiashop Ultimate.
  */
 import { getDb } from "../engine/database.js";
 import { getCardById } from "../engine/cards.js";

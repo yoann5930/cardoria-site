@@ -1,5 +1,5 @@
 /**
- * Indice de marché Cardoria — Cardoria Market Score & recommandations admin.
+ * Indice de marché Cardiashop — Cardiashop Market Score & recommandations admin.
  */
 import { getDb } from "../engine/database.js";
 import { getPriceHistory } from "./history.js";
@@ -376,7 +376,7 @@ export function computeMarketIndex({
   };
 }
 
-/** Ajuste marge, rachat et revente selon le Cardoria Market Score */
+/** Ajuste marge, rachat et revente selon le Cardiashop Market Score */
 export function applyMarketScoreToPricing(pricing, marketIndex) {
   if (!marketIndex || !pricing) return pricing;
 

@@ -1,5 +1,5 @@
 /**
- * Schéma paiements Cardoria — multi-prestataire.
+ * Schéma paiements Cardiashop — multi-prestataire.
  * Les colonnes SumUp historiques sont conservées uniquement pour compatibilité.
  */
 import { getDb } from "../engine/database.js";

@@ -16,7 +16,7 @@ test("Live mounts grant-authenticated admin studio",()=>{
   assert.match(studioRoute,/x-live-admin-grant/);
 });
 
-test("Embedded studio exposes full Cardoria controls",()=>{
+test("Embedded studio exposes full Cardiashop controls",()=>{
   for(const marker of["Démarrer Caméra 1","Démarrer Caméra 2 PC","Caméra 2 \/ téléphone","Lancer enchère","Vente flash","Giveaway","Tirer gagnant","Break","Paiements en direct"])assert.ok(studio.includes(marker),marker);
   assert.match(studio,/\/actions\/pin/);
   assert.match(studio,/\/actions\/auction\/start/);

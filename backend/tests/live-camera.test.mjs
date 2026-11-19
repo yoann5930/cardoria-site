@@ -128,7 +128,7 @@ test("messages français pour NotAllowedError et les autres erreurs média", () 
   assert.equal(denied.code, "NotAllowedError");
   assert.equal(denied.retry, true);
   assert.match(denied.text, /autorisez Caméra et Microphone/i);
-  assert.match(denied.text, /cardoriashop\.fr/);
+  assert.match(denied.text, /cardiashop\.fr/);
   assert.doesNotMatch(denied.text, /^Permission denied$/);
   assert.equal(explainGetUserMediaError({ name: "NotFoundError" }).code, "NotFoundError");
   assert.equal(explainGetUserMediaError({ name: "NotReadableError" }).code, "NotReadableError");
@@ -142,7 +142,7 @@ test("frontend admin/publisher : pas d’alerte Permission denied, pas de facing
   assert.match(admin, /Caméra 2 PC/);
   assert.match(admin, /Caméra 2 \/ téléphone/);
   assert.match(admin, /Réessayer/);
-  assert.match(admin, /Cardoria\/Admin = SumUp/);
+  assert.match(admin, /Cardiashop\/Admin = SumUp/);
   assert.match(admin, /isMobile: false/);
   assert.match(admin, /liveCameraSelect1/);
   assert.match(admin, /liveCameraSelect2/);

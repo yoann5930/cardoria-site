@@ -1,10 +1,10 @@
 /**
- * Client API du moteur Cardoria — catalogue centralisé.
+ * Client API du moteur Cardiashop — catalogue centralisé.
  */
 (function (global) {
   "use strict";
 
-  var BACKEND = global.CARDORIA_BACKEND || "https://www.cardoriashop.fr";
+  var BACKEND = global.CARDORIA_BACKEND || "https://www.cardiashop.fr";
   var cache = { licenses: null, licensesAt: 0 };
 
   function fetchJson(path) {

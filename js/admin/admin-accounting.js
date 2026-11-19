@@ -46,7 +46,7 @@
       return '<tr><td>' + esc(entry[0]) + '</td><td><strong>' + A.euro(entry[1]) + '</strong></td></tr>';
     }).join("") || "<tr><td colspan='2'>Aucun achat payé sur la période.</td></tr>";
 
-    A.qs("#financeNotes").innerHTML = '<p><strong>CA Cardoria :</strong> ' + esc(s.notes && s.notes.cardoriaRevenue || "") + '</p>' +
+    A.qs("#financeNotes").innerHTML = '<p><strong>CA Cardiashop :</strong> ' + esc(s.notes && s.notes.cardoriaRevenue || "") + '</p>' +
       '<p><strong>GMV Marketplace :</strong> ' + esc(s.notes && s.notes.marketplaceGmv || "") + '</p>' +
       '<p><strong>Marge commerciale :</strong> ' + esc(s.notes && s.notes.commercialMargin || "") + '</p>' +
       '<p><strong>Solde commercial :</strong> ' + esc(s.notes && s.notes.cashCommercialBalance || "") + '</p>';
@@ -123,15 +123,15 @@
     } catch (e) { alert(e.message || "Export impossible"); }
   }
 
-  A.renderShell("accounting", "Comptabilité", "Vue financière Cardoria organisée à partir des ventes réellement payées et des achats réellement payés",
+  A.renderShell("accounting", "Comptabilité", "Vue financière Cardiashop organisée à partir des ventes réellement payées et des achats réellement payés",
     '<div class="admin-periods" id="financePeriods"><button data-period="day">Jour</button><button data-period="week">Semaine</button><button data-period="month" class="active">Mois</button><button data-period="year">Année</button><button data-period="all">Tout</button></div>' +
     '<div class="admin-kpi-grid">' +
-      '<div class="admin-kpi"><label>CA Cardoria</label><strong id="finRevenue">0,00 €</strong><small>Boutique + commissions Marketplace</small></div>' +
+      '<div class="admin-kpi"><label>CA Cardiashop</label><strong id="finRevenue">0,00 €</strong><small>Boutique + commissions Marketplace</small></div>' +
       '<div class="admin-kpi"><label>CA Boutique</label><strong id="finBoutique">0,00 €</strong><small id="finBoutiqueCount">0 vente</small></div>' +
       '<div class="admin-kpi"><label>Commission Marketplace</label><strong id="finMarketplaceCommission">0,00 €</strong><small id="finMarketplaceGmv">GMV : 0,00 €</small></div>' +
-      '<div class="admin-kpi"><label>Achats Cardoria payés</label><strong id="finPurchases">0,00 €</strong><small id="finPurchaseCount">0 achat</small></div>' +
+      '<div class="admin-kpi"><label>Achats Cardiashop payés</label><strong id="finPurchases">0,00 €</strong><small id="finPurchaseCount">0 achat</small></div>' +
       '<div class="admin-kpi"><label>Marge commerciale</label><strong id="finMargin">0,00 €</strong><small id="finCogs">Coût articles vendus : 0,00 €</small></div>' +
-      '<div class="admin-kpi"><label>Solde commercial trésorerie</label><strong id="finCash">0,00 €</strong><small>CA Cardoria - achats payés période</small></div>' +
+      '<div class="admin-kpi"><label>Solde commercial trésorerie</label><strong id="finCash">0,00 €</strong><small>CA Cardiashop - achats payés période</small></div>' +
       '<div class="admin-kpi"><label>Remboursements ventes</label><strong id="finRefunds">0,00 €</strong><small id="finRefundCount">0 remboursement</small></div>' +
       '<div class="admin-kpi"><label>Valeur achat stock disponible</label><strong id="finStockCost">0,00 €</strong><small id="finStockRetail">Valeur vente : 0,00 €</small><small id="finStockUnits">0 unité</small></div>' +
       '<div class="admin-kpi"><label>Achats en attente</label><strong id="finPendingPurchases">0,00 €</strong><small id="finPendingPurchaseCount">0 achat en attente</small></div>' +
@@ -143,9 +143,9 @@
     '</div>' +
     '<div class="admin-panel"><h2>Ventes / encaissements</h2>' +
       '<div class="admin-filters"><input id="financeSearch" placeholder="Commande, client, référence paiement..."><select id="financeSource"><option value="">Boutique + Marketplace</option><option value="boutique">Boutique</option><option value="marketplace">Marketplace</option></select><select id="saleStatus"><option value="paid">Payées</option><option value="">Tous statuts</option><option value="pending">En attente</option><option value="refunded">Remboursées</option><option value="failed">Échouées</option></select><button class="btn btn-primary" id="exportSales" type="button">Exporter ventes CSV</button><button class="btn btn-secondary" id="exportSummary" type="button">Exporter synthèse CSV</button></div>' +
-      '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Commande / paiement</th><th>Date</th><th>Source</th><th>Client</th><th>Montant brut</th><th>Revenu Cardoria</th><th>Commission</th><th>Statut</th></tr></thead><tbody id="salesBody"></tbody></table></div>' +
+      '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Commande / paiement</th><th>Date</th><th>Source</th><th>Client</th><th>Montant brut</th><th>Revenu Cardiashop</th><th>Commission</th><th>Statut</th></tr></thead><tbody id="salesBody"></tbody></table></div>' +
     '</div>' +
-    '<div class="admin-panel"><h2>Achats / dépenses Cardoria</h2>' +
+    '<div class="admin-panel"><h2>Achats / dépenses Cardiashop</h2>' +
       '<div class="admin-filters"><select id="purchaseStatus"><option value="paid">Payés</option><option value="">Tous statuts</option><option value="pending">En attente</option><option value="cancelled">Annulés</option><option value="refunded">Remboursés</option></select><select id="purchaseBuyer"><option value="">Tous acheteurs</option><option value="yoann">Yoann</option><option value="valentin">Valentin</option><option value="non_attribue">Non attribué</option></select><button class="btn btn-primary" id="exportPurchases" type="button">Exporter achats CSV</button></div>' +
       '<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Achat / référence</th><th>Date</th><th>Acheteur</th><th>Type</th><th>Vendeur</th><th>Description</th><th>Qté</th><th>Montant</th><th>Statut</th></tr></thead><tbody id="purchasesBody"></tbody></table></div>' +
     '</div>');

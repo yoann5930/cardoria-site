@@ -1,5 +1,5 @@
 /**
- * API publique Scanner Intelligent Cardoria.
+ * API publique Scanner Intelligent Cardiashop.
  */
 import { Router } from "express";
 import { scanCardIntelligent } from "../lib/scanner/analyze.js";
@@ -8,7 +8,7 @@ import { validateBody } from "../lib/security/validate.js";
 const router = Router();
 
 router.get("/", (req, res) => {
-  res.json({ ok: true, service: "Cardoria Scanner", version: "1.0" });
+  res.json({ ok: true, service: "Cardiashop Scanner", version: "1.0" });
 });
 
 router.post("/scan", async (req, res) => {

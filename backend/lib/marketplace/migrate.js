@@ -1,5 +1,5 @@
 /**
- * Schema marketplace Cardoria — meme base SQLite que le moteur cartes.
+ * Schema marketplace Cardiashop — meme base SQLite que le moteur cartes.
  */
 import { getDb, normalizeText } from "../engine/database.js";
 
@@ -113,7 +113,7 @@ export function migrateMarketplace() {
     );
   `);
 
-  // Global Cardoria rule: no card listing may remain below 1 EUR.
+  // Global Cardiashop rule: no card listing may remain below 1 EUR.
   db.exec("UPDATE mk_listings SET price=1 WHERE price>0 AND price<1");
 
   ensureColumn(db, "mk_sellers", "auth_user_id", "TEXT DEFAULT ''");

@@ -61,7 +61,7 @@
     });
   }
 
-  A.renderShell("ultimate", "Cardoria Ultimate Enterprise",
+  A.renderShell("ultimate", "Cardiashop Ultimate Enterprise",
     "Pilotage premium — visiteurs, CA, marges, tendances, conversion",
     "<div id='ultKpi'></div>" +
     "<div class='admin-filters' style='margin:12px 0'>" +

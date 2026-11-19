@@ -1,5 +1,5 @@
 /**
- * Pipeline IA Premium Cardoria — analyse complète.
+ * Pipeline IA Premium Cardiashop — analyse complète.
  */
 import OpenAI from "openai";
 import { CONFIDENCE_THRESHOLD, sendEmail, sendCounterfeitAlert, extractSuspicionReasons } from "../email.js";
@@ -120,7 +120,7 @@ export async function analyzeCardPremium(data) {
   });
 
   await sendEmail({
-    subject: `Cardoria IA — Analyse ${id}`,
+    subject: `Cardiashop IA — Analyse ${id}`,
     text: `${record.customerName}\n${record.customerEmail}\n${JSON.stringify(detection, null, 2)}\n\n${clientResult}`
   });
 

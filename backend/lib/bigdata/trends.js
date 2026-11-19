@@ -1,5 +1,5 @@
 /**
- * Moteur de tendances Big Data Cardoria.
+ * Moteur de tendances Big Data Cardiashop.
  */
 import { getDb } from "../engine/database.js";
 

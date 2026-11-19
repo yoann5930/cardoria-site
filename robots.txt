@@ -31,4 +31,4 @@ Disallow: /souhaits.html
 Disallow: /panier-marketplace.html
 Disallow: /document-commande.html
 
-Sitemap: https://www.cardoriashop.fr/sitemap.xml
+Sitemap: https://www.cardiashop.fr/sitemap.xml

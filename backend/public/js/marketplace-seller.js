@@ -7,7 +7,7 @@
 
   M.api("/v1/sellers/" + encodeURIComponent(id) + "/public").then(function (d) {
     var s = d.seller;
-    document.title = (s.displayName || "Vendeur") + " — Vendeur Cardoria";
+    document.title = (s.displayName || "Vendeur") + " — Vendeur Cardiashop";
     var reviews = (d.reviews || []).map(function (r) {
       return "<li>★ " + Number(r.rating || 0) + "/5 — " + M.esc(r.comment || "") + " <small>(" + new Date(r.createdAt).toLocaleDateString("fr-FR") + ")</small></li>";
     }).join("") || "<li>Aucun avis</li>";

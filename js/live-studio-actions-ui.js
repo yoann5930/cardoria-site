@@ -367,7 +367,7 @@
         openSheet(title,
           "<label>Quantité d’items mise en jeu <input id='lasItemCount' type='number' min='1' max='" + stock + "' value='1'></label>" +
           "<label>Boosters par item <input id='lasBoostersPerItem' type='number' min='1' max='1000' value='" + units + "'></label>" +
-          "<p class='live-studio-hint'>Référence : " + esc(meta.packaging||"item") + " · Cardoria calcule automatiquement le total de boosters et les numérote.</p>" +
+          "<p class='live-studio-hint'>Référence : " + esc(meta.packaging||"item") + " · Cardiashop calcule automatiquement le total de boosters et les numérote.</p>" +
           "<div class='live-studio-hint'><strong>Total boosters : <span id='lasBoosterTotal'>" + units + "</span></strong></div>" +
           "<label>Prix de départ de l’enchère <input id='lasSpotPrice' type='number' min='0.01' step='0.01' value='" + Number(product.price || 1) + "'></label>" +
           "<label>Durée de l’enchère <select id='lasGameDuration'><option value='30'>30 s</option><option value='45'>45 s</option><option value='60'>60 s</option></select></label>",

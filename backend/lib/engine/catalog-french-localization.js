@@ -210,8 +210,8 @@ export function localizeMultilingualCatalogToFrench() {
       else stats.missingImages += 1;
 
       const languageLabel = LANGUAGE_LABELS[row.language] || "étrangère";
-      const metaTitle = `${displayName} — ${displayExtension} · version ${languageLabel} | Cardoria`;
-      const metaDescription = `Référence Cardoria pour ${displayName}, ${displayExtension}, numéro ${row.number || "non renseigné"}, carte ${languageLabel}.`;
+      const metaTitle = `${displayName} — ${displayExtension} · version ${languageLabel} | Cardiashop`;
+      const metaDescription = `Référence Cardiashop pour ${displayName}, ${displayExtension}, numéro ${row.number || "non renseigné"}, carte ${languageLabel}.`;
       update.run(displayName, normalizeText(displayName), displayExtension, displayRarity, displayHit,
         imageHd, imageThumb, sourceHd, sourceThumb, translationSource, imageLanguage,
         metaTitle, metaDescription, now, row.id);

@@ -58,7 +58,7 @@ export function createListingV1(data) {
   const now = new Date().toISOString();
   const status = normalizeStatus(data.status || "active");
   const slug = ensureUniqueSlug(makeListingSlug(data.title, id), id);
-  const seoTitle = data.seoTitle || `${data.title} | Cardoria`;
+  const seoTitle = data.seoTitle || `${data.title} | Cardiashop`;
   const seoDesc = data.seoDescription || (data.description || "").slice(0, 160);
   const photos = JSON.stringify((data.photos || []).slice(0, 8));
 
@@ -87,7 +87,7 @@ export function updateListingV1(id, sellerId, data) {
   const existing = db.prepare("SELECT * FROM mk_listings WHERE id = ?").get(id);
   const requestedStatus = data.status ? normalizeStatus(data.status) : existing.status;
   if (existing.moderation_locked && requestedStatus !== existing.status) {
-    const error = new Error("Cette annonce est verrouillée par la modération Cardoria.");
+    const error = new Error("Cette annonce est verrouillée par la modération Cardiashop.");
     error.status = 409;
     throw error;
   }
@@ -175,7 +175,7 @@ export function deleteListingV1(id, sellerId) {
   assertOwnership(id, sellerId);
   const existing = getDb().prepare("SELECT moderation_locked FROM mk_listings WHERE id = ?").get(id);
   if (existing?.moderation_locked) {
-    const error = new Error("Cette annonce est verrouillée par la modération Cardoria.");
+    const error = new Error("Cette annonce est verrouillée par la modération Cardiashop.");
     error.status = 409;
     throw error;
   }

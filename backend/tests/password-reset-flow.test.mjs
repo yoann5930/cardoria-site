@@ -35,7 +35,7 @@ test("password reset sends a canonical HTTPS mail, confirms once, then rejects t
   assert.equal(requested.ok, true);
   const mail = readOutbox(outbox);
   assert.equal(mail.kind, "password_reset");
-  assert.match(mail.actionUrl, /^https:\/\/www\.cardoriashop\.fr\/reset-password\.html\?token=/);
+  assert.match(mail.actionUrl, /^https:\/\/www\.cardiashop\.fr\/reset-password\.html\?token=/);
   assert.doesNotMatch(JSON.stringify(mail), /localhost|127\.0\.0\.1|onrender|vercel/);
   const token = new URL(mail.actionUrl).searchParams.get("token");
   assert.match(token, /^[a-f0-9]{64}$/);

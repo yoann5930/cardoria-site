@@ -106,6 +106,6 @@ export function renderCardMain(card) {
 <div class="engine-meta-grid">${extensionDetail}${detail('Numéro', card.number)}${detail('Langue', languageLabel)}${detail('Rareté', card.rarity)}${detail('Illustrateur', card.illustration)}${detail('État réf.', card.condition)}${detail('Licence', licenseName)}</div>
 <div class="engine-prices">${priceBox('Prix moyen', prices.avg)}${priceBox('Prix bas', prices.low)}${priceBox('Prix haut', prices.high)}${priceBox('Prix conseillé', prices.recommended, true)}</div>
 <p class="small">Données de référence lorsqu’elles sont disponibles, et non une offre de vente. La valeur dépend notamment de l’état, de la langue et de la version de la carte.</p>
-<div class="actions" style="margin-top:18px"><a class="btn btn-primary" href="/estimation.html?card=${encodeURIComponent(card.id || '')}">Faire estimer cette carte</a> <a class="btn btn-secondary" href="/rachat-cartes.html">Vendre à Cardoria</a></div>
+<div class="actions" style="margin-top:18px"><a class="btn btn-primary" href="/estimation.html?card=${encodeURIComponent(card.id || '')}">Faire estimer cette carte</a> <a class="btn btn-secondary" href="/rachat-cartes.html">Vendre à Cardiashop</a></div>
 </div></div></main>`;
 }

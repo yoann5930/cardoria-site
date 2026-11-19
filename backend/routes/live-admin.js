@@ -1,4 +1,4 @@
-/** Administration des Lives Cardoria. */
+/** Administration des Lives Cardiashop. */
 import { Router } from "express";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logAudit } from "../lib/audit.js";

@@ -56,8 +56,8 @@
         link.textContent = label;
       }
       link.setAttribute("aria-label", loggedIn
-        ? "Ouvrir mon espace client Cardoria"
-        : "Se connecter à son espace client Cardoria");
+        ? "Ouvrir mon espace client Cardiashop"
+        : "Se connecter à son espace client Cardiashop");
       link.classList.toggle("is-authenticated", Boolean(loggedIn));
       if (loggedIn && account && account.name) {
         link.title = "Compte : " + String(account.name);

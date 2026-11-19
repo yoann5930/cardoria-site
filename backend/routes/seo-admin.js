@@ -24,13 +24,13 @@ router.post("/regenerate", (req, res) => {
 });
 
 router.get("/sitemap.xml", (req, res) => {
-  const site = process.env.SITE_URL || "https://www.cardoriashop.fr";
+  const site = process.env.SITE_URL || "https://www.cardiashop.fr";
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.send(generateSitemapXml(site));
 });
 
 router.get("/robots.txt", (req, res) => {
-  const site = process.env.SITE_URL || "https://www.cardoriashop.fr";
+  const site = process.env.SITE_URL || "https://www.cardiashop.fr";
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.send(generateRobotsTxt(site));
 });

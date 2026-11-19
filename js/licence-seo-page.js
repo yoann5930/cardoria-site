@@ -5,7 +5,7 @@
   if (!root) return;
 
   var slug = root.dataset.slug || new URLSearchParams(location.search).get("slug") || "pokemon";
-  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardoriashop.fr";
+  var BACKEND = (window.CARDORIA_SEO && CARDORIA_SEO.backendUrl) || "https://www.cardiashop.fr";
   var licCfg = (window.CARDORIA_SEO && CARDORIA_SEO.licenses && CARDORIA_SEO.licenses[slug]) || { name: slug };
 
   window.CARDORIA_SEO_PAGE = {
@@ -63,7 +63,7 @@
   }
 
   function render(page, cards, extensions) {
-    var siteUrl = (window.CARDORIA_SEO && CARDORIA_SEO.siteUrl) || "https://www.cardoriashop.fr";
+    var siteUrl = (window.CARDORIA_SEO && CARDORIA_SEO.siteUrl) || "https://www.cardiashop.fr";
     var pageUrl = siteUrl + "/pages/licences/" + slug + "/";
     var defaultImage = siteUrl + ((window.CARDORIA_SEO && CARDORIA_SEO.defaultImage) || "/assets/logo/cardoria-premium.png");
     updateSocialMeta(page.title, page.metaDescription, pageUrl, defaultImage);
@@ -93,13 +93,13 @@
       '<p class="seo-lead">' + escapeHtml(page.content && page.content.intro || "") + "</p>" +
       '<div class="seo-links">' + pokemonGuides +
       '<a href="/estimation.html">Estimer une carte ' + escapeHtml(licCfg.name) + "</a>" +
-      '<a href="/rachat-cartes.html">Vendre à Cardoria</a>' +
+      '<a href="/rachat-cartes.html">Vendre à Cardiashop</a>' +
       '<a href="/licence.html?slug=' + encodeURIComponent(slug) + '">Recherche avancée</a>' +
       '<a href="/marketplace.html">Marketplace</a></div>' +
       '<section class="seo-section"><h2>Extensions ' + escapeHtml(licCfg.name) + "</h2><p>Parcourez les extensions référencées pour accéder directement aux listes de cartes, numéros et raretés.</p><div class=\"seo-links\">" + (extHtml || "<span>Catalogue en cours de référencement</span>") + "</div></section>" +
       '<section class="seo-section"><h2>Cartes ' + escapeHtml(licCfg.name) + " référencées</h2><div class=\"seo-grid\">" + cardsHtml + "</div></section>" +
       '<section class="seo-section"><h2>Prix, cote et estimation des cartes ' + escapeHtml(licCfg.name) + "</h2>" +
-      "<p>Les fiches Cardoria regroupent les informations disponibles pour identifier une carte, son extension, son numéro, sa rareté et ses données de prix. Utilisez ensuite l'espace estimation pour analyser une carte que vous possédez.</p></section>";
+      "<p>Les fiches Cardiashop regroupent les informations disponibles pour identifier une carte, son extension, son numéro, sa rareté et ses données de prix. Utilisez ensuite l'espace estimation pour analyser une carte que vous possédez.</p></section>";
 
     injectJsonLd({
       "@context": "https://schema.org",
@@ -117,7 +117,7 @@
       description: page.metaDescription,
       url: pageUrl,
       inLanguage: "fr-FR",
-      isPartOf: { "@type": "WebSite", name: "Cardoria", url: siteUrl }
+      isPartOf: { "@type": "WebSite", name: "Cardiashop", url: siteUrl }
     });
   }
 
@@ -126,9 +126,9 @@
     fetch(BACKEND + "/api/engine/cards?license=" + encodeURIComponent(slug) + "&limit=12&sort=showcase&requireImage=1&featuredOnly=1").then(function (r) { return r.json(); }),
     fetch(BACKEND + "/api/seo/extensions?license=" + encodeURIComponent(slug)).then(function (r) { return r.json(); })
   ]).then(function (results) {
-    var pageData = results[0].page || { title: licCfg.name + " | Cardoria", h1: "Cartes " + licCfg.name, metaDescription: "", content: {} };
+    var pageData = results[0].page || { title: licCfg.name + " | Cardiashop", h1: "Cartes " + licCfg.name, metaDescription: "", content: {} };
     render(pageData, results[1].cards || [], results[2].extensions || []);
   }).catch(function () {
-    render({ title: licCfg.name + " TCG | Cardoria", h1: "Cartes " + licCfg.name, metaDescription: "Catalogue " + licCfg.name, content: { intro: "Explorez le catalogue " + licCfg.name + " sur Cardoria." } }, [], []);
+    render({ title: licCfg.name + " TCG | Cardiashop", h1: "Cartes " + licCfg.name, metaDescription: "Catalogue " + licCfg.name, content: { intro: "Explorez le catalogue " + licCfg.name + " sur Cardiashop." } }, [], []);
   });
 })();

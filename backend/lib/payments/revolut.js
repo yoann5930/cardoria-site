@@ -1,5 +1,5 @@
 /**
- * Paiements Revolut Merchant API — Boutique CardoriaShop.
+ * Paiements Revolut Merchant API — Boutique Cardiashop.
  * Sandbox est le mode par défaut pour empêcher tout débit réel pendant les tests.
  */
 import crypto from "crypto";
@@ -99,7 +99,7 @@ export async function createRevolutCheckout({
   const payload = {
     amount: amountMinor,
     currency: "EUR",
-    description: description || `Commande CardoriaShop ${orderId}`,
+    description: description || `Commande Cardiashop ${orderId}`,
     metadata: {
       cardoria_order_id: String(orderId),
       cardoria_source: String(source)
@@ -231,11 +231,11 @@ export async function syncRevolutOrder(revolutOrderId) {
 
 export async function syncRevolutOrderByCardoriaOrder(orderId) {
   const payment = getPaymentByOrderId(orderId, "revolut");
-  if (!payment?.providerOrderId) throw Object.assign(new Error("Commande Revolut introuvable pour cette commande CardoriaShop"), { status: 404 });
+  if (!payment?.providerOrderId) throw Object.assign(new Error("Commande Revolut introuvable pour cette commande Cardiashop"), { status: 404 });
   return syncRevolutOrder(payment.providerOrderId);
 }
 
-export async function refundRevolutOrder(revolutOrderId, { amount, currency = "EUR", description = "Remboursement CardoriaShop" } = {}) {
+export async function refundRevolutOrder(revolutOrderId, { amount, currency = "EUR", description = "Remboursement Cardiashop" } = {}) {
   const body = {};
   if (amount != null) {
     const minor = toMinor(amount);

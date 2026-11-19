@@ -1,5 +1,5 @@
 /**
- * Indices Cardoria Big Data — demande, vendeur, acheteur, spéculation, collection, investissement.
+ * Indices Cardiashop Big Data — demande, vendeur, acheteur, spéculation, collection, investissement.
  * + popularité, vitesse vente, rareté réelle.
  */
 import { getDb } from "../engine/database.js";

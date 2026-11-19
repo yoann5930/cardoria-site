@@ -1,4 +1,4 @@
-/* Cardoria — accueil luxe noir & or. Mise en page uniquement. */
+/* Cardiashop — accueil luxe noir & or. Mise en page uniquement. */
 :root{
   --lux-bg:#05070a;
   --lux-panel:#090d12;
@@ -62,7 +62,7 @@ body.home-premium::before{
 .lux-btn--gold{background:linear-gradient(135deg,#f0d77d,#b98727);color:#171004;border:1px solid rgba(255,241,185,.30);box-shadow:0 12px 32px rgba(213,173,62,.16)}
 .lux-btn--outline{border:1px solid rgba(213,173,62,.46);color:var(--lux-gold-light);background:rgba(0,0,0,.12)}
 
-/* CSS-only collector stage; uses only the existing Cardoria logo asset. */
+/* CSS-only collector stage; uses only the existing Cardiashop logo asset. */
 .lux-stage{position:relative;min-height:500px;display:grid;place-items:center;perspective:1200px}
 .lux-stage::before{content:"";position:absolute;width:480px;height:130px;bottom:34px;border-radius:50%;border:1px solid rgba(213,173,62,.30);background:radial-gradient(ellipse,rgba(213,173,62,.17),rgba(213,173,62,.035) 48%,transparent 70%);box-shadow:0 0 60px rgba(213,173,62,.10),inset 0 0 35px rgba(213,173,62,.07);transform:rotateX(72deg)}
 .lux-stage::after{content:"";position:absolute;width:410px;height:410px;border-radius:50%;border:1px solid rgba(213,173,62,.08);box-shadow:0 0 80px rgba(213,173,62,.045)}

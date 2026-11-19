@@ -8,7 +8,7 @@
     if (!slot) return;
     slot.innerHTML =
       '<header class="header"><div class="container nav">' +
-      '<a class="brand" href="/" aria-label="CardoriaShop.fr — site officiel Cardoria"><img src="' + A.logo + '" alt="CardoriaShop.fr — site officiel Cardoria" width="58" height="42" loading="eager" decoding="async"><span>CARDORIA</span></a>' +
+      '<a class="brand" href="/" aria-label="Cardiashop.fr — site officiel Cardiashop"><img src="' + A.logo + '" alt="Cardiashop.fr — site officiel Cardiashop" width="58" height="42" loading="eager" decoding="async"><span>CARDIASHOP</span></a>' +
       '<button class="burger" type="button" aria-label="Ouvrir le menu" onclick="toggleMenu()">Menu</button>' +
       '<nav class="menu" id="menu" aria-label="Navigation principale">' +
       '<a href="/">Accueil</a>' +
@@ -34,8 +34,8 @@
       '<footer class="footer-premium">' +
       '<div class="container footer-grid">' +
       '<div class="footer-brand">' +
-      '<img src="' + A.logo + '" alt="CardoriaShop.fr — logo Cardoria" width="90" height="65" loading="lazy" decoding="async">' +
-      '<p><strong>CardoriaShop.fr</strong> est le site officiel de Cardoria : catalogue, estimation, boutique et marketplace de cartes TCG.</p>' +
+      '<img src="' + A.logo + '" alt="Cardiashop.fr — logo Cardiashop" width="90" height="65" loading="lazy" decoding="async">' +
+      '<p><strong>Cardiashop.fr</strong> est le site officiel de Cardiashop : catalogue, estimation, boutique et marketplace de cartes TCG.</p>' +
       '<p class="footer-email"><a href="mailto:Cardoria59330@gmail.com">Cardoria59330@gmail.com</a></p>' +
       "</div>" +
       '<div class="footer-col"><h4>Navigation</h4><ul>' +
@@ -46,7 +46,7 @@
       '<li><a href="/tendances.html">Tendances</a></li>' +
       "</ul></div>" +
       '<div class="footer-col"><h4>Informations</h4><ul>' +
-      '<li><a href="/pages/a-propos/">À propos de CardoriaShop</a></li>' +
+      '<li><a href="/pages/a-propos/">À propos de Cardiashop</a></li>' +
       '<li><a href="/pages/faq/">FAQ</a></li>' +
       '<li><a href="/pages/blog/">Blog TCG</a></li>' +
       '<li><a href="/referencement.html">Référencement</a></li>' +
@@ -61,11 +61,11 @@
       '<div class="footer-col"><h4>Licences TCG</h4><ul>' + licLinks + "</ul></div>" +
       "</div>" +
       '<div class="footer-bottom"><div class="container footer-cta">' +
-      '<div class="footer-cta-text"><h3>Estimez vos cartes avec CardoriaShop</h3><p>Photos + analyse multi-sources — sans engagement.</p></div>' +
+      '<div class="footer-cta-text"><h3>Estimez vos cartes avec Cardiashop</h3><p>Photos + analyse multi-sources — sans engagement.</p></div>' +
       '<a class="btn btn-primary" href="/estimation.html">Faire estimer une carte</a></div>' +
       '<div class="container footer-bottom-inner">' +
-      '<p class="small">© ' + new Date().getFullYear() + ' CardoriaShop.fr — Site officiel Cardoria</p>' +
-      '<p class="small"><a href="/pages/a-propos/">Identité CardoriaShop</a> • <a href="/sitemap.xml">Sitemap</a></p></div></div></footer>';
+      '<p class="small">© ' + new Date().getFullYear() + ' Cardiashop.fr — Site officiel Cardiashop</p>' +
+      '<p class="small"><a href="/pages/a-propos/">Identité Cardiashop</a> • <a href="/sitemap.xml">Sitemap</a></p></div></div></footer>';
   }
 
   document.addEventListener("DOMContentLoaded", function () {

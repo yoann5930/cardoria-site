@@ -117,7 +117,7 @@ if (process.env.NODE_ENV !== "test") {
   startupCatchupTimer.unref?.();
 
   // Keep reconciling the source even if TCGdex is temporarily unavailable.
-  // This prevents a provider outage around startup/noon from leaving Cardoria
+  // This prevents a provider outage around startup/noon from leaving Cardiashop
   // stale until the following day.
   catalogRetryTimer = setInterval(() => {
     runCatalogRetry("hourly-catalog-retry").catch((error) => console.error("[pokemon-catalog-retry] hourly failure", error?.message || String(error)));

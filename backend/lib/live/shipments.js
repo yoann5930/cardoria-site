@@ -28,8 +28,8 @@ function senderForLive(live){
     return{address:{...seller.sender,recipientName:seller.sender.name},email:seller.email||"",companyName:seller.displayName||""};
   }
   const address={name:clean(process.env.CARDORIA_SENDER_NAME,120),recipientName:clean(process.env.CARDORIA_SENDER_NAME,120),addressLine1:clean(process.env.CARDORIA_SENDER_ADDRESS_LINE1,160),addressLine2:clean(process.env.CARDORIA_SENDER_ADDRESS_LINE2,160),postalCode:clean(process.env.CARDORIA_SENDER_POSTAL_CODE,24),city:clean(process.env.CARDORIA_SENDER_CITY,120),countryCode:clean(process.env.CARDORIA_SENDER_COUNTRY||"FR",2),phone:clean(process.env.CARDORIA_SENDER_PHONE,32)};
-  if(!address.recipientName||!address.addressLine1||!address.postalCode||!address.city)throw Object.assign(new Error("Adresse expéditeur Cardoria non configurée."),{status:503,code:"CARDORIA_SENDER_NOT_CONFIGURED"});
-  return{address,email:clean(process.env.CARDORIA_SENDER_EMAIL,254),companyName:"Cardoria"};
+  if(!address.recipientName||!address.addressLine1||!address.postalCode||!address.city)throw Object.assign(new Error("Adresse expéditeur Cardiashop non configurée."),{status:503,code:"CARDORIA_SENDER_NOT_CONFIGURED"});
+  return{address,email:clean(process.env.CARDORIA_SENDER_EMAIL,254),companyName:"Cardiashop"};
 }
 // Read-only preview used both for tests and real creation; it never purchases a label.
 export function prepareLiveShipmentGroup(liveId,buyerEmail){

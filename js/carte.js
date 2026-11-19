@@ -90,7 +90,7 @@
     var licenseSlug = card.license || card.licenseSlug || "pokemon";
 
     var sales = (card.salesHistory || []).map(function (s) {
-      return "<tr><td>" + escape(s.date) + "</td><td>" + escape(E.euro(s.price)) + "</td><td>" + escape(s.condition || "—") + "</td><td>" + escape(s.channel || "Cardoria") + "</td></tr>";
+      return "<tr><td>" + escape(s.date) + "</td><td>" + escape(E.euro(s.price)) + "</td><td>" + escape(s.condition || "—") + "</td><td>" + escape(s.channel || "Cardiashop") + "</td></tr>";
     }).join("") || "<tr><td colspan='4'>Aucune vente enregistrée</td></tr>";
 
     root.innerHTML =
@@ -112,7 +112,7 @@
       '<p class="small">Données de référence lorsqu’elles sont disponibles, et non une offre de vente. La valeur dépend notamment de l’état, de la langue et de la version de la carte.</p>' +
       trendLabel(card.marketTrend, card.trendPercent) +
       '<div id="cardIntelligenceBox" style="margin-top:18px"></div>' +
-      '<div class="actions" style="margin-top:18px"><a class="btn btn-primary" href="/estimation.html?card=' + encodeURIComponent(card.id) + '">Faire estimer cette carte</a> <a class="btn btn-secondary" href="/rachat-cartes.html">Vendre à Cardoria</a></div>' +
+      '<div class="actions" style="margin-top:18px"><a class="btn btn-primary" href="/estimation.html?card=' + encodeURIComponent(card.id) + '">Faire estimer cette carte</a> <a class="btn btn-secondary" href="/rachat-cartes.html">Vendre à Cardiashop</a></div>' +
       '<section class="engine-section"><h2>Historique des ventes</h2><div class="table-wrap"><table class="engine-sales-table"><thead><tr><th>Date</th><th>Prix</th><th>État</th><th>Canal</th></tr></thead><tbody>' + sales + "</tbody></table></div></section>" +
       '<section class="engine-section" id="aiHistorySection"><h2>Évolution des prix</h2><div class="admin-periods" id="historyPeriods"><button data-period="7">7 j</button><button data-period="30" class="active">30 j</button><button data-period="90">90 j</button><button data-period="365">1 an</button></div><canvas class="ai-chart" id="priceHistoryChart" width="900" height="220"></canvas><div id="aiTrendsBox"></div></section>' +
       "</div></div>";
@@ -131,7 +131,7 @@
       .then(function (d) {
         if (!d.ok) return;
         if (!d.intelligence) {
-          box.innerHTML = "<p class='small'>Données de prix insuffisantes pour générer un conseil Cardoria fiable.</p>";
+          box.innerHTML = "<p class='small'>Données de prix insuffisantes pour générer un conseil Cardiashop fiable.</p>";
           return;
         }
         box.innerHTML = CardoriaAI.renderIntelligencePanel(d.intelligence);
@@ -151,9 +151,9 @@
   function applySeo(card) {
     // The server owns canonical metadata and JSON-LD for dynamic card URLs.
     if (serverSeo) return;
-    var title = card.meta?.title || card.name + " — " + card.extension + " | Cardoria";
-    var desc = card.meta?.description || "Fiche " + card.name + " : extension, numéro, rareté et données de prix disponibles sur Cardoria.";
-    var siteUrl = (window.CARDORIA_SEO?.siteUrl || location.origin || "https://www.cardoriashop.fr").replace(/\/$/, "");
+    var title = card.meta?.title || card.name + " — " + card.extension + " | Cardiashop";
+    var desc = card.meta?.description || "Fiche " + card.name + " : extension, numéro, rareté et données de prix disponibles sur Cardiashop.";
+    var siteUrl = (window.CARDORIA_SEO?.siteUrl || location.origin || "https://www.cardiashop.fr").replace(/\/$/, "");
     var licenseSlug = card.license || card.licenseSlug || "pokemon";
     var url = siteUrl + "/cartes/" + encodeURIComponent(licenseSlug) + "/" + encodeURIComponent(card.slug);
     var image = safeImage(card.imageHd) || safeImage(card.imageThumb);
@@ -229,7 +229,7 @@
     }).catch(function () {
       // A temporary API failure must not remove the useful server-rendered page.
       if (root.getAttribute("data-server-rendered") === "true") return;
-      root.innerHTML = "<div class='panel'><h1>Erreur de chargement</h1><p>Vérifiez la connexion au moteur Cardoria.</p></div>";
+      root.innerHTML = "<div class='panel'><h1>Erreur de chargement</h1><p>Vérifiez la connexion au moteur Cardiashop.</p></div>";
     });
   }
 

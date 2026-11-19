@@ -1,4 +1,4 @@
-/* Cardoria Enterprise Back-Office */
+/* Cardiashop Enterprise Back-Office */
 .admin-app{margin:0;background:#06080d;color:#fff8e8;min-height:100vh}
 .admin-layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
 .admin-sidebar{background:linear-gradient(180deg,#0a0c12,#07080c);border-right:1px solid rgba(212,175,55,.25);padding:24px 16px;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:2}

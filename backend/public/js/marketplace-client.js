@@ -1,4 +1,4 @@
-/** Client Marketplace Cardoria — panier anonyme + session authentifiee pour actions sensibles. */
+/** Client Marketplace Cardiashop — panier anonyme + session authentifiee pour actions sensibles. */
 (function (global) {
   "use strict";
   var BACKEND = global.CARDORIA_BACKEND || global.location.origin;
@@ -40,7 +40,7 @@
   }
   function fetchJson(url, opts) {
     opts = opts || {}; opts.headers = authHeaders(opts.headers);
-    return fetch(url, opts).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || d.ok === false) { var e = new Error(d.error || "Erreur Cardoria"); e.status = r.status; throw e; } return d; }); });
+    return fetch(url, opts).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || d.ok === false) { var e = new Error(d.error || "Erreur Cardiashop"); e.status = r.status; throw e; } return d; }); });
   }
   function api(path, opts) { return fetchJson(BACKEND + "/api/marketplace" + path, opts); }
   function syncSeller() {

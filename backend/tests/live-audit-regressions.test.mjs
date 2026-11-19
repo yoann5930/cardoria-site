@@ -96,7 +96,7 @@ test("independent audit: real route ownership, verified payment events and corru
       }
       assert.equal(carrierCalls, 0);
     });
-    await t.test("owner downloads protected PDF via Cardoria without exposing carrier credentials", async () => {
+    await t.test("owner downloads protected PDF via Cardiashop without exposing carrier credentials", async () => {
       const response = await nativeFetch(base + "/api/live/seller/shipments/LSH-A/label", { headers: { Authorization: "Bearer " + a.token } });
       assert.equal(response.status, 200); assert.equal(response.headers.get("content-type"), "application/pdf"); assert.match(response.headers.get("cache-control"), /no-store/); assert.match(await response.text(), /^%PDF-/); assert.equal(carrierCalls, 1);
     });

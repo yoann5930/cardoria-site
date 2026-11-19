@@ -14,7 +14,7 @@ import {
 } from "../lib/estimation/capture-sessions.js";
 
 const router = Router();
-const PUBLIC_ORIGIN = String(process.env.SITE_URL || "https://www.cardoriashop.fr").replace(/\/$/, "");
+const PUBLIC_ORIGIN = String(process.env.SITE_URL || "https://www.cardiashop.fr").replace(/\/$/, "");
 
 export function validateEstimationPayload(body = {}) {
   const images = Array.isArray(body.imagesBase64)
@@ -90,7 +90,7 @@ export async function handleEstimation(req, res) {
     const isProd = process.env.NODE_ENV === "production";
     res.status(500).json({
       ok: false,
-      error: "Erreur pendant l'analyse Cardoria.",
+      error: "Erreur pendant l'analyse Cardiashop.",
       details: isProd ? undefined : String(error?.message || error)
     });
   }

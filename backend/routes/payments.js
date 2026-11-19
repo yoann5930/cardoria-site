@@ -1,4 +1,4 @@
-/** API publique paiements SumUp CardoriaShop. */
+/** API publique paiements SumUp Cardiashop. */
 import { Router } from "express";
 import { isSumUpConfigured, syncPaymentFromCheckout, handleSumUpWebhook } from "../lib/payments/sumup.js";
 import { listBoutiqueProducts } from "../lib/boutique/catalog.js";
@@ -62,6 +62,6 @@ router.post("/sumup/webhook", async (req, res) => {
   } catch (e) { res.status(e.status || 500).json({ ok: false, provider: "sumup", error: e.message }); }
 });
 
-router.all("/revolut/*", (req, res) => res.status(410).json({ ok: false, provider: "sumup", error: "Revolut n'est plus utilisé sur CardoriaShop." }));
+router.all("/revolut/*", (req, res) => res.status(410).json({ ok: false, provider: "sumup", error: "Revolut n'est plus utilisé sur Cardiashop." }));
 
 export default router;

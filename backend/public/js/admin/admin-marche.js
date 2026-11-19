@@ -71,7 +71,7 @@
     });
   }
 
-  A.renderShell("marche", "Données marché Cardoria", "Collecte, statistiques et indices — alimentation automatique de l'IA",
+  A.renderShell("marche", "Données marché Cardiashop", "Collecte, statistiques et indices — alimentation automatique de l'IA",
     "<div id='marketDash'></div>" +
     "<div class='admin-filters' style='margin-top:16px'>" +
     "<input id='cardSearch' placeholder='Rechercher une carte…' style='min-width:220px'>" +

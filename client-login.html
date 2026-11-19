@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mon espace client — CardoriaShop</title>
-  <meta name="description" content="Tableau de bord client CardoriaShop : commandes, expéditions, profil et services.">
+  <title>Mon espace client — Cardiashop</title>
+  <meta name="description" content="Tableau de bord client Cardiashop : commandes, expéditions, profil et services.">
   <meta name="robots" content="noindex,follow">
   <meta name="theme-color" content="#030303">
   <link rel="stylesheet" href="/style.css">
@@ -13,11 +13,11 @@
 </head>
 <body class="client-auth-page">
   <header class="client-auth-header">
-    <a class="client-auth-brand" href="/" aria-label="Accueil CardoriaShop">
-      <img src="/assets/logo/cardoria-premium.png" alt="CardoriaShop" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
-      <span><strong>CARDORIA</strong><small>ESPACE CLIENT</small></span>
+    <a class="client-auth-brand" href="/" aria-label="Accueil Cardiashop">
+      <img src="/assets/logo/cardoria-premium.png" alt="Cardiashop" onerror="this.onerror=null;this.src='/logo-cardoria.jpg'">
+      <span><strong>CARDIASHOP</strong><small>ESPACE CLIENT</small></span>
     </a>
-    <nav class="client-site-nav" aria-label="Navigation Cardoria">
+    <nav class="client-site-nav" aria-label="Navigation Cardiashop">
       <a href="/">Accueil</a><a href="/boutique.html">Boutique</a><a href="/marketplace.html">Marketplace</a><a href="/estimation.html">Estimation</a><a href="/live.html">Live</a>
     </nav>
     <a class="client-auth-back" href="/boutique.html">Continuer mes achats</a>
@@ -26,9 +26,9 @@
   <main class="client-auth-main">
     <section class="client-auth-shell" id="clientGuestShell" aria-labelledby="clientAuthTitle">
       <div class="client-auth-intro">
-        <p class="client-auth-kicker">CARDORIASHOP</p>
+        <p class="client-auth-kicker">CARDIASHOP</p>
         <h1 id="clientAuthTitle">Votre espace client</h1>
-        <p>Un seul compte pour parcourir Cardoria, acheter dans la Boutique et la Marketplace, retrouver vos commandes et suivre vos expéditions.</p>
+        <p>Un seul compte pour parcourir Cardiashop, acheter dans la Boutique et la Marketplace, retrouver vos commandes et suivre vos expéditions.</p>
         <div class="client-auth-benefits"><span>Session persistante</span><span>Achats centralisés</span><span>Suivi des colis</span></div>
       </div>
 
@@ -71,7 +71,7 @@
           <h1>Bonjour <span id="clientAccountName">Client</span></h1>
           <p id="clientAccountEmail"></p>
         </div>
-        <div class="client-dashboard-session"><span class="client-session-dot"></span><strong>Session Cardoria active</strong><small>Votre connexion reste valable pendant votre navigation.</small></div>
+        <div class="client-dashboard-session"><span class="client-session-dot"></span><strong>Session Cardiashop active</strong><small>Votre connexion reste valable pendant votre navigation.</small></div>
       </div>
 
       <div class="client-dashboard-stats">
@@ -81,9 +81,15 @@
         <div><small>PROFIL LIVRAISON</small><strong id="clientStatProfile">—</strong><span id="clientStatProfileText">À compléter</span></div>
       </div>
 
+      <section class="client-dashboard-panel" aria-labelledby="clientPokedexTitle">
+        <div class="client-panel-head"><div><p class="client-auth-kicker">MA COLLECTION POKÉMON</p><h2 id="clientPokedexTitle">Mon Pokédex</h2></div><a href="/pokedex.html">Ouvrir mon Pokédex →</a></div>
+        <p class="client-muted">Retrouvez les cartes que vous possédez, suivez vos doublons et complétez votre collection.</p>
+        <a class="client-auth-primary" href="/pokedex.html" style="display:inline-block;text-decoration:none;margin-top:12px">Gérer ma collection</a>
+      </section>
+
       <section class="client-dashboard-panel client-pro-setup-panel" id="clientProfessionalSetupPanel" hidden>
         <div class="client-panel-head">
-          <div><p class="client-auth-kicker">LIVEUR CARDORIA</p><h2>Activer mon profil professionnel</h2></div>
+          <div><p class="client-auth-kicker">LIVEUR CARDIASHOP</p><h2>Activer mon profil professionnel</h2></div>
         </div>
         <p class="client-muted">Le profil Professionnel sert uniquement à créer et diffuser des Lives. La Marketplace reste accessible aux particuliers et aux professionnels.</p>
         <form id="clientProfessionalActivationForm" class="client-auth-form client-pro-activation-form">
@@ -97,7 +103,7 @@
             <label>Numéro de SIRET
               <input id="clientProfessionalSiret" type="text" inputmode="numeric" maxlength="14" pattern="[0-9]{14}" placeholder="14 chiffres">
             </label>
-            <p class="client-field-help">Le SIRET est vérifié automatiquement. Une fois validé, ce même compte Cardoria donne accès au Studio Liveur.</p>
+            <p class="client-field-help">Le SIRET est vérifié automatiquement. Une fois validé, ce même compte Cardiashop donne accès au Studio Liveur.</p>
           </div>
           <button class="client-auth-primary" type="submit">Enregistrer mon statut</button>
         </form>
@@ -166,7 +172,7 @@
       </section>
 
       <div class="client-dashboard-footer">
-        <div><strong>Votre compte vous suit partout sur Cardoria.</strong><p>Les commandes liées à votre compte restent accessibles après reconnexion.</p></div>
+        <div><strong>Votre compte vous suit partout sur Cardiashop.</strong><p>Les commandes liées à votre compte restent accessibles après reconnexion.</p></div>
         <button id="clientLogoutButton" class="client-auth-secondary is-logout" type="button">Se déconnecter</button>
       </div>
     </section>

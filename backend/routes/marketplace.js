@@ -1,5 +1,5 @@
 /**
- * API publique marketplace Cardoria.
+ * API publique marketplace Cardiashop.
  */
 import { Router } from "express";
 import { searchListings, getListing, createListing, updateListing, deleteListing } from "../lib/marketplace/listings.js";

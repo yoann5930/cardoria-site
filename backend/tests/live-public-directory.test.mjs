@@ -15,7 +15,7 @@ test("live category aliases and title inference stay canonical", () => {
   assert.equal(normalizeLiveCategory("", "Break One Piece OP01"), "onepiece");
   assert.equal(normalizeLiveCategory("", "Session Lorcana"), "lorcana");
   assert.equal(normalizeLiveCategory("", "MTG draft"), "magic");
-  assert.equal(normalizeLiveCategory("", "Live Cardoria"), "other");
+  assert.equal(normalizeLiveCategory("", "Live Cardiashop"), "other");
   assert.equal(requestedLiveCategory("tous"), "");
   assert.equal(requestedLiveCategory("pokemon"), "pokemon");
   assert.equal(requestedLiveCategory("unknown-licence"), "");
@@ -48,7 +48,7 @@ test("category filter keeps pack ranking inside the selected licence", () => {
   assert.deepEqual(filtered.map((row) => row.id), ["poke-elite"]);
 });
 
-test("Cardoria admin lives stay featured like the top pack", () => {
+test("Cardiashop admin lives stay featured like the top pack", () => {
   const admin = publicPlanMeta({ ownerRole: "admin", ownerId: "cardoria" });
   assert.equal(admin.planId, "cardoria");
   assert.equal(admin.featured, true);

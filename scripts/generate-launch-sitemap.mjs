@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const SITE = (process.env.SITE_URL || "https://www.cardoriashop.fr").replace(/\/$/, "");
+const SITE = (process.env.SITE_URL || "https://www.cardiashop.fr").replace(/\/$/, "");
 const BACKEND = (process.env.BACKEND_URL || SITE).replace(/\/$/, "");
 const today = new Date().toISOString().slice(0, 10);
 

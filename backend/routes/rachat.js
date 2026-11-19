@@ -43,7 +43,7 @@ router.post("/propositions", async (req, res) => {
   }
 
   if (clean(body.source, 50) !== "estimation") {
-    return res.status(403).json({ ok: false, error: "Commencez par une estimation Cardoria." });
+    return res.status(403).json({ ok: false, error: "Commencez par une estimation Cardiashop." });
   }
 
   const customerName = clean(body.customerName, 150);
@@ -58,7 +58,7 @@ router.post("/propositions", async (req, res) => {
 
   const verifiedEstimate = recentMatchingEstimate({ customerEmail, cardName, cardId });
   if (!verifiedEstimate) {
-    return res.status(403).json({ ok: false, error: "Estimation Cardoria récente introuvable. Relancez l’estimation avant de proposer la carte." });
+    return res.status(403).json({ ok: false, error: "Estimation Cardiashop récente introuvable. Relancez l’estimation avant de proposer la carte." });
   }
 
   try {
@@ -75,9 +75,9 @@ router.post("/propositions", async (req, res) => {
 
     await sendEmail({
       kind: "rachat_proposal_admin",
-      subject: `[Cardoria] Proposition de vente — ${proposal.cardName}`,
+      subject: `[Cardiashop] Proposition de vente — ${proposal.cardName}`,
       text: [
-        "Nouvelle proposition de vente Cardoria",
+        "Nouvelle proposition de vente Cardiashop",
         "",
         `Référence : ${proposal.id}`,
         `Estimation : ${proposal.estimationId}`,
@@ -88,11 +88,11 @@ router.post("/propositions", async (req, res) => {
         `État : ${proposal.condition || "—"}`,
         `Message : ${proposal.message || "Aucun"}`,
         "",
-        "Cette proposition provient d’une estimation Cardoria vérifiée des dernières 24 h."
+        "Cette proposition provient d’une estimation Cardiashop vérifiée des dernières 24 h."
       ].join("\n")
     });
 
-    res.status(201).json({ ok: true, id: proposal.id, message: "Votre proposition a bien été transmise à Cardoria." });
+    res.status(201).json({ ok: true, id: proposal.id, message: "Votre proposition a bien été transmise à Cardiashop." });
   } catch (error) {
     res.status(error.status || 500).json({ ok: false, error: error.message });
   }

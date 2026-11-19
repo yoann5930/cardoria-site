@@ -82,7 +82,7 @@ jobs:
           grep -q 'giveaway_subscriber' js/live-studio-actions-ui.js
           grep -q 'giveaway_buyer' js/live-studio-actions-ui.js
           grep -q 'Valider / préparer</button>' js/live-studio-actions-ui.js
-          grep -q 'Cardoria identity: clear operator UI' css/live-pro-dashboard.css
+          grep -q 'Cardiashop identity: clear operator UI' css/live-pro-dashboard.css
           grep -q 'PRÉ-TEST RÉEL' js/live-vendeur.js
           grep -q 'Activer / vérifier PayPal' js/live-vendeur.js
           grep -q 'sender-profile' js/live-vendeur.js

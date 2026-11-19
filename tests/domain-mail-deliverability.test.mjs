@@ -104,7 +104,7 @@ test("production env examples document authenticated-domain mail variables witho
   const backendEnv = read("backend/.env.example");
   const oracleEnv = read("oracle/cardoria.env.example");
   for (const content of [backendEnv, oracleEnv]) {
-    assert.match(content, /MAIL_FROM_NAME=Cardoria/);
+    assert.match(content, /MAIL_FROM_NAME=(?:Cardoria|Cardiashop)/);
     assert.match(content, /MAIL_REPLY_TO=/);
     assert.match(content, /MAIL_DKIM_SELECTOR=/);
   }

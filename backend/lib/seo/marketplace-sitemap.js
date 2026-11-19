@@ -1,4 +1,4 @@
-const SITE = "https://www.cardoriashop.fr";
+const SITE = "https://www.cardiashop.fr";
 
 function xmlEscape(value) {
   return String(value || "")

@@ -116,7 +116,7 @@
     email: org.email || cfg.email,
     description: org.description || cfg.disambiguatingDescription,
     disambiguatingDescription: org.disambiguatingDescription || cfg.disambiguatingDescription,
-    brand: { "@type": "Brand", name: org.brandName || cfg.brandName || "Cardoria" },
+    brand: { "@type": "Brand", name: org.brandName || cfg.brandName || "Cardiashop" },
     address: org.address ? { "@type": "PostalAddress", addressCountry: org.address.country || "FR" } : undefined,
     sameAs: org.sameAs || []
   };
@@ -128,7 +128,7 @@
     "@type": "WebSite",
     "@id": cfg.siteUrl + "/#website",
     name: cfg.siteName,
-    alternateName: cfg.alternateNames || [cfg.brandName || "Cardoria"],
+    alternateName: cfg.alternateNames || [cfg.brandName || "Cardiashop"],
     url: cfg.siteUrl,
     description: cfg.disambiguatingDescription,
     inLanguage: "fr-FR",
